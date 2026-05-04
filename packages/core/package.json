@@ -1,0 +1,74 @@
+{
+  "name": "@wats/core",
+  "version": "0.2.1",
+  "private": false,
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./updateParser": {
+      "types": "./dist/updateParser.d.ts",
+      "import": "./dist/updateParser.js"
+    },
+    "./router": {
+      "types": "./dist/router.d.ts",
+      "import": "./dist/router.js"
+    },
+    "./filters": {
+      "types": "./dist/filters/index.d.ts",
+      "import": "./dist/filters/index.js"
+    },
+    "./filtersTyped": {
+      "types": "./dist/filtersTyped/index.d.ts",
+      "import": "./dist/filtersTyped/index.js"
+    },
+    "./webhookNormalizer": {
+      "types": "./dist/webhookNormalizer.d.ts",
+      "import": "./dist/webhookNormalizer.js"
+    },
+    "./typedRouter": {
+      "types": "./dist/typedRouter.d.ts",
+      "import": "./dist/typedRouter.js"
+    },
+    "./whatsappFacade": {
+      "types": "./dist/whatsappFacade.d.ts",
+      "import": "./dist/whatsappFacade.js"
+    },
+    "./listener": {
+      "types": "./dist/listener.d.ts",
+      "import": "./dist/listener.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/switchbord/wats.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/switchbord/wats#readme",
+  "bugs": {
+    "url": "https://github.com/switchbord/wats/issues"
+  },
+  "keywords": [
+    "whatsapp",
+    "whatsapp-cloud-api",
+    "bun",
+    "typescript",
+    "wats"
+  ],
+  "dependencies": {
+    "@wats/graph": "^0.2.1"
+  }
+}

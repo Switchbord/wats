@@ -1,0 +1,11 @@
+{
+  "name": "graph-consumer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "verify-imports": "bun run ./verify-imports.ts"
+  },
+  "dependencies": {
+    "@wats/graph": "workspace:*"
+  }
+}

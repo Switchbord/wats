@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": [],
+    "paths": {
+      "@wats/crypto": ["../crypto/src/index.ts"],
+      "@wats/crypto/*": ["../crypto/src/*"],
+      "@wats/core": ["../core/src/index.ts"],
+      "@wats/core/*": ["../core/src/*"],
+      "@wats/types": ["../types/src/index.ts"],
+      "@wats/types/*": ["../types/src/*"],
+      "@wats/graph": ["../graph/src/index.ts"],
+      "@wats/graph/*": ["../graph/src/*"]
+    }
+  },
+  "include": ["src"]
+}

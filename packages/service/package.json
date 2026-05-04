@@ -1,0 +1,46 @@
+{
+  "name": "@wats/service",
+  "version": "0.2.1",
+  "private": false,
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/switchbord/wats.git",
+    "directory": "packages/service"
+  },
+  "homepage": "https://github.com/switchbord/wats#readme",
+  "bugs": {
+    "url": "https://github.com/switchbord/wats/issues"
+  },
+  "keywords": [
+    "whatsapp",
+    "whatsapp-cloud-api",
+    "bun",
+    "typescript",
+    "wats"
+  ],
+  "dependencies": {
+    "@wats/config": "^0.2.1",
+    "@wats/core": "^0.2.1",
+    "@wats/http": "^0.2.1",
+    "@wats/graph": "^0.2.1",
+    "@wats/crypto": "^0.2.1"
+  }
+}

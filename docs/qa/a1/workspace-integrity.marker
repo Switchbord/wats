@@ -1,0 +1,6 @@
+Feature A1 workspace integrity marker
+Version: 1
+
+GREEN step evidence:
+- RED commit intentionally required this file in workspace integrity test.
+- This marker file satisfies that requirement and restores passing tests.

@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "defaultProfile": "local",
+  "profiles": {
+    "local": {
+      "graph": {
+        "apiVersion": "v21.0",
+        "baseUrl": "https://graph.facebook.com"
+      },
+      "whatsapp": {
+        "wabaId": "000000000000000",
+        "phoneNumberId": "00000000000"
+      },
+      "auth": {
+        "accessToken": {
+          "env": "WATS_ACCESS_TOKEN"
+        }
+      },
+      "webhook": {
+        "path": "/webhooks/whatsapp",
+        "verifyToken": {
+          "env": "WATS_VERIFY_TOKEN"
+        },
+        "appSecret": {
+          "env": "WATS_APP_SECRET"
+        },
+        "maxBodyBytes": 1048576
+      },
+      "service": {
+        "host": "127.0.0.1",
+        "port": 8787,
+        "apiPrefix": "/api",
+        "bearerToken": {
+          "env": "WATS_SERVICE_TOKEN"
+        }
+      }
+    },
+    "prod": {
+      "graph": {
+        "apiVersion": "v21.0",
+        "baseUrl": "https://graph.facebook.com"
+      },
+      "whatsapp": {
+        "wabaId": "000000000000000",
+        "phoneNumberId": "00000000000"
+      },
+      "auth": {
+        "accessToken": {
+          "env": "WATS_ACCESS_TOKEN"
+        }
+      },
+      "webhook": {
+        "path": "/webhooks/whatsapp",
+        "verifyToken": {
+          "env": "WATS_VERIFY_TOKEN"
+        },
+        "appSecret": {
+          "env": "WATS_APP_SECRET"
+        },
+        "maxBodyBytes": 1048576
+      },
+      "service": {
+        "host": "0.0.0.0",
+        "port": 8787,
+        "apiPrefix": "/api",
+        "bearerToken": {
+          "env": "WATS_SERVICE_TOKEN"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "name": "@wats/crypto",
+  "version": "0.2.1",
+  "private": false,
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./provider": {
+      "types": "./dist/provider.d.ts",
+      "import": "./dist/provider.js"
+    },
+    "./errors": {
+      "types": "./dist/errors.d.ts",
+      "import": "./dist/errors.js"
+    },
+    "./node": {
+      "types": "./dist/adapters/node/index.d.ts",
+      "import": "./dist/adapters/node/index.js"
+    },
+    "./webcrypto": {
+      "types": "./dist/adapters/webcrypto/index.d.ts",
+      "import": "./dist/adapters/webcrypto/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/switchbord/wats.git",
+    "directory": "packages/crypto"
+  },
+  "homepage": "https://github.com/switchbord/wats#readme",
+  "bugs": {
+    "url": "https://github.com/switchbord/wats/issues"
+  },
+  "keywords": [
+    "whatsapp",
+    "whatsapp-cloud-api",
+    "bun",
+    "typescript",
+    "wats"
+  ]
+}

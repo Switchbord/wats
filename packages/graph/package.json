@@ -1,0 +1,79 @@
+{
+  "name": "@wats/graph",
+  "version": "0.2.1",
+  "private": false,
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "import": "./dist/client.js"
+    },
+    "./errors": {
+      "types": "./dist/errors.d.ts",
+      "import": "./dist/errors.js"
+    },
+    "./endpoints/messages": {
+      "types": "./dist/endpoints/messages.d.ts",
+      "import": "./dist/endpoints/messages.js"
+    },
+    "./endpoints/media": {
+      "types": "./dist/endpoints/media.d.ts",
+      "import": "./dist/endpoints/media.js"
+    },
+    "./endpoints/templates": {
+      "types": "./dist/endpoints/templates.d.ts",
+      "import": "./dist/endpoints/templates.js"
+    },
+    "./endpoints/flows": {
+      "types": "./dist/endpoints/flows.d.ts",
+      "import": "./dist/endpoints/flows.js"
+    },
+    "./endpoints/calling": {
+      "types": "./dist/endpoints/calling.d.ts",
+      "import": "./dist/endpoints/calling.js"
+    },
+    "./endpoints/business-management": {
+      "types": "./dist/endpoints/businessManagement.d.ts",
+      "import": "./dist/endpoints/businessManagement.js"
+    },
+    "./transport": {
+      "types": "./dist/transport.d.ts",
+      "import": "./dist/transport.js"
+    },
+    "./testing": {
+      "types": "./dist/createMockTransport.d.ts",
+      "import": "./dist/createMockTransport.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/switchbord/wats.git",
+    "directory": "packages/graph"
+  },
+  "homepage": "https://github.com/switchbord/wats#readme",
+  "bugs": {
+    "url": "https://github.com/switchbord/wats/issues"
+  },
+  "keywords": [
+    "whatsapp",
+    "whatsapp-cloud-api",
+    "bun",
+    "typescript",
+    "wats"
+  ]
+}

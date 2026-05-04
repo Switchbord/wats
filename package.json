@@ -1,0 +1,32 @@
+{
+  "name": "wats",
+  "version": "0.2.1",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "bunx tsc --noEmit -p tsconfig.release.json",
+    "build:packages": "bun run scripts/build-packages.ts",
+    "pack:smoke": "bun run scripts/pack-smoke.ts",
+    "release:dry-run": "bun run scripts/release-dry-run.ts",
+    "check-publish": "bun run typecheck && bun run build:packages && bun run pack:smoke && bun run publish:dry-run && bun run release:dry-run && bun test packages/testing/tests/wats31-release-ci-policy.test.ts packages/testing/tests/wats83-publishable-artifacts.test.ts packages/testing/tests/wats85-release-dry-run.test.ts packages/testing/tests/wats021-alpha-release.test.ts",
+    "api:check": "bun run scripts/check-public-api-consistency.ts",
+    "docs:openapi": "bun run scripts/generate-docs-openapi.ts",
+    "docs:api": "bun run scripts/generate-docs-api.ts",
+    "docs:check": "bun run scripts/check-public-docs.ts",
+    "docs:build": "bun run scripts/docs-build.ts",
+    "docs:dev": "bun run docs:openapi && bun run docs:api && bunx vitepress dev docs",
+    "publish:dry-run": "bun run scripts/npm-publish-dry-run.ts"
+  },
+  "devDependencies": {
+    "@scalar/api-reference": "^1.55.1",
+    "typedoc": "^0.28.19",
+    "typedoc-plugin-markdown": "^4.11.0",
+    "typescript": "^6.0.3",
+    "vitepress": "^1.6.4"
+  },
+  "workspaces": [
+    "packages/*",
+    "packages/testing/fixtures/*"
+  ]
+}

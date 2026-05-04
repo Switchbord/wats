@@ -1,0 +1,37 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "types": [],
+    "paths": {
+      "@wats/types": ["./packages/types/src/index.ts"],
+      "@wats/types/*": ["./packages/types/src/*"],
+      "@wats/crypto": ["./packages/crypto/src/index.ts"],
+      "@wats/crypto/*": ["./packages/crypto/src/*"],
+      "@wats/graph": ["./packages/graph/src/index.ts"],
+      "@wats/graph/*": ["./packages/graph/src/*"],
+      "@wats/core": ["./packages/core/src/index.ts"],
+      "@wats/core/*": ["./packages/core/src/*"],
+      "@wats/http": ["./packages/http/src/index.ts"],
+      "@wats/http/*": ["./packages/http/src/*"],
+      "@wats/cli": ["./packages/cli/src/index.ts"],
+      "@wats/cli/*": ["./packages/cli/src/*"],
+      "@wats/service": ["./packages/service/src/index.ts"],
+      "@wats/service/*": ["./packages/service/src/*"],
+      "@wats/config": ["./packages/config/src/index.ts"],
+      "@wats/config/*": ["./packages/config/src/*"],
+      "@wats/internal-utils": ["./packages/internal-utils/src/index.ts"],
+      "@wats/internal-utils/*": ["./packages/internal-utils/src/*"]
+    }
+  },
+  "include": [
+    "packages/types/src/**/*.ts",
+    "packages/crypto/src/**/*.ts",
+    "packages/graph/src/**/*.ts",
+    "packages/core/src/**/*.ts",
+    "packages/http/src/**/*.ts",
+    "packages/internal-utils/src/**/*.ts",
+    "packages/cli/src/**/*.ts",
+    "packages/service/src/**/*.ts",
+    "packages/config/src/**/*.ts"
+  ]
+}

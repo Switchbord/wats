@@ -1,0 +1,126 @@
+{
+  "schema": "wats.public-api-consistency.v1",
+  "scope": "@wats/graph endpoint subpaths",
+  "graphEndpointSubpaths": [
+    {
+      "packageName": "@wats/graph",
+      "specifier": "@wats/graph/endpoints/messages",
+      "exportKey": "./endpoints/messages",
+      "source": "./src/endpoints/messages.ts",
+      "fixture": "packages/testing/fixtures/graph-consumer/verify-imports.ts",
+      "fixtureChecks": [
+        "from \"@wats/graph/endpoints/messages\"",
+        "WATS-54 messages subpath exports runtime surface",
+        "\"@wats/graph/endpoints/messages\""
+      ],
+      "docs": [
+        "docs/reference/index.md",
+        "docs/architecture/public-api-surface.md",
+        "docs/architecture/package-map.md",
+        "docs/migration/pywa-to-wats.md",
+        "CHANGELOG.md"
+      ],
+      "dist": "./dist/endpoints/messages.js"
+    },
+    {
+      "packageName": "@wats/graph",
+      "specifier": "@wats/graph/endpoints/media",
+      "exportKey": "./endpoints/media",
+      "source": "./src/endpoints/media.ts",
+      "fixture": "packages/testing/fixtures/graph-consumer/verify-imports.ts",
+      "fixtureChecks": [
+        "from \"@wats/graph/endpoints/media\"",
+        "WATS-53 media subpath exports runtime surface",
+        "\"@wats/graph/endpoints/media\""
+      ],
+      "docs": [
+        "docs/reference/index.md",
+        "docs/architecture/public-api-surface.md",
+        "docs/architecture/package-map.md",
+        "docs/migration/pywa-to-wats.md",
+        "CHANGELOG.md"
+      ],
+      "dist": "./dist/endpoints/media.js"
+    },
+    {
+      "packageName": "@wats/graph",
+      "specifier": "@wats/graph/endpoints/templates",
+      "exportKey": "./endpoints/templates",
+      "source": "./src/endpoints/templates.ts",
+      "fixture": "packages/testing/fixtures/graph-consumer/verify-imports.ts",
+      "fixtureChecks": [
+        "from \"@wats/graph/endpoints/templates\"",
+        "WATS-53 templates subpath exports runtime surface",
+        "\"@wats/graph/endpoints/templates\""
+      ],
+      "docs": [
+        "docs/reference/index.md",
+        "docs/architecture/public-api-surface.md",
+        "docs/architecture/package-map.md",
+        "docs/migration/pywa-to-wats.md",
+        "CHANGELOG.md"
+      ],
+      "dist": "./dist/endpoints/templates.js"
+    },
+    {
+      "packageName": "@wats/graph",
+      "specifier": "@wats/graph/endpoints/flows",
+      "exportKey": "./endpoints/flows",
+      "source": "./src/endpoints/flows.ts",
+      "fixture": "packages/testing/fixtures/graph-consumer/verify-imports.ts",
+      "fixtureChecks": [
+        "from \"@wats/graph/endpoints/flows\"",
+        "WATS-53 flows subpath exports runtime surface",
+        "\"@wats/graph/endpoints/flows\""
+      ],
+      "docs": [
+        "docs/reference/index.md",
+        "docs/architecture/public-api-surface.md",
+        "docs/architecture/package-map.md",
+        "docs/migration/pywa-to-wats.md",
+        "CHANGELOG.md"
+      ],
+      "dist": "./dist/endpoints/flows.js"
+    },
+    {
+      "packageName": "@wats/graph",
+      "specifier": "@wats/graph/endpoints/calling",
+      "exportKey": "./endpoints/calling",
+      "source": "./src/endpoints/calling.ts",
+      "fixture": "packages/testing/fixtures/graph-consumer/verify-imports.ts",
+      "fixtureChecks": [
+        "from \"@wats/graph/endpoints/calling\"",
+        "WATS-54 calling subpath exports runtime surface",
+        "\"@wats/graph/endpoints/calling\""
+      ],
+      "docs": [
+        "docs/reference/index.md",
+        "docs/architecture/public-api-surface.md",
+        "docs/architecture/package-map.md",
+        "docs/migration/pywa-to-wats.md",
+        "CHANGELOG.md"
+      ],
+      "dist": "./dist/endpoints/calling.js"
+    },
+    {
+      "packageName": "@wats/graph",
+      "specifier": "@wats/graph/endpoints/business-management",
+      "exportKey": "./endpoints/business-management",
+      "source": "./src/endpoints/businessManagement.ts",
+      "fixture": "packages/testing/fixtures/graph-consumer/verify-imports.ts",
+      "fixtureChecks": [
+        "from \"@wats/graph/endpoints/business-management\"",
+        "wats42-business-management subpath exports are functions",
+        "\"@wats/graph/endpoints/business-management\""
+      ],
+      "docs": [
+        "docs/reference/index.md",
+        "docs/architecture/public-api-surface.md",
+        "docs/architecture/package-map.md",
+        "docs/migration/pywa-to-wats.md",
+        "CHANGELOG.md"
+      ],
+      "dist": "./dist/endpoints/businessManagement.js"
+    }
+  ]
+}

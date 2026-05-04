@@ -1,0 +1,385 @@
+// F-7 PhoneNumberClient (WATS-19 / Arch-E).
+//
+// Scoped sub-client that binds a `phoneNumberId` at CONSTRUCTION and
+// exposes endpoint callables as methods that inject the bound id into
+// the params object. Constructor validation reuses the F-6 path-param
+// sanitizer (`assertSafePathParamValue` from endpoint.ts) so invalid ids
+// fail at CONSTRUCTION rather than at first call.
+//
+// The method catalog started minimal in F-7 with `sendMessage`, expanded
+// in WATS-30 with `sendText`, and expands in WATS-38 with outbound media
+// and message composer helpers. All methods delegate to the F-6
+// `sendMessage` endpoint-registry callable after building typed payloads.
+
+import type { GraphClient } from "../client";
+import type { EndpointInvokeOptions } from "../endpoint";
+import { assertSafePathParamValue } from "../endpoint";
+import { GraphRequestValidationError } from "../errors";
+import { copyOptionalParamsObject } from "../internal/validation/options";
+import {
+  getBusinessProfile as getBusinessProfileEndpoint,
+  getCommerceSettings as getCommerceSettingsEndpoint,
+  getPhoneNumberInfo as getPhoneNumberInfoEndpoint,
+  getPhoneNumberSettings as getPhoneNumberSettingsEndpoint,
+  type BusinessProfileResponse,
+  type CommerceSettingsResponse,
+  type GetBusinessProfileInput,
+  type GetCommerceSettingsInput,
+  type GetPhoneNumberInfoInput,
+  type GetPhoneNumberSettingsInput,
+  type PhoneNumberInfo,
+  type PhoneNumberSettingsResponse
+} from "../endpoints/businessManagement";
+import {
+  acceptCall as acceptCallEndpoint,
+  initiateCall as initiateCallEndpoint,
+  preAcceptCall as preAcceptCallEndpoint,
+  rejectCall as rejectCallEndpoint,
+  terminateCall as terminateCallEndpoint,
+  type AcceptCallRequest,
+  type CallLifecycleResponse,
+  type InitiateCallRequest,
+  type PreAcceptCallRequest,
+  type RejectCallRequest,
+  type TerminateCallRequest
+} from "../endpoints/calling";
+import {
+  buildMarkMessageAsReadPayload,
+  buildRemoveReactionPayload,
+  buildRequestLocationPayload,
+  buildSendAudioPayload,
+  buildSendButtonsPayload,
+  buildSendCatalogPayload,
+  buildSendContactsPayload,
+  buildSendCtaUrlPayload,
+  buildSendDocumentPayload,
+  buildSendImagePayload,
+  buildSendListPayload,
+  buildSendLocationPayload,
+  buildSendProductPayload,
+  buildSendProductsPayload,
+  buildSendReactionPayload,
+  buildSendStickerPayload,
+  buildSendTemplatePayload,
+  buildSendTextPayload,
+  buildSendVideoPayload,
+  buildTypingIndicatorPayload,
+  sendMessage as sendMessageEndpoint,
+  type GraphMessagesMarkMessageAsReadInput,
+  type GraphMessagesRemoveReactionInput,
+  type GraphMessagesRequestLocationInput,
+  type GraphMessagesSendAudioInput,
+  type GraphMessagesSendBody,
+  type GraphMessagesSendButtonsInput,
+  type GraphMessagesSendCatalogInput,
+  type GraphMessagesSendContactsInput,
+  type GraphMessagesSendCtaUrlInput,
+  type GraphMessagesSendDocumentInput,
+  type GraphMessagesSendImageInput,
+  type GraphMessagesSendListInput,
+  type GraphMessagesSendLocationInput,
+  type GraphMessagesSendProductInput,
+  type GraphMessagesSendProductsInput,
+  type GraphMessagesSendReactionInput,
+  type GraphMessagesSendResponse,
+  type GraphMessagesSendStickerInput,
+  type GraphMessagesSendTemplateInput,
+  type GraphMessagesSendTextInput,
+  type GraphMessagesSendVideoInput,
+  type GraphMessagesTypingIndicatorInput
+} from "../endpoints/messages";
+
+export interface PhoneNumberClientConfig {
+  readonly graphClient: GraphClient;
+  readonly phoneNumberId: string;
+}
+
+function hasRequestMethod(
+  candidate: unknown
+): candidate is { request: (...args: readonly unknown[]) => unknown } {
+  if (candidate === null || typeof candidate !== "object") {
+    return false;
+  }
+  const maybe = candidate as { request?: unknown };
+  return typeof maybe.request === "function";
+}
+
+function assertNoEncodedUnsafePathParam(value: string, fieldName: string): void {
+  let decoded = value;
+  for (let round = 0; round < 8; round += 1) {
+    let next: string;
+    try {
+      next = decodeURIComponent(decoded);
+    } catch {
+      throw new GraphRequestValidationError(
+        `Invalid PhoneNumberClient config: ${fieldName} contains malformed percent encoding.`
+      );
+    }
+    if (next === decoded) return;
+    decoded = next;
+    if (
+      decoded === "." ||
+      decoded === ".." ||
+      decoded.includes("/") ||
+      decoded.includes("\\") ||
+      decoded.includes("?") ||
+      decoded.includes("#")
+    ) {
+      throw new GraphRequestValidationError(
+        `Invalid PhoneNumberClient config: ${fieldName} contains an unsafe path segment.`
+      );
+    }
+  }
+  throw new GraphRequestValidationError(
+    `Invalid PhoneNumberClient config: ${fieldName} contains excessive percent encoding.`
+  );
+}
+
+export function validatePhoneNumberClientConfig(
+  config: PhoneNumberClientConfig
+): void {
+  if (typeof config !== "object" || config === null) {
+    throw new GraphRequestValidationError(
+      "Invalid PhoneNumberClient config: expected an options object."
+    );
+  }
+  const raw = config as {
+    graphClient?: unknown;
+    phoneNumberId?: unknown;
+  };
+  if (!hasRequestMethod(raw.graphClient)) {
+    throw new GraphRequestValidationError(
+      "Invalid PhoneNumberClient config: graphClient must expose a request() method."
+    );
+  }
+  if (typeof raw.phoneNumberId !== "string") {
+    throw new GraphRequestValidationError(
+      "Invalid PhoneNumberClient config: phoneNumberId must be a non-empty string."
+    );
+  }
+  if (raw.phoneNumberId.length === 0 || raw.phoneNumberId.trim().length === 0) {
+    throw new GraphRequestValidationError(
+      "Invalid PhoneNumberClient config: phoneNumberId must be a non-empty string."
+    );
+  }
+  // Reuse the F-6 path-param sanitizer so the same rules apply at
+  // CONSTRUCTION as would fire at call time — fail early.
+  assertSafePathParamValue("phoneNumberId", raw.phoneNumberId);
+  assertNoEncodedUnsafePathParam(raw.phoneNumberId, "phoneNumberId");
+}
+
+export class PhoneNumberClient {
+  readonly #graphClient: GraphClient;
+  readonly #phoneNumberId: string;
+
+  constructor(config: PhoneNumberClientConfig) {
+    validatePhoneNumberClientConfig(config);
+    this.#graphClient = config.graphClient;
+    this.#phoneNumberId = config.phoneNumberId;
+  }
+
+  get phoneNumberId(): string {
+    return this.#phoneNumberId;
+  }
+
+  get graphClient(): GraphClient {
+    return this.#graphClient;
+  }
+
+  /** Graph `GET /{phoneNumberId}` — returns phone-number inventory/profile fields. */
+  async getInfo(
+    params?: Omit<GetPhoneNumberInfoInput, "phoneNumberId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<PhoneNumberInfo> {
+    const scopedParams: Record<string, unknown> = copyOptionalParamsObject(
+      params,
+      "PhoneNumberClient.getInfo"
+    );
+    scopedParams.phoneNumberId = this.#phoneNumberId;
+    return getPhoneNumberInfoEndpoint(
+      this.#graphClient,
+      scopedParams as unknown as GetPhoneNumberInfoInput,
+      undefined,
+      opts
+    );
+  }
+
+  /** Graph `GET /{phoneNumberId}/settings`; includeSipCredentials responses may be sensitive. */
+  async getSettings(
+    params?: Omit<GetPhoneNumberSettingsInput, "phoneNumberId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<PhoneNumberSettingsResponse> {
+    const scopedParams: Record<string, unknown> = copyOptionalParamsObject(
+      params,
+      "PhoneNumberClient.getSettings"
+    );
+    scopedParams.phoneNumberId = this.#phoneNumberId;
+    return getPhoneNumberSettingsEndpoint(
+      this.#graphClient,
+      scopedParams as unknown as GetPhoneNumberSettingsInput,
+      undefined,
+      opts
+    );
+  }
+
+  /** Graph `GET /{phoneNumberId}/whatsapp_business_profile`. */
+  async getBusinessProfile(
+    params?: Omit<GetBusinessProfileInput, "phoneNumberId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<BusinessProfileResponse> {
+    const scopedParams: Record<string, unknown> = copyOptionalParamsObject(
+      params,
+      "PhoneNumberClient.getBusinessProfile"
+    );
+    scopedParams.phoneNumberId = this.#phoneNumberId;
+    return getBusinessProfileEndpoint(
+      this.#graphClient,
+      scopedParams as unknown as GetBusinessProfileInput,
+      undefined,
+      opts
+    );
+  }
+
+  /** Graph `GET /{phoneNumberId}/whatsapp_commerce_settings`. */
+  async getCommerceSettings(
+    params?: Omit<GetCommerceSettingsInput, "phoneNumberId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<CommerceSettingsResponse> {
+    const scopedParams: Record<string, unknown> = copyOptionalParamsObject(
+      params,
+      "PhoneNumberClient.getCommerceSettings"
+    );
+    scopedParams.phoneNumberId = this.#phoneNumberId;
+    return getCommerceSettingsEndpoint(
+      this.#graphClient,
+      scopedParams as unknown as GetCommerceSettingsInput,
+      undefined,
+      opts
+    );
+  }
+
+  /**
+   * Graph `POST /{phoneNumberId}/messages` — delegates to the F-6
+   * endpoint-registry `sendMessage` callable with the bound
+   * phoneNumberId injected automatically.
+   */
+  async sendMessage(
+    body: GraphMessagesSendBody,
+    opts?: EndpointInvokeOptions
+  ): Promise<GraphMessagesSendResponse> {
+    return sendMessageEndpoint(
+      this.#graphClient,
+      { phoneNumberId: this.#phoneNumberId },
+      body,
+      opts
+    );
+  }
+
+  /**
+   * Ergonomic text helper for starting or continuing a chat with any
+   * phone-number-like recipient. Does not consult contacts; it validates
+   * the public JS input shape and delegates to `POST /{phoneNumberId}/messages`.
+   */
+  async sendText(
+    input: GraphMessagesSendTextInput,
+    opts?: EndpointInvokeOptions
+  ): Promise<GraphMessagesSendResponse> {
+    return this.sendMessage(buildSendTextPayload(input), opts);
+  }
+
+  async sendImage(input: GraphMessagesSendImageInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse> {
+    return this.sendMessage(buildSendImagePayload(input), opts);
+  }
+
+  async sendVideo(input: GraphMessagesSendVideoInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse> {
+    return this.sendMessage(buildSendVideoPayload(input), opts);
+  }
+
+  async sendAudio(input: GraphMessagesSendAudioInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse> {
+    return this.sendMessage(buildSendAudioPayload(input), opts);
+  }
+
+  async sendDocument(input: GraphMessagesSendDocumentInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse> {
+    return this.sendMessage(buildSendDocumentPayload(input), opts);
+  }
+
+  async sendSticker(input: GraphMessagesSendStickerInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse> {
+    return this.sendMessage(buildSendStickerPayload(input), opts);
+  }
+
+  async sendLocation(input: GraphMessagesSendLocationInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse> {
+    return this.sendMessage(buildSendLocationPayload(input), opts);
+  }
+
+  async sendContacts(input: GraphMessagesSendContactsInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse> {
+    return this.sendMessage(buildSendContactsPayload(input), opts);
+  }
+
+  async sendReaction(input: GraphMessagesSendReactionInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse> {
+    return this.sendMessage(buildSendReactionPayload(input), opts);
+  }
+
+  async removeReaction(input: GraphMessagesRemoveReactionInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse> {
+    return this.sendMessage(buildRemoveReactionPayload(input), opts);
+  }
+
+  async sendButtons(input: GraphMessagesSendButtonsInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse> {
+    return this.sendMessage(buildSendButtonsPayload(input), opts);
+  }
+
+  async sendList(input: GraphMessagesSendListInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse> {
+    return this.sendMessage(buildSendListPayload(input), opts);
+  }
+
+  async sendCtaUrl(input: GraphMessagesSendCtaUrlInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse> {
+    return this.sendMessage(buildSendCtaUrlPayload(input), opts);
+  }
+
+  async sendProduct(input: GraphMessagesSendProductInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse> {
+    return this.sendMessage(buildSendProductPayload(input), opts);
+  }
+
+  async sendProducts(input: GraphMessagesSendProductsInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse> {
+    return this.sendMessage(buildSendProductsPayload(input), opts);
+  }
+
+  async sendCatalog(input: GraphMessagesSendCatalogInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse> {
+    return this.sendMessage(buildSendCatalogPayload(input), opts);
+  }
+
+  async requestLocation(input: GraphMessagesRequestLocationInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse> {
+    return this.sendMessage(buildRequestLocationPayload(input), opts);
+  }
+
+  async markMessageAsRead(input: GraphMessagesMarkMessageAsReadInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse> {
+    return this.sendMessage(buildMarkMessageAsReadPayload(input), opts);
+  }
+
+  async indicateTyping(input: GraphMessagesTypingIndicatorInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse> {
+    return this.sendMessage(buildTypingIndicatorPayload(input), opts);
+  }
+
+  async sendTemplate(input: GraphMessagesSendTemplateInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse> {
+    return this.sendMessage(buildSendTemplatePayload(input), opts);
+  }
+
+  async initiateCall(input: InitiateCallRequest, opts?: EndpointInvokeOptions): Promise<CallLifecycleResponse> {
+    return initiateCallEndpoint(this.#graphClient, { phoneNumberId: this.#phoneNumberId }, input, opts);
+  }
+
+  async preAcceptCall(input: PreAcceptCallRequest, opts?: EndpointInvokeOptions): Promise<CallLifecycleResponse> {
+    return preAcceptCallEndpoint(this.#graphClient, { phoneNumberId: this.#phoneNumberId }, input, opts);
+  }
+
+  async acceptCall(input: AcceptCallRequest, opts?: EndpointInvokeOptions): Promise<CallLifecycleResponse> {
+    return acceptCallEndpoint(this.#graphClient, { phoneNumberId: this.#phoneNumberId }, input, opts);
+  }
+
+  async rejectCall(input: RejectCallRequest, opts?: EndpointInvokeOptions): Promise<CallLifecycleResponse> {
+    return rejectCallEndpoint(this.#graphClient, { phoneNumberId: this.#phoneNumberId }, input, opts);
+  }
+
+  async terminateCall(input: TerminateCallRequest, opts?: EndpointInvokeOptions): Promise<CallLifecycleResponse> {
+    return terminateCallEndpoint(this.#graphClient, { phoneNumberId: this.#phoneNumberId }, input, opts);
+  }
+}

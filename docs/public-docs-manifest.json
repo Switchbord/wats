@@ -1,0 +1,85 @@
+{
+  "nav": [
+    {
+      "text": "Start",
+      "link": "/"
+    },
+    {
+      "text": "Getting Started",
+      "link": "/getting-started"
+    },
+    {
+      "text": "Reference",
+      "link": "/reference/"
+    },
+    {
+      "text": "Guides",
+      "link": "/guides/cli-init"
+    },
+    {
+      "text": "Migration",
+      "link": "/migration/pywa-to-wats"
+    },
+    {
+      "text": "OpenAPI",
+      "link": "/reference/openapi-ui"
+    }
+  ],
+  "pages": [
+    "index.md",
+    "getting-started.md",
+    "reference/index.md",
+    "reference/client.md",
+    "reference/endpoints.md",
+    "reference/scoped-clients.md",
+    "reference/errors.md",
+    "reference/pagination.md",
+    "reference/media.md",
+    "reference/webhook-normalizer.md",
+    "reference/filters.md",
+    "reference/router.md",
+    "reference/whatsapp-facade.md",
+    "reference/listeners.md",
+    "reference/webhook-adapter.md",
+    "reference/webhook.md",
+    "reference/types.md",
+    "reference/crypto.md",
+    "reference/config.md",
+    "reference/cli.md",
+    "reference/service.md",
+    "reference/persistence.md",
+    "reference/internal-utils.md",
+    "reference/openapi.md",
+    "reference/openapi-ui.md",
+    "api/index.md",
+    "guides/cli-init.md",
+    "guides/transport-and-testing.md",
+    "guides/community-examples.md",
+    "guides/deploy-docker.md",
+    "guides/deploy-bun.md",
+    "guides/deploy-node.md",
+    "guides/deploy-cloudflare-workers.md",
+    "migration/pywa-to-wats.md",
+    "parity/pywa-parity-matrix.md",
+    "parity/live-testing-campaign.md",
+    "architecture/overview.md",
+    "architecture/public-api-surface.md",
+    "architecture/roadmap-to-whatsapp-pywa-parity.md",
+    "architecture/alpha-cli-runtime-operations-plan.md",
+    "architecture/wats47-cli-operator-ux-design.md",
+    "architecture/wats48-persistence-contract-design.md",
+    "architecture/wats49-docker-deployment-design.md",
+    "architecture/wats50-release-hygiene-policy.md",
+    "architecture/wats82-first-release-readiness.md",
+    "architecture/release-policy.md"
+  ],
+  "exclude": [
+    "handoff.md",
+    "handoff-reviewer-*.md",
+    "handoff-context-compression-*.md",
+    "guides/getting-started.md",
+    "architecture/cli-service-openapi-options.md",
+    "architecture/wats57-graph-endpoint-module-split-plan.md",
+    "architecture/wats58-graph-validation-utility-reuse-plan.md"
+  ]
+}
