@@ -606,8 +606,36 @@ function isSafeWebhookPath(value: string): boolean {
   return decodedSegments.every((segment) => segment !== "." && segment !== ".." && !/[ -]/u.test(segment));
 }
 
+function rawUrlPath(value: string): string | null {
+  const schemeMatch = /^https:\/\/[^/?#]*/iu.exec(value);
+  if (schemeMatch === null) return null;
+  const afterAuthority = value.slice(schemeMatch[0].length);
+  if (afterAuthority.length === 0) return "/";
+  if (!afterAuthority.startsWith("/")) return null;
+  const endIndex = afterAuthority.search(/[?#]/u);
+  return endIndex === -1 ? afterAuthority : afterAuthority.slice(0, endIndex);
+}
+
+function pathContainsTraversal(value: string): boolean {
+  const segments = value.split("/").filter((segment) => segment.length > 0);
+  for (const segment of segments) {
+    let current = segment;
+    for (let index = 0; index < 5; index += 1) {
+      const decoded = safeDecodeURIComponent(current);
+      if (decoded === null) return true;
+      current = decoded;
+      if (current === "." || current === "..") return true;
+      if (/[\\/?#\u0000-\u001f\u007f]/u.test(current)) return true;
+      if (decoded === segment || (decoded === current && safeDecodeURIComponent(current) === current)) break;
+    }
+  }
+  return false;
+}
+
 function canonicalPublicUrl(value: string, webhookPath: string): string | null {
   if (!isNonEmptyArg(value) || hasRawUrlWhitespace(value)) return null;
+  const rawPath = rawUrlPath(value);
+  if (rawPath === null || pathContainsTraversal(rawPath)) return null;
   let parsed: URL;
   try {
     parsed = new URL(value);
@@ -618,7 +646,7 @@ function canonicalPublicUrl(value: string, webhookPath: string): string | null {
   const baseSegments = parsed.pathname.split("/").filter((segment) => segment.length > 0);
   for (const segment of baseSegments) {
     const decoded = repeatedlyDecode(segment);
-    if (decoded === null || decoded === "." || decoded === ".." || /[\/?# -]/u.test(decoded)) return null;
+    if (decoded === null || decoded === "." || decoded === ".." || /[\\/?#\u0000-\u001f\u007f]/u.test(decoded)) return null;
   }
   const basePath = parsed.pathname.replace(/\/+$/u, "");
   parsed.pathname = `${basePath}${webhookPath}`.replace(/\/+/gu, "/");
