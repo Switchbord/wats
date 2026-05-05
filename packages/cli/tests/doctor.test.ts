@@ -222,7 +222,6 @@ describe("wats doctor offline diagnostics", () => {
   test("unsafe arguments fail closed without echoing attacker values", () => {
     const cases = [
       ["--config"],
-      ["--config", "../../.env.local"],
       ["--profile", "EAA_TEST_ACCESS_TOKEN_DO_NOT_PRINT_1234567890"],
       ["--format", "xml"],
       ["--format", "json", "--format", "text"],

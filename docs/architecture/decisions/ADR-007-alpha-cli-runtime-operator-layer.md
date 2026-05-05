@@ -14,7 +14,7 @@ WATS now has the raw spine needed for alpha operations:
 - `@switchbord/core` for routing, filters, listeners, and the `WhatsApp` facade.
 - `@switchbord/config` for YAML/JSON config with env-secret references.
 - `@switchbord/service` for a runtime-neutral standalone webhook/API app and OpenAPI document.
-- `@switchbord/cli` for package-manager UX around config validation, OpenAPI export, local token generation, and planned `init`/`doctor`/`serve` behavior.
+- `@switchbord/cli` for package-manager UX around config validation, OpenAPI export, local token generation, implemented `init`, implemented offline `doctor`, and planned `serve` behavior.
 - `@switchbord/testing` as a private monorepo package and `@switchbord/internal-utils` as an internal support package published only when public runtime packages require it.
 
 The alpha question is whether the release-alpha operational layer (CLI process wrapper, runtime service wrapper, Docker/deploy artifacts, persistence adapters, example configs, and release hygiene) should stay in this WATS monorepo or move to a second repository that imports the raw WATS spine as dependencies.
