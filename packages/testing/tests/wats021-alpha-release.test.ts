@@ -38,6 +38,7 @@ describe("WATS 0.2.1 alpha launch release contract", () => {
 
     for (const pkg of PUBLISHABLE_PACKAGES) {
       const manifest = readJson(`packages/${pkg}/package.json`);
+      expect(manifest.name, `${pkg} npm scope`).toBe(`@switchbord/${pkg}`);
       expect(manifest.version, `${pkg} version`).toBe("0.2.1");
       expect(manifest.private, `${pkg} private gate before publish command`).toBe(false);
       expect(manifest.publishConfig, `${pkg} public publishConfig`).toEqual({ access: "public" });
