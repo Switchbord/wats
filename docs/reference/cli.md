@@ -5,7 +5,7 @@
 - package: `@switchbord/cli`
 - lastReviewed: 2026-05-04
 
-`@switchbord/cli` provides the `wats` command for safe local onboarding and inspection. WATS-33 ships real offline config validation and OpenAPI export. WATS-69 adds safe `wats init` config/env placeholder generation. `doctor` and `serve` remain planned/help-only surfaces until their runtime slices land.
+`@switchbord/cli` provides the `wats` command for safe local onboarding and inspection. WATS-33 ships real offline config validation and OpenAPI export. WATS-69 adds safe `wats init` config/env placeholder generation. WATS-70 adds real offline `wats doctor` diagnostics. `serve` remains a planned/help-only surface until its runtime slice lands.
 
 ## No-live-credentials default
 
@@ -98,9 +98,30 @@ Failure behavior:
 - sanitizes file-read errors so attacker-supplied paths are not echoed
 - redacts dynamic profile-name path segments in validation paths and uses generic profile-validation messages
 
+### `wats doctor --config <path> [--profile <name>] [--check-env] [--format text|json]`
+
+Runs real offline diagnostics for local operator readiness. The command checks runtime compatibility, package imports, config validation, selected profile availability, service route collision safety, and local OpenAPI generation.
+
+Default text output is status-only and does not print profile names, config paths, env-secret reference names, or secret values:
+
+```text
+doctor ok
+runtime: ok
+package-imports: ok
+config: ok
+profile: ok
+routes: ok
+openapi: ok
+summary: ok=6 warning=0 error=0
+```
+
+`--format json` returns a stable `{ ok, summary, checks }` object. `--check-env` adds one env-presence check that reports counts only, such as `missing 1 required env value`; it does not print env names or values. Expected config/profile/route/OpenAPI failures are aggregated into safe findings instead of host stack traces.
+
+The command does not call Meta Graph APIs, does not resolve or print credential values, and does not write files.
+
 ### `wats doctor --help`
 
-Prints planned offline diagnostics help and exits 0. The current command performs no environment inspection, network access, credential validation, or file writes.
+Prints doctor usage and exits 0.
 
 ### `wats openapi --config <path>`
 
@@ -206,8 +227,8 @@ WATS-47 target error families include `CliUsageError`, `CliConfigError`, `Config
 
 Future implementation work may add:
 
-- deeper `wats doctor` diagnostics for runtime/package/config health;
 - a real `wats serve` process wrapper;
-- optional live checks behind explicit credential-gated flags.
+- optional live checks behind explicit credential-gated flags;
+- deeper doctor integrations beyond the current offline runtime/package/config/profile/routes/OpenAPI/env-presence checks.
 
 Those planned commands must keep the no-live-credentials default unless a user explicitly opts into live validation.

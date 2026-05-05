@@ -51,10 +51,13 @@ Design-only/docs-only boundaries preserved in this launch: WATS-46/WATS-47/WATS-
 - `bun run docs:build`
 - targeted release policy tests including `packages/testing/tests/wats021-alpha-release.test.ts`
 
+### CLI diagnostics
+
+- `wats doctor --config <path>` now runs offline diagnostics for runtime/package imports, config/profile checks, service route collisions, OpenAPI generation, and optional env presence counts without printing env names or values.
+
 ### Not included
 
 - No real `wats serve` process wrapper yet.
-- No deeper `wats doctor` diagnostics yet.
 - No live Meta validation campaign execution yet.
 - No Docker image publication.
 - No GitHub release/tag creation until the sanitized public repository is pushed and reviewed.

@@ -6,7 +6,7 @@
 
 ## Purpose
 
-The WATS CLI is the package-manager entry point for safe local onboarding and inspection. WATS-33 ships credential-safe help surfaces, local verify-token generation, offline config validation, OpenAPI export, and a `serve --help` handoff. WATS-69 implements the safe `wats init` bootstrap for config/env placeholder generation; `doctor` and `serve` remain future runtime slices.
+The WATS CLI is the package-manager entry point for safe local onboarding and inspection. WATS-33 ships credential-safe help surfaces, local verify-token generation, offline config validation, OpenAPI export, and a `serve --help` handoff. WATS-69 implements the safe `wats init` bootstrap for config/env placeholder generation. WATS-70 implements real offline `wats doctor` diagnostics. `serve` remains a future runtime slice.
 
 ## Current commands
 
@@ -15,6 +15,9 @@ wats --help
 wats init --help
 wats config validate <path>
 wats config validate --config <path>
+wats doctor --config <path>
+wats doctor --config <path> --profile <name> --check-env
+wats doctor --config <path> --format json
 wats doctor --help
 wats openapi --config <path>
 wats openapi --config <path> --profile <name>
@@ -113,14 +116,13 @@ On failure, the command exits 1 and prints a compact `ConfigValidationError` cod
 
 ## Doctor offline diagnostics
 
-WATS-47 target:
-
 ```bash
 wats doctor --config wats.config.yaml --profile local
 wats doctor --config wats.config.yaml --profile local --check-env
+wats doctor --config wats.config.yaml --format json
 ```
 
-Default doctor checks should stay offline:
+`wats doctor` runs real offline diagnostics for local operator readiness:
 
 - runtime compatibility
 - package imports
@@ -130,7 +132,20 @@ Default doctor checks should stay offline:
 - local OpenAPI generation
 - env variable presence only when `--check-env` is passed
 
-Doctor should never print env values. Live checks require the credential gate and are not part of default docs/tests.
+The text output is status-only and redacted:
+
+```text
+doctor ok
+runtime: ok
+package-imports: ok
+config: ok
+profile: ok
+routes: ok
+openapi: ok
+summary: ok=6 warning=0 error=0
+```
+
+`--format json` returns `{ ok, summary, checks }` with stable check names. `--check-env` reports counts only, for example `missing 1 required env value`; it does not print env names or values. Doctor never calls Meta Graph APIs and never writes files.
 
 ## Export service OpenAPI
 
