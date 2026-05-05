@@ -1,4 +1,4 @@
-// @wats/types — package barrel.
+// @switchbord/types — package barrel.
 //
 // Keeps B1 entrypoints (./config, ./webhook, ./entities) stable while
 // exposing the F-1 discriminated-union modules under their own

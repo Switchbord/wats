@@ -3,7 +3,7 @@
 - status: active
 - decisionStatus: locked
 - labels: [camelCaseOnly, asyncOnly, aggressiveParity, handlers, router]
-- applies to: `@wats/core` (F-10)
+- applies to: `@switchbord/core` (F-10)
 - depends on: ADR-004 (typed-updates + handler model), F-8 (typed
   update normalizer), F-9 (typed filter surface)
 - closes: WATS-10 (L4 ordering guarantee), WATS-15 (A3 observability
@@ -34,7 +34,7 @@ Handler throws NEVER propagate out of `.dispatch()`.
 ## Construction
 
 ```ts
-import { TypedRouter } from "@wats/core";
+import { TypedRouter } from "@switchbord/core";
 
 const router = new TypedRouter({
   concurrency: "sequential",            // default; "parallel" is also supported
@@ -261,8 +261,8 @@ reach back into the router.
 import {
   TypedRouter,
   type HandlerContext
-} from "@wats/core";
-import { and, message } from "@wats/core/filtersTyped";
+} from "@switchbord/core";
+import { and, message } from "@switchbord/core/filtersTyped";
 
 const router = new TypedRouter({
   concurrency: "sequential",
@@ -285,7 +285,7 @@ helloHandle.unregister();
 
 ## Non-goals
 
-- No direct HTTP server integration inside `TypedRouter`; `@wats/http`
+- No direct HTTP server integration inside `TypedRouter`; `@switchbord/http`
   owns webhook adapters and calls a facade/router-shaped dispatch method.
 - No persistence for the handler registry.
 - No retry / backoff for failed handlers.

@@ -14,8 +14,8 @@ three layers:
 - `packages/testing/tests/*.test.ts` — workspace-level integrity tests
   (docs presence, consumer importability, repository invariants).
 - `packages/testing/fixtures/types-consumer/` — a self-contained package
-  with its own `package.json` that imports `@wats/types`,
-  `@wats/types/config`, `@wats/types/webhook`, `@wats/types/entities` as
+  with its own `package.json` that imports `@switchbord/types`,
+  `@switchbord/types/config`, `@switchbord/types/webhook`, `@switchbord/types/entities` as
   publishable specifiers and asserts the declared export symbols are
   reachable.
 
@@ -32,7 +32,7 @@ Three concrete drivers:
    `packages/graph/tests/client.test.ts` and `packages/http/tests/*` become
    obsolete under ADR-003's Transport seam; they must migrate cleanly.
 2. Edge-runtime portability is a hard invariant (ADR-003). A CI-reachable
-   smoke test must exist that imports `@wats/http` and `@wats/crypto` under
+   smoke test must exist that imports `@switchbord/http` and `@switchbord/crypto` under
    a WinterCG-compatible harness with no `node:crypto`.
 3. Every implementer subagent must run the adversarial-battery skill
    before concluding a task. This is currently enforced by prose in task
@@ -42,9 +42,9 @@ Three concrete drivers:
 
 WATS organises testing along four axes: per-package unit tests, per-package
 contract (consumer-fixture) tests, a shared workspace-integrity suite,
-and an edge-runtime sanity suite. The `@wats/testing` package is retained
+and an edge-runtime sanity suite. The `@switchbord/testing` package is retained
 as the internal home for workspace + fixture host concerns; a future
-`@wats/test-utils` package is reserved (not built yet) for public-facing
+`@switchbord/test-utils` package is reserved (not built yet) for public-facing
 test helpers.
 
 ### Layer map
@@ -54,7 +54,7 @@ test helpers.
    |                                       (bun test; no cross-package mocks)
    v
  packages/testing/fixtures/<pkg>-consumer/ consumer-fixture (own package.json)
-   |                                       imports "@wats/<pkg>" as a consumer
+   |                                       imports "@switchbord/<pkg>" as a consumer
    |                                       would; type-checks + runs
    v
  packages/testing/tests/                   workspace-integrity + fixture
@@ -94,15 +94,15 @@ packages/testing/fixtures/
     verify-router-importability.ts
 ```
 
-Each fixture's `package.json` pins `@wats/<pkg>` via a workspace link:
+Each fixture's `package.json` pins `@switchbord/<pkg>` via a workspace link:
 
 ```json
 {
-  "name": "@wats/fixture-<pkg>-consumer",
+  "name": "@switchbord/fixture-<pkg>-consumer",
   "private": true,
   "type": "module",
   "dependencies": {
-    "@wats/<pkg>": "workspace:*"
+    "@switchbord/<pkg>": "workspace:*"
   }
 }
 ```
@@ -115,9 +115,9 @@ A test file in `packages/testing/tests/<pkg>-consumer.test.ts` asserts that:
 - the set of exported symbols under each publishable specifier matches a
   committed allowlist (the A1 regression shape).
 
-### `@wats/testing` role
+### `@switchbord/testing` role
 
-Today `@wats/testing` holds:
+Today `@switchbord/testing` holds:
 
 - workspace self-tests (e.g. `workspace.test.ts`),
 - docs-presence tests,
@@ -127,21 +127,21 @@ Today `@wats/testing` holds:
 
 Three candidate paths considered:
 
-1. **Rename to `@wats/workspace-tests` (private), carve a new `@wats/test-utils` (public) for consumer helpers later.**
-2. **Keep `@wats/testing` as a private dual-role package (workspace + fixture host).**
-3. **Reserve `@wats/testing` as the eventual public test-utils name and move internals to `@wats/workspace-tests` now.**
+1. **Rename to `@switchbord/workspace-tests` (private), carve a new `@switchbord/test-utils` (public) for consumer helpers later.**
+2. **Keep `@switchbord/testing` as a private dual-role package (workspace + fixture host).**
+3. **Reserve `@switchbord/testing` as the eventual public test-utils name and move internals to `@switchbord/workspace-tests` now.**
 
-**Decision: (2).** Keep `@wats/testing` as the internal workspace +
+**Decision: (2).** Keep `@switchbord/testing` as the internal workspace +
 fixture-host package, `private: true`. Create a new **future** package
-`@wats/test-utils` (public) as a later F-step for consumer-facing helpers
+`@switchbord/test-utils` (public) as a later F-step for consumer-facing helpers
 (`createMockTransport` re-exports, `createFakeCryptoProvider` re-exports,
 `createUpdateBuilder`, fake Graph client). Rationale:
 
-- The A1 regression coverage currently in `@wats/testing` is valuable and
+- The A1 regression coverage currently in `@switchbord/testing` is valuable and
   moving it adds churn with zero safety gain.
-- `@wats/test-utils` has not shipped yet; claiming the `@wats/testing`
+- `@switchbord/test-utils` has not shipped yet; claiming the `@switchbord/testing`
   namespace now would force a package rename under consumer code later.
-- Private dual-role is acceptable because nothing inside `@wats/testing`
+- Private dual-role is acceptable because nothing inside `@switchbord/testing`
   is exported to consumers today; no API surface is affected.
 
 `packages/testing/package.json` stays at `"private": true` and gains no
@@ -150,7 +150,7 @@ fixture-host package, `private: true`. Create a new **future** package
 ### Edge-runtime sanity tests
 
 A minimal suite under `packages/testing/edge/*.test.ts` runs under a
-WinterCG-compatible harness and asserts that `@wats/http` and `@wats/crypto`
+WinterCG-compatible harness and asserts that `@switchbord/http` and `@switchbord/crypto`
 import and exercise without `node:crypto`. Harness options, in preference
 order: (1) Bun with a module resolver that throws on any `node:crypto`
 request (native `--no-node-builtin` not yet available), (2) Miniflare
@@ -160,9 +160,9 @@ stabilises. Both run on a separate CI job so unit-test latency is unaffected.
 
 Edge-suite assertions:
 
-- `import("@wats/http/signature")` resolves without a dynamic
+- `import("@switchbord/http/signature")` resolves without a dynamic
   `node:crypto` load under `prefer: "webcrypto"`.
-- `import("@wats/crypto")` resolves and `createCryptoProvider({ prefer:
+- `import("@switchbord/crypto")` resolves and `createCryptoProvider({ prefer:
   "webcrypto" })` returns a provider whose `name === "webcrypto"`.
 - `validateWebhookSignature({ crypto, ... })` succeeds for a known
   appSecret/body/header triple with the WebCrypto provider.
@@ -220,11 +220,11 @@ RED-before-GREEN ordering. Its output gates the `main`-merge check.
 ### Test doubles policy
 
 No heavy mocking frameworks (sinon, jest mocks, vi.mock equivalents). WATS
-uses explicit test doubles that live in `@wats/testing/doubles/` (internal)
-and later re-export through `@wats/test-utils` (public):
+uses explicit test doubles that live in `@switchbord/testing/doubles/` (internal)
+and later re-export through `@switchbord/test-utils` (public):
 
 ```ts
-// @wats/testing/doubles (internal, private)
+// @switchbord/testing/doubles (internal, private)
 export function createMockTransport(handler: MockTransportHandler): MockTransport;
 export function createFakeCryptoProvider(seed?: FakeCryptoSeed): CryptoProvider;
 export function createUpdateBuilder(): UpdateBuilder;
@@ -291,7 +291,7 @@ original is left passing until the GREEN commit removes it.
 
 A fixture is a "consumer of the published specifier" simulation. Rules:
 
-- The fixture's `package.json` depends on `@wats/<pkg>` via
+- The fixture's `package.json` depends on `@switchbord/<pkg>` via
   `"workspace:*"`. No relative `../../../packages/<pkg>/src` imports.
 - The fixture imports only from the published specifiers advertised in the
   package's own `exports` map. Breaking an `exports` entry must break a
@@ -309,8 +309,8 @@ Example fixture shape for ADR-005 verification (TS signatures only):
 
 ```ts
 // packages/testing/fixtures/graph-consumer/verify-endpoint-definition.ts
-import { defineEndpoint, type EndpointDef } from "@wats/graph";
-import type { ExtractPathParams } from "@wats/graph";
+import { defineEndpoint, type EndpointDef } from "@switchbord/graph";
+import type { ExtractPathParams } from "@switchbord/graph";
 
 declare function expectType<T>(value: T): void;
 declare function expectAssignable<T, _U extends T>(): void;
@@ -339,8 +339,8 @@ Positive:
 - Edge-runtime portability becomes a committed invariant, not a review
   hope.
 - TDD RED→GREEN is enforceable, not aspirational.
-- Future `@wats/test-utils` extraction is straightforward: move
-  `@wats/testing/doubles/*` up to a new package without renaming existing
+- Future `@switchbord/test-utils` extraction is straightforward: move
+  `@switchbord/testing/doubles/*` up to a new package without renaming existing
   workspace-test files.
 
 Negative:
@@ -360,15 +360,15 @@ Negative:
 - **Collapse all fixtures into one `packages/testing/fixtures/` package.**
   Rejected: a single `package.json` can't simultaneously depend on each
   workspace package under a distinct, realistic subset; the "consumer of
-  `@wats/graph` uses only `@wats/graph`" property is lost.
+  `@switchbord/graph` uses only `@switchbord/graph`" property is lost.
 - **Consumer-fixture tests inside `packages/<pkg>/tests/` importing
-  `@wats/<pkg>` from the same workspace.** Rejected: tsconfig path mapping
+  `@switchbord/<pkg>` from the same workspace.** Rejected: tsconfig path mapping
   and workspace aliasing let tests import `src/` directly; fixture-host
   separation is what forces the published-specifier path.
 - **`vitest` + `vi.mock` module replacement instead of explicit seams.**
   Rejected: ADR-001 is Bun-first, and explicit seams are a stronger
   architectural pressure than a mocking framework.
-- **Make `@wats/testing` public and expose doubles now.** Rejected: the
+- **Make `@switchbord/testing` public and expose doubles now.** Rejected: the
   doubles touch unstable types (Transport, CryptoProvider, EndpointDef)
   that are 0.x; exposing them now locks semver early.
 
@@ -383,13 +383,13 @@ and WATS-27 as they land. Explicit deliverables:
   ADR-003, ADR-005, and subsequent F-steps.
 - Consumer-fixture coverage for every publishable specifier touched by
   ADR-003 and ADR-005.
-- Edge-runtime sanity suite gating `@wats/http` and `@wats/crypto`
+- Edge-runtime sanity suite gating `@switchbord/http` and `@switchbord/crypto`
   compliance with the no-`node:crypto` invariant.
 
 ## Public API sketches (TS signatures only)
 
 ```ts
-// internal, @wats/testing/doubles
+// internal, @switchbord/testing/doubles
 export function createMockTransport(handler: MockTransportHandler): MockTransport;
 export function createFakeCryptoProvider(seed?: FakeCryptoSeed): CryptoProvider;
 export function createUpdateBuilder(): UpdateBuilder;
@@ -397,7 +397,7 @@ export function createFakeGraphClient(
   overrides?: FakeGraphClientOverrides
 ): GraphClient;
 
-// internal, @wats/testing/fixtures runner
+// internal, @switchbord/testing/fixtures runner
 export interface FixtureReport {
   readonly ok: true;
 }
@@ -410,7 +410,7 @@ export type FixtureResult = FixtureReport | FixtureFailure;
 export function runFixture(entry: string): Promise<FixtureResult>;
 export function typecheckFixture(fixtureDir: string): Promise<FixtureResult>;
 
-// future, @wats/test-utils (public) — not implemented yet
+// future, @switchbord/test-utils (public) — not implemented yet
 export {
   createMockTransport,
   createFakeCryptoProvider,
@@ -426,7 +426,7 @@ export {
 - **Node**: fixtures must type-check under a Node-flavoured `tsc` to catch
   `moduleResolution: "node16"` regressions.
 - **Workers / Edge**: sole target of the edge-runtime sanity suite;
-  `@wats/http` and `@wats/crypto` fixtures run with `prefer: "webcrypto"`.
+  `@switchbord/http` and `@switchbord/crypto` fixtures run with `prefer: "webcrypto"`.
 - **Deno**: not required in CI for 0.x; adding a Deno job is a drop-in
   since Deno consumes the same published specifiers.
 
@@ -436,7 +436,7 @@ export {
   Decision deferred to the ADR-003 F-step.
 - `bun run audit:tdd`: hard CI gate or advisor-only? Starting as advisor
   for one release cycle, then promoting to gate once noise is measured.
-- Does `@wats/test-utils` re-export `MockTransport` class identity or a
+- Does `@switchbord/test-utils` re-export `MockTransport` class identity or a
   structural interface? Locks semver semantics; revisit before it ships.
 - TDD audit: inspect squashed PR commits or pre-squash branch history?
   Depends on CI provider granularity.

@@ -1,4 +1,4 @@
-// @wats/crypto — capability-detected factory.
+// @switchbord/crypto — capability-detected factory.
 //
 // Selection algorithm (per ADR-003):
 //   1. If `options.prefer` is set, try that adapter first; on failure,

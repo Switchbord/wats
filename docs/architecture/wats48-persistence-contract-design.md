@@ -15,7 +15,7 @@ ADR-007 keeps persistence in the WATS monorepo. There is no second repository fo
 
 Included:
 
-- future `@wats/persistence` package boundary
+- future `@switchbord/persistence` package boundary
 - `PersistenceStore`, `PersistenceAdapter`, and `PersistenceTransaction` design target
 - SQLite local/dev default target
 - Postgres optional deploy/production target
@@ -27,7 +27,7 @@ Included:
 
 Not included:
 
-- no `@wats/persistence` package export
+- no `@switchbord/persistence` package export
 - no SQLite adapter
 - no Postgres adapter
 - no migration runner
@@ -41,7 +41,7 @@ Not included:
 ## Design goals
 
 1. Preserve the WATS no-live default: persistence work must not call Meta.
-2. Keep `@wats/service` runtime-neutral: callers inject persistence instead of letting the service read database environment variables.
+2. Keep `@switchbord/service` runtime-neutral: callers inject persistence instead of letting the service read database environment variables.
 3. Make SQLite the boring local/dev default once implemented.
 4. Make Postgres optional for deploy/production and multi-process service operation once implemented.
 5. Keep raw secrets out of diagnostics and storage.
@@ -52,21 +52,21 @@ Not included:
 The future package should be public only after behavior and consumer fixtures exist:
 
 ```text
-@wats/persistence
-@wats/persistence/sqlite
-@wats/persistence/postgres
-@wats/persistence/testing
+@switchbord/persistence
+@switchbord/persistence/sqlite
+@switchbord/persistence/postgres
+@switchbord/persistence/testing
 ```
 
 The base package owns portable interfaces, errors, migration descriptors, redaction helpers, and contract tests. Runtime adapters live behind subpaths so SQLite and Postgres dependencies do not leak into every consumer.
 
 Dependency direction:
 
-- `@wats/persistence` may depend on `@wats/types` and shared internal utility helpers.
-- `@wats/service` may later accept a `PersistenceStore` through explicit injection.
-- `@wats/cli` may later compose config, service, and persistence for doctor/serve/migration commands.
-- `@wats/config` validates persistence config shape only after a schema field is intentionally added.
-- `@wats/persistence` must not depend on `@wats/cli`.
+- `@switchbord/persistence` may depend on `@switchbord/types` and shared internal utility helpers.
+- `@switchbord/service` may later accept a `PersistenceStore` through explicit injection.
+- `@switchbord/cli` may later compose config, service, and persistence for doctor/serve/migration commands.
+- `@switchbord/config` validates persistence config shape only after a schema field is intentionally added.
+- `@switchbord/persistence` must not depend on `@switchbord/cli`.
 
 ## Core contract concepts
 
@@ -252,6 +252,6 @@ Future behavior tests:
 - redaction tests for database URLs and raw webhook payloads
 - idempotency conflict/replay tests
 - transaction rollback tests
-- consumer fixture importing through `@wats/persistence`
+- consumer fixture importing through `@switchbord/persistence`
 
 Every future adapter must pass the same contract suite before docs can describe it as implemented.

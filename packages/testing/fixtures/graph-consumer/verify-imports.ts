@@ -1,4 +1,4 @@
-// Consumer fixture for @wats/graph.
+// Consumer fixture for @switchbord/graph.
 //
 // Imports ONLY through the published package specifiers (never through
 // relative paths). Exercises the Transport seam via createMockTransport,
@@ -7,13 +7,13 @@
 // registry + seeded subclass identity. Emits a single-line JSON report
 // ending with the success sentinel `graph-consumer:ok`.
 
-import * as rootEntrypoint from "@wats/graph";
-import * as messagesSubpath from "@wats/graph/endpoints/messages";
-import * as mediaSubpath from "@wats/graph/endpoints/media";
-import * as templatesSubpath from "@wats/graph/endpoints/templates";
-import * as flowsSubpath from "@wats/graph/endpoints/flows";
-import * as callingSubpath from "@wats/graph/endpoints/calling";
-import * as businessManagementSubpath from "@wats/graph/endpoints/business-management";
+import * as rootEntrypoint from "@switchbord/graph";
+import * as messagesSubpath from "@switchbord/graph/endpoints/messages";
+import * as mediaSubpath from "@switchbord/graph/endpoints/media";
+import * as templatesSubpath from "@switchbord/graph/endpoints/templates";
+import * as flowsSubpath from "@switchbord/graph/endpoints/flows";
+import * as callingSubpath from "@switchbord/graph/endpoints/calling";
+import * as businessManagementSubpath from "@switchbord/graph/endpoints/business-management";
 import {
   GraphApiError,
   GraphAuthError,
@@ -108,8 +108,8 @@ import {
   type PhoneNumberSettingsResponse,
   type BusinessProfileResponse,
   type CommerceSettingsResponse
-} from "@wats/graph";
-import { createMockTransport } from "@wats/graph/testing";
+} from "@switchbord/graph";
+import { createMockTransport } from "@switchbord/graph/testing";
 
 interface VerifyReportOk {
   readonly ok: true;
@@ -705,7 +705,7 @@ async function verify(): Promise<VerifyReportOk> {
   };
   checks["PhoneNumberClient.sendText returns parsed response"] =
     pnTextRes.messages?.[0]?.id === "wamid.P";
-  checks["PhoneNumberClient.sendText accepts arbitrary recipient via @wats/graph"] =
+  checks["PhoneNumberClient.sendText accepts arbitrary recipient via @switchbord/graph"] =
     pnHandle.requests[0]?.url ===
       "https://graph.facebook.com/v20.0/555000111/messages" &&
     pnTextBody.to === "15551230001" &&
@@ -723,7 +723,7 @@ async function verify(): Promise<VerifyReportOk> {
     readonly type?: string;
     readonly image?: { readonly link?: string; readonly caption?: string };
   };
-  checks["PhoneNumberClient.sendImage sends exact media payload via @wats/graph"] =
+  checks["PhoneNumberClient.sendImage sends exact media payload via @switchbord/graph"] =
     pnHandle.requests[0]?.url ===
       "https://graph.facebook.com/v20.0/555000111/messages" &&
     pnImageBody.type === "image" &&
@@ -740,7 +740,7 @@ async function verify(): Promise<VerifyReportOk> {
     readonly type?: string;
     readonly interactive?: { readonly type?: string; readonly action?: { readonly buttons?: readonly unknown[] } };
   };
-  checks["PhoneNumberClient.sendButtons sends interactive payload via @wats/graph"] =
+  checks["PhoneNumberClient.sendButtons sends interactive payload via @switchbord/graph"] =
     pnButtonsBody.type === "interactive" &&
     pnButtonsBody.interactive?.type === "button" &&
     pnButtonsBody.interactive?.action?.buttons?.length === 1;
@@ -1074,7 +1074,7 @@ async function verify(): Promise<VerifyReportOk> {
     contentLength: 3
   }, { maxBytes: DEFAULT_MAX_UPLOAD_SESSION_BYTES });
   const sessionStatus = await getUploadSession(sessionClient, { uploadSessionId: session.id });
-  checks["resumable upload session helpers run through @wats/graph"] =
+  checks["resumable upload session helpers run through @switchbord/graph"] =
     session.id === "upload:fixture" &&
     fileHandle.h === "file-handle" &&
     sessionStatus.fileOffset === 3;
@@ -1142,13 +1142,13 @@ async function verify(): Promise<VerifyReportOk> {
     checks,
     sentinel: "graph-consumer:ok",
     moduleKeys: {
-      "@wats/graph": Object.keys(rootEntrypoint).sort(),
-      "@wats/graph/endpoints/messages": Object.keys(messagesSubpath).sort(),
-      "@wats/graph/endpoints/media": Object.keys(mediaSubpath).sort(),
-      "@wats/graph/endpoints/templates": Object.keys(templatesSubpath).sort(),
-      "@wats/graph/endpoints/flows": Object.keys(flowsSubpath).sort(),
-      "@wats/graph/endpoints/calling": Object.keys(callingSubpath).sort(),
-      "@wats/graph/endpoints/business-management": Object.keys(businessManagementSubpath).sort()
+      "@switchbord/graph": Object.keys(rootEntrypoint).sort(),
+      "@switchbord/graph/endpoints/messages": Object.keys(messagesSubpath).sort(),
+      "@switchbord/graph/endpoints/media": Object.keys(mediaSubpath).sort(),
+      "@switchbord/graph/endpoints/templates": Object.keys(templatesSubpath).sort(),
+      "@switchbord/graph/endpoints/flows": Object.keys(flowsSubpath).sort(),
+      "@switchbord/graph/endpoints/calling": Object.keys(callingSubpath).sort(),
+      "@switchbord/graph/endpoints/business-management": Object.keys(businessManagementSubpath).sort()
     }
   };
 }

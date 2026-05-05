@@ -15,9 +15,9 @@ This example is intentionally docs-only for WATS-52A. It demonstrates the shape 
 ## Sketch
 
 ```ts
-import { normalizeWebhookEnvelope, TypedRouter, filtersTyped } from "@wats/core";
-import { GraphClient } from "@wats/graph";
-import { createMockTransport } from "@wats/graph/testing";
+import { normalizeWebhookEnvelope, TypedRouter, filtersTyped } from "@switchbord/core";
+import { GraphClient } from "@switchbord/graph";
+import { createMockTransport } from "@switchbord/graph/testing";
 
 const transport = createMockTransport({
   defaultResponse: { status: 200, body: { messages: [{ id: "wamid.OFFLINE_BOT" }] } }
@@ -43,4 +43,4 @@ const normalized = normalizeWebhookEnvelope({
 for (const update of normalized.updates) await router.dispatch(update);
 ```
 
-If this sketch becomes runnable code in a later slice, keep imports public (`@wats/core`, `@wats/graph`, `@wats/graph/testing`) and keep it offline by default.
+If this sketch becomes runnable code in a later slice, keep imports public (`@switchbord/core`, `@switchbord/graph`, `@switchbord/graph/testing`) and keep it offline by default.

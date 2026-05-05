@@ -4,8 +4,8 @@
 - decisionStatus: locked
 - labels: [camelCaseOnly, asyncOnly, aggressiveParity, monorepo,
   typed-updates, f-8]
-- package: `@wats/core`
-- subpath: `@wats/core/webhookNormalizer`
+- package: `@switchbord/core`
+- subpath: `@switchbord/core/webhookNormalizer`
 - source: `packages/core/src/webhookNormalizer.ts`
 - tests: `packages/core/tests/webhookNormalizer.test.ts`
 - spec: ADR-004 (Typed Updates and Handler Model); F-8 in the
@@ -82,7 +82,7 @@ All four carry `rawChange` (the wire `WhatsAppWebhookChange`).
 ### Narrowing recipe
 
 ```ts
-import { normalizeWebhookEnvelope, type TypedUpdate } from "@wats/core";
+import { normalizeWebhookEnvelope, type TypedUpdate } from "@switchbord/core";
 
 const { updates, skipped, limitError } = normalizeWebhookEnvelope(req.body);
 
@@ -129,7 +129,7 @@ interface NormalizedWebhookResult {
 ```
 
 - `envelope` — the HTTP JSON body already parsed by the consumer (or
-  by whatever framework sits in front of `@wats/http`). Must be a
+  by whatever framework sits in front of `@switchbord/http`). Must be a
   plain object with the canonical Meta shape. Bad shapes throw.
 - `maxEventsPerEnvelope` — positive finite integer cap. Invalid
   values (NaN / Infinity / 0 / negative / non-integer) throw
@@ -314,16 +314,16 @@ The normalizer still does NOT:
 - Deep-normalize `status` and arbitrary `account` payload internals beyond the
   existing template helpers; WATS-43A is message-body focused.
 - Register handlers — F-10.
-- Provide Graph API calls — no `@wats/graph` coupling.
+- Provide Graph API calls — no `@switchbord/graph` coupling.
 - Persist dedup state — caller's responsibility.
 - Modify the existing C2 `parseWebhookUpdate` — normalizer is an
   independent producer above it.
-- Verify webhook signatures — that is `@wats/http`'s job.
+- Verify webhook signatures — that is `@switchbord/http`'s job.
 - Talk to live Meta endpoints or require credentials.
 
 ## Exported surface
 
-From `@wats/core` (and mirrored at `@wats/core/webhookNormalizer`):
+From `@switchbord/core` (and mirrored at `@switchbord/core/webhookNormalizer`):
 
 - `normalizeWebhookEnvelope`
 - `WebhookNormalizationError` (class; extends `Error`)
@@ -343,7 +343,7 @@ import {
   WebhookNormalizationError,
   DEFAULT_MAX_EVENTS_PER_ENVELOPE,
   type TypedUpdate
-} from "@wats/core";
+} from "@switchbord/core";
 
 async function handleWebhook(rawBody: string) {
   let envelope: unknown;

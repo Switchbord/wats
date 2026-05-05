@@ -81,7 +81,7 @@ function runBun(args: string[], cwd: string): {
 }
 
 describe("B1 external consumer importability", () => {
-  test("documented @wats/types entrypoints are importable from an external consumer fixture", () => {
+  test("documented @switchbord/types entrypoints are importable from an external consumer fixture", () => {
     const repoRoot = findRepoRoot(import.meta.dir);
     const fixtureTemplateDir = join(
       repoRoot,
@@ -104,7 +104,7 @@ describe("B1 external consumer importability", () => {
         throw new Error("Fixture dependencies must be an object");
       }
 
-      fixtureManifest.dependencies["@wats/types"] = `file:${join(
+      fixtureManifest.dependencies["@switchbord/types"] = `file:${join(
         repoRoot,
         "packages/types"
       )}`;
@@ -119,7 +119,7 @@ describe("B1 external consumer importability", () => {
 
       const installedTypesPackageManifestPath = join(
         fixtureRuntimeDir,
-        "node_modules/@wats/types/package.json"
+        "node_modules/@switchbord/types/package.json"
       );
       expect(existsSync(installedTypesPackageManifestPath)).toBe(true);
 
@@ -146,14 +146,14 @@ describe("B1 external consumer importability", () => {
       };
 
       expect(Object.keys(parsedReport.moduleKeys).sort()).toEqual([
-        "@wats/types",
-        "@wats/types/config",
-        "@wats/types/contacts",
-        "@wats/types/entities",
-        "@wats/types/errors",
-        "@wats/types/messages",
-        "@wats/types/statuses",
-        "@wats/types/webhook"
+        "@switchbord/types",
+        "@switchbord/types/config",
+        "@switchbord/types/contacts",
+        "@switchbord/types/entities",
+        "@switchbord/types/errors",
+        "@switchbord/types/messages",
+        "@switchbord/types/statuses",
+        "@switchbord/types/webhook"
       ]);
 
       // F-1 consumer fixture must exercise the discriminated unions at
@@ -195,7 +195,7 @@ describe("B1 external consumer importability", () => {
       ]);
 
       const dependencyPath = normalize(
-        join(fixtureRuntimeDir, "node_modules/@wats/types/package.json")
+        join(fixtureRuntimeDir, "node_modules/@switchbord/types/package.json")
       );
       expect(normalize(installedTypesPackageManifestPath)).toBe(dependencyPath);
     } finally {

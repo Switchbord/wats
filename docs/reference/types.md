@@ -10,7 +10,7 @@
 
 Define foundational shared TypeScript contracts used across WATS packages.
 
-`@wats/types` ships discriminated-union shapes for every inbound WhatsApp
+`@switchbord/types` ships discriminated-union shapes for every inbound WhatsApp
 domain object the library exposes. Callers narrow via `switch` on the
 `type` discriminator; exhaustive switches with a `never` default branch
 catch any future variant that is added to the union.
@@ -128,7 +128,7 @@ The outer envelope remains `WhatsAppWebhookEnvelope` → `entry[]` →
 ### Exhaustive switch
 
 ```ts
-import type { WhatsAppMessage } from "@wats/types";
+import type { WhatsAppMessage } from "@switchbord/types";
 
 function describe(message: WhatsAppMessage): string {
   switch (message.type) {
@@ -156,7 +156,7 @@ variant is added to the union, which is the contract WATS-23 encodes.
 import type {
   WhatsAppMessageStatus,
   WhatsAppMessageStatusKind
-} from "@wats/types";
+} from "@switchbord/types";
 
 function isTerminal(status: WhatsAppMessageStatus): boolean {
   const kind: WhatsAppMessageStatusKind = status.status;
@@ -167,7 +167,7 @@ function isTerminal(status: WhatsAppMessageStatus): boolean {
 ### Interactive narrowing
 
 ```ts
-import type { InteractiveMessage, InteractiveReply } from "@wats/types";
+import type { InteractiveMessage, InteractiveReply } from "@switchbord/types";
 
 function replyBody(message: InteractiveMessage): string {
   const reply: InteractiveReply = message.interactive;
@@ -206,7 +206,7 @@ if (message.type === "unsupported") {
 
 ## Parsed update event types (C2)
 
-`@wats/core` introduces normalized parsed-event contracts for handler
+`@switchbord/core` introduces normalized parsed-event contracts for handler
 routing.
 
 - `ParsedUpdateEvent`
@@ -259,15 +259,15 @@ explicit degradation counters and hard-limit failures.
 
 Exports are available via:
 
-- `@wats/types/config` — `WhatsAppClientConfig`, `WhatsAppClientRuntimeConfig`
-- `@wats/types/webhook` — webhook envelope + value union
-- `@wats/types/entities` — B1 entity barrel (retained for compatibility)
-- `@wats/types/messages` — WhatsAppMessage union + every variant +
+- `@switchbord/types/config` — `WhatsAppClientConfig`, `WhatsAppClientRuntimeConfig`
+- `@switchbord/types/webhook` — webhook envelope + value union
+- `@switchbord/types/entities` — B1 entity barrel (retained for compatibility)
+- `@switchbord/types/messages` — WhatsAppMessage union + every variant +
   supporting media/context types
-- `@wats/types/statuses` — WhatsAppMessageStatus + status kind union
-- `@wats/types/contacts` — WhatsAppContact + sub-shapes
-- `@wats/types/errors` — WhatsAppError + legacy WhatsAppErrorPayload
-- `@wats/types` — barrel (all of the above)
+- `@switchbord/types/statuses` — WhatsAppMessageStatus + status kind union
+- `@switchbord/types/contacts` — WhatsAppContact + sub-shapes
+- `@switchbord/types/errors` — WhatsAppError + legacy WhatsAppErrorPayload
+- `@switchbord/types` — barrel (all of the above)
 
 Runtime contract constants are also exported so external-consumer
 fixtures can assert the documented surface without relying on

@@ -1,7 +1,7 @@
-// Consumer fixture for @wats/internal-utils.
+// Consumer fixture for @switchbord/internal-utils.
 //
 // This file is imported from the fixture runtime via the published
-// specifier "@wats/internal-utils" (not via relative paths), which is
+// specifier "@switchbord/internal-utils" (not via relative paths), which is
 // exactly how a downstream workspace package would use it. It prints a
 // single-line JSON report on stdout with a success sentinel so the
 // runner under packages/testing/tests/ can assert the contract.
@@ -9,7 +9,7 @@
 // A failure inside verify() must throw; the runner treats a non-zero
 // exit code as a fixture failure.
 
-import { isRecord } from "@wats/internal-utils";
+import { isRecord } from "@switchbord/internal-utils";
 
 interface VerifyReportOk {
   readonly ok: true;

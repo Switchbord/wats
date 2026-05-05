@@ -1,4 +1,4 @@
-// WATS-53 RED — @wats/graph endpoint subpath consistency for media, templates, and flows.
+// WATS-53 RED — @switchbord/graph endpoint subpath consistency for media, templates, and flows.
 
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
@@ -30,7 +30,7 @@ function expectAll(source: string, needles: readonly string[], label: string): v
   }
 }
 
-describe("WATS-53 @wats/graph endpoint subpath exports", () => {
+describe("WATS-53 @switchbord/graph endpoint subpath exports", () => {
   test("package exports publish media, templates, and flows subpaths", () => {
     const packageJson = JSON.parse(read("packages/graph/package.json")) as {
       exports?: Record<string, string>;
@@ -44,9 +44,9 @@ describe("WATS-53 @wats/graph endpoint subpath exports", () => {
   test("graph-consumer fixture imports and runtime-checks every new subpath", () => {
     const fixture = read("packages/testing/fixtures/graph-consumer/verify-imports.ts");
     expectAll(fixture, [
-      'from "@wats/graph/endpoints/media"',
-      'from "@wats/graph/endpoints/templates"',
-      'from "@wats/graph/endpoints/flows"',
+      'from "@switchbord/graph/endpoints/media"',
+      'from "@switchbord/graph/endpoints/templates"',
+      'from "@switchbord/graph/endpoints/flows"',
       "WATS-53 media subpath exports runtime surface",
       "WATS-53 templates subpath exports runtime surface",
       "WATS-53 flows subpath exports runtime surface"
@@ -64,13 +64,13 @@ describe("WATS-53 docs lockstep", () => {
 
     for (const doc of [referenceIndex, publicApi, packageMap, migration, changelog]) {
       expectAll(doc, [
-        "@wats/graph/endpoints/media",
-        "@wats/graph/endpoints/templates",
-        "@wats/graph/endpoints/flows"
+        "@switchbord/graph/endpoints/media",
+        "@switchbord/graph/endpoints/templates",
+        "@switchbord/graph/endpoints/flows"
       ], "WATS-53 docs packet");
     }
 
-    expect(migration).not.toContain("Some root `@wats/graph` exports do not yet have dedicated package subpaths");
+    expect(migration).not.toContain("Some root `@switchbord/graph` exports do not yet have dedicated package subpaths");
     expect(changelog).toContain("WATS-53");
     expect(publicApi).toContain("WATS-53");
   });

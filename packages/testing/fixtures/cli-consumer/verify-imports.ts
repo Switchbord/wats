@@ -1,4 +1,4 @@
-import * as cli from "@wats/cli";
+import * as cli from "@switchbord/cli";
 
 const token = await cli.createWebhookVerifyToken();
 const result = await cli.runCli(["--help"]);

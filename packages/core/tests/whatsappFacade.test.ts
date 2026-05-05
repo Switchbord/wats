@@ -26,7 +26,7 @@ import {
   type ListenerHandle
 } from "../src/listener";
 import { message } from "../src/filtersTyped/index";
-import { GraphClient } from "@wats/graph";
+import { GraphClient } from "@switchbord/graph";
 import {
   createMockTransport,
   type MockTransportHandle

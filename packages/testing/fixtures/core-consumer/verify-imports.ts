@@ -1,6 +1,6 @@
-// F-8 consumer fixture for @wats/core's webhookNormalizer.
+// F-8 consumer fixture for @switchbord/core's webhookNormalizer.
 //
-// Imports ONLY through the published package specifier `@wats/core`
+// Imports ONLY through the published package specifier `@switchbord/core`
 // (never via relative paths) so the external-shape contract is
 // exercised across the workspace boundary. Runs a realistic multi-
 // entry webhook envelope through `normalizeWebhookEnvelope` and
@@ -11,7 +11,7 @@
 // Emits a single-line JSON report on stdout and the success sentinel
 // `core-consumer:ok` as the last line.
 
-import * as rootEntrypoint from "@wats/core";
+import * as rootEntrypoint from "@switchbord/core";
 import {
   DEFAULT_MAX_EVENTS_PER_ENVELOPE,
   ListenerAbortError,
@@ -36,7 +36,7 @@ import {
   type TypedStatusUpdate,
   type TypedUnknownUpdate,
   type TypedUpdate
-} from "@wats/core";
+} from "@switchbord/core";
 import {
   FILTER_BRAND,
   FilterValidationError,
@@ -53,9 +53,9 @@ import {
   status,
   unknown as unknownKind,
   type TypedFilter
-} from "@wats/core/filtersTyped";
-import { GraphClient } from "@wats/graph";
-import { createMockTransport } from "@wats/graph/testing";
+} from "@switchbord/core/filtersTyped";
+import { GraphClient } from "@switchbord/graph";
+import { createMockTransport } from "@switchbord/graph/testing";
 
 interface VerifyReportOk {
   readonly ok: true;
@@ -341,8 +341,8 @@ async function verify(): Promise<VerifyReportOk> {
 
   // ---- F-9 typed-filter surface round-trip ----------------------
   //
-  // Assert the typed-filter surface is wired through @wats/core AND
-  // the @wats/core/filtersTyped subpath, and that round-tripping a
+  // Assert the typed-filter surface is wired through @switchbord/core AND
+  // the @switchbord/core/filtersTyped subpath, and that round-tripping a
   // compound filter over the realistic envelope above produces the
   // expected per-variant truth table. Every sibling-kind check
   // should return a boolean (never throw) — the router layer (F-10)
@@ -359,7 +359,7 @@ async function verify(): Promise<VerifyReportOk> {
     typeof FILTER_BRAND === "symbol";
 
   checks["FILTER_BRAND is interned via Symbol.for"] =
-    FILTER_BRAND === Symbol.for("@wats/core/filter-brand");
+    FILTER_BRAND === Symbol.for("@switchbord/core/filter-brand");
 
   checks["message / status / account / template / unknown are typed filters"] =
     isTypedFilter(message) &&
@@ -586,7 +586,7 @@ async function verify(): Promise<VerifyReportOk> {
   };
   checks["WhatsApp.startChat returns parsed response"] =
     startChatRes.messages?.[0]?.id === "wamid.CORE";
-  checks["WhatsApp.startChat sends arbitrary recipient through @wats/core"] =
+  checks["WhatsApp.startChat sends arbitrary recipient through @switchbord/core"] =
     mockHandle.requests[0]?.url ===
       "https://graph.facebook.com/v21.0/1234567890/messages" &&
     startChatBody.to === "15551230002" &&
@@ -608,7 +608,7 @@ async function verify(): Promise<VerifyReportOk> {
   };
   checks["WhatsApp.sendImage returns parsed response"] =
     sendImageRes.messages?.[0]?.id === "wamid.CORE";
-  checks["WhatsApp.sendImage sends exact media payload through @wats/core"] =
+  checks["WhatsApp.sendImage sends exact media payload through @switchbord/core"] =
     mockHandle.requests[0]?.url ===
       "https://graph.facebook.com/v21.0/1234567890/messages" &&
     sendImageBody.to === "15551230003" &&
@@ -627,7 +627,7 @@ async function verify(): Promise<VerifyReportOk> {
     readonly type?: string;
     readonly location?: { readonly latitude?: number; readonly longitude?: number };
   };
-  checks["WhatsApp.sendLocation sends exact location payload through @wats/core"] =
+  checks["WhatsApp.sendLocation sends exact location payload through @switchbord/core"] =
     sendLocationBody.type === "location" &&
     sendLocationBody.location?.latitude === 1 &&
     sendLocationBody.location?.longitude === 2;
@@ -643,7 +643,7 @@ async function verify(): Promise<VerifyReportOk> {
     readonly type?: string;
     readonly interactive?: { readonly type?: string };
   };
-  checks["WhatsApp.sendButtons sends interactive payload through @wats/core"] =
+  checks["WhatsApp.sendButtons sends interactive payload through @switchbord/core"] =
     sendButtonsBody.type === "interactive" &&
     sendButtonsBody.interactive?.type === "button";
 
@@ -746,7 +746,7 @@ async function verify(): Promise<VerifyReportOk> {
   //     ListenerAbortError(code "listener_cancelled")
   //   - a ListenerTimeoutError fires on `timeoutMs` expiry
   //   - the createListenerRegistry factory is re-exported from
-  //     @wats/core alongside the facade method
+  //     @switchbord/core alongside the facade method
 
   const listenerFacade = new WhatsApp({
     graphClient,
@@ -867,7 +867,7 @@ async function verify(): Promise<VerifyReportOk> {
     checks,
     sentinel: "core-consumer:ok",
     moduleKeys: {
-      "@wats/core": Object.keys(rootEntrypoint).sort()
+      "@switchbord/core": Object.keys(rootEntrypoint).sort()
     }
   };
 }

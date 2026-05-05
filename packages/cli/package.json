@@ -1,5 +1,5 @@
 {
-  "name": "@wats/cli",
+  "name": "@switchbord/cli",
   "version": "0.2.1",
   "private": false,
   "license": "MIT",
@@ -40,7 +40,7 @@
     "wats"
   ],
   "dependencies": {
-    "@wats/config": "^0.2.1",
-    "@wats/service": "^0.2.1"
+    "@switchbord/config": "^0.2.1",
+    "@switchbord/service": "^0.2.1"
   }
 }

@@ -9,29 +9,29 @@ WATS is a Bun-first TypeScript monorepo for WhatsApp operations. The repo is org
 ## Package layers
 
 ```text
-@wats/types
+@switchbord/types
   shared domain contracts
 
-@wats/crypto        @wats/graph        @wats/http
+@switchbord/crypto        @switchbord/graph        @switchbord/http
   crypto seam         graph client        webhook HTTP boundary
   adapters            endpoints           runtime adapters
 
-@wats/core
+@switchbord/core
   typed updates, filters, router, listeners, WhatsApp facade
 
-@wats/testing
+@switchbord/testing
   private fixtures and workspace policy tests
 ```
 
 Application-edge packages sit above these foundations:
 
 ```text
-@wats/config   config schema, YAML/JSON loading, env-secret references
-@wats/service  standalone webhook/API service, OpenAPI 3.1
-@wats/cli      init, validate, doctor, serve, openapi commands
+@switchbord/config   config schema, YAML/JSON loading, env-secret references
+@switchbord/service  standalone webhook/API service, OpenAPI 3.1
+@switchbord/cli      init, validate, doctor, serve, openapi commands
 ```
 
-Those app-layer packages may depend on `@wats/core`; lower-level packages should not. ADR-007 keeps the alpha CLI/runtime/operator layer in this monorepo by default rather than splitting it into a second repository.
+Those app-layer packages may depend on `@switchbord/core`; lower-level packages should not. ADR-007 keeps the alpha CLI/runtime/operator layer in this monorepo by default rather than splitting it into a second repository.
 
 ## Request flow
 
@@ -46,7 +46,7 @@ This lets endpoint breadth grow without duplicating transport, auth, validation,
 
 ## Webhook flow
 
-A webhook request enters through `@wats/http`:
+A webhook request enters through `@switchbord/http`:
 
 1. A runtime wrapper adapts Bun, Node, or Fetch `Request` shapes to the runtime-neutral `WebhookAdapter`.
 2. The adapter verifies the Meta challenge or `X-Hub-Signature-256` signature.

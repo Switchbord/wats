@@ -1,4 +1,4 @@
-// @wats/types/messages — barrel.
+// @switchbord/types/messages — barrel.
 //
 // Re-exports every discriminated-union member plus the WhatsAppMessage
 // union itself and the supporting MediaReference / MessageContext

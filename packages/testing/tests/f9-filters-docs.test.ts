@@ -131,7 +131,7 @@ describe("F-9 filters.md reference guide", () => {
 
   test("contains a usage code sample in TypeScript", () => {
     expect(doc).toMatch(/```[ \t]*(ts|typescript)/i);
-    expect(doc).toContain("@wats/core/filtersTyped");
+    expect(doc).toContain("@switchbord/core/filtersTyped");
   });
 
   test("references ADR-004 and the F-9 scope", () => {
@@ -146,14 +146,14 @@ describe("F-9 filters.md reference guide", () => {
 });
 
 describe("F-9 core-consumer fixture coverage", () => {
-  test("fixture imports from @wats/core/filtersTyped", () => {
+  test("fixture imports from @switchbord/core/filtersTyped", () => {
     const repoRoot = findRepoRoot(import.meta.dir);
     const verifyPath = join(
       repoRoot,
       "packages/testing/fixtures/core-consumer/verify-imports.ts"
     );
     const source = readFileSync(verifyPath, "utf8");
-    expect(source).toContain('from "@wats/core/filtersTyped"');
+    expect(source).toContain('from "@switchbord/core/filtersTyped"');
     expect(source).toContain("createTypedFilter");
     expect(source).toContain("isTypedFilter");
     expect(source).toContain("FilterValidationError");
@@ -230,7 +230,7 @@ describe("F-9 CHANGELOG", () => {
     expect(changelog).toContain("TypedFilter");
     expect(changelog).toContain("createTypedFilter");
     expect(changelog).toContain("FilterValidationError");
-    expect(changelog).toContain("@wats/core/filtersTyped");
+    expect(changelog).toContain("@switchbord/core/filtersTyped");
   });
 });
 

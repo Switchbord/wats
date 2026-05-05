@@ -2,10 +2,10 @@
 
 - status: experimental
 - applies-to: WATS-33, WATS-47, and WATS-69
-- package: `@wats/cli`
+- package: `@switchbord/cli`
 - lastReviewed: 2026-05-04
 
-`@wats/cli` provides the `wats` command for safe local onboarding and inspection. WATS-33 ships real offline config validation and OpenAPI export. WATS-69 adds safe `wats init` config/env placeholder generation. `doctor` and `serve` remain planned/help-only surfaces until their runtime slices land.
+`@switchbord/cli` provides the `wats` command for safe local onboarding and inspection. WATS-33 ships real offline config validation and OpenAPI export. WATS-69 adds safe `wats init` config/env placeholder generation. `doctor` and `serve` remain planned/help-only surfaces until their runtime slices land.
 
 ## No-live-credentials default
 
@@ -51,7 +51,7 @@ Failure behavior:
 
 ### `wats config validate <path>`
 
-Loads and validates a JSON/YAML WATS config file through `@wats/config` and exits 0 when valid.
+Loads and validates a JSON/YAML WATS config file through `@switchbord/config` and exits 0 when valid.
 
 Equivalent alias:
 
@@ -108,7 +108,7 @@ wats openapi --config wats.config.json --out openapi.json
 
 `--profile <name>` selects a named config profile. Missing or blank profiles fail closed.
 
-`--server-url <url>` must be an `http:` or `https:` URL accepted by `@wats/service`; query strings and fragments are stripped by the generator.
+`--server-url <url>` must be an `http:` or `https:` URL accepted by `@switchbord/service`; query strings and fragments are stripped by the generator.
 
 `--out <path>` writes JSON only when explicit. The CLI refuses to overwrite existing files. Empty paths, directories, control characters, NUL, backslashes, and `.` / `..` path segments are rejected. Relative paths resolve under the current working directory.
 
@@ -126,7 +126,7 @@ Prints OpenAPI export help and exits 0. OpenAPI export remains service-only: it 
 
 ### `wats serve --help`
 
-Prints service-runtime handoff help and exits 0. WATS-33 does not start a process/server; the current runtime-neutral app remains available programmatically through `@wats/service`.
+Prints service-runtime handoff help and exits 0. WATS-33 does not start a process/server; the current runtime-neutral app remains available programmatically through `@switchbord/service`.
 
 WATS-49 deployment note: Docker packaging must target implemented `wats serve`, not this help-only handoff. The current CLI does not start a server process.
 
@@ -168,11 +168,11 @@ WATS-47 target rules:
 - Generated configs use env-secret references rather than embedded secret values.
 - All CLI file creation uses no overwrite by default.
 - `wats doctor` is offline by default and reports env variable presence by name/presence only.
-- `wats serve` wraps `@wats/service` and starts in dry-run/mock mode by default for alpha.
+- `wats serve` wraps `@switchbord/service` and starts in dry-run/mock mode by default for alpha.
 - Credential-gated live validation requires explicit live flags and an acknowledgement.
 - The phrase credential-gated live validation means the CLI requires both a live flag and an operator acknowledgement before any live check can run.
 - There are no live Meta calls by default, and no command prints raw secrets.
-- `@wats/cli` composes `@wats/config` for schema validation and `@wats/service` for routing/OpenAPI; it does not duplicate either package.
+- `@switchbord/cli` composes `@switchbord/config` for schema validation and `@switchbord/service` for routing/OpenAPI; it does not duplicate either package.
 
 See `docs/architecture/wats47-cli-operator-ux-design.md` for the full design.
 

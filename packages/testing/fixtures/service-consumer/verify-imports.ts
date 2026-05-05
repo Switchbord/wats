@@ -5,8 +5,8 @@ import {
   type WatsServiceConfig,
   type WatsServiceApp,
   type WatsServiceOpenApiOptions
-} from "@wats/service";
-import { createMockTransport } from "@wats/graph/testing";
+} from "@switchbord/service";
+import { createMockTransport } from "@switchbord/graph/testing";
 
 interface VerifyReportOk {
   readonly ok: true;

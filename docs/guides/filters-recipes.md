@@ -13,7 +13,7 @@ Show practical composition patterns for D1 filter primitives.
 ## Recipe 1: inbound text from specific customer
 
 ```ts
-import { and, hasMessageText, messageFromWaId } from "@wats/core/filters";
+import { and, hasMessageText, messageFromWaId } from "@switchbord/core/filters";
 
 const fromCustomer = and(
   hasMessageText,
@@ -24,7 +24,7 @@ const fromCustomer = and(
 ## Recipe 2: case-insensitive keyword routing
 
 ```ts
-import { and, hasMessageText, messageTextContains } from "@wats/core/filters";
+import { and, hasMessageText, messageTextContains } from "@switchbord/core/filters";
 
 const containsOrderKeyword = and(
   hasMessageText,
@@ -35,7 +35,7 @@ const containsOrderKeyword = and(
 ## Recipe 3: strict case-sensitive keyword routing
 
 ```ts
-import { and, hasMessageText, messageTextContains } from "@wats/core/filters";
+import { and, hasMessageText, messageTextContains } from "@switchbord/core/filters";
 
 const containsExactToken = and(
   hasMessageText,
@@ -46,7 +46,7 @@ const containsExactToken = and(
 ## Recipe 4: status monitoring for selected states
 
 ```ts
-import { and, hasMessageStatus, messageStatusIn } from "@wats/core/filters";
+import { and, hasMessageStatus, messageStatusIn } from "@switchbord/core/filters";
 
 const terminalStatuses = and(
   hasMessageStatus,
@@ -64,7 +64,7 @@ import {
   messageStatusIn,
   messageTextContains,
   or
-} from "@wats/core/filters";
+} from "@switchbord/core/filters";
 
 const actionableEvent = or(
   and(hasMessageText, messageTextContains("help")),
@@ -75,7 +75,7 @@ const actionableEvent = or(
 ## Recipe 6: exclude internal sender ids
 
 ```ts
-import { and, hasMessageText, messageFromWaId, not } from "@wats/core/filters";
+import { and, hasMessageText, messageFromWaId, not } from "@switchbord/core/filters";
 
 const customerOnly = and(
   hasMessageText,

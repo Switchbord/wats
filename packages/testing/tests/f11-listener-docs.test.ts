@@ -131,9 +131,9 @@ describe("F-11 listeners.md reference guide", () => {
     expect(doc).toContain("onListenerMatch");
   });
 
-  test("contains a usage code sample importing from @wats/core", () => {
+  test("contains a usage code sample importing from @switchbord/core", () => {
     expect(doc).toMatch(/```[ \t]*(ts|typescript)/i);
-    expect(doc).toContain("@wats/core");
+    expect(doc).toContain("@switchbord/core");
   });
 
   test("references WATS-22 Arch-H and the F-11 scope", () => {
@@ -153,7 +153,7 @@ describe("F-11 listeners.md reference guide", () => {
 // ---------------------------------------------------------------------
 
 describe("F-11 core-consumer fixture coverage", () => {
-  test("fixture imports listener substrate from @wats/core", () => {
+  test("fixture imports listener substrate from @switchbord/core", () => {
     const repoRoot = findRepoRoot(import.meta.dir);
     const verifyPath = join(
       repoRoot,

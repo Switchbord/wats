@@ -1,15 +1,15 @@
 {
   "schema": "wats.public-api-consistency.v1",
-  "scope": "@wats/graph endpoint subpaths",
+  "scope": "@switchbord/graph endpoint subpaths",
   "graphEndpointSubpaths": [
     {
-      "packageName": "@wats/graph",
-      "specifier": "@wats/graph/endpoints/messages",
+      "packageName": "@switchbord/graph",
+      "specifier": "@switchbord/graph/endpoints/messages",
       "exportKey": "./endpoints/messages",
       "source": "./src/endpoints/not-real.ts",
       "fixture": "packages/testing/fixtures/graph-consumer/verify-imports.ts",
       "fixtureChecks": [
-        "from \"@wats/graph/endpoints/messages\""
+        "from \"@switchbord/graph/endpoints/messages\""
       ],
       "docs": [
         "docs/reference/index.md",

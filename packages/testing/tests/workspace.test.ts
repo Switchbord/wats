@@ -13,12 +13,12 @@ import { dirname, join, resolve } from "node:path";
 type JsonRecord = Record<string, unknown>;
 
 const REQUIRED_WORKSPACE_PACKAGES = [
-  { dir: "packages/core", name: "@wats/core" },
-  { dir: "packages/graph", name: "@wats/graph" },
-  { dir: "packages/types", name: "@wats/types" },
-  { dir: "packages/http", name: "@wats/http" },
-  { dir: "packages/crypto", name: "@wats/crypto" },
-  { dir: "packages/testing", name: "@wats/testing" }
+  { dir: "packages/core", name: "@switchbord/core" },
+  { dir: "packages/graph", name: "@switchbord/graph" },
+  { dir: "packages/types", name: "@switchbord/types" },
+  { dir: "packages/http", name: "@switchbord/http" },
+  { dir: "packages/crypto", name: "@switchbord/crypto" },
+  { dir: "packages/testing", name: "@switchbord/testing" }
 ] as const;
 
 function isJsonRecord(value: unknown): value is JsonRecord {

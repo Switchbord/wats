@@ -24,7 +24,7 @@ import type {
   MediaReference,
   DocumentReference,
   MessageContext
-} from "@wats/types";
+} from "@switchbord/types";
 
 // Type-level helpers for exhaustiveness and equality assertions.
 type Expect<T extends true> = T;

@@ -47,7 +47,7 @@ function runBun(args: string[], cwd: string): { exitCode: number; stdout: string
   };
 }
 
-describe("WATS-32 @wats/config consumer fixture", () => {
+describe("WATS-32 @switchbord/config consumer fixture", () => {
   test("fixture imports the public package specifier and verifies runtime shapes", () => {
     const repoRoot = findRepoRoot(import.meta.dir);
     const fixtureDir = join(repoRoot, "packages/testing/fixtures/config-consumer");
@@ -57,7 +57,7 @@ describe("WATS-32 @wats/config consumer fixture", () => {
     expect(manifest.private).toBe(true);
     const dependencies = manifest.dependencies;
     expect(isJsonRecord(dependencies)).toBe(true);
-    expect((dependencies as JsonRecord)["@wats/config"]).toBe("workspace:*");
+    expect((dependencies as JsonRecord)["@switchbord/config"]).toBe("workspace:*");
 
     const result = runBun(["run", "verify-imports"], fixtureDir);
     expect(result.exitCode).toBe(

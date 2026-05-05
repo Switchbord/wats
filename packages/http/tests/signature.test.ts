@@ -4,7 +4,7 @@ import {
   _setDefaultCryptoProviderFactory,
   validateWebhookSignature
 } from "../src/signature";
-import { UnsupportedCapabilityError } from "@wats/crypto";
+import { UnsupportedCapabilityError } from "@switchbord/crypto";
 
 describe("C1 webhook signature validation", () => {
   const appSecret = "app-secret";
@@ -417,7 +417,7 @@ describe("F-3 remediation: crypto_provider_unavailable escape hatch", () => {
 
     // Wire up a real provider via createCryptoProvider - but through the
     // input.crypto path which MUST NOT touch the default factory.
-    const { createCryptoProvider } = await import("@wats/crypto");
+    const { createCryptoProvider } = await import("@switchbord/crypto");
     const provider = await createCryptoProvider();
 
     const result = await validateWebhookSignature({

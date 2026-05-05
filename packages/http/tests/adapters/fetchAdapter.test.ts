@@ -5,11 +5,11 @@
 // CRITICAL for Cloudflare Workers / Deno / edge runtimes.
 
 import { describe, expect, test } from "bun:test";
-import { createCryptoProvider } from "@wats/crypto";
+import { createCryptoProvider } from "@switchbord/crypto";
 import {
   createFetchWebhookHandler,
   createWebhookAdapter
-} from "@wats/http";
+} from "@switchbord/http";
 
 const APP_SECRET = "test-app-secret";
 const VERIFY_TOKEN = "test-verify-token";

@@ -1,4 +1,4 @@
-import { isRecord } from "@wats/internal-utils";
+import { isRecord } from "@switchbord/internal-utils";
 
 export const WATS_CONFIG_VERSION = 1 as const;
 export const DEFAULT_WEBHOOK_MAX_BODY_BYTES = 1_048_576 as const;

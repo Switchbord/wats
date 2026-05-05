@@ -124,7 +124,7 @@ WATS_ENABLE_DESTRUCTIVE=1
 
 Rules:
 
-- Secrets must remain environment variables or `@wats/config` env-secret refs.
+- Secrets must remain environment variables or `@switchbord/config` env-secret refs.
 - Do not paste raw secrets into docs, commits, memory, skills, Linear, or chat.
 - `WATS_LIVE_ENABLE=1` is necessary but not sufficient for mutations; require domain flags such as `WATS_ENABLE_TEMPLATE_MUTATIONS=1`.
 

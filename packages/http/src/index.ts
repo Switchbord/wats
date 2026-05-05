@@ -1,6 +1,6 @@
 // Explicit re-exports (rather than `export *`) so module-private
 // test-only override hooks (`_setDefaultCryptoProviderFactory`) stay
-// OUT of the public @wats/http surface. Each hook is still importable
+// OUT of the public @switchbord/http surface. Each hook is still importable
 // from its submodule path for tests, but never surfaces through the
 // package entry point.
 

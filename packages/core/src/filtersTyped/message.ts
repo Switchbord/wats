@@ -1,4 +1,4 @@
-// @wats/core — filtersTyped/message.ts (F-9 GREEN)
+// @switchbord/core — filtersTyped/message.ts (F-9 GREEN)
 //
 // The `message` export is BOTH a kind-filter (TypedFilter narrowing
 // TypedUpdate to TypedMessageUpdate) AND a namespace carrying the
@@ -19,7 +19,7 @@
 // TypedUnknownUpdate. The outer kind check short-circuits before
 // any body-specific inspection.
 
-import type { WhatsAppMessage } from "@wats/types";
+import type { WhatsAppMessage } from "@switchbord/types";
 import type { TypedMessageUpdate, TypedUpdate } from "../webhookNormalizer";
 import {
   FILTER_BRAND,

@@ -68,7 +68,7 @@ import {
   GraphClient,
   PhoneNumberClient,
   type PhoneNumberClientConfig
-} from "@wats/graph";
+} from "@switchbord/graph";
 
 const graphClient = new GraphClient({
   accessToken: process.env.WHATSAPP_TOKEN!,
@@ -148,7 +148,7 @@ endpoint callable.
 | `acceptCall` | implemented (WATS-41) | `POST /{phoneNumberId}/calls` action `accept` |
 | `rejectCall` | implemented (WATS-41) | `POST /{phoneNumberId}/calls` action `reject` |
 | `terminateCall` | implemented (WATS-41) | `POST /{phoneNumberId}/calls` action `terminate` |
-| `uploadMedia` scoped method | deferred | Use root `uploadMedia(client, { phoneNumberId }, ...)` from `@wats/graph` today (WATS-37); a bound scoped convenience method may land later. |
+| `uploadMedia` scoped method | deferred | Use root `uploadMedia(client, { phoneNumberId }, ...)` from `@switchbord/graph` today (WATS-37); a bound scoped convenience method may land later. |
 
 Live template/Flow/calling validation, production Flow hosting, encrypted data-exchange
 request handling, live call sessions, and broad admin APIs remain separate credential-gated
@@ -243,7 +243,7 @@ await phone.acceptCall({
 await phone.terminateCall({ callId: "wacid.ABGG..." });
 ```
 
-Direct callables are also exported from `@wats/graph`: `initiateCall`,
+Direct callables are also exported from `@switchbord/graph`: `initiateCall`,
 `preAcceptCall`, `acceptCall`, `rejectCall`, and `terminateCall`. All five
 delegate to `POST /{phoneNumberId}/calls`; only the Graph body `action` differs
 (`connect`, `pre_accept`, `accept`, `reject`, `terminate`).
@@ -288,7 +288,7 @@ rooted at `/{wabaId}/...` — the most visible of which is the
 phone-number registry.
 
 ```ts
-import { GraphClient, WABAClient } from "@wats/graph";
+import { GraphClient, WABAClient } from "@switchbord/graph";
 
 const waba = new WABAClient({
   graphClient,
@@ -338,7 +338,7 @@ Violations throw `GraphRequestValidationError` at construction.
 | `subscribeApp`     | deferred    | `POST /{wabaId}/subscribed_apps` (later)      |
 
 The `listPhoneNumbers`, WATS-39 template endpoint callables, and WATS-40 Flow endpoint callables are
-also exported from `@wats/graph` so direct-callable users do not need
+also exported from `@switchbord/graph` so direct-callable users do not need
 the sub-client:
 
 ```ts
@@ -346,7 +346,7 @@ import {
   buildTemplateBodyComponent,
   createMessageTemplate,
   listMessageTemplates
-} from "@wats/graph";
+} from "@switchbord/graph";
 
 const { data } = await listMessageTemplates(graphClient, {
   wabaId: "999",
@@ -366,7 +366,7 @@ and validate Graph request shapes and are covered through MockTransport;
 they do not run live Meta/WABA mutations in CI.
 
 ```ts
-import { buildFlowJson, createFlow, listFlows } from "@wats/graph";
+import { buildFlowJson, createFlow, listFlows } from "@switchbord/graph";
 
 await listFlows(graphClient, { wabaId: "999", status: "DRAFT" });
 
@@ -397,7 +397,7 @@ import {
   getWabaInfo,
   getBusinessProfile,
   getPhoneNumberSettings
-} from "@wats/graph";
+} from "@switchbord/graph";
 
 await waba.getInfo({ fields: ["id", "name", "business_verification_status"] });
 await waba.listSubscribedApps();
@@ -409,7 +409,7 @@ await phone.getCommerceSettings({ fields: ["is_cart_enabled", "is_catalog_visibl
 await phone.getSettings({ fields: "calling", includeSipCredentials: false });
 ```
 
-Direct callables mirror those methods: `getWabaInfo`, `listSubscribedApps`, enhanced `listPhoneNumbers`, `getPhoneNumberInfo`, `getPhoneNumberSettings`, `getBusinessProfile`, and `getCommerceSettings`. They are exported from root `@wats/graph` and from `@wats/graph/endpoints/business-management`.
+Direct callables mirror those methods: `getWabaInfo`, `listSubscribedApps`, enhanced `listPhoneNumbers`, `getPhoneNumberInfo`, `getPhoneNumberSettings`, `getBusinessProfile`, and `getCommerceSettings`. They are exported from root `@switchbord/graph` and from `@switchbord/graph/endpoints/business-management`.
 
 Validation is fail-closed before transport: path ids reject raw/encoded/double-encoded traversal and control characters; `fields` accepts a string or dense readonly string array and is joined with commas through URLSearchParams; `includeSipCredentials` must be boolean when provided and maps to Graph `include_sip_credentials=true|false`. `getPhoneNumberSettings({ includeSipCredentials: true })` may return SIP credentials, so treat that response as sensitive and avoid logging it. Mutating admin endpoints and live Meta verification remain credential-gated.
 
@@ -426,7 +426,7 @@ import {
   GraphAuthError,
   UnsupportedMessageTypeError,
   InvalidParameterError
-} from "@wats/graph";
+} from "@switchbord/graph";
 
 try {
   await phone.sendMessage(body);

@@ -1,4 +1,4 @@
-// @wats/core — filtersTyped/core.ts (F-9 GREEN)
+// @switchbord/core — filtersTyped/core.ts (F-9 GREEN)
 //
 // Pre-built "kind" filters narrowing TypedUpdate to each of its
 // four discriminated-union variants. `message` and `status` live

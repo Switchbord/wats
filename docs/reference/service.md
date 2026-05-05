@@ -1,4 +1,4 @@
-# Service Reference (`@wats/service`)
+# Service Reference (`@switchbord/service`)
 
 - status: experimental
 - applies-to: WATS-34/WATS-35
@@ -6,7 +6,7 @@
 
 ## Purpose
 
-`@wats/service` is the first standalone WATS application boundary. It exposes a runtime-neutral `Request -> Response` app that composes the existing Graph client, webhook adapter, config profile shape, and WhatsApp facade.
+`@switchbord/service` is the first standalone WATS application boundary. It exposes a runtime-neutral `Request -> Response` app that composes the existing Graph client, webhook adapter, config profile shape, and WhatsApp facade.
 
 It is not a production server by itself. Bun/Node/Docker wrappers, persistence, metrics, and public docs UI remain separate roadmap items. WATS-35 adds a generated OpenAPI 3.1 document for the routes listed below.
 
@@ -20,7 +20,7 @@ import {
   type WatsServiceApp,
   type WatsServiceConfig,
   type WatsServiceOpenApiOptions
-} from "@wats/service";
+} from "@switchbord/service";
 ```
 
 ### `createWatsServiceApp(config)`
@@ -37,7 +37,7 @@ Config:
 
 ```ts
 interface WatsServiceConfig {
-  profile: WatsProfileConfig;       // already validated by @wats/config
+  profile: WatsProfileConfig;       // already validated by @switchbord/config
   secrets: {
     accessToken: string;
     webhookVerifyToken: string;
@@ -50,7 +50,7 @@ interface WatsServiceConfig {
 }
 ```
 
-The service package does not read environment variables. Callers resolve env refs from `@wats/config` outside the service and pass explicit secret values in memory.
+The service package does not read environment variables. Callers resolve env refs from `@switchbord/config` outside the service and pass explicit secret values in memory.
 
 ## Routes
 
@@ -123,7 +123,7 @@ Other message types are available through the library-level WATS-38 composer hel
 
 ## Webhook route
 
-The configured webhook path delegates to `@wats/http`:
+The configured webhook path delegates to `@switchbord/http`:
 
 - GET challenge verification uses `secrets.webhookVerifyToken`
 - POST signature verification uses `secrets.webhookAppSecret`
@@ -158,13 +158,13 @@ Common HTTP error codes:
 
 ## WATS-48 persistence design target
 
-WATS-48 documents a future injected PersistenceStore for service runtimes. There is no persistence integration in current @wats/service runtime.
+WATS-48 documents a future injected PersistenceStore for service runtimes. There is no persistence integration in current @switchbord/service runtime.
 
 Future service integration should accept an injected PersistenceStore instead of reading database environment variables directly. The service must not log secrets or raw webhook bodies through persistence diagnostics, and persistence failures must not expose database URLs, access tokens, app secrets, webhook verify tokens, service bearer tokens, message text, or raw webhook envelopes.
 
 ## WATS-49 Docker/deployment design target
 
-WATS-49 documents the future container deployment contract. There is no supported Dockerfile/Compose/container image yet, and current @wats/service has no process wrapper/Docker integration.
+WATS-49 documents the future container deployment contract. There is no supported Dockerfile/Compose/container image yet, and current @switchbord/service has no process wrapper/Docker integration.
 
 Future containers should wrap `wats serve` rather than duplicating service routing. WATS-49 does not add image publication, registry credentials, live Meta startup checks, or release automation. In docs-lock wording: no image publication and no registry credentials.
 

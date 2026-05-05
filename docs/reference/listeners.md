@@ -33,8 +33,8 @@ import {
   ListenerAbortError,
   ListenerTimeoutError,
   type ListenerHandle
-} from "@wats/core";
-import { message } from "@wats/core/filtersTyped";
+} from "@switchbord/core";
+import { message } from "@switchbord/core/filtersTyped";
 
 const wa = new WhatsApp({ graphClient });
 
@@ -199,7 +199,7 @@ keeps normal routing unaffected by the listener substrate.
 `TypedRouterOptions` accepts an optional `listenerRegistry` hook:
 
 ```ts
-import { TypedRouter, createListenerRegistry } from "@wats/core";
+import { TypedRouter, createListenerRegistry } from "@switchbord/core";
 
 const registry = createListenerRegistry();
 const router = new TypedRouter({ listenerRegistry: registry });
@@ -244,7 +244,7 @@ wa.listen<TKind>(
 
 The facade composes the kind gate, the optional `from` narrower, and
 the optional user-supplied `filter` via `and(...)` from
-`@wats/core/filtersTyped`.
+`@switchbord/core/filtersTyped`.
 
 Additional facade surface:
 
@@ -335,7 +335,7 @@ F-11 intentionally excludes:
   `FakeClock` threading is tracked for a later F-step if
   deterministic tests require it; today the contract is a numeric
   `timeoutMs`.
-- **No @wats/http webhook wiring.** F-12 owns that integration — the
+- **No @switchbord/http webhook wiring.** F-12 owns that integration — the
   adapter calls `wa.dispatch(update)` as envelopes arrive.
 
 ## Open questions

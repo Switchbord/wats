@@ -39,12 +39,12 @@ Goal: make the repository ready for public release engineering.
 
 Goal: make WATS adoptable without writing framework glue.
 
-- `@wats/config` with YAML/JSON config loading and env-secret references
-- `@wats/cli` with `init`, `config validate`, `doctor`, `serve`, and `openapi`
+- `@switchbord/config` with YAML/JSON config loading and env-secret references
+- `@switchbord/cli` with `init`, `config validate`, `doctor`, `serve`, and `openapi`
 - WATS-47 CLI operator UX design for `init`, `doctor`, and `serve`, keeping no live Meta calls by default while implementation proceeds in later CLI slices
 - WATS-48 persistence contract design for durable runtime state, SQLite/Postgres adapter path, migrations, and idempotency. No runtime adapter implementation in the design slice.
 - WATS-49 Docker/deployment design scaffold for future `wats serve` packaging; no runtime Docker artifact/image publication in the design slice.
-- `@wats/service` with webhook ingestion, text send, health/readiness, auth, and OpenAPI 3.1
+- `@switchbord/service` with webhook ingestion, text send, health/readiness, auth, and OpenAPI 3.1
 - docs for package-manager installation and standalone operation
 
 ### M2 — media runtime
@@ -132,7 +132,7 @@ Goal: cover WABA and phone-number operations needed for real operations teams.
 WATS-42A — Complete for the bounded read-only, credential-free first slice:
 - `getWabaInfo`, `listSubscribedApps`, enhanced `listPhoneNumbers({ fields?, limit?, after?, before? })`
 - `getPhoneNumberInfo`, `getPhoneNumberSettings`, `getBusinessProfile`, `getCommerceSettings`
-- matching `WABAClient` / `PhoneNumberClient` methods and public `@wats/graph/endpoints/business-management` subpath
+- matching `WABAClient` / `PhoneNumberClient` methods and public `@switchbord/graph/endpoints/business-management` subpath
 - MockTransport-only validation; `getPhoneNumberSettings({ includeSipCredentials: true })` may return sensitive SIP credential material
 
 Remaining:

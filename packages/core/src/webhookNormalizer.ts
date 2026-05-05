@@ -1,4 +1,4 @@
-// @wats/core — webhookNormalizer.ts (F-8 GREEN)
+// @switchbord/core — webhookNormalizer.ts (F-8 GREEN)
 //
 // Typed-update normalizer above the C2 parser. Takes a loose webhook
 // envelope (JSON already parsed) and emits a TypedUpdate discriminated
@@ -27,7 +27,7 @@
 //   - No cross-envelope dedup persistence (caller responsibility).
 //   - No handler registration / routing (F-10).
 //   - No filter types (F-9).
-//   - No modification of @wats/core/updateParser (the C2 parser).
+//   - No modification of @switchbord/core/updateParser (the C2 parser).
 //     The normalizer consumes raw envelope JSON directly and is
 //     independent of the parser; the parser remains available for
 //     lower-level observability use-cases.
@@ -41,7 +41,7 @@ import type {
   WhatsAppMessage,
   WhatsAppMessageStatus,
   WhatsAppWebhookChange
-} from "@wats/types";
+} from "@switchbord/types";
 
 export type CallEvent = "connect" | "terminate";
 export type CallDirection = "USER_INITIATED" | "BUSINESS_INITIATED";

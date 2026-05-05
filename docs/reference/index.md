@@ -6,7 +6,7 @@
 
 Curated index of every WATS reference doc. Use the "When to use it" column to find the right entry point — the detailed surface lives in the linked doc.
 
-## Graph primitives (`@wats/graph`)
+## Graph primitives (`@switchbord/graph`)
 
 | Doc | When to use it |
 | --- | --- |
@@ -15,9 +15,9 @@ Curated index of every WATS reference doc. Use the "When to use it" column to fi
 | [`reference/scoped-clients.md`](./scoped-clients.md) | Binding a `phoneNumberId` or `wabaId` into a `PhoneNumberClient` / `WABAClient`. |
 | [`reference/errors.md`](./errors.md) | The F-5 error registry; every pywa error code → WATS subclass; classification axis. |
 | [`reference/pagination.md`](./pagination.md) | `paginate` / `paginateAll`; cursor extraction; `AbortSignal`; `PaginationError` taxonomy. |
-| [`reference/media.md`](./media.md) | Media runtime: upload, metadata, binary download, delete, encrypted decrypt, upload sessions, validation, and integrity checks. Public Graph endpoint subpaths cover messages at `@wats/graph/endpoints/messages`, media at `@wats/graph/endpoints/media`, templates at `@wats/graph/endpoints/templates`, Flows at `@wats/graph/endpoints/flows`, calling at `@wats/graph/endpoints/calling`, and business management at `@wats/graph/endpoints/business-management`; WATS-54 keeps these aligned with `bun run api:check`. |
+| [`reference/media.md`](./media.md) | Media runtime: upload, metadata, binary download, delete, encrypted decrypt, upload sessions, validation, and integrity checks. Public Graph endpoint subpaths cover messages at `@switchbord/graph/endpoints/messages`, media at `@switchbord/graph/endpoints/media`, templates at `@switchbord/graph/endpoints/templates`, Flows at `@switchbord/graph/endpoints/flows`, calling at `@switchbord/graph/endpoints/calling`, and business management at `@switchbord/graph/endpoints/business-management`; WATS-54 keeps these aligned with `bun run api:check`. |
 
-## Core primitives (`@wats/core`)
+## Core primitives (`@switchbord/core`)
 
 | Doc | When to use it |
 | --- | --- |
@@ -27,20 +27,20 @@ Curated index of every WATS reference doc. Use the "When to use it" column to fi
 | [`reference/whatsapp-facade.md`](./whatsapp-facade.md) | The `WhatsApp` composition root; what it binds, what it exposes, when to bypass it. |
 | [`reference/listeners.md`](./listeners.md) | Listener substrate: `wa.listen({ ... })`, timeouts, cancellation, registry lifecycle. |
 
-## HTTP primitives (`@wats/http`)
+## HTTP primitives (`@switchbord/http`)
 
 | Doc | When to use it |
 | --- | --- |
 | [`reference/webhook-adapter.md`](./webhook-adapter.md) | Wiring up a webhook endpoint: `createWebhookAdapter` core + Bun / Node / Fetch wrappers. |
 | [`reference/webhook.md`](./webhook.md) | Low-level `verifyWebhookChallenge` + `validateWebhookSignature` primitives. |
 
-## Crypto primitives (`@wats/crypto`)
+## Crypto primitives (`@switchbord/crypto`)
 
 | Doc | When to use it |
 | --- | --- |
 | [`reference/crypto.md`](./crypto.md) | `CryptoProvider` seam; Node / Bun / WebCrypto adapters; typed error hierarchy. |
 
-## Shared types (`@wats/types`)
+## Shared types (`@switchbord/types`)
 
 | Doc | When to use it |
 | --- | --- |
@@ -50,9 +50,9 @@ Curated index of every WATS reference doc. Use the "When to use it" column to fi
 
 | Doc | When to use it |
 | --- | --- |
-| [`reference/config.md`](./config.md) | `@wats/config` YAML/JSON schema, env-secret refs, validation, redaction. |
-| [`reference/cli.md`](./cli.md) | `@wats/cli` skeleton commands and planned onboarding workflow. |
-| [`reference/service.md`](./service.md) | `@wats/service` runtime-neutral standalone webhook/API service foundation. |
+| [`reference/config.md`](./config.md) | `@switchbord/config` YAML/JSON schema, env-secret refs, validation, redaction. |
+| [`reference/cli.md`](./cli.md) | `@switchbord/cli` skeleton commands and planned onboarding workflow. |
+| [`reference/service.md`](./service.md) | `@switchbord/service` runtime-neutral standalone webhook/API service foundation. |
 | [`reference/persistence.md`](./persistence.md) | WATS-48 design target for durable runtime state, SQLite/Postgres adapter contract, migrations, and idempotency. |
 | [`reference/openapi.md`](./openapi.md) | Generated OpenAPI 3.1 document and `GET /openapi.json` service route. |
 

@@ -62,23 +62,23 @@ After `1.0.0`:
 
 ## Monorepo package policy
 
-The root package remains private. Published packages should be scoped packages under `@wats/*` until a future rename/scope decision is made. The alpha CLI/runtime/operator layer stays in this monorepo per ADR-007; a second repository is not the default release target for `@wats/cli`, `@wats/service`, config templates, persistence contracts, Docker/deploy docs, or alpha launch documentation.
+The root package remains private. Published packages should be scoped packages under `@switchbord/*` until a future rename/scope decision is made. The alpha CLI/runtime/operator layer stays in this monorepo per ADR-007; a second repository is not the default release target for `@switchbord/cli`, `@switchbord/service`, config templates, persistence contracts, Docker/deploy docs, or alpha launch documentation.
 
 Publishable packages:
 
-- `@wats/types`
-- `@wats/crypto`
-- `@wats/graph`
-- `@wats/core`
-- `@wats/http`
-- `@wats/config`
-- `@wats/service`
-- `@wats/cli`
+- `@switchbord/types`
+- `@switchbord/crypto`
+- `@switchbord/graph`
+- `@switchbord/core`
+- `@switchbord/http`
+- `@switchbord/config`
+- `@switchbord/service`
+- `@switchbord/cli`
 
 Private packages:
 
-- `@wats/internal-utils`
-- `@wats/testing`
+- `@switchbord/internal-utils`
+- `@switchbord/testing`
 
 Before any public release, publishable packages must expose built artifacts via `exports` and `types`; source-only `./src/*.ts` exports are acceptable for the local Bun workspace but not for registry release.
 
@@ -100,7 +100,7 @@ bun run check-publish
 What these commands mean today:
 
 - `bun test` runs the existing unit, policy, consumer-fixture, docs-lockstep, and edge-runtime tests.
-- `bun run typecheck` runs `bunx tsc --noEmit -p tsconfig.release.json` over the currently publishable package source trees: `@wats/types`, `@wats/crypto`, `@wats/graph`, `@wats/core`, `@wats/http`, `@wats/config`, `@wats/service`, and `@wats/cli`.
+- `bun run typecheck` runs `bunx tsc --noEmit -p tsconfig.release.json` over the currently publishable package source trees: `@switchbord/types`, `@switchbord/crypto`, `@switchbord/graph`, `@switchbord/core`, `@switchbord/http`, `@switchbord/config`, `@switchbord/service`, and `@switchbord/cli`.
 - `bun run docs:check` validates the public docs manifest, local links, internal-path exclusions, and generated-output secret scan.
 - `bun run docs:build` generates the static OpenAPI JSON, creates the TypeDoc-ready package API page, and builds the VitePress site credential-free.
 - `bun run check-publish` runs typecheck, `bun run build:packages`, `bun run pack:smoke`, and the WATS-31/WATS-83 workspace-policy tests.
@@ -111,7 +111,7 @@ CI mirrors those commands in `.github/workflows/ci.yml` using Bun on GitHub-host
 
 WATS-83 converts the publishable package manifests from source-only `./src/*.ts` exports to built `dist` artifacts. The publishable packages now declare `main`, `types`, and `exports` entries that point at `dist/index.js`, `dist/index.d.ts`, and matching subpath `dist` files.
 
-The new `bun run build:packages` gate builds JavaScript and declarations for `@wats/types`, `@wats/crypto`, `@wats/graph`, `@wats/core`, `@wats/http`, `@wats/internal-utils`, `@wats/config`, `@wats/service`, and `@wats/cli` into each package-local `dist/` directory. The private `@wats/testing` package remains outside this build list.
+The new `bun run build:packages` gate builds JavaScript and declarations for `@switchbord/types`, `@switchbord/crypto`, `@switchbord/graph`, `@switchbord/core`, `@switchbord/http`, `@switchbord/internal-utils`, `@switchbord/config`, `@switchbord/service`, and `@switchbord/cli` into each package-local `dist/` directory. The private `@switchbord/testing` package remains outside this build list.
 
 The new `bun run pack:smoke` gate runs packed-output smoke tests with `bun pm pack --dry-run --ignore-scripts` plus temporary tarball inspection. It verifies package tarballs contain `package.json`, `dist/index.js`, and `dist/index.d.ts`, and exclude source entrypoints, `.env` files, and `node_modules`.
 
@@ -200,21 +200,21 @@ Before tagging or pushing a release:
 
 ## 0.2.1 alpha launch package-manager release
 
-WATS 0.2.1 is the alpha launch package-manager line. The intended registry path is npm-compatible package publication, which Bun consumes with `bun add @wats/...`.
+WATS 0.2.1 is the alpha launch package-manager line. The intended registry path is npm-compatible package publication, which Bun consumes with `bun add @switchbord/...`.
 
 Publishable packages for 0.2.1:
 
-- `@wats/types`
-- `@wats/crypto`
-- `@wats/graph`
-- `@wats/core`
-- `@wats/http`
-- `@wats/internal-utils`
-- `@wats/config`
-- `@wats/service`
-- `@wats/cli`
+- `@switchbord/types`
+- `@switchbord/crypto`
+- `@switchbord/graph`
+- `@switchbord/core`
+- `@switchbord/http`
+- `@switchbord/internal-utils`
+- `@switchbord/config`
+- `@switchbord/service`
+- `@switchbord/cli`
 
-`@wats/internal-utils` is included because `@wats/config` depends on it at runtime; keeping it private would make registry installs fail. It remains documented as an internal package and should not be treated as a stable public API.
+`@switchbord/internal-utils` is included because `@switchbord/config` depends on it at runtime; keeping it private would make registry installs fail. It remains documented as an internal package and should not be treated as a stable public API.
 
 Before actual publication, run:
 

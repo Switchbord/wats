@@ -8,12 +8,12 @@
 
 ## Goal
 
-Show minimal Bun route wiring for webhook challenge and signature verification using C1 primitives from `@wats/http`.
+Show minimal Bun route wiring for webhook challenge and signature verification using C1 primitives from `@switchbord/http`.
 
 ## Minimal Example
 
 ```ts
-import { validateWebhookSignature, verifyWebhookChallenge } from "@wats/http";
+import { validateWebhookSignature, verifyWebhookChallenge } from "@switchbord/http";
 
 const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN as string;
 const appSecret = process.env.WHATSAPP_APP_SECRET as string;

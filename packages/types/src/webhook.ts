@@ -1,4 +1,4 @@
-// @wats/types — webhook.ts
+// @switchbord/types — webhook.ts
 //
 // F-1 closes the open `[key: string]: unknown` on every webhook-value
 // variant in favor of a discriminated union keyed by the outer field

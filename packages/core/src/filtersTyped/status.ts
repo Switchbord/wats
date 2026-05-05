@@ -1,4 +1,4 @@
-// @wats/core — filtersTyped/status.ts (F-9 GREEN)
+// @switchbord/core — filtersTyped/status.ts (F-9 GREEN)
 //
 // The `status` export is BOTH a kind-filter (narrow TypedUpdate to
 // TypedStatusUpdate) AND a namespace carrying the four message-status
@@ -7,7 +7,7 @@
 // via `custom(predicate)` in the interim.
 
 import type { TypedStatusUpdate, TypedUpdate } from "../webhookNormalizer";
-import type { WhatsAppMessageStatusKind } from "@wats/types";
+import type { WhatsAppMessageStatusKind } from "@switchbord/types";
 import { FILTER_BRAND, type TypedFilter } from "./typedFilter";
 
 function isStatus(u: TypedUpdate): u is TypedStatusUpdate {

@@ -1,5 +1,5 @@
 {
-  "name": "@wats/core",
+  "name": "@switchbord/core",
   "version": "0.2.1",
   "private": false,
   "license": "MIT",
@@ -69,6 +69,6 @@
     "wats"
   ],
   "dependencies": {
-    "@wats/graph": "^0.2.1"
+    "@switchbord/graph": "^0.2.1"
   }
 }

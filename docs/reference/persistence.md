@@ -2,7 +2,7 @@
 
 - status: design
 - applies-to: WATS-48
-- package: future `@wats/persistence`
+- package: future `@switchbord/persistence`
 - lastReviewed: 2026-05-01
 
 ## Design target
@@ -11,7 +11,7 @@ WATS-48 defines the public persistence design target for future durable runtime 
 
 ## Current implementation status
 
-`@wats/persistence is not exported yet`. There is no package export yet, no adapters implemented in this slice, no config schema field, no service persistence integration, and no migration runner.
+`@switchbord/persistence is not exported yet`. There is no package export yet, no adapters implemented in this slice, no config schema field, no service persistence integration, and no migration runner.
 
 This page is public so future CLI/service/deployment work can align before behavior lands.
 
@@ -26,14 +26,14 @@ import type {
   PersistenceTransaction,
   MigrationReport,
   PersistenceHealth
-} from "@wats/persistence";
+} from "@switchbord/persistence";
 ```
 
 Potential subpaths:
 
 ```ts
-import { createSqlitePersistence } from "@wats/persistence/sqlite";
-import { createPostgresPersistence } from "@wats/persistence/postgres";
+import { createSqlitePersistence } from "@switchbord/persistence/sqlite";
+import { createPostgresPersistence } from "@switchbord/persistence/postgres";
 ```
 
 These imports are not available in the current implementation.

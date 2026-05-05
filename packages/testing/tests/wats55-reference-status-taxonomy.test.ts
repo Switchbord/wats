@@ -35,11 +35,11 @@ function expectAll(source: string, needles: readonly string[], label: string): v
 }
 
 const graphEndpointSubpaths = [
-  "@wats/graph/endpoints/media",
-  "@wats/graph/endpoints/templates",
-  "@wats/graph/endpoints/flows",
-  "@wats/graph/endpoints/calling",
-  "@wats/graph/endpoints/business-management"
+  "@switchbord/graph/endpoints/media",
+  "@switchbord/graph/endpoints/templates",
+  "@switchbord/graph/endpoints/flows",
+  "@switchbord/graph/endpoints/calling",
+  "@switchbord/graph/endpoints/business-management"
 ] as const;
 
 describe("WATS-55 reference status taxonomy and metadata", () => {
@@ -77,7 +77,7 @@ describe("WATS-55 reference status taxonomy and metadata", () => {
     expect(endpoints).toContain("## Primitive vs first-class endpoint families");
     expect(endpoints).toContain("`defineEndpoint` is the plumbing primitive");
     expect(endpoints).toContain("first-class Graph endpoint family subpaths");
-    expect(endpoints).toContain("`@wats/graph/endpoints/messages`");
+    expect(endpoints).toContain("`@switchbord/graph/endpoints/messages`");
     expectAll(endpoints, graphEndpointSubpaths, "endpoints reference first-class subpaths");
     expect(endpoints).toContain("WATS-54");
     expect(endpoints).toContain("bun run api:check");
@@ -97,16 +97,16 @@ describe("WATS-55 reference status taxonomy and metadata", () => {
     const migration = read("docs/migration/pywa-to-wats.md");
 
     expectAll(migration, [
-      "@wats/graph/endpoints/media",
-      "@wats/graph/endpoints/templates",
-      "@wats/graph/endpoints/flows",
-      "@wats/graph/endpoints/calling",
-      "@wats/graph/endpoints/business-management",
+      "@switchbord/graph/endpoints/media",
+      "@switchbord/graph/endpoints/templates",
+      "@switchbord/graph/endpoints/flows",
+      "@switchbord/graph/endpoints/calling",
+      "@switchbord/graph/endpoints/business-management",
       "Use consumer fixtures as the source of truth for supported package-specifier imports"
     ], "migration import cheat sheet");
     expect(migration).not.toMatch(/root[- ]only/i);
-    expect(migration).not.toContain("Root `@wats/graph` exports only");
-    expect(migration).not.toContain("Some root `@wats/graph` exports do not yet have dedicated package subpaths");
+    expect(migration).not.toContain("Root `@switchbord/graph` exports only");
+    expect(migration).not.toContain("Some root `@switchbord/graph` exports do not yet have dedicated package subpaths");
   });
 
   test("changelog records WATS-55 as docs-only status taxonomy work", () => {

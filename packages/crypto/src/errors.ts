@@ -1,4 +1,4 @@
-// @wats/crypto — typed error hierarchy + shared input-validation helpers.
+// @switchbord/crypto — typed error hierarchy + shared input-validation helpers.
 //
 // These errors are the public taxonomy for validation failures across
 // both adapters. Adapters MUST throw / reject with one of the subclasses

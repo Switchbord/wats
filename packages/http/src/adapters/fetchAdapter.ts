@@ -1,4 +1,4 @@
-// @wats/http — Fetch adapter wrapper (F-12 GREEN + WATS-29 hardening).
+// @switchbord/http — Fetch adapter wrapper (F-12 GREEN + WATS-29 hardening).
 //
 // WinterCG-shaped adapter: takes a WHATWG Request and returns a
 // Promise<Response>. Usable directly from Cloudflare Workers, Deno,

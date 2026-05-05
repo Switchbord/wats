@@ -1,4 +1,4 @@
-// @wats/core — filtersTyped/combinators.ts (F-9 GREEN)
+// @switchbord/core — filtersTyped/combinators.ts (F-9 GREEN)
 //
 // and/or/not/custom combinators over the TypedFilter brand. All
 // factories validate at construction (never swallow consumer errors)

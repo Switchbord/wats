@@ -25,7 +25,7 @@ function read(path: string): string {
 }
 
 describe("WATS-42A package exports and consumer fixture", () => {
-  test("@wats/graph exposes business-management subpath and fixture imports it", () => {
+  test("@switchbord/graph exposes business-management subpath and fixture imports it", () => {
     const packageJson = JSON.parse(read("packages/graph/package.json")) as {
       exports?: Record<string, { types?: string; import?: string }>;
     };
@@ -47,7 +47,7 @@ describe("WATS-42A package exports and consumer fixture", () => {
     ]) {
       expect(fixture).toContain(symbol);
     }
-    expect(fixture).toContain('from "@wats/graph/endpoints/business-management"');
+    expect(fixture).toContain('from "@switchbord/graph/endpoints/business-management"');
     expect(fixture).toContain("WABAClient");
     expect(fixture).toContain("PhoneNumberClient");
     expect(fixture).toContain("wats42-business-management round trips");

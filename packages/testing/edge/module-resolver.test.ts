@@ -1,20 +1,20 @@
 import { describe, expect, test } from "bun:test";
-import { isRecord } from "@wats/internal-utils";
+import { isRecord } from "@switchbord/internal-utils";
 
 // F-0 edge-runtime module-resolver guard placeholder.
 //
 // This test runs under the default `bun test` runtime. It asserts that
-// importing @wats/internal-utils from an edge-suite file succeeds and that
+// importing @switchbord/internal-utils from an edge-suite file succeeds and that
 // the exported contract has the shape an edge runtime (WinterCG / Workers)
 // can rely on without any node:* capabilities.
 //
 // When F-12 introduces a real WinterCG / Miniflare harness, this file is
 // the anchor point the harness will replace. Until then it locks the fact
-// that @wats/internal-utils has zero runtime capabilities beyond pure
+// that @switchbord/internal-utils has zero runtime capabilities beyond pure
 // JavaScript.
 
 describe("edge-runtime module-resolver guard (F-0 placeholder)", () => {
-  test("@wats/internal-utils exports isRecord as a pure function", () => {
+  test("@switchbord/internal-utils exports isRecord as a pure function", () => {
     expect(typeof isRecord).toBe("function");
     expect(isRecord.length).toBe(1);
   });

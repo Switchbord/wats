@@ -66,7 +66,7 @@ describe("WATS-51 config and env templates", () => {
     expect(gitignore).toContain("wats.config.json");
   });
 
-  test("YAML and JSON examples parse through @wats/config and redact env names", () => {
+  test("YAML and JSON examples parse through @switchbord/config and redact env names", () => {
     const yaml = read("examples/config/wats.config.example.yaml");
     const json = read("examples/config/wats.config.example.json");
 

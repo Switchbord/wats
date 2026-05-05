@@ -37,7 +37,7 @@ Behavior changes should follow RED/GREEN discipline:
 - run targeted tests and neighboring regressions;
 - update docs and changelog in the same branch.
 
-Public package changes must include package-specifier consumer coverage. Import through `@wats/*` entrypoints rather than package-internal relative paths so export maps and downstream consumption are tested.
+Public package changes must include package-specifier consumer coverage. Import through `@switchbord/*` entrypoints rather than package-internal relative paths so export maps and downstream consumption are tested.
 
 Security-sensitive changes need adversarial checks for malformed JavaScript callers, accessor-backed objects, URL/path/header injection, resource caps, body passthrough semantics, typed error taxonomy, and secret redaction.
 

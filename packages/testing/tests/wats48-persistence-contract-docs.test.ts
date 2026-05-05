@@ -40,7 +40,7 @@ describe("WATS-48 persistence contract design docs", () => {
       "Linear remains the source of truth",
       "no second repository",
       "design/docs/test-planner only",
-      "@wats/persistence",
+      "@switchbord/persistence",
       "PersistenceStore",
       "PersistenceAdapter",
       "PersistenceTransaction",
@@ -65,7 +65,7 @@ describe("WATS-48 persistence contract design docs", () => {
       "applies-to: WATS-48",
       "Design target",
       "Current implementation status",
-      "@wats/persistence is not exported yet",
+      "@switchbord/persistence is not exported yet",
       "no package export yet",
       "no adapters implemented in this slice",
       "PersistenceStore",
@@ -91,27 +91,27 @@ describe("WATS-48 persistence contract design docs", () => {
     expectAll(service, [
       "WATS-48",
       "injected PersistenceStore",
-      "no persistence integration in current @wats/service runtime",
+      "no persistence integration in current @switchbord/service runtime",
       "must not log secrets or raw webhook bodies"
     ]);
 
     expectAll(config, [
       "WATS-48",
-      "current @wats/config schema has no persistence field",
+      "current @switchbord/config schema has no persistence field",
       "WATS_DATABASE_URL",
       "raw database credentials must not be committed"
     ]);
 
     expectAll(packageMap, [
       "WATS-48 planned package boundary",
-      "@wats/persistence",
-      "@wats/persistence/sqlite",
-      "@wats/persistence/postgres",
+      "@switchbord/persistence",
+      "@switchbord/persistence/sqlite",
+      "@switchbord/persistence/postgres",
       "not current package surface until implementation lands"
     ]);
 
     expectAll(publicSurface, [
-      "@wats/persistence package and SQLite/Postgres adapters are WATS-48 design targets only",
+      "@switchbord/persistence package and SQLite/Postgres adapters are WATS-48 design targets only",
       "No current package export",
       "no service persistence integration",
       "no config persistence schema"
@@ -176,7 +176,7 @@ describe("WATS-48 persistence contract design docs", () => {
     expectAll(changelog, [
       "WATS-48 — persistence contract design",
       "design/docs/test-planner only",
-      "no @wats/persistence package export",
+      "no @switchbord/persistence package export",
       "no adapters",
       "no config schema changes",
       "no service persistence integration",

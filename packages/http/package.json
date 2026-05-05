@@ -1,5 +1,5 @@
 {
-  "name": "@wats/http",
+  "name": "@switchbord/http",
   "version": "0.2.1",
   "private": false,
   "license": "MIT",
@@ -61,8 +61,8 @@
     "wats"
   ],
   "dependencies": {
-    "@wats/crypto": "^0.2.1",
-    "@wats/core": "^0.2.1",
-    "@wats/types": "^0.2.1"
+    "@switchbord/crypto": "^0.2.1",
+    "@switchbord/core": "^0.2.1",
+    "@switchbord/types": "^0.2.1"
   }
 }

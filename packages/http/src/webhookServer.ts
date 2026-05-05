@@ -1,12 +1,12 @@
-// @wats/http — webhook verify-challenge handler built on the
-// @wats/crypto CryptoProvider seam. Zero static `node:*` imports and
+// @switchbord/http — webhook verify-challenge handler built on the
+// @switchbord/crypto CryptoProvider seam. Zero static `node:*` imports and
 // zero `Buffer` references — edge-portable.
 
 import {
   UnsupportedCapabilityError,
   createCryptoProvider,
   type CryptoProvider
-} from "@wats/crypto";
+} from "@switchbord/crypto";
 
 export type WebhookChallengeErrorCode =
   | "invalid_expected_verify_token"

@@ -1,12 +1,12 @@
-import type { WatsProfileConfig } from "@wats/config";
-import { WhatsApp } from "@wats/core";
-import { GraphClient, type GraphMessagesSendBody, type Transport } from "@wats/graph";
-import type { CryptoProvider } from "@wats/crypto";
+import type { WatsProfileConfig } from "@switchbord/config";
+import { WhatsApp } from "@switchbord/core";
+import { GraphClient, type GraphMessagesSendBody, type Transport } from "@switchbord/graph";
+import type { CryptoProvider } from "@switchbord/crypto";
 import {
   createFetchWebhookHandler,
   createWebhookAdapter,
   type WebhookFacadeLike
-} from "@wats/http";
+} from "@switchbord/http";
 
 export interface WatsServiceSecrets {
   readonly accessToken: string;

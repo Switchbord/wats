@@ -8,14 +8,14 @@
 
 ## Purpose
 
-`@wats/graph` ships a small `Transport` seam under `GraphClient` so that every HTTP concern — retries, authentication refresh, tracing, mocking in tests — lives in a composable layer the user controls. The default transport (`createFetchTransport`) is a thin wrapper over `globalThis.fetch`. Tests inject `createMockTransport` via the `@wats/graph/testing` subpath and assert on a `requests` array rather than monkey-patching global state.
+`@switchbord/graph` ships a small `Transport` seam under `GraphClient` so that every HTTP concern — retries, authentication refresh, tracing, mocking in tests — lives in a composable layer the user controls. The default transport (`createFetchTransport`) is a thin wrapper over `globalThis.fetch`. Tests inject `createMockTransport` via the `@switchbord/graph/testing` subpath and assert on a `requests` array rather than monkey-patching global state.
 
 This guide covers three recipes: the test recipe, a custom Transport for production concerns, and the Interceptor primer.
 
 ## The Transport contract
 
 ```ts
-import type { Transport, TransportRequest, TransportResponse } from "@wats/graph";
+import type { Transport, TransportRequest, TransportResponse } from "@switchbord/graph";
 ```
 
 A `Transport` has one method:
@@ -32,11 +32,11 @@ The seam is intentionally minimal: if you can write the function, you can swap i
 
 ## Recipe 1 — Testing with `createMockTransport`
 
-Import the mock factory from the `@wats/graph/testing` subpath. This subpath is separate so production bundles do not pull the mock in by accident.
+Import the mock factory from the `@switchbord/graph/testing` subpath. This subpath is separate so production bundles do not pull the mock in by accident.
 
 ```ts
-import { GraphClient } from "@wats/graph";
-import { createMockTransport } from "@wats/graph/testing";
+import { GraphClient } from "@switchbord/graph";
+import { createMockTransport } from "@switchbord/graph/testing";
 
 const handle = createMockTransport({
   responses: [
@@ -92,7 +92,7 @@ import {
   createFetchTransport,
   type Transport,
   type TransportRequest
-} from "@wats/graph";
+} from "@switchbord/graph";
 
 export function createRetryingTransport(
   inner: Transport,
@@ -162,7 +162,7 @@ This path composes with the other body types: `FormData`, `Blob`, `ArrayBuffer`,
 `createFetchTransport` accepts an optional `interceptors` array for the common case where you just want to rewrite the request or observe the response without wrapping the entire Transport:
 
 ```ts
-import { createFetchTransport, type TransportInterceptor } from "@wats/graph";
+import { createFetchTransport, type TransportInterceptor } from "@switchbord/graph";
 
 const tracing: TransportInterceptor = {
   onRequest: (req) => {
@@ -187,7 +187,7 @@ Interceptors can be async; the chain awaits each hook. For errors originating in
 
 ## Why a separate testing subpath?
 
-`createMockTransport` lives at `@wats/graph/testing`, not the package root. Production code that imports `@wats/graph` never pulls the mock in. Tests import `@wats/graph/testing` explicitly, which keeps the dependency graph honest and keeps mocks out of production bundles.
+`createMockTransport` lives at `@switchbord/graph/testing`, not the package root. Production code that imports `@switchbord/graph` never pulls the mock in. Tests import `@switchbord/graph/testing` explicitly, which keeps the dependency graph honest and keeps mocks out of production bundles.
 
 ## Related ADRs
 

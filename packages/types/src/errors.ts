@@ -1,4 +1,4 @@
-// @wats/types — errors.ts
+// @switchbord/types — errors.ts
 //
 // Unified error payload shapes exposed in message, status, and webhook
 // variants. The stricter `WhatsAppError` (required fields) is used when

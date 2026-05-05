@@ -12,7 +12,7 @@
 //   4. Else throw a descriptive Error indicating the mock was underspecified.
 //
 // The MockTransport is intended exclusively for test suites. Exposed via
-// the `@wats/graph/testing` subpath so production code cannot import it.
+// the `@switchbord/graph/testing` subpath so production code cannot import it.
 
 import type {
   Transport,

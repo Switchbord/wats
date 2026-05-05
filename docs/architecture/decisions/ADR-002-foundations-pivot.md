@@ -37,8 +37,8 @@ Specifically:
   Pywa-style ergonomics (`onMessage`, `onCallbackButton`, `onMessageStatus`,
   `listen(...)`) cannot be implemented on top of `ParsedUpdateEvent` alone
   without re-implementing normalization in every handler.
-- There is no client facade (WATS-15). `@wats/graph.GraphClient` and
-  `@wats/core` primitives do not compose into a single `WhatsApp` object.
+- There is no client facade (WATS-15). `@switchbord/graph.GraphClient` and
+  `@switchbord/core` primitives do not compose into a single `WhatsApp` object.
   Users would currently need to wire seven packages themselves.
 - There is no transport seam, no crypto seam, no endpoint registry, no scoped
   sub-clients (WATS-16/17/18/19 cluster). Each new endpoint bolts onto the
@@ -89,7 +89,7 @@ or call handling. The cycle delivers, in order:
 9. Listener substrate (WATS-22). `client.listen({ type, from, filter?,
    timeoutMs?, signal? })`. Integrates with `Clock` for deterministic timeout
    tests.
-10. Webhook adapters (`@wats/http`): Bun-native adapter plus a framework-agnostic
+10. Webhook adapters (`@switchbord/http`): Bun-native adapter plus a framework-agnostic
     `WebhookAdapter` contract so Hono, Elysia, Express, Cloudflare Workers,
     and Deno can plug in without forking.
 
@@ -114,7 +114,7 @@ Short term (one cycle):
   router stays as a low-level primitive used by the facade, so the migration
   is additive, not destructive.
 - `WhatsAppMessage` and `WhatsAppMessageStatus` become discriminated unions
-  (WATS-23), which is a source-level breaking change to `@wats/types`. This
+  (WATS-23), which is a source-level breaking change to `@switchbord/types`. This
   is acceptable pre-release.
 
 Long term:

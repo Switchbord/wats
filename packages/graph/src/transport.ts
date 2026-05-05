@@ -3,7 +3,7 @@
 // Defines the Transport contract that GraphClient consumes. Two canonical
 // implementations ship alongside:
 //   - createFetchTransport (production default; wraps globalThis.fetch)
-//   - createMockTransport (exported from `@wats/graph/testing` for tests)
+//   - createMockTransport (exported from `@switchbord/graph/testing` for tests)
 //
 // The Transport boundary is deliberately minimal: a single async `request`
 // method that accepts a fully-resolved TransportRequest and returns a

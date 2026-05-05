@@ -32,18 +32,18 @@ const REQUIRED_TYPE_FILES = [
 ] as const;
 
 const PACKAGE_ENTRYPOINTS = [
-  "@wats/types",
-  "@wats/types/config",
-  "@wats/types/webhook",
-  "@wats/types/entities",
-  "@wats/types/messages",
-  "@wats/types/statuses",
-  "@wats/types/contacts",
-  "@wats/types/errors"
+  "@switchbord/types",
+  "@switchbord/types/config",
+  "@switchbord/types/webhook",
+  "@switchbord/types/entities",
+  "@switchbord/types/messages",
+  "@switchbord/types/statuses",
+  "@switchbord/types/contacts",
+  "@switchbord/types/errors"
 ] as const;
 
 const REQUIRED_RUNTIME_EXPORTS: Record<(typeof PACKAGE_ENTRYPOINTS)[number], readonly string[]> = {
-  "@wats/types": [
+  "@switchbord/types": [
     "WATS_TYPES_CONFIG_EXPORTS",
     "WATS_TYPES_WEBHOOK_EXPORTS",
     "WATS_TYPES_ENTITIES_EXPORTS",
@@ -52,13 +52,13 @@ const REQUIRED_RUNTIME_EXPORTS: Record<(typeof PACKAGE_ENTRYPOINTS)[number], rea
     "WATS_TYPES_CONTACTS_EXPORTS",
     "WATS_TYPES_ERRORS_EXPORTS"
   ],
-  "@wats/types/config": ["WATS_TYPES_CONFIG_EXPORTS"],
-  "@wats/types/webhook": ["WATS_TYPES_WEBHOOK_EXPORTS"],
-  "@wats/types/entities": ["WATS_TYPES_ENTITIES_EXPORTS"],
-  "@wats/types/messages": ["WATS_TYPES_MESSAGES_EXPORTS"],
-  "@wats/types/statuses": ["WATS_TYPES_STATUSES_EXPORTS"],
-  "@wats/types/contacts": ["WATS_TYPES_CONTACTS_EXPORTS"],
-  "@wats/types/errors": ["WATS_TYPES_ERRORS_EXPORTS"]
+  "@switchbord/types/config": ["WATS_TYPES_CONFIG_EXPORTS"],
+  "@switchbord/types/webhook": ["WATS_TYPES_WEBHOOK_EXPORTS"],
+  "@switchbord/types/entities": ["WATS_TYPES_ENTITIES_EXPORTS"],
+  "@switchbord/types/messages": ["WATS_TYPES_MESSAGES_EXPORTS"],
+  "@switchbord/types/statuses": ["WATS_TYPES_STATUSES_EXPORTS"],
+  "@switchbord/types/contacts": ["WATS_TYPES_CONTACTS_EXPORTS"],
+  "@switchbord/types/errors": ["WATS_TYPES_ERRORS_EXPORTS"]
 } as const;
 
 const EXPECTED_CONTRACT_VALUES = {
@@ -197,7 +197,7 @@ describe("B1 foundational shared types", () => {
     }
   });
 
-  test("@wats/types package manifest exposes documented entrypoints", () => {
+  test("@switchbord/types package manifest exposes documented entrypoints", () => {
     const repoRoot = findRepoRoot(import.meta.dir);
     const packageManifest = parseJsonFile(join(repoRoot, "packages/types/package.json"));
 
@@ -215,7 +215,7 @@ describe("B1 foundational shared types", () => {
     });
   });
 
-  test("documented @wats/types entrypoints are importable with runtime contract exports", async () => {
+  test("documented @switchbord/types entrypoints are importable with runtime contract exports", async () => {
     for (const specifier of PACKAGE_ENTRYPOINTS) {
       const importedModule = (await import(specifier)) as Record<string, unknown>;
       expect(importedModule).toBeObject();

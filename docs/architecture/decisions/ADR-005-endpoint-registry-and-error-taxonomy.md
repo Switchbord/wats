@@ -67,7 +67,7 @@ type, so `client.execute(endpoint, req)` cannot be called with a `req`
 missing `phoneNumberId`.
 
 ```ts
-// @wats/graph/endpoints
+// @switchbord/graph/endpoints
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 export type ExtractPathParams<P extends string> =
@@ -110,7 +110,7 @@ export interface EndpointErrorMap {
 ### Client execute
 
 ```ts
-// @wats/graph/client
+// @switchbord/graph/client
 export interface GraphExecuteOptions {
   readonly signal?: AbortSignal;
   readonly idempotencyKey?: string;
@@ -144,7 +144,7 @@ Both are structurally identical — one binds `phoneNumberId`, the other
 `wabaId`:
 
 ```ts
-// @wats/graph/client
+// @switchbord/graph/client
 export type OmitBoundField<T, K extends PropertyKey> = Omit<T, K>;
 
 export interface PhoneScopedClient {
@@ -184,7 +184,7 @@ Sugar groups (`client.messages.sendText(req)`) are generated from a
 module-level registry populated at package load:
 
 ```ts
-// @wats/graph/endpoints/registry
+// @switchbord/graph/endpoints/registry
 export interface EndpointRegistryEntry {
   readonly group: "messages" | "media" | "businessProfile"
     | "phoneNumbers" | "templates" | "flows";
@@ -219,7 +219,7 @@ GraphNetworkError                 (Transport-level; not GraphApiError)
 ```
 
 ```ts
-// @wats/graph/errors
+// @switchbord/graph/errors
 export class GraphApiError extends Error {
   readonly status: number;
   readonly code?: number;
@@ -342,7 +342,7 @@ server:
   2            503  ServiceUnavailable
 ```
 
-Registration runs at import time in `@wats/graph/errors/codes.ts`;
+Registration runs at import time in `@switchbord/graph/errors/codes.ts`;
 consumers may call `registerErrorCode` to layer app-specific subclasses.
 
 ### Input-rejection policy (M2, M3, M4)
@@ -359,7 +359,7 @@ consumers may call `registerErrorCode` to layer app-specific subclasses.
 
 ### Consumer-fixture test contract
 
-`defineEndpoint` is imported from `@wats/graph` in an external fixture under
+`defineEndpoint` is imported from `@switchbord/graph` in an external fixture under
 `packages/testing/fixtures/graph-consumer/` (see ADR-006). The fixture
 imports `defineEndpoint`, `EndpointDef`, `GraphClient`, `PhoneScopedClient`;
 constructs a sample endpoint with a 2-parameter path template; asserts via a
@@ -433,7 +433,7 @@ Negative:
 - **Bun/Node/Deno/Workers/Edge**: registry is pure data + plain functions;
   no runtime-specific deps. Import-time registration writes to a
   module-level `Map` (single-instance per realm on all supported runtimes).
-- **Tree-shaking**: consumers importing `@wats/graph/endpoints/<group>`
+- **Tree-shaking**: consumers importing `@switchbord/graph/endpoints/<group>`
   directly skip unused endpoint modules; sugar groups resolve lazily so
   untouched groups don't pull their endpoint modules.
 - **React Native / browsers**: identical to Workers for the registry;

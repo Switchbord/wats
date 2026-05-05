@@ -3,18 +3,18 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 const PUBLISHABLE_PACKAGE_NAMES = [
-  "@wats/types",
-  "@wats/crypto",
-  "@wats/graph",
-  "@wats/core",
-  "@wats/http",
-  "@wats/internal-utils",
-  "@wats/cli",
-  "@wats/service",
-  "@wats/config"
+  "@switchbord/types",
+  "@switchbord/crypto",
+  "@switchbord/graph",
+  "@switchbord/core",
+  "@switchbord/http",
+  "@switchbord/internal-utils",
+  "@switchbord/cli",
+  "@switchbord/service",
+  "@switchbord/config"
 ] as const;
 
-const PRIVATE_PACKAGE_NAMES = ["@wats/testing"] as const;
+const PRIVATE_PACKAGE_NAMES = ["@switchbord/testing"] as const;
 const ALPHA_LAUNCH_VERSION = "0.2.1" as const;
 
 type JsonRecord = Record<string, unknown>;
@@ -85,7 +85,7 @@ describe("WATS-31 release and CI publishability scaffold", () => {
     const repoRoot = findRepoRoot(import.meta.dir);
 
     for (const packageName of PRIVATE_PACKAGE_NAMES) {
-      const packageDir = packageName.replace(/^@wats\//, "");
+      const packageDir = packageName.replace(/^@switchbord\//, "");
       const manifest = parseJsonFile(join(repoRoot, "packages", packageDir, "package.json"));
 
       expect(manifest.name).toBe(packageName);
@@ -93,7 +93,7 @@ describe("WATS-31 release and CI publishability scaffold", () => {
     }
 
     for (const packageName of PUBLISHABLE_PACKAGE_NAMES) {
-      const packageDir = packageName.replace(/^@wats\//, "");
+      const packageDir = packageName.replace(/^@switchbord\//, "");
       const manifest = parseJsonFile(join(repoRoot, "packages", packageDir, "package.json"));
       expect(manifest.name).toBe(packageName);
       expect(manifest.version).toBe(ALPHA_LAUNCH_VERSION);
@@ -109,7 +109,7 @@ describe("WATS-31 release and CI publishability scaffold", () => {
     expect(tsconfig.noEmit).toBe(undefined);
     expect(tsconfig.include).toEqual(
       PUBLISHABLE_PACKAGE_NAMES.map(
-        (packageName) => `packages/${packageName.replace(/^@wats\//, "")}/src/**/*.ts`
+        (packageName) => `packages/${packageName.replace(/^@switchbord\//, "")}/src/**/*.ts`
       )
     );
   });

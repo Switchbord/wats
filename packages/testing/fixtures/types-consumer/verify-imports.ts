@@ -1,11 +1,11 @@
-import * as rootEntrypoint from "@wats/types";
-import * as configEntrypoint from "@wats/types/config";
-import * as webhookEntrypoint from "@wats/types/webhook";
-import * as entitiesEntrypoint from "@wats/types/entities";
-import * as messagesEntrypoint from "@wats/types/messages";
-import * as statusesEntrypoint from "@wats/types/statuses";
-import * as contactsEntrypoint from "@wats/types/contacts";
-import * as errorsEntrypoint from "@wats/types/errors";
+import * as rootEntrypoint from "@switchbord/types";
+import * as configEntrypoint from "@switchbord/types/config";
+import * as webhookEntrypoint from "@switchbord/types/webhook";
+import * as entitiesEntrypoint from "@switchbord/types/entities";
+import * as messagesEntrypoint from "@switchbord/types/messages";
+import * as statusesEntrypoint from "@switchbord/types/statuses";
+import * as contactsEntrypoint from "@switchbord/types/contacts";
+import * as errorsEntrypoint from "@switchbord/types/errors";
 
 import type {
   WhatsAppMessage,
@@ -30,10 +30,10 @@ import type {
   DocumentReference,
   MessageContext,
   WhatsAppError
-} from "@wats/types";
+} from "@switchbord/types";
 
 const REQUIRED_EXPORT_SYMBOLS = {
-  "@wats/types": [
+  "@switchbord/types": [
     "WATS_TYPES_CONFIG_EXPORTS",
     "WATS_TYPES_WEBHOOK_EXPORTS",
     "WATS_TYPES_ENTITIES_EXPORTS",
@@ -42,24 +42,24 @@ const REQUIRED_EXPORT_SYMBOLS = {
     "WATS_TYPES_CONTACTS_EXPORTS",
     "WATS_TYPES_ERRORS_EXPORTS"
   ],
-  "@wats/types/config": ["WATS_TYPES_CONFIG_EXPORTS"],
-  "@wats/types/webhook": ["WATS_TYPES_WEBHOOK_EXPORTS"],
-  "@wats/types/entities": ["WATS_TYPES_ENTITIES_EXPORTS"],
-  "@wats/types/messages": ["WATS_TYPES_MESSAGES_EXPORTS"],
-  "@wats/types/statuses": ["WATS_TYPES_STATUSES_EXPORTS"],
-  "@wats/types/contacts": ["WATS_TYPES_CONTACTS_EXPORTS"],
-  "@wats/types/errors": ["WATS_TYPES_ERRORS_EXPORTS"]
+  "@switchbord/types/config": ["WATS_TYPES_CONFIG_EXPORTS"],
+  "@switchbord/types/webhook": ["WATS_TYPES_WEBHOOK_EXPORTS"],
+  "@switchbord/types/entities": ["WATS_TYPES_ENTITIES_EXPORTS"],
+  "@switchbord/types/messages": ["WATS_TYPES_MESSAGES_EXPORTS"],
+  "@switchbord/types/statuses": ["WATS_TYPES_STATUSES_EXPORTS"],
+  "@switchbord/types/contacts": ["WATS_TYPES_CONTACTS_EXPORTS"],
+  "@switchbord/types/errors": ["WATS_TYPES_ERRORS_EXPORTS"]
 } as const;
 
 const ENTRYPOINT_MODULES = {
-  "@wats/types": rootEntrypoint,
-  "@wats/types/config": configEntrypoint,
-  "@wats/types/webhook": webhookEntrypoint,
-  "@wats/types/entities": entitiesEntrypoint,
-  "@wats/types/messages": messagesEntrypoint,
-  "@wats/types/statuses": statusesEntrypoint,
-  "@wats/types/contacts": contactsEntrypoint,
-  "@wats/types/errors": errorsEntrypoint
+  "@switchbord/types": rootEntrypoint,
+  "@switchbord/types/config": configEntrypoint,
+  "@switchbord/types/webhook": webhookEntrypoint,
+  "@switchbord/types/entities": entitiesEntrypoint,
+  "@switchbord/types/messages": messagesEntrypoint,
+  "@switchbord/types/statuses": statusesEntrypoint,
+  "@switchbord/types/contacts": contactsEntrypoint,
+  "@switchbord/types/errors": errorsEntrypoint
 } as const;
 
 // Exhaustive switch over the discriminated WhatsAppMessage union. The

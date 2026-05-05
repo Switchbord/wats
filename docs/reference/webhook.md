@@ -1,7 +1,7 @@
 # Webhook primitives reference
 
 - status: active
-- applies-to: `@wats/http`, `@wats/core` (`0.2.0-foundations-complete`)
+- applies-to: `@switchbord/http`, `@switchbord/core` (`0.2.0-foundations-complete`)
 - lastReviewed: 2026-04-28
 
 ## Purpose
@@ -13,7 +13,7 @@ This page documents the low-level webhook primitives. Most applications should s
 1. Receive the raw HTTP request body without modification.
 2. Verify Meta's GET challenge with `verifyWebhookChallenge(...)`, or verify POST signatures with `validateWebhookSignature(...)`.
 3. Parse JSON only after signature verification succeeds.
-4. Normalize the parsed body with `normalizeWebhookEnvelope(...)` from `@wats/core`.
+4. Normalize the parsed body with `normalizeWebhookEnvelope(...)` from `@switchbord/core`.
 5. Dispatch each `TypedUpdate` through `WhatsApp.dispatch(...)` or a compatible router/facade.
 
 `createWebhookAdapter` performs these steps for Bun, Node, Fetch/Workers, and Deno-style runtimes.
@@ -21,7 +21,7 @@ This page documents the low-level webhook primitives. Most applications should s
 ## `verifyWebhookChallenge(input)`
 
 ```ts
-import { verifyWebhookChallenge } from "@wats/http";
+import { verifyWebhookChallenge } from "@switchbord/http";
 
 const result = await verifyWebhookChallenge({
   mode: url.searchParams.get("hub.mode"),
@@ -57,7 +57,7 @@ Verify-token comparison uses the `CryptoProvider` timing-safe comparison after a
 ## `validateWebhookSignature(input)`
 
 ```ts
-import { validateWebhookSignature } from "@wats/http";
+import { validateWebhookSignature } from "@switchbord/http";
 
 const result = await validateWebhookSignature({
   appSecret: process.env.WATS_APP_SECRET!,
@@ -107,7 +107,7 @@ The signature header must match `sha256=<64 lowercase hex chars>`. HMAC-SHA256 i
 After signature verification and JSON parsing, normalize the parsed envelope:
 
 ```ts
-import { normalizeWebhookEnvelope } from "@wats/core";
+import { normalizeWebhookEnvelope } from "@switchbord/core";
 
 const normalized = normalizeWebhookEnvelope(parsedBody, {
   maxEventsPerEnvelope: 1000

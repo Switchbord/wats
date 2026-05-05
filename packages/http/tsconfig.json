@@ -3,14 +3,14 @@
   "compilerOptions": {
     "types": [],
     "paths": {
-      "@wats/crypto": ["../crypto/src/index.ts"],
-      "@wats/crypto/*": ["../crypto/src/*"],
-      "@wats/core": ["../core/src/index.ts"],
-      "@wats/core/*": ["../core/src/*"],
-      "@wats/types": ["../types/src/index.ts"],
-      "@wats/types/*": ["../types/src/*"],
-      "@wats/graph": ["../graph/src/index.ts"],
-      "@wats/graph/*": ["../graph/src/*"]
+      "@switchbord/crypto": ["../crypto/src/index.ts"],
+      "@switchbord/crypto/*": ["../crypto/src/*"],
+      "@switchbord/core": ["../core/src/index.ts"],
+      "@switchbord/core/*": ["../core/src/*"],
+      "@switchbord/types": ["../types/src/index.ts"],
+      "@switchbord/types/*": ["../types/src/*"],
+      "@switchbord/graph": ["../graph/src/index.ts"],
+      "@switchbord/graph/*": ["../graph/src/*"]
     }
   },
   "include": ["src"]

@@ -1,4 +1,4 @@
-// Consumer fixture for @wats/http.
+// Consumer fixture for @switchbord/http.
 //
 // Imports ONLY through the published package specifiers (never through
 // relative paths). Exercises both public functions end-to-end, asserts
@@ -6,7 +6,7 @@
 // 'invalid_raw_body' for null input, and emits a single-line JSON
 // report ending with the success sentinel.
 
-import * as rootEntrypoint from "@wats/http";
+import * as rootEntrypoint from "@switchbord/http";
 import {
   createFetchWebhookHandler,
   createWebhookAdapter,
@@ -14,8 +14,8 @@ import {
   verifyWebhookChallenge,
   WebhookAdapterConfigError,
   type SignatureValidationErrorCode
-} from "@wats/http";
-import { createCryptoProvider } from "@wats/crypto";
+} from "@switchbord/http";
+import { createCryptoProvider } from "@switchbord/crypto";
 
 interface VerifyReportOk {
   readonly ok: true;
@@ -127,7 +127,7 @@ async function verify(): Promise<VerifyReportOk> {
   // adapter only requires `dispatch(update)`), build a
   // WebhookAdapter, and exercise POST + GET verify + invalid
   // signature + config validation paths. Imports flow through the
-  // published @wats/http surface only.
+  // published @switchbord/http surface only.
 
   const facadeDispatches: unknown[] = [];
   const facadeLike = {
@@ -244,7 +244,7 @@ async function verify(): Promise<VerifyReportOk> {
     checks,
     sentinel: "http-consumer:ok",
     moduleKeys: {
-      "@wats/http": Object.keys(rootEntrypoint).sort()
+      "@switchbord/http": Object.keys(rootEntrypoint).sort()
     }
   };
 }

@@ -1,4 +1,4 @@
-// @wats/http — Node adapter wrapper (F-12 GREEN).
+// @switchbord/http — Node adapter wrapper (F-12 GREEN).
 //
 // Returns a request listener compatible with the standard Node
 // `http.createServer((req, res) => ...)` shape. The adapter core is
@@ -8,7 +8,7 @@
 //
 // IMPORTANT: this module contains zero static `node:*` imports. The
 // workspace-policy test forbids static node:* references in any
-// @wats/http src file (matches the @wats/crypto/adapters/node
+// @switchbord/http src file (matches the @switchbord/crypto/adapters/node
 // precedent). If the caller hands us an IncomingMessage/ServerResponse
 // pair, we already have enough surface to work — we don't need to
 // resolve `node:http` at import time.

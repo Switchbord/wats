@@ -8,7 +8,7 @@ import {
   parseConfig,
   redactConfig,
   validateConfig
-} from "@wats/config";
+} from "@switchbord/config";
 
 const VALID_CONFIG = Object.freeze({
   version: 1,
@@ -63,7 +63,7 @@ function expectConfigValidationError(fn: () => unknown, code: string, path: stri
   throw new Error("expected ConfigValidationError");
 }
 
-describe("@wats/config validateConfig", () => {
+describe("@switchbord/config validateConfig", () => {
   test("accepts the minimal v1 config object and freezes the returned shape", () => {
     const parsed = validateConfig(validConfig());
 
@@ -244,7 +244,7 @@ describe("@wats/config validateConfig", () => {
   });
 });
 
-describe("@wats/config parseConfig", () => {
+describe("@switchbord/config parseConfig", () => {
   test("parses and validates JSON strings", () => {
     const parsed = parseConfig(JSON.stringify(validConfig()), { format: "json" });
 
@@ -287,7 +287,7 @@ describe("@wats/config parseConfig", () => {
   });
 });
 
-describe("@wats/config loadConfig", () => {
+describe("@switchbord/config loadConfig", () => {
   test("loads JSON and YAML config files by extension", async () => {
     const tempDir = await mkdtemp(join(tmpdir(), "wats-config-test-"));
     const jsonPath = join(tempDir, "tmp-wats-config.json");
@@ -321,7 +321,7 @@ describe("@wats/config loadConfig", () => {
   });
 });
 
-describe("@wats/config redactConfig", () => {
+describe("@switchbord/config redactConfig", () => {
   test("redacts secret env names without mutating the validated config", () => {
     const validated = validateConfig(validConfig());
     const redacted = redactConfig(validated);

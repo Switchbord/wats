@@ -1,4 +1,4 @@
-# Typed filters (`@wats/core/filtersTyped`)
+# Typed filters (`@switchbord/core/filtersTyped`)
 
 - status: active
 - shipped: F-9 (`[0.2.0-f9]`)
@@ -8,7 +8,7 @@
 F-9 introduces a typed, type-narrowing filter surface that composes
 directly over the F-8 [`TypedUpdate`](./webhook-normalizer.md)
 discriminated union emitted by `normalizeWebhookEnvelope`. It replaces
-the loose `ParsedUpdateEvent`-based filters in `@wats/core/filters`
+the loose `ParsedUpdateEvent`-based filters in `@switchbord/core/filters`
 (which remain available and untouched for backwards compatibility)
 with branded, narrowing predicates that TypeScript can check across
 handler boundaries.
@@ -44,25 +44,25 @@ import {
   // Types
   type TypedFilter,
   type FilterValidationErrorCode
-} from "@wats/core/filtersTyped";
+} from "@switchbord/core/filtersTyped";
 ```
 
-Consumers of `@wats/core` can also reach the surface under the
+Consumers of `@switchbord/core` can also reach the surface under the
 `filtersTyped` namespace on the root entrypoint:
 
 ```ts
-import { filtersTyped } from "@wats/core";
+import { filtersTyped } from "@switchbord/core";
 filtersTyped.message.textMatches(/^hello/);
 ```
 
 ### Two filter surfaces coexist (transitional)
 
-`@wats/core` currently ships TWO filter surfaces side-by-side:
+`@switchbord/core` currently ships TWO filter surfaces side-by-side:
 
 | Surface | Import | Status | Shape |
 |---------|--------|--------|-------|
-| Legacy (D1/C2) | `@wats/core/filters` | Preserved byte-for-byte from `[0.1.14]` / `[0.1.15]` | untyped `and`/`or`/`not` + `hasMessageText`, `messageTextContains`, `messageFromWaId`, `hasMessageStatus`, `messageStatusIn` |
-| Typed (F-9)    | `@wats/core/filtersTyped` (this doc) | New in `[0.2.0-f9]` | branded `TypedFilter<T>` + typed `and`/`or`/`not`/`custom` + `message.*` / `status.*` built-ins |
+| Legacy (D1/C2) | `@switchbord/core/filters` | Preserved byte-for-byte from `[0.1.14]` / `[0.1.15]` | untyped `and`/`or`/`not` + `hasMessageText`, `messageTextContains`, `messageFromWaId`, `hasMessageStatus`, `messageStatusIn` |
+| Typed (F-9)    | `@switchbord/core/filtersTyped` (this doc) | New in `[0.2.0-f9]` | branded `TypedFilter<T>` + typed `and`/`or`/`not`/`custom` + `message.*` / `status.*` built-ins |
 
 The two surfaces are independent: the typed surface does NOT import
 from the legacy one, and vice versa. The names `and` / `or` / `not`
@@ -75,7 +75,7 @@ legacy path is tracked for a later F-step.
 
 `TypedFilter<T extends TypedUpdate>` is a branded object that
 identifies as a filter across module boundaries. The brand symbol is
-interned with `Symbol.for("@wats/core/filter-brand")` so filters
+interned with `Symbol.for("@switchbord/core/filter-brand")` so filters
 built in a consumer workspace still pass `isTypedFilter` against
 this module.
 
@@ -125,7 +125,7 @@ produced in a consumer package still identifies correctly.
 
 #### Brand-forgery caveat
 
-`Symbol.for("@wats/core/filter-brand")` is **globally interned** by
+`Symbol.for("@switchbord/core/filter-brand")` is **globally interned** by
 design — that is how cross-workspace filter identity works. The flip
 side is that any untrusted code running in the same realm can
 produce an object that carries the same symbol key and will pass
@@ -180,7 +180,7 @@ the core-consumer fixture.
 `normalizeWebhookEnvelope(...)` from `field: "calls"` payloads.
 
 ```ts
-import { call, and } from "@wats/core/filtersTyped";
+import { call, and } from "@switchbord/core/filtersTyped";
 
 const answeredIncoming = and(call.answered(), call.incoming());
 if (call.connect().predicate(update)) {
@@ -449,14 +449,14 @@ function handle(update: TypedUpdate) {
 ## Full usage example
 
 ```typescript
-import { normalizeWebhookEnvelope } from "@wats/core";
+import { normalizeWebhookEnvelope } from "@switchbord/core";
 import {
   and,
   custom,
   message,
   status
-} from "@wats/core/filtersTyped";
-import type { TypedMessageUpdate } from "@wats/core";
+} from "@switchbord/core/filtersTyped";
+import type { TypedMessageUpdate } from "@switchbord/core";
 
 const helloFromAlice = and(
   message,
@@ -491,7 +491,7 @@ In scope:
   `type` / `from`.
 - Status built-ins: `sent` / `delivered` / `read` / `failed`.
 - Sibling-kind safety (no throws on off-kind).
-- Subpath export `@wats/core/filtersTyped` + root namespace
+- Subpath export `@switchbord/core/filtersTyped` + root namespace
   `filtersTyped`.
 
 Out of scope (deferred):
@@ -502,7 +502,7 @@ Out of scope (deferred):
 - Router / dispatch integration — that is F-10.
 - Listener registration — that is F-11.
 - Async filter predicates.
-- Removal of the legacy `@wats/core/filters` path — consumers
+- Removal of the legacy `@switchbord/core/filters` path — consumers
   migrate at their own pace.
 
 ## References

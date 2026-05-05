@@ -1,4 +1,4 @@
-// @wats/crypto — Node/Bun adapter.
+// @switchbord/crypto — Node/Bun adapter.
 //
 // IMPORTANT: this module MUST NOT statically import `node:crypto`. The
 // import happens inside `createNodeCryptoProvider` so the module is

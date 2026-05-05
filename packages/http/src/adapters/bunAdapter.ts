@@ -1,4 +1,4 @@
-// @wats/http — Bun adapter wrapper (F-12 GREEN).
+// @switchbord/http — Bun adapter wrapper (F-12 GREEN).
 //
 // Wraps createWebhookAdapter in a Bun.serve handler. Bun.serve's
 // request handler already speaks WinterCG Request → Response, so

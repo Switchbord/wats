@@ -6,14 +6,14 @@
 // and sibling-class error assertions.
 
 import { describe, expect, test } from "bun:test";
-import { createCryptoProvider } from "@wats/crypto";
+import { createCryptoProvider } from "@switchbord/crypto";
 import {
   WebhookAdapterConfigError,
   createWebhookAdapter,
   type WebhookAdapterEvent,
   type WebhookRequest
-} from "@wats/http";
-import { validateWebhookSignature } from "@wats/http/signature";
+} from "@switchbord/http";
+import { validateWebhookSignature } from "@switchbord/http/signature";
 
 // ---- helpers -------------------------------------------------------
 
@@ -511,7 +511,7 @@ describe("F-12 WebhookAdapter — POST dispatch flow", () => {
     // The facade's dispatch threw — adapter should still respond 200
     // because webhook acknowledgement semantics say: if we verified &
     // normalized, we've received the update. Handler failures are a
-    // @wats/core concern, not an HTTP concern.
+    // @switchbord/core concern, not an HTTP concern.
     expect(response.status).toBe(200);
   });
 
@@ -577,7 +577,7 @@ describe("F-12 WebhookAdapter — method taxonomy", () => {
 
 // ---- signature verification is delegated (sibling assertion) --------
 
-describe("F-12 WebhookAdapter — delegates to @wats/http signature", () => {
+describe("F-12 WebhookAdapter — delegates to @switchbord/http signature", () => {
   test("signature delegation uses validateWebhookSignature (shape)", () => {
     // Not a behavior assertion — structural guard that the adapter
     // surface is wired on top of the same signature primitive. Covers

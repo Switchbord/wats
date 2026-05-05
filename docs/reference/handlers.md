@@ -18,7 +18,7 @@ Describe framework-agnostic handler registration and dispatch semantics for pars
 
 ## API Surface (C2)
 
-`@wats/core` now exposes:
+`@switchbord/core` now exposes:
 
 - `parseWebhookUpdate(rawEnvelope, options?)`
 - `createUpdateRouter(options?)`
@@ -33,7 +33,7 @@ Router contracts:
   - executes matching handlers for each event via indexed lookup
   - returns structured dispatch summary
 - Filter integration primitives (D1):
-  - `UpdateFilter` and combinators (`and`, `or`, `not`) from `@wats/core/filters`
+  - `UpdateFilter` and combinators (`and`, `or`, `not`) from `@switchbord/core/filters`
   - built-ins for common payload predicates (`hasMessageText`, `messageTextContains`, `messageFromWaId`, `hasMessageStatus`, `messageStatusIn`)
 
 Router options:

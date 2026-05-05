@@ -12,7 +12,7 @@ Define the public client API surface for WATS.
 
 ## Configuration Types (B1)
 
-Client initialization references foundational shared types from `@wats/types`.
+Client initialization references foundational shared types from `@switchbord/types`.
 
 ### `WhatsAppClientConfig`
 
@@ -34,7 +34,7 @@ Use this normalized shape internally after resolving defaults (for example `apiV
 
 ## Graph request primitive (B2, F-4)
 
-B2 introduced a minimal Graph API client primitive in `@wats/graph`; F-4 refactored it onto a Transport seam with strict construction-time validation and baseUrl pathname preservation.
+B2 introduced a minimal Graph API client primitive in `@switchbord/graph`; F-4 refactored it onto a Transport seam with strict construction-time validation and baseUrl pathname preservation.
 
 ### `GraphClientConfig`
 
@@ -101,7 +101,7 @@ F-4 introduces the `Transport` seam so every HTTP concern — retry, auth-refres
 
 - `Transport`, `TransportRequest`, `TransportResponse`, `TransportHttpMethod`, `TransportInterceptor`, `TransportRetryPolicy`, `DEFAULT_TRANSPORT_RETRY_POLICY`
 - `createFetchTransport(options?)` — production default wrapping `globalThis.fetch`
-- `createMockTransport(config?)` — in-memory Transport for tests, exposed via the `@wats/graph/testing` subpath
+- `createMockTransport(config?)` — in-memory Transport for tests, exposed via the `@switchbord/graph/testing` subpath
 
 The default transport does NOT retry; retry is opt-in via a Transport decorator. See the [Transport and Testing guide](../guides/transport-and-testing.md) for the full recipe.
 
@@ -238,8 +238,8 @@ WATS-39 exports:
 ## Usage Examples
 
 ```ts
-import { GraphClient } from "@wats/graph";
-import { WhatsApp } from "@wats/core";
+import { GraphClient } from "@switchbord/graph";
+import { WhatsApp } from "@switchbord/core";
 
 const graphClient = new GraphClient({
   accessToken: process.env.WHATSAPP_TOKEN!,

@@ -18,13 +18,13 @@ The foundations pivot shipped four packages of primitives:
 
 | Package              | What's inside                                                       |
 | -------------------- | ------------------------------------------------------------------- |
-| `@wats/types`        | Discriminated-union domain types (message / status / contact / …). |
-| `@wats/crypto`       | `CryptoProvider` seam + Node/Bun/WebCrypto adapters.                |
-| `@wats/graph`        | `GraphClient`, `Transport`, `defineEndpoint`, sub-clients, pagination. |
-| `@wats/core`         | `normalizeWebhookEnvelope`, typed filters, `TypedRouter`, `WhatsApp` facade, listener substrate. |
-| `@wats/http`         | Webhook signature + challenge primitives, `WebhookAdapter`, Bun/Node/Fetch wrappers. |
+| `@switchbord/types`        | Discriminated-union domain types (message / status / contact / …). |
+| `@switchbord/crypto`       | `CryptoProvider` seam + Node/Bun/WebCrypto adapters.                |
+| `@switchbord/graph`        | `GraphClient`, `Transport`, `defineEndpoint`, sub-clients, pagination. |
+| `@switchbord/core`         | `normalizeWebhookEnvelope`, typed filters, `TypedRouter`, `WhatsApp` facade, listener substrate. |
+| `@switchbord/http`         | Webhook signature + challenge primitives, `WebhookAdapter`, Bun/Node/Fetch wrappers. |
 
-The `WhatsApp` facade in `@wats/core` is the **composition root** — most
+The `WhatsApp` facade in `@switchbord/core` is the **composition root** — most
 consumers start there and reach down to the lower-level primitives
 only when they need to.
 
@@ -33,10 +33,10 @@ only when they need to.
 Install the packages you need:
 
 ```bash
-bun add @wats/core @wats/graph @wats/http
+bun add @switchbord/core @switchbord/graph @switchbord/http
 ```
 
-`@wats/types` and `@wats/crypto` are pulled in transitively. Inside
+`@switchbord/types` and `@switchbord/crypto` are pulled in transitively. Inside
 this monorepo the packages are `workspace:*` — no install needed.
 
 ## 3. Construct a `GraphClient` + `WhatsApp` facade
@@ -46,9 +46,9 @@ wraps it and auto-derives scoped sub-clients from `phoneNumberId` /
 `wabaId`.
 
 ```ts
-import { GraphClient } from "@wats/graph";
-import { createMockTransport } from "@wats/graph/testing";
-import { WhatsApp } from "@wats/core";
+import { GraphClient } from "@switchbord/graph";
+import { createMockTransport } from "@switchbord/graph/testing";
+import { WhatsApp } from "@switchbord/core";
 
 // For a real deployment, drop createMockTransport and let the
 // GraphClient build a fetch-backed Transport for you.
@@ -108,7 +108,7 @@ import {
   GraphRateLimitError,
   InvalidParameterError,
   UnsupportedMessageTypeError
-} from "@wats/graph";
+} from "@switchbord/graph";
 
 try {
   await wa.phoneNumberClient!.sendMessage({ /* ... */ } as never);
@@ -130,7 +130,7 @@ import {
   getCommerceSettings,
   getPhoneNumberSettings,
   getWabaInfo
-} from "@wats/graph";
+} from "@switchbord/graph";
 
 const wabaInfo = await getWabaInfo(graphClient, {
   wabaId: "9999999999",
@@ -185,7 +185,7 @@ The router lives on the facade. `wa.on(filter, handler)` returns a
 `RegistrationHandle` with an idempotent `.unregister()`:
 
 ```ts
-import { and, message, status } from "@wats/core/filtersTyped";
+import { and, message, status } from "@switchbord/core/filtersTyped";
 
 const h1 = wa.on(message, async (update, ctx) => {
   // update is narrowed to TypedMessageUpdate
@@ -210,7 +210,7 @@ promises are captured on the `DispatchReport` — `dispatch()` never
 rejects. Attach an observer to watch the lifecycle:
 
 ```ts
-import { WhatsApp, TypedRouter } from "@wats/core";
+import { WhatsApp, TypedRouter } from "@switchbord/core";
 
 const wa2 = new WhatsApp({
   graphClient,
@@ -250,7 +250,7 @@ it — both receive the same update.
 The `WebhookAdapter` is runtime-neutral. Pick one wrapper per runtime:
 
 ```ts
-import { createWebhookAdapter, createBunWebhookServer } from "@wats/http";
+import { createWebhookAdapter, createBunWebhookServer } from "@switchbord/http";
 
 const adapter = createWebhookAdapter({
   verifyToken: process.env.WA_VERIFY_TOKEN!,
@@ -271,7 +271,7 @@ cap, `500` rare internal failure.
 For Workers / Deno / edge runtimes:
 
 ```ts
-import { createFetchWebhookHandler } from "@wats/http";
+import { createFetchWebhookHandler } from "@switchbord/http";
 const handler = createFetchWebhookHandler(adapter);
 export default { fetch: handler };
 ```
@@ -279,7 +279,7 @@ export default { fetch: handler };
 For Node `http`:
 
 ```ts
-import { createNodeWebhookHandler } from "@wats/http";
+import { createNodeWebhookHandler } from "@switchbord/http";
 import { createServer } from "node:http";
 const handler = createNodeWebhookHandler(adapter);
 createServer(handler).listen(3000);
@@ -291,12 +291,12 @@ Here is the full loop — adapter, signature verification,
 normalization, dispatch — driven from one process with no network:
 
 ```ts
-import { createWebhookAdapter, createFetchWebhookHandler } from "@wats/http";
-import { createCryptoProvider } from "@wats/crypto";
-import { WhatsApp } from "@wats/core";
-import { message } from "@wats/core/filtersTyped";
-import { GraphClient } from "@wats/graph";
-import { createMockTransport } from "@wats/graph/testing";
+import { createWebhookAdapter, createFetchWebhookHandler } from "@switchbord/http";
+import { createCryptoProvider } from "@switchbord/crypto";
+import { WhatsApp } from "@switchbord/core";
+import { message } from "@switchbord/core/filtersTyped";
+import { GraphClient } from "@switchbord/graph";
+import { createMockTransport } from "@switchbord/graph/testing";
 
 const handle = createMockTransport({
   defaultResponse: { status: 200, body: { ok: true } }
@@ -361,9 +361,9 @@ const res = await fetchHandler(new Request("https://example.test/webhook", {
 `PaginatedPage<T>`:
 
 ```ts
-import { defineEndpoint, GraphClient, paginate, paginateAll } from "@wats/graph";
-import { createMockTransport } from "@wats/graph/testing";
-import type { PaginatedPage } from "@wats/graph";
+import { defineEndpoint, GraphClient, paginate, paginateAll } from "@switchbord/graph";
+import { createMockTransport } from "@switchbord/graph/testing";
+import type { PaginatedPage } from "@switchbord/graph";
 
 const listItems = defineEndpoint<
   { accountId: string; after?: string },

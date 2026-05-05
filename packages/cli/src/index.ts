@@ -1,5 +1,5 @@
-import { ConfigValidationError, loadConfig, parseConfig, redactConfig, type WatsConfig, type WatsProfileConfig } from "@wats/config";
-import { createWatsServiceOpenApiDocument, WatsServiceError } from "@wats/service";
+import { ConfigValidationError, loadConfig, parseConfig, redactConfig, type WatsConfig, type WatsProfileConfig } from "@switchbord/config";
+import { createWatsServiceOpenApiDocument, WatsServiceError } from "@switchbord/service";
 
 export type CliCommandResult = Readonly<{
   exitCode: number;
@@ -87,7 +87,7 @@ ${NO_LIVE_CREDENTIALS}
 const CONFIG_VALIDATE_HELP = `Usage: wats config validate <path>
        wats config validate --config <path>
 
-Validates a WATS config file (JSON/YAML) with @wats/config loadConfig/validate behavior.
+Validates a WATS config file (JSON/YAML) with @switchbord/config loadConfig/validate behavior.
 
 Output on success is a safe count summary only: config valid, redacted default profile marker, and profile count. The command does not resolve env-secret values, read .env.local, call Meta Graph APIs, print profile names, or print raw secret env-var names.
 
@@ -105,7 +105,7 @@ ${NO_LIVE_CREDENTIALS}
 
 const OPENAPI_HELP = `Usage: wats openapi --config <path> [--profile <name>] [--server-url <http(s) URL>] [--out <path>]
 
-Loads a WATS config file and exports OpenAPI 3.1 JSON for the WATS service API routes implemented by @wats/service.
+Loads a WATS config file and exports OpenAPI 3.1 JSON for the WATS service API routes implemented by @switchbord/service.
 
 Prints OpenAPI JSON to stdout by default. With --profile, selects a named config profile; otherwise the config default profile is used. With --server-url, passes the http(s) URL to the generator, which validates and canonicalizes it.
 
@@ -119,7 +119,7 @@ const SERVE_HELP = `Usage: wats serve --help
 
 Show service-runtime handoff help.
 
-The server runtime is not implemented in this CLI slice. Use @wats/service programmatically for the current Request -> Response service app; a future CLI slice will add a tested no-surprise process runtime.
+The server runtime is not implemented in this CLI slice. Use @switchbord/service programmatically for the current Request -> Response service app; a future CLI slice will add a tested no-surprise process runtime.
 ${NO_LIVE_CREDENTIALS}
 `;
 

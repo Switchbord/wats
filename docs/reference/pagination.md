@@ -36,7 +36,7 @@ import {
   paginateAll,
   PaginationError,
   type PaginatedPage
-} from "@wats/graph";
+} from "@switchbord/graph";
 
 // 1. Define a list endpoint whose response conforms to PaginatedPage<T>.
 interface PhoneNumberEntry {

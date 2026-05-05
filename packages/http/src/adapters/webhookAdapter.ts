@@ -1,4 +1,4 @@
-// @wats/http — WebhookAdapter (F-12 GREEN).
+// @switchbord/http — WebhookAdapter (F-12 GREEN).
 //
 // Runtime-neutral core of the webhook HTTP adapter. Takes a
 // runtime-agnostic WebhookRequest (method, url, headers, raw body
@@ -26,8 +26,8 @@
 //     validateWebhookSignature primitives — they are reused
 //     verbatim here.
 
-import { normalizeWebhookEnvelope, WebhookNormalizationError } from "@wats/core/webhookNormalizer";
-import type { CryptoProvider } from "@wats/crypto";
+import { normalizeWebhookEnvelope, WebhookNormalizationError } from "@switchbord/core/webhookNormalizer";
+import type { CryptoProvider } from "@switchbord/crypto";
 import { validateWebhookSignature } from "../signature";
 import { verifyWebhookChallenge } from "../webhookServer";
 
@@ -35,8 +35,8 @@ import { verifyWebhookChallenge } from "../webhookServer";
 
 // Structural typing: the adapter only needs `dispatch(update)` from
 // whatever the caller passes. Declaring the shape locally keeps
-// @wats/http decoupled from a hard runtime dependency on
-// @wats/core. A real `WhatsApp` facade from @wats/core satisfies
+// @switchbord/http decoupled from a hard runtime dependency on
+// @switchbord/core. A real `WhatsApp` facade from @switchbord/core satisfies
 // this shape.
 export interface WebhookFacadeLike {
   dispatch(update: unknown): Promise<unknown> | unknown;
@@ -480,7 +480,7 @@ async function handleDispatch(ctx: HandleContext): Promise<WebhookResponse> {
   const signatureHeader = request.headers.get("x-hub-signature-256");
 
   // Early guards: distinguish missing signature (401) from malformed
-  // signature (400) before handing to @wats/http's validator, which
+  // signature (400) before handing to @switchbord/http's validator, which
   // reports both as typed results.
   if (signatureHeader === null) {
     return errorResponse(401, "missing_signature", "Missing X-Hub-Signature-256 header.");
@@ -547,7 +547,7 @@ async function handleDispatch(ctx: HandleContext): Promise<WebhookResponse> {
   // Dispatch each update. Failures are isolated — the webhook
   // acknowledgement contract says: once we verified + normalized,
   // the event IS received from an HTTP perspective. Downstream
-  // handler errors are a @wats/core concern and don't propagate as
+  // handler errors are a @switchbord/core concern and don't propagate as
   // 5xx (Meta would retry the webhook otherwise, creating a
   // duplicate-event flood against a bug that isn't a transport
   // failure).

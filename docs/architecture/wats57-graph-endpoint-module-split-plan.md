@@ -21,12 +21,12 @@ The consistency review found that WATS foundations are strong, but newer post-fo
 
 WATS-53 added first-class endpoint subpaths for the existing runtime surfaces:
 
-- `@wats/graph/endpoints/messages`
-- `@wats/graph/endpoints/media`
-- `@wats/graph/endpoints/templates`
-- `@wats/graph/endpoints/flows`
-- `@wats/graph/endpoints/calling`
-- `@wats/graph/endpoints/business-management`
+- `@switchbord/graph/endpoints/messages`
+- `@switchbord/graph/endpoints/media`
+- `@switchbord/graph/endpoints/templates`
+- `@switchbord/graph/endpoints/flows`
+- `@switchbord/graph/endpoints/calling`
+- `@switchbord/graph/endpoints/business-management`
 
 WATS-54 added `bun run api:check`, a manifest-backed consistency gate for package exports, source files, consumer fixture imports, and docs packet references.
 
@@ -39,7 +39,7 @@ Do not combine mechanical subpath/export consistency with large internal module 
 Included in the future split implementation:
 
 - mechanically split endpoint families into smaller files;
-- preserve all root `@wats/graph` exports;
+- preserve all root `@switchbord/graph` exports;
 - preserve all WATS-53 endpoint subpath exports;
 - preserve request snapshots, runtime validation, and error taxonomy;
 - preserve consumer fixture behavior;
@@ -76,7 +76,7 @@ Target layout:
 
 ```text
 packages/graph/src/endpoints/messages/
-  index.ts              public barrel for @wats/graph/endpoints/messages
+  index.ts              public barrel for @switchbord/graph/endpoints/messages
   types.ts              GraphMessages* input/output/payload types and constants
   validation.ts         string/object/array/url/contact/template validation helpers
   builders-text.ts      buildSendTextPayload and legacy raw text helper support
@@ -101,7 +101,7 @@ Target layout:
 
 ```text
 packages/graph/src/endpoints/templates/
-  index.ts              public barrel for @wats/graph/endpoints/templates
+  index.ts              public barrel for @switchbord/graph/endpoints/templates
   types.ts              Template* response/input/component types
   validation.ts         template string/array/plain-object/safe-json helpers
   builders.ts           buildCreate/UpdateMessageTemplateBody and component builders
@@ -125,7 +125,7 @@ Target layout:
 
 ```text
 packages/graph/src/endpoints/flows/
-  index.ts              public barrel for @wats/graph/endpoints/flows
+  index.ts              public barrel for @switchbord/graph/endpoints/flows
   types.ts              Flow* response/input/types and caps
   validation.ts         Flow JSON and option validation helpers
   flowJson.ts           buildFlowJson / validateFlowJson
@@ -185,7 +185,7 @@ Goal: reduce `wabaEndpoints.ts` risk by extracting the more self-contained templ
 
 Steps:
 
-1. RED: add tests asserting current template public behavior through root, `@wats/graph/endpoints/templates`, and `WABAClient` stays identical.
+1. RED: add tests asserting current template public behavior through root, `@switchbord/graph/endpoints/templates`, and `WABAClient` stays identical.
 2. Create `packages/graph/src/endpoints/templates/` files.
 3. Move template types/builders/callables mechanically.
 4. Change `wabaEndpoints.ts` to re-export template symbols from the new family while keeping Flow and phone-listing code in place.
@@ -205,7 +205,7 @@ Goal: move Flow code after template extraction proves the compatibility-barrel p
 
 Steps:
 
-1. RED: add tests asserting Flow public behavior through root, `@wats/graph/endpoints/flows`, and `WABAClient` stays identical.
+1. RED: add tests asserting Flow public behavior through root, `@switchbord/graph/endpoints/flows`, and `WABAClient` stays identical.
 2. Create `packages/graph/src/endpoints/flows/` files.
 3. Move Flow types, validation, Flow JSON, data-exchange builders, and callables mechanically.
 4. Change `wabaEndpoints.ts` to re-export Flow symbols from the new family.
@@ -230,7 +230,7 @@ Goal: split the high-traffic message composer module only after templates/flows 
 
 Steps:
 
-1. Add or strengthen message composer request-snapshot tests for root, `@wats/graph/endpoints/messages`, `PhoneNumberClient`, and `WhatsApp` facade paths.
+1. Add or strengthen message composer request-snapshot tests for root, `@switchbord/graph/endpoints/messages`, `PhoneNumberClient`, and `WhatsApp` facade paths.
 2. Create `endpoints/messages/` target files.
 3. Move types/constants first, then validators, then builders, then callables.
 4. Keep `messages.ts` as a compatibility barrel re-exporting from `./messages/index` initially.
@@ -273,7 +273,7 @@ Create or extend `packages/graph/tests/wabaFlows.test.ts`:
 
 Extend existing message tests if needed:
 
-- root export identity vs `@wats/graph/endpoints/messages` export identity;
+- root export identity vs `@switchbord/graph/endpoints/messages` export identity;
 - representative builder snapshots for text, media, interactive, template, read/typing;
 - `PhoneNumberClient` and `WhatsApp` facade delegate through unchanged request shapes;
 - malformed inputs continue to reject with `GraphRequestValidationError` and no raw host errors.

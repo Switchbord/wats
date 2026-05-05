@@ -1,4 +1,4 @@
-// @wats/types — contacts.ts
+// @switchbord/types — contacts.ts
 //
 // Closed contact shape per ADR-004 F-1. The wire payload uses snake_case
 // sub-fields (first_name / formatted_name) which are preserved here via

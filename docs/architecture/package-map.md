@@ -11,36 +11,36 @@ Canonical dependency map for the WATS workspace. Arrows point from dependent pac
 ## Current dependency graph
 
 ```text
-                         @wats/types
+                         @switchbord/types
                               ^
                               |
           +-------------------+-------------------+
           |                   |                   |
-     @wats/crypto        @wats/graph         @wats/http
+     @switchbord/crypto        @switchbord/graph         @switchbord/http
           ^                   ^                   ^
           |                   |                   |
           +-------------------+-------------------+
                               |
-                         @wats/core
+                         @switchbord/core
                               ^
                               |
                    +----------+----------+
                    |                     |
-              @wats/config          @wats/cli
+              @switchbord/config          @switchbord/cli
                    ^                     |
                    |                     |
-              @wats/service --------+ 
+              @switchbord/service --------+ 
                    ^
                    |
-              @wats/testing
+              @switchbord/testing
           (private fixtures / policy tests)
 ```
 
-`@wats/internal-utils` is a published internal support package used by public runtime packages that need shared helpers. It exists to make registry installs complete; it is documented as internal and should not be treated as a stable application API.
+`@switchbord/internal-utils` is a published internal support package used by public runtime packages that need shared helpers. It exists to make registry installs complete; it is documented as internal and should not be treated as a stable application API.
 
 ## Current packages
 
-### `@wats/types`
+### `@switchbord/types`
 
 - Purpose: shared TypeScript domain contracts for config, webhook envelopes, messages, statuses, contacts, entities, and error payloads.
 - Runtime targets: Bun, Node, Workers, Deno.
@@ -48,20 +48,20 @@ Canonical dependency map for the WATS workspace. Arrows point from dependent pac
 - Dependencies out: none.
 - Stability: foundations-complete.
 
-### `@wats/crypto`
+### `@switchbord/crypto`
 
 - Purpose: `CryptoProvider` seam plus Node/Bun and WebCrypto adapters.
 - Runtime targets: Bun, Node, Workers, Deno.
 - Public: yes.
-- Dependencies out: `@wats/types` for shared error payload contracts.
+- Dependencies out: `@switchbord/types` for shared error payload contracts.
 - Stability: foundations-complete.
 
-### `@wats/graph`
+### `@switchbord/graph`
 
 - Purpose: Graph client, transport seam, endpoint registry, scoped clients, error registry, pagination, and endpoint catalog.
 - Runtime targets: Bun, Node, Workers, Deno through injected `Transport` / fetch.
 - Public: yes.
-- Dependencies out: `@wats/types`.
+- Dependencies out: `@switchbord/types`.
 - Stability: foundations-complete for client/transport/errors/pagination; endpoint breadth is expanding.
 
 Current runtime endpoints and helpers:
@@ -73,12 +73,12 @@ Current runtime endpoints and helpers:
 
 Current endpoint subpaths:
 
-- `@wats/graph/endpoints/messages`
-- `@wats/graph/endpoints/media`
-- `@wats/graph/endpoints/templates`
-- `@wats/graph/endpoints/flows`
-- `@wats/graph/endpoints/calling`
-- `@wats/graph/endpoints/business-management`
+- `@switchbord/graph/endpoints/messages`
+- `@switchbord/graph/endpoints/media`
+- `@switchbord/graph/endpoints/templates`
+- `@switchbord/graph/endpoints/flows`
+- `@switchbord/graph/endpoints/calling`
+- `@switchbord/graph/endpoints/business-management`
 
 Run `bun run api:check` after changing this list. WATS-54 checks package exports, target source files, graph-consumer package-specifier imports, `docs/reference/index.md`, `docs/architecture/public-api-surface.md`, this package map, `docs/migration/pywa-to-wats.md`, and `CHANGELOG.md` for the same Graph endpoint subpaths.
 
@@ -95,48 +95,48 @@ Current media runtime status:
 - `decryptEncryptedMedia` verifies and decrypts encrypted media bundles.
 - `createUploadSession`, `uploadFileToSession`, and `getUploadSession` implement resumable upload sessions.
 
-### `@wats/http`
+### `@switchbord/http`
 
 - Purpose: webhook challenge/signature primitives, runtime-neutral `WebhookAdapter`, and Bun/Node/Fetch wrappers.
 - Runtime targets: Bun, Node, Workers, Deno-style Fetch runtimes.
 - Public: yes.
-- Dependencies out: `@wats/crypto`, `@wats/core`, `@wats/types`.
+- Dependencies out: `@switchbord/crypto`, `@switchbord/core`, `@switchbord/types`.
 - Stability: foundations-complete.
 
-`@wats/http` depends on `@wats/core` for the normalizer. Its adapter accepts only a structural `{ dispatch(update) }` facade-like object at runtime.
+`@switchbord/http` depends on `@switchbord/core` for the normalizer. Its adapter accepts only a structural `{ dispatch(update) }` facade-like object at runtime.
 
-### `@wats/core`
+### `@switchbord/core`
 
 - Purpose: typed webhook normalization, typed filters, raw filters, routers, listener registry, and `WhatsApp` facade composition root.
 - Runtime targets: Bun, Node, Workers, Deno where dependencies are available.
 - Public: yes.
-- Dependencies out: `@wats/types`, `@wats/graph`.
+- Dependencies out: `@switchbord/types`, `@switchbord/graph`.
 - Stability: foundations-complete.
 
 The facade binds a `GraphClient`, optional `PhoneNumberClient` / `WABAClient`, a `TypedRouter`, and optional listener registry support. WATS-30 adds `WhatsApp.startChat(...)`, which delegates through the bound `PhoneNumberClient` to start a text conversation with any valid phone-number-like recipient without contacts lookup. WATS-38 adds facade composer helpers for media, location, contacts, reaction, interactive variants, template send, mark-as-read, and typing indicators; they require a bound `phoneNumberId` and use the same phone-number client.
 
-### `@wats/config`
+### `@switchbord/config`
 
 - Purpose: YAML/JSON config schema, env-secret references, config loading, validation, and redaction.
 - Runtime targets: Bun and Node-compatible ESM; config parsing itself is runtime-light.
 - Public: yes, experimental in WATS-32.
-- Dependencies out: `@wats/internal-utils` for shared object guards.
+- Dependencies out: `@switchbord/internal-utils` for shared object guards.
 - Stability: experimental until the CLI/service config contract settles.
 
-### `@wats/cli`
+### `@switchbord/cli`
 
 - Purpose: package-manager CLI surface for safe config validation, OpenAPI export, help, and local webhook token generation.
 - Runtime targets: Bun now; Node-compatible ESM is the direction for the publishable CLI.
 - Public: yes, experimental in WATS-33.
-- Dependencies out: `@wats/config`, `@wats/service`.
+- Dependencies out: `@switchbord/config`, `@switchbord/service`.
 - Stability: experimental until init/doctor/serve process behavior settles.
 
-### `@wats/service`
+### `@switchbord/service`
 
 - Purpose: runtime-neutral standalone webhook/API service foundation plus generated OpenAPI 3.1 document for the service routes.
 - Runtime targets: Bun and Web Fetch-compatible runtimes for the core `Request -> Response` app; Node/Bun server wrappers are later work.
 - Public: yes, experimental in WATS-34/WATS-35.
-- Dependencies out: `@wats/config`, `@wats/core`, `@wats/http`, `@wats/graph`, `@wats/crypto`.
+- Dependencies out: `@switchbord/config`, `@switchbord/core`, `@switchbord/http`, `@switchbord/graph`, `@switchbord/crypto`.
 - Stability: experimental until CLI serve/openapi integration and broader route coverage settle.
 
 ## WATS-48 planned package boundary
@@ -145,26 +145,26 @@ WATS-48 defines a design target, not current package surface until implementatio
 
 Future public package and subpaths:
 
-- `@wats/persistence`
-- `@wats/persistence/sqlite`
-- `@wats/persistence/postgres`
-- `@wats/persistence/testing`
+- `@switchbord/persistence`
+- `@switchbord/persistence/sqlite`
+- `@switchbord/persistence/postgres`
+- `@switchbord/persistence/testing`
 
 Intended dependency direction:
 
-- `@wats/persistence` may depend on `@wats/types` and `@wats/internal-utils`.
-- `@wats/service` may later consume `@wats/persistence` through injected stores, not direct env reads.
-- `@wats/cli` may later compose config/service/persistence for doctor and serve lifecycle checks.
-- The current dependency graph does not include `@wats/persistence`.
+- `@switchbord/persistence` may depend on `@switchbord/types` and `@switchbord/internal-utils`.
+- `@switchbord/service` may later consume `@switchbord/persistence` through injected stores, not direct env reads.
+- `@switchbord/cli` may later compose config/service/persistence for doctor and serve lifecycle checks.
+- The current dependency graph does not include `@switchbord/persistence`.
 
-### `@wats/internal-utils`
+### `@switchbord/internal-utils`
 
 - Purpose: internal support package for shared pure helpers required by public runtime packages.
 - Public: yes for package-manager completeness; application code should not treat it as stable public API.
-- Published: yes in the 0.2.1 alpha package set because `@wats/config` depends on it at runtime.
+- Published: yes in the 0.2.1 alpha package set because `@switchbord/config` depends on it at runtime.
 - Dependencies out: none.
 
-### `@wats/testing`
+### `@switchbord/testing`
 
 - Purpose: private workspace tests, consumer fixtures, fixture payloads, and policy checks.
 - Runtime targets: Bun test runner only.
@@ -174,10 +174,10 @@ Intended dependency direction:
 
 ## Invariants
 
-1. `@wats/types` has no runtime dependencies.
-2. `@wats/graph`, `@wats/http`, and `@wats/crypto` expose portable seams and keep runtime-specific behavior behind adapters.
-3. `@wats/core` is the SDK composition root; app-layer packages compose it rather than duplicating router/webhook semantics.
-4. `@wats/internal-utils` may be published only as an internal support package required by public runtime packages; `@wats/testing` remains private and must not be published.
+1. `@switchbord/types` has no runtime dependencies.
+2. `@switchbord/graph`, `@switchbord/http`, and `@switchbord/crypto` expose portable seams and keep runtime-specific behavior behind adapters.
+3. `@switchbord/core` is the SDK composition root; app-layer packages compose it rather than duplicating router/webhook semantics.
+4. `@switchbord/internal-utils` may be published only as an internal support package required by public runtime packages; `@switchbord/testing` remains private and must not be published.
 5. Consumer fixtures import through package specifiers, never relative source paths.
 6. Roadmap/deferred work is tracked in Linear.
 
@@ -185,13 +185,13 @@ Intended dependency direction:
 
 | package | Bun | Node | Workers | Deno | notes |
 | --- | :---: | :---: | :---: | :---: | --- |
-| `@wats/types` | Y | Y | Y | Y | type-first |
-| `@wats/crypto` | Y | Y | Y | Y | adapter chosen at runtime |
-| `@wats/graph` | Y | Y | Y | Y | injected transport |
-| `@wats/http` | Y | Y | Y | Y | runtime wrappers |
-| `@wats/core` | Y | Y | Y | Y | no server binding |
-| `@wats/config` | Y | Y | possible | possible | boundary validation; file loading runtime-dependent |
-| `@wats/cli` | Y | planned | N | N | config validation + OpenAPI export + package-manager UX |
-| `@wats/internal-utils` | Y | Y | possible | possible | internal support package |
-| `@wats/testing` | Y | N | N | N | Bun tests only |
-| `@wats/service` | Y | planned | possible | possible | runtime-neutral app plus OpenAPI generator; server wrappers later |
+| `@switchbord/types` | Y | Y | Y | Y | type-first |
+| `@switchbord/crypto` | Y | Y | Y | Y | adapter chosen at runtime |
+| `@switchbord/graph` | Y | Y | Y | Y | injected transport |
+| `@switchbord/http` | Y | Y | Y | Y | runtime wrappers |
+| `@switchbord/core` | Y | Y | Y | Y | no server binding |
+| `@switchbord/config` | Y | Y | possible | possible | boundary validation; file loading runtime-dependent |
+| `@switchbord/cli` | Y | planned | N | N | config validation + OpenAPI export + package-manager UX |
+| `@switchbord/internal-utils` | Y | Y | possible | possible | internal support package |
+| `@switchbord/testing` | Y | N | N | N | Bun tests only |
+| `@switchbord/service` | Y | planned | possible | possible | runtime-neutral app plus OpenAPI generator; server wrappers later |

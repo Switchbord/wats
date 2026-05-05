@@ -1,7 +1,7 @@
 // F-2 crypto-consumer harness.
 //
 // Spawns `bun run verify-imports` from the crypto-consumer fixture
-// directory (which declares `@wats/crypto: workspace:*`) and asserts
+// directory (which declares `@switchbord/crypto: workspace:*`) and asserts
 // the success sentinel + runtime-shape report.
 
 import { describe, expect, test } from "bun:test";
@@ -67,7 +67,7 @@ function runBun(args: string[], cwd: string): {
   };
 }
 
-describe("F-2 @wats/crypto consumer fixture", () => {
+describe("F-2 @switchbord/crypto consumer fixture", () => {
   test("fixture manifest exists and declares the workspace dependency", () => {
     const repoRoot = findRepoRoot(import.meta.dir);
     const fixtureDir = join(
@@ -87,7 +87,7 @@ describe("F-2 @wats/crypto consumer fixture", () => {
     if (!isJsonRecord(dependencies)) {
       throw new Error("Fixture dependencies must be an object");
     }
-    expect(dependencies["@wats/crypto"]).toBe("workspace:*");
+    expect(dependencies["@switchbord/crypto"]).toBe("workspace:*");
   });
 
   test("running the fixture entry under bun emits the success sentinel", () => {
@@ -134,11 +134,11 @@ describe("F-2 @wats/crypto consumer fixture", () => {
     // Each subpath MUST resolve to a real module exposing at least one
     // documented export.
     for (const specifier of [
-      "@wats/crypto",
-      "@wats/crypto/provider",
-      "@wats/crypto/errors",
-      "@wats/crypto/node",
-      "@wats/crypto/webcrypto"
+      "@switchbord/crypto",
+      "@switchbord/crypto/provider",
+      "@switchbord/crypto/errors",
+      "@switchbord/crypto/node",
+      "@switchbord/crypto/webcrypto"
     ]) {
       const keys = parsed.moduleKeys[specifier];
       expect(
@@ -150,29 +150,29 @@ describe("F-2 @wats/crypto consumer fixture", () => {
 
     // Assert specific export identities at each subpath — not just
     // "the import resolves". Section 7 of the adversarial battery.
-    expect(parsed.moduleKeys["@wats/crypto/node"]).toContain(
+    expect(parsed.moduleKeys["@switchbord/crypto/node"]).toContain(
       "createNodeCryptoProvider"
     );
-    expect(parsed.moduleKeys["@wats/crypto/webcrypto"]).toContain(
+    expect(parsed.moduleKeys["@switchbord/crypto/webcrypto"]).toContain(
       "createWebCryptoProvider"
     );
-    expect(parsed.moduleKeys["@wats/crypto/errors"]).toContain(
+    expect(parsed.moduleKeys["@switchbord/crypto/errors"]).toContain(
       "CryptoProviderError"
     );
-    expect(parsed.moduleKeys["@wats/crypto/errors"]).toContain(
+    expect(parsed.moduleKeys["@switchbord/crypto/errors"]).toContain(
       "InvalidKeyError"
     );
-    expect(parsed.moduleKeys["@wats/crypto/errors"]).toContain(
+    expect(parsed.moduleKeys["@switchbord/crypto/errors"]).toContain(
       "InvalidBodyError"
     );
-    expect(parsed.moduleKeys["@wats/crypto/errors"]).toContain(
+    expect(parsed.moduleKeys["@switchbord/crypto/errors"]).toContain(
       "InvalidLengthError"
     );
-    expect(parsed.moduleKeys["@wats/crypto/errors"]).toContain(
+    expect(parsed.moduleKeys["@switchbord/crypto/errors"]).toContain(
       "UnsupportedCapabilityError"
     );
-    expect(parsed.moduleKeys["@wats/crypto"]).toContain("createCryptoProvider");
-    expect(parsed.moduleKeys["@wats/crypto"]).toContain(
+    expect(parsed.moduleKeys["@switchbord/crypto"]).toContain("createCryptoProvider");
+    expect(parsed.moduleKeys["@switchbord/crypto"]).toContain(
       "WATS_CRYPTO_PROVIDER_EXPORTS"
     );
   });

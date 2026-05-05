@@ -68,13 +68,13 @@ function writeConsumerSmoke(pkg: string, installRoot: string): void {
 
 try {
   const installRoot = join(packRoot, "install");
-  const scopedRoot = join(installRoot, "node_modules", "@wats");
+  const scopedRoot = join(installRoot, "node_modules", "@switchbord");
   mkdirSync(scopedRoot, { recursive: true });
 
   for (const pkg of PUBLISHABLE_PACKAGES) {
     const packageDir = join(repoRoot, "packages", pkg);
     const dryRunOutput = run("bun", ["pm", "pack", "--dry-run", "--ignore-scripts"], packageDir);
-    const label = `@wats/${pkg} dry-run pack`;
+    const label = `@switchbord/${pkg} dry-run pack`;
     assertIncludes(dryRunOutput, "package.json", label);
     assertIncludes(dryRunOutput, "dist/index.js", label);
     assertIncludes(dryRunOutput, "dist/index.d.ts", label);
@@ -121,8 +121,8 @@ try {
     for (const dep of INTERNAL_WORKSPACE_DEPS[pkg] ?? []) {
       const packageJsonPath = join(scopedRoot, pkg, "package.json");
       const manifest = JSON.parse(readFileSync(packageJsonPath, "utf8")) as { dependencies?: Record<string, string> };
-      if (manifest.dependencies?.[`@wats/${dep}`] === "workspace:*") {
-        manifest.dependencies[`@wats/${dep}`] = "0.2.1";
+      if (manifest.dependencies?.[`@switchbord/${dep}`] === "workspace:*") {
+        manifest.dependencies[`@switchbord/${dep}`] = "0.2.1";
         writeFileSync(packageJsonPath, JSON.stringify(manifest, null, 2));
       }
     }
@@ -131,7 +131,7 @@ try {
       const cliBin = join(scopedRoot, "cli", "dist", "bin.js");
       const binText = readFileSync(cliBin, "utf8");
       if (!binText.startsWith("#!/usr/bin/env bun")) {
-        throw new Error("@wats/cli packed bin must preserve the Bun shebang for package-manager installs");
+        throw new Error("@switchbord/cli packed bin must preserve the Bun shebang for package-manager installs");
       }
       run(cliBin, ["--help"], installRoot);
     }

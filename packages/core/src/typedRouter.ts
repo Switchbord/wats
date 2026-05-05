@@ -1,4 +1,4 @@
-// @wats/core — typedRouter.ts (F-10 GREEN)
+// @switchbord/core — typedRouter.ts (F-10 GREEN)
 //
 // Handle-based TypedRouter above the F-8 `TypedUpdate` discriminated
 // union and the F-9 branded `TypedFilter` surface. Closes WATS-10 (L4

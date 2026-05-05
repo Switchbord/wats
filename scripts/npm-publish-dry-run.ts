@@ -75,7 +75,7 @@ function assertNoPublishSideEffects(scriptText: string): void {
 
 function assertManifest(pkg: string): Manifest {
   const manifest = readManifest(pkg);
-  assert(manifest.name === `@wats/${pkg}`, `${pkg} package name mismatch`);
+  assert(manifest.name === `@switchbord/${pkg}`, `${pkg} package name mismatch`);
   assert(manifest.version === VERSION, `${pkg} must be version ${VERSION}`);
   assert(manifest.private === false, `${pkg} must be publishable (private false) for alpha launch`);
   assert(manifest.publishConfig?.access === "public", `${pkg} must publish with public access`);
@@ -90,7 +90,7 @@ function assertManifest(pkg: string): Manifest {
 function rewriteInternalDeps(manifestPath: string): void {
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as Manifest;
   for (const [dep, spec] of Object.entries(manifest.dependencies ?? {})) {
-    if (dep.startsWith("@wats/") && spec.startsWith("^0.2.")) {
+    if (dep.startsWith("@switchbord/") && spec.startsWith("^0.2.")) {
       manifest.dependencies![dep] = VERSION;
     }
   }
@@ -102,7 +102,7 @@ try {
   assertNoPublishSideEffects(scriptText);
   run("bun", ["run", "build:packages"], repoRoot);
 
-  const scopedRoot = join(packRoot, "install", "node_modules", "@wats");
+  const scopedRoot = join(packRoot, "install", "node_modules", "@switchbord");
   mkdirSync(scopedRoot, { recursive: true });
 
   for (const pkg of PUBLISHABLE_PACKAGES) {
@@ -143,5 +143,5 @@ try {
 }
 
 function manifestFileSafeName(pkg: string): string {
-  return `wats-${pkg}`;
+  return `switchbord-${pkg}`;
 }

@@ -133,9 +133,9 @@ describe("F-10 router.md reference guide", () => {
     expect(doc).toMatch(/10[_,]?000/);
   });
 
-  test("contains a usage code sample importing from @wats/core", () => {
+  test("contains a usage code sample importing from @switchbord/core", () => {
     expect(doc).toMatch(/```[ \t]*(ts|typescript)/i);
-    expect(doc).toContain("@wats/core");
+    expect(doc).toContain("@switchbord/core");
   });
 
   test("references ADR-004 and the F-10 scope", () => {
@@ -200,7 +200,7 @@ describe("F-10 whatsapp-facade.md reference guide", () => {
 // ---------------------------------------------------------------------
 
 describe("F-10 core-consumer fixture coverage", () => {
-  test("fixture imports TypedRouter + WhatsApp from @wats/core", () => {
+  test("fixture imports TypedRouter + WhatsApp from @switchbord/core", () => {
     const repoRoot = findRepoRoot(import.meta.dir);
     const verifyPath = join(
       repoRoot,
@@ -211,7 +211,7 @@ describe("F-10 core-consumer fixture coverage", () => {
     expect(source).toContain("WhatsApp");
     expect(source).toContain("DispatchReport");
     expect(source).toContain("RegistrationHandle");
-    expect(source).toMatch(/@wats\/core/);
+    expect(source).toMatch(/@switchbord\/core/);
   });
 
   test("running the fixture entry still emits the core-consumer:ok sentinel and runs F-10 assertions", () => {
@@ -266,13 +266,13 @@ describe("F-10 core-consumer fixture coverage", () => {
     );
     expect(labels).toContain("WhatsApp.sendImage returns parsed response");
     expect(labels).toContain(
-      "WhatsApp.sendImage sends exact media payload through @wats/core"
+      "WhatsApp.sendImage sends exact media payload through @switchbord/core"
     );
     expect(labels).toContain(
-      "WhatsApp.sendLocation sends exact location payload through @wats/core"
+      "WhatsApp.sendLocation sends exact location payload through @switchbord/core"
     );
     expect(labels).toContain(
-      "WhatsApp.sendButtons sends interactive payload through @wats/core"
+      "WhatsApp.sendButtons sends interactive payload through @switchbord/core"
     );
     for (const [label, ok] of Object.entries(parsed.checks)) {
       expect(ok, `fixture check "${label}" must report true`).toBe(true);

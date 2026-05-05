@@ -44,12 +44,12 @@ future Graph routes that WATS has not wrapped yet.
 
 Current first-class Graph endpoint family subpaths are:
 
-- `@wats/graph/endpoints/messages`
-- `@wats/graph/endpoints/media`
-- `@wats/graph/endpoints/templates`
-- `@wats/graph/endpoints/flows`
-- `@wats/graph/endpoints/calling`
-- `@wats/graph/endpoints/business-management`
+- `@switchbord/graph/endpoints/messages`
+- `@switchbord/graph/endpoints/media`
+- `@switchbord/graph/endpoints/templates`
+- `@switchbord/graph/endpoints/flows`
+- `@switchbord/graph/endpoints/calling`
+- `@switchbord/graph/endpoints/business-management`
 
 WATS-54 keeps package exports, target source files, graph-consumer
 package-specifier imports, reference docs, architecture docs, migration
@@ -65,7 +65,7 @@ import {
   type EndpointParamSpec,
   type EndpointCallable,
   type EndpointInvokeOptions
-} from "@wats/graph";
+} from "@switchbord/graph";
 ```
 
 ### Signature
@@ -202,14 +202,14 @@ try {
 
 ## messages: the two invocation shapes
 
-F-6 refactors `@wats/graph/endpoints/messages` onto `defineEndpoint`.
+F-6 refactors `@switchbord/graph/endpoints/messages` onto `defineEndpoint`.
 Two shapes are exposed; both produce byte-for-byte identical HTTP
 requests.
 
 ### 1. Endpoint-registry callable (preferred for new call sites)
 
 ```ts
-import { GraphClient, sendMessage } from "@wats/graph";
+import { GraphClient, sendMessage } from "@switchbord/graph";
 
 const client = new GraphClient({
   accessToken: process.env.WATS_TOKEN!,
@@ -250,7 +250,7 @@ example wires a hypothetical `GET /{businessId}/analytics` endpoint with
 a required path parameter and an optional `since` query parameter:
 
 ```ts
-import { defineEndpoint, GraphClient } from "@wats/graph";
+import { defineEndpoint, GraphClient } from "@switchbord/graph";
 
 interface AnalyticsResponse {
   readonly totals: { readonly messages: number };

@@ -1,7 +1,7 @@
 # WhatsApp facade reference (`WhatsApp`)
 
 - status: active
-- applies-to: `@wats/core` (`0.2.0-foundations-complete`)
+- applies-to: `@switchbord/core` (`0.2.0-foundations-complete`)
 - lastReviewed: 2026-04-28
 
 ## WhatsApp
@@ -11,8 +11,8 @@
 ## Construction
 
 ```ts
-import { WhatsApp } from "@wats/core";
-import { GraphClient, createFetchTransport } from "@wats/graph";
+import { WhatsApp } from "@switchbord/core";
+import { GraphClient, createFetchTransport } from "@switchbord/graph";
 
 const graphClient = new GraphClient({
   accessToken: process.env.META_WA_TOKEN!,
@@ -71,7 +71,7 @@ await wa.phoneNumberClient?.sendMessage({
 `wa.on(filter, handler)` delegates directly to the underlying `TypedRouter` and returns the same `RegistrationHandle`.
 
 ```ts
-import { and, message } from "@wats/core/filtersTyped";
+import { and, message } from "@switchbord/core/filtersTyped";
 
 const handle = wa.on(and(message, message.textMatches(/hello/i)), async (ctx) => {
   if (ctx.update.kind !== "message") return;
@@ -129,7 +129,7 @@ const report = await wa.dispatch(typedUpdate);
 
 `dispatch` first evaluates facade listeners, then delegates to `TypedRouter.dispatch`. The returned `DispatchReport` is the router report.
 
-`@wats/http` uses this shape through `createWebhookAdapter({ whatsapp: wa, ... })`, but the facade itself is not an HTTP server.
+`@switchbord/http` uses this shape through `createWebhookAdapter({ whatsapp: wa, ... })`, but the facade itself is not an HTTP server.
 
 ## Error taxonomy
 

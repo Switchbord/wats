@@ -94,7 +94,7 @@ describe("WATS-49 Docker/deployment scaffold design docs", () => {
     expectAll(service, [
       "WATS-49",
       "no supported Dockerfile/Compose/container image yet",
-      "current @wats/service has no process wrapper/Docker integration",
+      "current @switchbord/service has no process wrapper/Docker integration",
       "no image publication",
       "no registry credentials"
     ]);

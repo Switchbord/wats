@@ -1,4 +1,4 @@
-// @wats/types — statuses.ts
+// @switchbord/types — statuses.ts
 //
 // Closed WhatsAppMessageStatus per ADR-004 F-1. The `status` field is
 // the discriminator and narrows to one of six literals. Additional

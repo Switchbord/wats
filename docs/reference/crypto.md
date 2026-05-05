@@ -1,16 +1,16 @@
-# `@wats/crypto` reference
+# `@switchbord/crypto` reference
 
 - status: stable (F-2)
-- package: `@wats/crypto`
+- package: `@switchbord/crypto`
 - ADR: ADR-003 Transport and crypto abstractions
 - parity: WATS-20
 
 ## Provider contract
 
-`@wats/crypto` ships a single interface and two adapters:
+`@switchbord/crypto` ships a single interface and two adapters:
 
 ```ts
-import type { CryptoProvider } from "@wats/crypto/provider";
+import type { CryptoProvider } from "@switchbord/crypto/provider";
 
 export interface CryptoProvider {
   readonly name: string;
@@ -100,7 +100,7 @@ Validation (`InvalidLengthError`, `code: "invalid_length"`):
 ## Adapter selection
 
 ```ts
-import { createCryptoProvider } from "@wats/crypto";
+import { createCryptoProvider } from "@switchbord/crypto";
 
 const provider = await createCryptoProvider();
 // ...or force a specific adapter
@@ -138,7 +138,7 @@ CryptoProviderError (Error)
 └── UnsupportedCapabilityError   code: "unsupported_capability"
 ```
 
-Every error from `@wats/crypto` inherits from `CryptoProviderError`.
+Every error from `@switchbord/crypto` inherits from `CryptoProviderError`.
 Consumers that care about individual codes may branch on `err.code`;
 consumers that only need to distinguish crypto failures from other
 runtime errors may use `instanceof CryptoProviderError`.
@@ -161,11 +161,11 @@ escape the provider surface. Internal wrapping policy:
 
 | Specifier                   | Purpose                                        |
 |-----------------------------|------------------------------------------------|
-| `@wats/crypto`              | barrel: factory + adapters + error classes     |
-| `@wats/crypto/provider`     | `CryptoProvider` interface + capability types  |
-| `@wats/crypto/errors`       | error class hierarchy + validation helpers     |
-| `@wats/crypto/node`         | `createNodeCryptoProvider` (direct adapter)    |
-| `@wats/crypto/webcrypto`    | `createWebCryptoProvider` (direct adapter)     |
+| `@switchbord/crypto`              | barrel: factory + adapters + error classes     |
+| `@switchbord/crypto/provider`     | `CryptoProvider` interface + capability types  |
+| `@switchbord/crypto/errors`       | error class hierarchy + validation helpers     |
+| `@switchbord/crypto/node`         | `createNodeCryptoProvider` (direct adapter)    |
+| `@switchbord/crypto/webcrypto`    | `createWebCryptoProvider` (direct adapter)     |
 
 All subpaths are listed in `packages/crypto/package.json`'s `exports`
 map. Every subpath has at least one consumer-fixture assertion in
@@ -201,7 +201,7 @@ names so later additions are additive (not breaking).
 
 ## Validation helpers
 
-`@wats/crypto/errors` re-exports validation helpers used by the
+`@switchbord/crypto/errors` re-exports validation helpers used by the
 adapters and available to downstream consumers:
 
 - `assertValidKey(key)` — asserts `Uint8Array | string` (non-empty).

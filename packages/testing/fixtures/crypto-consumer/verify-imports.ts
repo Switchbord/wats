@@ -1,4 +1,4 @@
-// Consumer fixture for @wats/crypto.
+// Consumer fixture for @switchbord/crypto.
 //
 // Imports ONLY through the published package specifiers (never through
 // relative paths). Exercises each documented subpath entrypoint, asserts
@@ -7,11 +7,11 @@
 // with the success sentinel. A failure inside verify() must throw; the
 // runner treats a non-zero exit code as a fixture failure.
 
-import * as rootEntrypoint from "@wats/crypto";
-import * as providerEntrypoint from "@wats/crypto/provider";
-import * as errorsEntrypoint from "@wats/crypto/errors";
-import * as nodeEntrypoint from "@wats/crypto/node";
-import * as webcryptoEntrypoint from "@wats/crypto/webcrypto";
+import * as rootEntrypoint from "@switchbord/crypto";
+import * as providerEntrypoint from "@switchbord/crypto/provider";
+import * as errorsEntrypoint from "@switchbord/crypto/errors";
+import * as nodeEntrypoint from "@switchbord/crypto/node";
+import * as webcryptoEntrypoint from "@switchbord/crypto/webcrypto";
 
 import {
   createCryptoProvider,
@@ -23,8 +23,8 @@ import {
   InvalidLengthError,
   UnsupportedCapabilityError,
   WATS_CRYPTO_PROVIDER_EXPORTS
-} from "@wats/crypto";
-import type { CryptoProvider } from "@wats/crypto/provider";
+} from "@switchbord/crypto";
+import type { CryptoProvider } from "@switchbord/crypto/provider";
 
 interface VerifyReportOk {
   readonly ok: true;
@@ -130,11 +130,11 @@ async function verify(): Promise<VerifyReportOk> {
     checks,
     sentinel: "crypto-consumer:ok",
     moduleKeys: {
-      "@wats/crypto": Object.keys(rootEntrypoint).sort(),
-      "@wats/crypto/provider": Object.keys(providerEntrypoint).sort(),
-      "@wats/crypto/errors": Object.keys(errorsEntrypoint).sort(),
-      "@wats/crypto/node": Object.keys(nodeEntrypoint).sort(),
-      "@wats/crypto/webcrypto": Object.keys(webcryptoEntrypoint).sort()
+      "@switchbord/crypto": Object.keys(rootEntrypoint).sort(),
+      "@switchbord/crypto/provider": Object.keys(providerEntrypoint).sort(),
+      "@switchbord/crypto/errors": Object.keys(errorsEntrypoint).sort(),
+      "@switchbord/crypto/node": Object.keys(nodeEntrypoint).sort(),
+      "@switchbord/crypto/webcrypto": Object.keys(webcryptoEntrypoint).sort()
     }
   };
 }

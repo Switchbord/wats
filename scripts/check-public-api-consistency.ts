@@ -9,7 +9,7 @@ interface Manifest {
 }
 
 interface GraphEndpointSubpathEntry {
-  readonly packageName: "@wats/graph";
+  readonly packageName: "@switchbord/graph";
   readonly specifier: string;
   readonly exportKey: string;
   readonly source: string;
@@ -23,7 +23,7 @@ type JsonRecord = Record<string, unknown>;
 
 const DEFAULT_MANIFEST_PATH = "scripts/public-api-consistency-manifest.json";
 const EXPECTED_SCHEMA = "wats.public-api-consistency.v1";
-const EXPECTED_SCOPE = "@wats/graph endpoint subpaths";
+const EXPECTED_SCOPE = "@switchbord/graph endpoint subpaths";
 const DOC_PACKET = [
   "docs/reference/index.md",
   "docs/architecture/public-api-surface.md",
@@ -97,8 +97,8 @@ function parseManifest(root: string, manifestRelPath: string): Manifest {
   const graphEndpointSubpaths = raw.graphEndpointSubpaths.map((entry, index): GraphEndpointSubpathEntry => {
     if (!isRecord(entry)) throw new Error(`manifest entry ${index} must be an object`);
     const packageName = asString(entry.packageName, `manifest entry ${index}.packageName`);
-    if (packageName !== "@wats/graph") {
-      throw new Error(`manifest entry ${index}.packageName must be @wats/graph`);
+    if (packageName !== "@switchbord/graph") {
+      throw new Error(`manifest entry ${index}.packageName must be @switchbord/graph`);
     }
     const docs = asStringArray(entry.docs, `manifest entry ${index}.docs`);
     if (JSON.stringify(docs) !== JSON.stringify(DOC_PACKET)) {
@@ -134,7 +134,7 @@ function assertUniqueSpecifiers(entries: readonly GraphEndpointSubpathEntry[]): 
 }
 
 function loadPackageExports(root: string, packageName: string): JsonRecord {
-  if (packageName !== "@wats/graph") throw new Error(`unsupported package ${packageName}`);
+  if (packageName !== "@switchbord/graph") throw new Error(`unsupported package ${packageName}`);
   const manifest = readJsonFile(join(root, "packages/graph/package.json"));
   if (!isRecord(manifest) || !isRecord(manifest.exports)) {
     throw new Error("packages/graph/package.json exports must be an object");

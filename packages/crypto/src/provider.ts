@@ -1,4 +1,4 @@
-// @wats/crypto — CryptoProvider interface (F-2 stub; implementation in GREEN).
+// @switchbord/crypto — CryptoProvider interface (F-2 stub; implementation in GREEN).
 
 export type CryptoProviderCapability =
   | "hmacSha256"

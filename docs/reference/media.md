@@ -37,7 +37,7 @@ import {
   MediaValidationError,
   MediaCryptoError,
   MediaIntegrityError
-} from "@wats/graph";
+} from "@switchbord/graph";
 ```
 
 ### `uploadMedia(client, params, body, options?)`

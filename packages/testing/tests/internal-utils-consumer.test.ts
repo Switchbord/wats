@@ -61,7 +61,7 @@ function runBun(args: string[], cwd: string): {
   };
 }
 
-describe("F-0 @wats/internal-utils consumer fixture", () => {
+describe("F-0 @switchbord/internal-utils consumer fixture", () => {
   test("fixture manifest exists and declares the workspace dependency", () => {
     const repoRoot = findRepoRoot(import.meta.dir);
     const fixtureDir = join(
@@ -81,7 +81,7 @@ describe("F-0 @wats/internal-utils consumer fixture", () => {
     if (!isJsonRecord(dependencies)) {
       throw new Error("Fixture dependencies must be an object");
     }
-    expect(dependencies["@wats/internal-utils"]).toBe("workspace:*");
+    expect(dependencies["@switchbord/internal-utils"]).toBe("workspace:*");
   });
 
   test("running the fixture entry under bun emits the success sentinel", () => {
@@ -92,7 +92,7 @@ describe("F-0 @wats/internal-utils consumer fixture", () => {
     );
 
     // We run the fixture in-place from the workspace. Bun resolves
-    // "@wats/internal-utils" through the workspace root's package
+    // "@switchbord/internal-utils" through the workspace root's package
     // resolution without a fixture-local install step (workspace:*).
     const result = runBun(["run", "verify-imports"], fixtureDir);
 

@@ -6,7 +6,7 @@
     "verify-imports": "bun run ./verify-imports.ts"
   },
   "dependencies": {
-    "@wats/http": "workspace:*",
-    "@wats/crypto": "workspace:*"
+    "@switchbord/http": "workspace:*",
+    "@switchbord/crypto": "workspace:*"
   }
 }

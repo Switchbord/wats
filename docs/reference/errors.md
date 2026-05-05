@@ -21,7 +21,7 @@ Define WATS error model, taxonomy, and propagation behavior.
 
 ### Graph error class hierarchy (B2 + F-4 + F-5)
 
-`@wats/graph` defines a single-inheritance hierarchy of typed errors:
+`@switchbord/graph` defines a single-inheritance hierarchy of typed errors:
 
 ```
 Error
@@ -58,7 +58,7 @@ Every `GraphApiError` instance carries:
 
 ### Error Code Registry (F-5, WATS-27 Arch-M)
 
-ADR-005 defines the error code registry. `@wats/graph` exposes three
+ADR-005 defines the error code registry. `@switchbord/graph` exposes three
 functions:
 
 ```ts
@@ -66,7 +66,7 @@ import {
   registerErrorCode,
   resolveRegisteredError,
   clearErrorRegistry
-} from "@wats/graph";
+} from "@switchbord/graph";
 
 registerErrorCode({
   code: 131079,                       // required: finite non-negative number
@@ -113,7 +113,7 @@ import {
   GraphApiError,
   registerErrorCode,
   type GraphErrorFactoryContext
-} from "@wats/graph";
+} from "@switchbord/graph";
 
 class MyCustomError extends GraphApiError {
   static readonly errorCode = 131079;
@@ -351,7 +351,7 @@ Guarantees:
 Example:
 
 ```ts
-import { scrubErrorCause } from "@wats/graph";
+import { scrubErrorCause } from "@switchbord/graph";
 
 try {
   await client.request({ method: "GET", path: "/me" });
@@ -387,7 +387,7 @@ these failures always remain base `GraphApiError` regardless of
 
 ## HTTP webhook verification errors (C1)
 
-`@wats/http` C1 primitives return typed error objects (result unions)
+`@switchbord/http` C1 primitives return typed error objects (result unions)
 rather than throwing for expected verification failures.
 
 Challenge verification (`verifyWebhookChallenge`) error codes:
@@ -413,7 +413,7 @@ Signature verification (`validateWebhookSignature`) error codes:
 - `crypto_provider_unavailable` (F-3)
 
 Both functions are `async` and route cryptographic primitives through
-the `@wats/crypto` `CryptoProvider` seam.
+the `@switchbord/crypto` `CryptoProvider` seam.
 
 ## Usage Examples
 
@@ -428,7 +428,7 @@ import {
   RecipientIdentityKeyMismatchError,
   UnsupportedMessageTypeError,
   scrubErrorCause
-} from "@wats/graph";
+} from "@switchbord/graph";
 
 try {
   await client.messages.sendMessage({ phoneNumberId, to, text });

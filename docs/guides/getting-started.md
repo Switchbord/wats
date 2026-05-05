@@ -26,7 +26,7 @@ Engineers onboarding to WATS development.
 Minimal Graph client setup (B2):
 
 ```ts
-import { GraphClient } from "@wats/graph";
+import { GraphClient } from "@switchbord/graph";
 
 const graphClient = new GraphClient({
   baseUrl: "https://graph.facebook.com",

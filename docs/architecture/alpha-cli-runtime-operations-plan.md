@@ -15,7 +15,7 @@ ADR-007 decides that WATS alpha CLI/runtime/deployment work stays in the existin
 
 Why:
 
-- `@wats/config`, `@wats/cli`, and `@wats/service` are still experimental and need coordinated contract iteration with `@wats/core`, `@wats/http`, and `@wats/graph`.
+- `@switchbord/config`, `@switchbord/cli`, and `@switchbord/service` are still experimental and need coordinated contract iteration with `@switchbord/core`, `@switchbord/http`, and `@switchbord/graph`.
 - One checkout, one docs site, one package map, and one CI loop are better for alpha contributors.
 - Package boundaries can be enforced by monorepo consumer fixtures and docs-lock tests until packages are published.
 - Docker/deploy examples, config templates, and persistence docs need to match the actual CLI/service contracts.
@@ -41,7 +41,7 @@ Expected alpha features:
 
 Boundary:
 
-- CLI composes `@wats/config` and `@wats/service`; it must not duplicate schema validation or service routing.
+- CLI composes `@switchbord/config` and `@switchbord/service`; it must not duplicate schema validation or service routing.
 - Live Meta validation requires explicit opt-in flags and a documented secrets plan.
 - No live Meta calls by default; no raw secrets in CLI arguments; no second repository for WATS-47.
 
@@ -105,7 +105,7 @@ Expected alpha features:
 - Semver policy for `0.x` package changes.
 - Changelog validation and package publish dry-runs.
 - Package smoke tests that import from built artifacts once dist builds exist.
-- Internal support package policy for `@wats/internal-utils` and private-package guards for `@wats/testing`.
+- Internal support package policy for `@switchbord/internal-utils` and private-package guards for `@switchbord/testing`.
 - A release process that can eventually bump at least patch for every merged incremental PR.
 - A reusable maintainer workflow for release closure hygiene.
 
@@ -123,7 +123,7 @@ Goal: make first-run setup safe and copyable.
 
 Expected alpha features:
 
-- `wats.config.yaml` and JSON examples using the existing `@wats/config` schema.
+- `wats.config.yaml` and JSON examples using the existing `@switchbord/config` schema.
 - `.env.example` with placeholder names only, not sample secrets.
 - Local/dev/prod profile guidance.
 - Secret-manager handoff guidance for deployment environments.
@@ -146,7 +146,7 @@ Expected alpha features:
 - Deployment examples aligned with the Docker/runtime decisions.
 - Troubleshooting for config/env/ports/webhook signatures.
 - pywa migration docs and parity matrix updates when operational behavior changes.
-- Curated examples that import only public `@wats/*` package specifiers.
+- Curated examples that import only public `@switchbord/*` package specifiers.
 
 Boundary:
 

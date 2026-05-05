@@ -4,7 +4,7 @@ import {
   parseConfig,
   redactConfig,
   validateConfig
-} from "@wats/config";
+} from "@switchbord/config";
 
 const checks = {
   loadConfig: typeof loadConfig === "function",

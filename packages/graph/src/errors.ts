@@ -416,7 +416,7 @@ function resolveRegisteredErrorSafely(
 
 // NOTE: seeding of built-in error codes happens in ./errorSubclasses at
 // its module top-level. The package barrel (./index.ts) imports that
-// module unconditionally, so any consumer of `@wats/graph` receives the
+// module unconditionally, so any consumer of `@switchbord/graph` receives the
 // seeded registry without having to invoke anything manually. errors.ts
 // intentionally does NOT import errorSubclasses to avoid an ESM cycle.
 

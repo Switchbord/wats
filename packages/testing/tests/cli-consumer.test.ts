@@ -54,18 +54,18 @@ function runBun(args: string[], cwd: string): {
   };
 }
 
-describe("WATS-33 @wats/cli consumer fixture", () => {
+describe("WATS-33 @switchbord/cli consumer fixture", () => {
   test("package manifest exposes documented export and bin", () => {
     const repoRoot = findRepoRoot(import.meta.dir);
     const manifest = parseJsonFile(join(repoRoot, "packages/cli/package.json"));
 
-    expect(manifest.name).toBe("@wats/cli");
+    expect(manifest.name).toBe("@switchbord/cli");
     expect(manifest.type).toBe("module");
     expect(manifest.exports).toEqual({ ".": { types: "./dist/index.d.ts", import: "./dist/index.js" } });
     expect(manifest.bin).toEqual({ wats: "./dist/bin.js" });
   });
 
-  test("fixture imports @wats/cli and verifies runtime shape", () => {
+  test("fixture imports @switchbord/cli and verifies runtime shape", () => {
     const repoRoot = findRepoRoot(import.meta.dir);
     const fixtureDir = join(repoRoot, "packages/testing/fixtures/cli-consumer");
 

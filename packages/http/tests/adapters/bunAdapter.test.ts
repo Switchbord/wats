@@ -3,8 +3,8 @@
 // trip. Skipped in environments that lack `Bun.serve`.
 
 import { describe, expect, test } from "bun:test";
-import { createCryptoProvider } from "@wats/crypto";
-import { createBunWebhookServer, createWebhookAdapter } from "@wats/http";
+import { createCryptoProvider } from "@switchbord/crypto";
+import { createBunWebhookServer, createWebhookAdapter } from "@switchbord/http";
 
 const APP_SECRET = "test-app-secret";
 const VERIFY_TOKEN = "test-verify-token";

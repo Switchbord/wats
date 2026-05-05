@@ -13,7 +13,7 @@ Show end-to-end C2 usage for parsing webhook updates and routing events to handl
 ## Minimal parser + router flow
 
 ```ts
-import { createUpdateRouter, parseWebhookUpdate } from "@wats/core";
+import { createUpdateRouter, parseWebhookUpdate } from "@switchbord/core";
 
 const router = createUpdateRouter({
   maxHandlersPerEvent: 25,

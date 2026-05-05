@@ -1,4 +1,4 @@
-# `@wats/internal-utils` (internal)
+# `@switchbord/internal-utils` (internal)
 
 - status: internal-support
 - published: yes in the 0.2.1 alpha package set (`private: false`)
@@ -9,15 +9,15 @@
 
 ## Purpose
 
-`@wats/internal-utils` hosts shared, runtime-pure helpers that WATS
+`@switchbord/internal-utils` hosts shared, runtime-pure helpers that WATS
 workspace packages need in more than one place. It is explicitly
 **internal support**: it is published only so public runtime packages such as
-`@wats/config` install correctly from the registry, not as a stable application API.
+`@switchbord/config` install correctly from the registry, not as a stable application API.
 
-Downstream application code should not depend on `@wats/internal-utils` as a
+Downstream application code should not depend on `@switchbord/internal-utils` as a
 stable API. If a utility proves broadly useful to consumers, it should be
 re-exported through a public package's own `exports` map (typically
-`@wats/types` or `@wats/core`) rather than promoted here.
+`@switchbord/types` or `@switchbord/core`) rather than promoted here.
 
 ## Contract
 
@@ -57,7 +57,7 @@ Two subtle properties are explicitly guaranteed by tests:
 
 ## Edge-runtime portability
 
-`@wats/internal-utils` contains no `node:*` imports. It relies only on
+`@switchbord/internal-utils` contains no `node:*` imports. It relies only on
 `Object.getPrototypeOf` and `Array.isArray`, which are WinterCG-uniform.
 This invariant is locked by
 `packages/testing/tests/workspace-policy.test.ts` (scans the src tree)
@@ -67,7 +67,7 @@ specifier under the Bun edge-guard harness).
 ## Usage (inside WATS packages)
 
 ```ts
-import { isRecord } from "@wats/internal-utils";
+import { isRecord } from "@switchbord/internal-utils";
 
 export function parseEntry(raw: unknown): Entry {
   if (!isRecord(raw)) {

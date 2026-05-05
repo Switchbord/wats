@@ -1,4 +1,4 @@
-// @wats/types — messages/media.ts
+// @switchbord/types — messages/media.ts
 //
 // Shared media reference shapes used by image/video/audio/document/
 // sticker messages, plus the MessageContext that may accompany any

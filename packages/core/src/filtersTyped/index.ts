@@ -1,4 +1,4 @@
-// @wats/core — filtersTyped/index.ts (F-9 barrel)
+// @switchbord/core — filtersTyped/index.ts (F-9 barrel)
 //
 // Public surface of the typed-filter module. Consumers mount via:
 //
@@ -8,7 +8,7 @@
 //     createTypedFilter, isTypedFilter,
 //     FilterValidationError, FILTER_BRAND,
 //     type TypedFilter
-//   } from "@wats/core/filtersTyped";
+//   } from "@switchbord/core/filtersTyped";
 //
 // `message` and `status` are callable namespaces — they ARE the
 // kind filter (narrow to their TypedUpdate variant) AND carry the

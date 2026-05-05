@@ -51,9 +51,9 @@ The first-run flow must be safe for local onboarding:
 
 1. Preview generated files with `wats init --dry-run`.
 2. Generate config/env placeholder files only when the operator runs `wats init` without dry-run.
-3. Validate the generated config through `@wats/config`.
+3. Validate the generated config through `@switchbord/config`.
 4. Run doctor offline diagnostics.
-5. Start a local dry-run service wrapper around `@wats/service` when implemented.
+5. Start a local dry-run service wrapper around `@switchbord/service` when implemented.
 
 ## Env placeholder policy
 
@@ -75,7 +75,7 @@ service:
     env: WATS_SERVICE_TOKEN
 ```
 
-WATS-51 ships checked-in alpha examples at `examples/config/wats.config.example.yaml`, `examples/config/wats.config.example.json`, and `.env.example`. They contain placeholder env names only, not raw secrets, and both config examples parse through `@wats/config`.
+WATS-51 ships checked-in alpha examples at `examples/config/wats.config.example.yaml`, `examples/config/wats.config.example.json`, and `.env.example`. They contain placeholder env names only, not raw secrets, and both config examples parse through `@switchbord/config`.
 
 WATS-69 adds real local generation:
 
@@ -99,7 +99,7 @@ wats config validate wats.config.json
 wats config validate --config wats.config.yaml
 ```
 
-Validation uses `@wats/config`. On success it prints only a safe count summary:
+Validation uses `@switchbord/config`. On success it prints only a safe count summary:
 
 ```text
 config valid
@@ -138,7 +138,7 @@ Doctor should never print env values. Live checks require the credential gate an
 wats openapi --config wats.config.json
 ```
 
-This prints OpenAPI 3.1 JSON for the WATS standalone service API implemented by `@wats/service`.
+This prints OpenAPI 3.1 JSON for the WATS standalone service API implemented by `@switchbord/service`.
 
 Useful variants:
 
@@ -177,7 +177,7 @@ wats serve --config wats.config.yaml --profile local --dry-run
 wats serve --config wats.config.yaml --profile local --host 127.0.0.1 --port 3000
 ```
 
-Alpha `serve` should default to dry-run/mock mode. In dry-run mode it loads config, starts the `@wats/service` process wrapper with synthetic in-memory secrets, exposes health/readiness/OpenAPI/webhook routes, and makes no live Meta calls by default.
+Alpha `serve` should default to dry-run/mock mode. In dry-run mode it loads config, starts the `@switchbord/service` process wrapper with synthetic in-memory secrets, exposes health/readiness/OpenAPI/webhook routes, and makes no live Meta calls by default.
 
 Live service mode is explicitly credential-gated:
 

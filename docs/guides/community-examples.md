@@ -51,8 +51,8 @@ This guide does not document a live serve command. Current service examples call
 The first community bot shape is a docs-first pattern: construct public WATS objects, inject MockTransport, and drive behavior with fixture data.
 
 ```ts
-import { GraphClient } from "@wats/graph";
-import { createMockTransport } from "@wats/graph/testing";
+import { GraphClient } from "@switchbord/graph";
+import { createMockTransport } from "@switchbord/graph/testing";
 
 const mock = createMockTransport({
   defaultResponse: {
@@ -78,12 +78,12 @@ For webhook examples, use synthetic webhook payloads/envelopes and `normalizeWeb
 
 ## Service app fetch and OpenAPI example
 
-`@wats/service` exposes a runtime-neutral Request-to-Response app. Use it directly for local examples; do not require a server process.
+`@switchbord/service` exposes a runtime-neutral Request-to-Response app. Use it directly for local examples; do not require a server process.
 
 ```ts
-import type { WatsProfileConfig } from "@wats/config";
-import { createMockTransport } from "@wats/graph/testing";
-import { createWatsServiceApp, createWatsServiceOpenApiDocument } from "@wats/service";
+import type { WatsProfileConfig } from "@switchbord/config";
+import { createMockTransport } from "@switchbord/graph/testing";
+import { createWatsServiceApp, createWatsServiceOpenApiDocument } from "@switchbord/service";
 
 const profile: WatsProfileConfig = {
   graph: { apiVersion: "v21.0", baseUrl: "https://graph.test/" },

@@ -6,6 +6,6 @@
     "verify-imports": "bun run ./verify-imports.ts"
   },
   "dependencies": {
-    "@wats/internal-utils": "workspace:*"
+    "@switchbord/internal-utils": "workspace:*"
   }
 }

@@ -1,4 +1,4 @@
-// @wats/core — whatsappFacade.ts (F-11 GREEN)
+// @switchbord/core — whatsappFacade.ts (F-11 GREEN)
 //
 // Composition root: `WhatsApp` binds a `GraphClient` (mandatory),
 // optional `PhoneNumberClient` / `WABAClient` sub-clients scoped by
@@ -62,7 +62,7 @@ import {
   type GraphMessagesSendTextInput,
   type GraphMessagesSendVideoInput,
   type GraphMessagesTypingIndicatorInput
-} from "@wats/graph";
+} from "@switchbord/graph";
 import {
   and,
   createTypedFilter,

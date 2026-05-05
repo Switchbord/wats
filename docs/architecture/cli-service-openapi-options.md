@@ -19,9 +19,9 @@ Make WATS adoptable as both a library and an operations backbone:
 Add three app-layer packages above the current foundation:
 
 ```text
-@wats/config   config schema, YAML/JSON loading, env-secret references
-@wats/service  standalone webhook/API service, OpenAPI 3.1
-@wats/cli      onboarding, validation, doctor, serve, openapi commands
+@switchbord/config   config schema, YAML/JSON loading, env-secret references
+@switchbord/service  standalone webhook/API service, OpenAPI 3.1
+@switchbord/cli      onboarding, validation, doctor, serve, openapi commands
 ```
 
 Use Zod only at application boundaries: config, CLI inputs, service REST payloads, and OpenAPI schema generation. Do not retrofit Zod into low-level graph/http/core validation unless a later feature has a specific reason.
@@ -95,7 +95,7 @@ Recommended libraries:
 - `yaml` for YAML support
 - boundary-only `zod` for validation
 
-Keep the CLI Node-compatible and Bun-compatible. Ship a `wats` bin from `@wats/cli`; optionally add a future `create-wats` alias for `npm create wats` / `bun create wats`.
+Keep the CLI Node-compatible and Bun-compatible. Ship a `wats` bin from `@switchbord/cli`; optionally add a future `create-wats` alias for `npm create wats` / `bun create wats`.
 
 ## Service package
 
@@ -172,16 +172,16 @@ Before first public package release:
 - emit `.d.ts`
 - add package smoke tests from a temp consumer
 - keep root package private
-- publish `@wats/internal-utils` only when required by public runtime packages; keep `@wats/testing` private
+- publish `@switchbord/internal-utils` only when required by public runtime packages; keep `@switchbord/testing` private
 - add Changesets or an equivalent release manager
 
 ## Implementation order
 
 1. Repo hygiene, release policy, README, docs drift cleanup.
 2. Linear roadmap for 100% WhatsApp/pywa coverage.
-3. `@wats/config`.
-4. `@wats/cli` init/validate/doctor.
-5. `@wats/service` webhook + text send + auth.
+3. `@switchbord/config`.
+4. `@switchbord/cli` init/validate/doctor.
+5. `@switchbord/service` webhook + text send + auth.
 6. OpenAPI 3.1 generation and Scalar docs.
 7. Publishable package build and CI.
 8. switchbord GitHub repo creation and first release push.

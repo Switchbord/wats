@@ -34,21 +34,21 @@ A row marked implemented does not mean live Meta parity unless the row explicitl
 
 | pywa concept | WATS equivalent | Status | Notes |
 | --- | --- | --- | --- |
-| `pywa.WhatsApp(...)` | `new GraphClient(...)` plus `new WhatsApp({ graphClient, phoneNumberId?, wabaId? })` from `@wats/core` | Implemented, credential-free | WATS separates Graph transport from facade orchestration. |
+| `pywa.WhatsApp(...)` | `new GraphClient(...)` plus `new WhatsApp({ graphClient, phoneNumberId?, wabaId? })` from `@switchbord/core` | Implemented, credential-free | WATS separates Graph transport from facade orchestration. |
 | `pywa_async.WhatsApp` | WATS Promise-returning APIs | Implemented, credential-free | WATS is async-only; there is no sync API. |
 | `wa.api` / low-level Graph API | `GraphClient.request`, `requestRaw`, `defineEndpoint` | Implemented, credential-free | Prefer first-class endpoints before custom `defineEndpoint`. |
 | `phone_id`-bound methods | `PhoneNumberClient` or `WhatsApp` with `phoneNumberId` | Implemented, credential-free | Constructor-bound ids are validated and cannot be caller-overridden. |
 | `business_account_id` / WABA methods | `WABAClient` or `WhatsApp` with `wabaId` | Implemented, credential-free | Templates, Flows, and read-only admin inventory hang from WABA. |
-| pywa server config | `@wats/http` adapter or `@wats/service` | Implemented, credential-free | WATS keeps standalone service separate from SDK primitives. |
-| pywa env/token constructor args | `@wats/config` env-secret references | Implemented, credential-free | WATS config stores `{ env: "..." }`, never raw secrets. |
+| pywa server config | `@switchbord/http` adapter or `@switchbord/service` | Implemented, credential-free | WATS keeps standalone service separate from SDK primitives. |
+| pywa env/token constructor args | `@switchbord/config` env-secret references | Implemented, credential-free | WATS config stores `{ env: "..." }`, never raw secrets. |
 
 ## Client construction and auth
 
 pywa commonly puts token, phone id, WABA id, server, webhook, and app secret into one `WhatsApp(...)` constructor. WATS separates those responsibilities:
 
 ```ts
-import { GraphClient, createFetchTransport } from "@wats/graph";
-import { WhatsApp } from "@wats/core";
+import { GraphClient, createFetchTransport } from "@switchbord/graph";
+import { WhatsApp } from "@switchbord/core";
 
 const graphClient = new GraphClient({
   accessToken: process.env.WATS_ACCESS_TOKEN!,
@@ -94,7 +94,7 @@ Migration notes:
 | `download_media` / `get_media_bytes` | `downloadMediaBytes` | Implemented, live pending | Use `maxBytes` and integrity checks. |
 | `delete_media` | `deleteMedia` | Implemented, live pending | Destructive; cleanup-only in live campaign. |
 | encrypted media decrypt helpers | `decryptEncryptedMedia` | Implemented, credential-free | Uses WATS crypto/integrity checks locally. |
-| resumable upload sessions | `createUploadSession`, `uploadFileToSession`, `getUploadSession` | Implemented, live pending | Import from `@wats/graph` or `@wats/graph/endpoints/media`; no `PhoneNumberClient.uploadMedia` convenience yet. |
+| resumable upload sessions | `createUploadSession`, `uploadFileToSession`, `getUploadSession` | Implemented, live pending | Import from `@switchbord/graph` or `@switchbord/graph/endpoints/media`; no `PhoneNumberClient.uploadMedia` convenience yet. |
 
 ## Templates map
 
@@ -143,7 +143,7 @@ Migration notes:
 pywa decorators such as `@wa.on_message`, `@wa.on_callback_button`, `@wa.on_flow_completion`, and `@wa.on_call_status` map to WATS router/listener primitives:
 
 ```ts
-import { WhatsApp, filtersTyped } from "@wats/core";
+import { WhatsApp, filtersTyped } from "@switchbord/core";
 
 wa.on(filtersTyped.message.text("hello"), async (update) => {
   await wa.startChat({ to: update.message.from, text: "hi" });
@@ -164,7 +164,7 @@ Migration differences:
 pywa raises `WhatsAppError` subclasses keyed from Graph error codes. WATS exposes `GraphApiError` subclasses and a seeded registry mirroring pywa error codes where possible:
 
 ```ts
-import { ExpiredAccessTokenError, GraphApiError } from "@wats/graph";
+import { ExpiredAccessTokenError, GraphApiError } from "@switchbord/graph";
 
 try {
   await phone.sendText({ to: "+15551234567", text: "hello" });
@@ -179,7 +179,7 @@ try {
 
 Migration notes:
 
-- Do not match Python class names in TypeScript code; import WATS subclasses from `@wats/graph`.
+- Do not match Python class names in TypeScript code; import WATS subclasses from `@switchbord/graph`.
 - WATS validation failures reject before transport with WATS-specific validation errors.
 - Rate-limit retry/backoff is still a planned transport decorator, not automatic.
 
@@ -187,20 +187,20 @@ Migration notes:
 
 | Need | Import |
 | --- | --- |
-| Graph client, scoped clients, endpoints | `@wats/graph` |
-| Mock transport | `@wats/graph/testing` |
-| Message endpoint helpers | `@wats/graph/endpoints/messages` |
-| Media runtime helpers | `@wats/graph/endpoints/media` |
-| Message-template helpers | `@wats/graph/endpoints/templates` |
-| Flow management helpers | `@wats/graph/endpoints/flows` |
-| Calling endpoint helpers | `@wats/graph/endpoints/calling` |
-| Business-management read helpers | `@wats/graph/endpoints/business-management` |
-| Facade/router/filters/listeners | `@wats/core` |
-| Typed filter subpath | `@wats/core/filtersTyped` |
-| Webhook adapters | `@wats/http` or `@wats/http/adapters/fetch` / `bun` / `node` |
-| Config | `@wats/config` |
-| Service app / OpenAPI document | `@wats/service` |
-| CLI testable entry | `@wats/cli` |
+| Graph client, scoped clients, endpoints | `@switchbord/graph` |
+| Mock transport | `@switchbord/graph/testing` |
+| Message endpoint helpers | `@switchbord/graph/endpoints/messages` |
+| Media runtime helpers | `@switchbord/graph/endpoints/media` |
+| Message-template helpers | `@switchbord/graph/endpoints/templates` |
+| Flow management helpers | `@switchbord/graph/endpoints/flows` |
+| Calling endpoint helpers | `@switchbord/graph/endpoints/calling` |
+| Business-management read helpers | `@switchbord/graph/endpoints/business-management` |
+| Facade/router/filters/listeners | `@switchbord/core` |
+| Typed filter subpath | `@switchbord/core/filtersTyped` |
+| Webhook adapters | `@switchbord/http` or `@switchbord/http/adapters/fetch` / `bun` / `node` |
+| Config | `@switchbord/config` |
+| Service app / OpenAPI document | `@switchbord/service` |
+| CLI testable entry | `@switchbord/cli` |
 
 Use consumer fixtures as the source of truth for supported package-specifier imports. WATS-54 adds `bun run api:check` to keep package exports, target source files, graph-consumer package-specifier imports, docs/reference/index.md, public API surface docs, package map, this migration cheat sheet, and CHANGELOG mentions aligned for messages, media, message-template, Flow, calling, and business-management Graph endpoint subpaths.
 
@@ -223,7 +223,7 @@ Do not migrate code assuming WATS already has pywa parity for:
 1. Inventory pywa imports and method names.
 2. Replace constructor setup with `GraphClient`, `PhoneNumberClient`, `WABAClient`, and `WhatsApp` facade composition.
 3. Convert snake_case names to camelCase.
-4. Move raw secrets to env vars or `@wats/config` env-secret refs.
+4. Move raw secrets to env vars or `@switchbord/config` env-secret refs.
 5. Replace pywa send methods with WATS scoped-client methods and root builders.
 6. Replace decorators with `TypedRouter.on(...)` / `WhatsApp.on(...)` and `filtersTyped`.
 7. Replace conversational waits with `wa.listen(...)` where possible; flag sent-update waiter gaps.

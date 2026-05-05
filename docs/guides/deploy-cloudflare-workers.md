@@ -11,7 +11,7 @@ that implements the WinterCG fetch handler contract.
 
 ## Why the fetch adapter works on Workers
 
-`@wats/http`'s `createFetchWebhookHandler` produces a pure
+`@switchbord/http`'s `createFetchWebhookHandler` produces a pure
 `(request: Request) => Promise<Response>` function. The file
 `packages/http/src/adapters/fetchAdapter.ts` contains **zero static
 `node:*` imports** — this invariant is enforced by two structural
@@ -22,7 +22,7 @@ sneak in.
 ## Install
 
 ```bash
-npm install @wats/http @wats/core @wats/graph @wats/crypto
+npm install @switchbord/http @switchbord/core @switchbord/graph @switchbord/crypto
 ```
 
 Workers require `"nodejs_compat"` **only** for `node:buffer`-style
@@ -52,9 +52,9 @@ binding = "META_ACCESS_TOKEN"
 import {
   createFetchWebhookHandler,
   createWebhookAdapter
-} from "@wats/http";
-import { GraphClient, createFetchTransport } from "@wats/graph";
-import { WhatsApp, message } from "@wats/core";
+} from "@switchbord/http";
+import { GraphClient, createFetchTransport } from "@switchbord/graph";
+import { WhatsApp, message } from "@switchbord/core";
 
 export interface Env {
   VERIFY_TOKEN: string;
@@ -102,7 +102,7 @@ export default {
 ## Deno
 
 ```ts
-import { createFetchWebhookHandler, createWebhookAdapter } from "@wats/http";
+import { createFetchWebhookHandler, createWebhookAdapter } from "@switchbord/http";
 // ... build adapter as above ...
 const handler = createFetchWebhookHandler(adapter);
 Deno.serve(handler);

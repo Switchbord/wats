@@ -13,134 +13,134 @@
       },
     },
     "packages/cli": {
-      "name": "@wats/cli",
+      "name": "@switchbord/cli",
       "version": "0.2.0",
       "bin": {
         "wats": "./src/bin.ts",
       },
       "dependencies": {
-        "@wats/config": "workspace:*",
-        "@wats/service": "workspace:*",
+        "@switchbord/config": "workspace:*",
+        "@switchbord/service": "workspace:*",
       },
     },
     "packages/config": {
-      "name": "@wats/config",
+      "name": "@switchbord/config",
       "version": "0.2.0",
       "dependencies": {
-        "@wats/internal-utils": "workspace:*",
+        "@switchbord/internal-utils": "workspace:*",
       },
     },
     "packages/core": {
-      "name": "@wats/core",
+      "name": "@switchbord/core",
       "version": "0.2.0",
       "dependencies": {
-        "@wats/graph": "workspace:*",
+        "@switchbord/graph": "workspace:*",
       },
     },
     "packages/crypto": {
-      "name": "@wats/crypto",
+      "name": "@switchbord/crypto",
       "version": "0.2.0",
     },
     "packages/graph": {
-      "name": "@wats/graph",
+      "name": "@switchbord/graph",
       "version": "0.2.0",
     },
     "packages/http": {
-      "name": "@wats/http",
+      "name": "@switchbord/http",
       "version": "0.2.0",
       "dependencies": {
-        "@wats/core": "workspace:*",
-        "@wats/crypto": "workspace:*",
-        "@wats/types": "workspace:*",
+        "@switchbord/core": "workspace:*",
+        "@switchbord/crypto": "workspace:*",
+        "@switchbord/types": "workspace:*",
       },
     },
     "packages/internal-utils": {
-      "name": "@wats/internal-utils",
+      "name": "@switchbord/internal-utils",
       "version": "0.2.0",
     },
     "packages/service": {
-      "name": "@wats/service",
+      "name": "@switchbord/service",
       "version": "0.2.0",
       "dependencies": {
-        "@wats/config": "workspace:*",
-        "@wats/core": "workspace:*",
-        "@wats/crypto": "workspace:*",
-        "@wats/graph": "workspace:*",
-        "@wats/http": "workspace:*",
+        "@switchbord/config": "workspace:*",
+        "@switchbord/core": "workspace:*",
+        "@switchbord/crypto": "workspace:*",
+        "@switchbord/graph": "workspace:*",
+        "@switchbord/http": "workspace:*",
       },
     },
     "packages/testing": {
-      "name": "@wats/testing",
+      "name": "@switchbord/testing",
       "version": "0.2.0",
       "dependencies": {
-        "@wats/crypto": "workspace:*",
-        "@wats/graph": "workspace:*",
-        "@wats/http": "workspace:*",
-        "@wats/internal-utils": "workspace:*",
-        "@wats/service": "workspace:*",
+        "@switchbord/crypto": "workspace:*",
+        "@switchbord/graph": "workspace:*",
+        "@switchbord/http": "workspace:*",
+        "@switchbord/internal-utils": "workspace:*",
+        "@switchbord/service": "workspace:*",
       },
     },
     "packages/testing/fixtures/cli-consumer": {
       "name": "cli-consumer",
       "dependencies": {
-        "@wats/cli": "workspace:*",
+        "@switchbord/cli": "workspace:*",
       },
     },
     "packages/testing/fixtures/config-consumer": {
       "name": "config-consumer",
       "version": "0.0.0",
       "dependencies": {
-        "@wats/config": "workspace:*",
+        "@switchbord/config": "workspace:*",
       },
     },
     "packages/testing/fixtures/core-consumer": {
       "name": "core-consumer",
       "dependencies": {
-        "@wats/core": "workspace:*",
-        "@wats/graph": "workspace:*",
+        "@switchbord/core": "workspace:*",
+        "@switchbord/graph": "workspace:*",
       },
     },
     "packages/testing/fixtures/crypto-consumer": {
       "name": "crypto-consumer",
       "dependencies": {
-        "@wats/crypto": "workspace:*",
+        "@switchbord/crypto": "workspace:*",
       },
     },
     "packages/testing/fixtures/graph-consumer": {
       "name": "graph-consumer",
       "dependencies": {
-        "@wats/graph": "workspace:*",
+        "@switchbord/graph": "workspace:*",
       },
     },
     "packages/testing/fixtures/http-consumer": {
       "name": "http-consumer",
       "dependencies": {
-        "@wats/crypto": "workspace:*",
-        "@wats/http": "workspace:*",
+        "@switchbord/crypto": "workspace:*",
+        "@switchbord/http": "workspace:*",
       },
     },
     "packages/testing/fixtures/internal-utils-consumer": {
       "name": "internal-utils-consumer",
       "dependencies": {
-        "@wats/internal-utils": "workspace:*",
+        "@switchbord/internal-utils": "workspace:*",
       },
     },
     "packages/testing/fixtures/service-consumer": {
       "name": "service-consumer",
       "version": "0.0.0",
       "dependencies": {
-        "@wats/graph": "workspace:*",
-        "@wats/service": "workspace:*",
+        "@switchbord/graph": "workspace:*",
+        "@switchbord/service": "workspace:*",
       },
     },
     "packages/testing/fixtures/types-consumer": {
       "name": "types-consumer-fixture",
       "dependencies": {
-        "@wats/types": "file:../../../../packages/types",
+        "@switchbord/types": "file:../../../../packages/types",
       },
     },
     "packages/types": {
-      "name": "@wats/types",
+      "name": "@switchbord/types",
       "version": "0.2.0",
     },
   },
@@ -519,25 +519,25 @@
 
     "@vueuse/shared": ["@vueuse/shared@13.9.0", "", { "peerDependencies": { "vue": "^3.5.0" } }, "sha512-e89uuTLMh0U5cZ9iDpEI2senqPGfbPRTHM/0AaQkcxnpqjkZqDYP8rpfm7edOz8s+pOCOROEy1PIveSW8+fL5g=="],
 
-    "@wats/cli": ["@wats/cli@workspace:packages/cli"],
+    "@switchbord/cli": ["@switchbord/cli@workspace:packages/cli"],
 
-    "@wats/config": ["@wats/config@workspace:packages/config"],
+    "@switchbord/config": ["@switchbord/config@workspace:packages/config"],
 
-    "@wats/core": ["@wats/core@workspace:packages/core"],
+    "@switchbord/core": ["@switchbord/core@workspace:packages/core"],
 
-    "@wats/crypto": ["@wats/crypto@workspace:packages/crypto"],
+    "@switchbord/crypto": ["@switchbord/crypto@workspace:packages/crypto"],
 
-    "@wats/graph": ["@wats/graph@workspace:packages/graph"],
+    "@switchbord/graph": ["@switchbord/graph@workspace:packages/graph"],
 
-    "@wats/http": ["@wats/http@workspace:packages/http"],
+    "@switchbord/http": ["@switchbord/http@workspace:packages/http"],
 
-    "@wats/internal-utils": ["@wats/internal-utils@workspace:packages/internal-utils"],
+    "@switchbord/internal-utils": ["@switchbord/internal-utils@workspace:packages/internal-utils"],
 
-    "@wats/service": ["@wats/service@workspace:packages/service"],
+    "@switchbord/service": ["@switchbord/service@workspace:packages/service"],
 
-    "@wats/testing": ["@wats/testing@workspace:packages/testing"],
+    "@switchbord/testing": ["@switchbord/testing@workspace:packages/testing"],
 
-    "@wats/types": ["@wats/types@workspace:packages/types"],
+    "@switchbord/types": ["@switchbord/types@workspace:packages/types"],
 
     "acorn": ["acorn@8.16.0", "", { "bin": { "acorn": "bin/acorn" } }, "sha512-UVJyE9MttOsBQIDKw1skb9nAwQuR5wuGD3+82K6JgJlm/Y+KI92oNsMNGZCYdDsVtRHSak0pcV5Dno5+4jh9sw=="],
 
@@ -1105,7 +1105,7 @@
 
     "shiki/@shikijs/themes": ["@shikijs/themes@2.5.0", "", { "dependencies": { "@shikijs/types": "2.5.0" } }, "sha512-wGrk+R8tJnO0VMzmUExHR+QdSaPUl/NKs+a4cQQRWyoc3YFbUzuLEi/KWK1hj+8BfHRKm2jNhhJck1dfstJpiw=="],
 
-    "types-consumer-fixture/@wats/types": ["@wats/types@file:packages/types", {}],
+    "types-consumer-fixture/@switchbord/types": ["@switchbord/types@file:packages/types", {}],
 
     "vitepress/@vueuse/core": ["@vueuse/core@12.8.2", "", { "dependencies": { "@types/web-bluetooth": "^0.0.21", "@vueuse/metadata": "12.8.2", "@vueuse/shared": "12.8.2", "vue": "^3.5.13" } }, "sha512-HbvCmZdzAu3VGi/pWYm5Ut+Kd9mn1ZHnn4L5G8kOQTPs/IwIAmJoBrmYk2ckLArgMXZj0AW3n5CAejLUO+PhdQ=="],
 

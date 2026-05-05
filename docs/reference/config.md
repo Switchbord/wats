@@ -1,4 +1,4 @@
-# Config Reference (`@wats/config`)
+# Config Reference (`@switchbord/config`)
 
 - status: experimental
 - applies-to: WATS-32
@@ -6,7 +6,7 @@
 
 ## Purpose
 
-`@wats/config` defines the first WATS application config shape for CLI onboarding and the future standalone service. It validates YAML or JSON config into a frozen `WatsConfig` object and keeps secrets as environment-variable references rather than raw credential values.
+`@switchbord/config` defines the first WATS application config shape for CLI onboarding and the future standalone service. It validates YAML or JSON config into a frozen `WatsConfig` object and keeps secrets as environment-variable references rather than raw credential values.
 
 ## Install / import
 
@@ -17,7 +17,7 @@ import {
   validateConfig,
   redactConfig,
   ConfigValidationError
-} from "@wats/config";
+} from "@switchbord/config";
 ```
 
 ## Config shape
@@ -61,7 +61,7 @@ WATS-51 adds checked-in alpha templates with placeholder env names only:
 - `examples/config/wats.config.example.json`
 - `.env.example`
 
-The YAML and JSON templates parse through `@wats/config` and use the same validated shape shown above. They include `local` and `prod` profiles, placeholder WABA/phone ids, env-secret refs for all secret-bearing fields, service routing defaults, and no raw tokens. `.env.example` lists placeholder env names only; copy it to an ignored local file such as `.env.local` before filling real values.
+The YAML and JSON templates parse through `@switchbord/config` and use the same validated shape shown above. They include `local` and `prod` profiles, placeholder WABA/phone ids, env-secret refs for all secret-bearing fields, service routing defaults, and no raw tokens. `.env.example` lists placeholder env names only; copy it to an ignored local file such as `.env.local` before filling real values.
 
 These templates are also available through `wats init` as of WATS-69. The command writes config/env placeholder files with no overwrite by default and keeps secret-bearing `.env.example` values blank.
 
@@ -205,7 +205,7 @@ The WATS-44 live campaign also requires runtime env flags such as `WATS_LIVE_ENA
 
 ## WATS-48 persistence config design note
 
-WATS-48 is design-only. The current @wats/config schema has no persistence field.
+WATS-48 is design-only. The current @switchbord/config schema has no persistence field.
 
 A future persistence config may introduce SQLite local paths and Postgres database URL env-secret references such as `WATS_DATABASE_URL`. Raw database credentials must not be committed, printed, or passed as CLI arguments; in lowercase, raw database credentials must not be committed. Config examples should keep database URLs as env-secret refs rather than raw credential-bearing strings.
 

@@ -1,4 +1,4 @@
-// @wats/core — typed calling filters (WATS-41).
+// @switchbord/core — typed calling filters (WATS-41).
 
 import type {
   CallDirection,

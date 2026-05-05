@@ -3,7 +3,7 @@
 - status: WATS-52 community examples scaffold
 - safety default: offline by default
 
-This directory contains credential-free community examples for WATS. The WATS-52 alpha launch scaffold is intentionally small: examples should teach public `@wats/*` package usage while avoiding live credentials and live Meta calls.
+This directory contains credential-free community examples for WATS. The WATS-52 alpha launch scaffold is intentionally small: examples should teach public `@switchbord/*` package usage while avoiding live credentials and live Meta calls.
 
 ## Safety rules
 
@@ -13,7 +13,7 @@ This directory contains credential-free community examples for WATS. The WATS-52
 - Keep real access tokens, bearer tokens, webhook values, app values, WABA ids, phone-number ids, service values, and database URLs out of this repository.
 - Treat tunnel exercises as credential-gated webhook tunnel guidance; they are checklists for operators, not default tests.
 - Do not claim WhatsApp `delivered` or `read` from send success. Those states require observed webhook/event-store evidence.
-- Example code must import WATS packages through public `@wats/*` specifiers, never by relative paths into `packages/*/src`.
+- Example code must import WATS packages through public `@switchbord/*` specifiers, never by relative paths into `packages/*/src`.
 
 ## Available examples
 

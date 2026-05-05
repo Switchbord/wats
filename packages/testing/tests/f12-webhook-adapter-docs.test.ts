@@ -132,10 +132,10 @@ describe("F-12 webhook-adapter.md reference guide", () => {
     expect(doc).toContain("invalid_app_secret");
   });
 
-  test("contains a usage code sample importing from @wats/http", () => {
+  test("contains a usage code sample importing from @switchbord/http", () => {
     const doc = readFileSync(docPath, "utf8");
     expect(doc).toMatch(/```[ \t]*(ts|typescript)/i);
-    expect(doc).toContain("@wats/http");
+    expect(doc).toContain("@switchbord/http");
   });
 
   test("references WATS-22 Arch-K + WATS-25 + F-12", () => {
@@ -165,7 +165,7 @@ describe("F-12 deploy guides", () => {
     expect(existsSync(docPath)).toBe(true);
     const doc = readFileSync(docPath, "utf8");
     expect(doc).toContain("createBunWebhookServer");
-    expect(doc).toContain("@wats/http");
+    expect(doc).toContain("@switchbord/http");
     expect(doc).toMatch(/Bun\.serve|Bun runtime/i);
   });
 
@@ -191,7 +191,7 @@ describe("F-12 deploy guides", () => {
 // ---------------------------------------------------------------------
 
 describe("F-12 http-consumer fixture coverage", () => {
-  test("fixture imports WebhookAdapter surface from @wats/http", () => {
+  test("fixture imports WebhookAdapter surface from @switchbord/http", () => {
     const repoRoot = findRepoRoot(import.meta.dir);
     const verifyPath = join(
       repoRoot,

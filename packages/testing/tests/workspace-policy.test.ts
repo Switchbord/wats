@@ -95,14 +95,14 @@ function hasStaticNodeReference(source: string): boolean {
   );
 }
 
-// F-3 policy: `@wats/http` joins `@wats/crypto` as an edge-portable
-// package. `@wats/http/src/` MUST contain zero static `node:*` imports
-// anywhere (it consumes crypto exclusively through the @wats/crypto
-// seam). `@wats/crypto/src/` remains edge-portable with ONE opt-out
+// F-3 policy: `@switchbord/http` joins `@switchbord/crypto` as an edge-portable
+// package. `@switchbord/http/src/` MUST contain zero static `node:*` imports
+// anywhere (it consumes crypto exclusively through the @switchbord/crypto
+// seam). `@switchbord/crypto/src/` remains edge-portable with ONE opt-out
 // path: `packages/crypto/src/adapters/node/`, which may reach node:*
 // only via dynamic `await import(...)` inside a function body — never
 // via a top-level static import.
-const EDGE_PORTABLE_PACKAGES = ["@wats/crypto", "@wats/http"] as const;
+const EDGE_PORTABLE_PACKAGES = ["@switchbord/crypto", "@switchbord/http"] as const;
 
 function isUnderCryptoNodeAdapter(filePath: string, repoRoot: string): boolean {
   const rel = filePath.slice(repoRoot.length + 1);
@@ -120,7 +120,7 @@ describe("F-0 workspace policy", () => {
       const packageDir = join(
         repoRoot,
         "packages",
-        packageName.replace(/^@wats\//, "")
+        packageName.replace(/^@switchbord\//, "")
       );
       const srcDir = join(packageDir, "src");
       const files = walkTypeScriptFiles(srcDir);
@@ -185,14 +185,14 @@ describe("F-0 workspace policy", () => {
     ).toBe(false);
   });
 
-  test("@wats/internal-utils package manifest exists as published internal support", () => {
+  test("@switchbord/internal-utils package manifest exists as published internal support", () => {
     const repoRoot = findRepoRoot(import.meta.dir);
     const manifestPath = join(repoRoot, "packages/internal-utils/package.json");
 
     expect(existsSync(manifestPath)).toBe(true);
 
     const manifest = parseJsonFile(manifestPath);
-    expect(manifest.name).toBe("@wats/internal-utils");
+    expect(manifest.name).toBe("@switchbord/internal-utils");
     expect(manifest.private).toBe(false);
     expect(manifest.type).toBe("module");
     expect(typeof manifest.version).toBe("string");

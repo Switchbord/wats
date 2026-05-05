@@ -1,7 +1,7 @@
 // F-3 http-consumer harness.
 //
 // Spawns `bun run verify-imports` from the http-consumer fixture
-// directory (which declares `@wats/http: workspace:*`) and asserts the
+// directory (which declares `@switchbord/http: workspace:*`) and asserts the
 // success sentinel + runtime-shape report.
 
 import { describe, expect, test } from "bun:test";
@@ -67,7 +67,7 @@ function runBun(args: string[], cwd: string): {
   };
 }
 
-describe("F-3 @wats/http consumer fixture", () => {
+describe("F-3 @switchbord/http consumer fixture", () => {
   test("fixture manifest exists and declares workspace dependencies", () => {
     const repoRoot = findRepoRoot(import.meta.dir);
     const fixtureDir = join(
@@ -87,8 +87,8 @@ describe("F-3 @wats/http consumer fixture", () => {
     if (!isJsonRecord(dependencies)) {
       throw new Error("Fixture dependencies must be an object");
     }
-    expect(dependencies["@wats/http"]).toBe("workspace:*");
-    expect(dependencies["@wats/crypto"]).toBe("workspace:*");
+    expect(dependencies["@switchbord/http"]).toBe("workspace:*");
+    expect(dependencies["@switchbord/crypto"]).toBe("workspace:*");
   });
 
   test("running the fixture entry under bun emits the success sentinel", () => {
@@ -130,7 +130,7 @@ describe("F-3 @wats/http consumer fixture", () => {
       expect(ok, `fixture check "${label}" must report true`).toBe(true);
     }
 
-    const keys = parsed.moduleKeys["@wats/http"];
+    const keys = parsed.moduleKeys["@switchbord/http"];
     expect(Array.isArray(keys)).toBe(true);
     expect((keys as string[])).toContain("validateWebhookSignature");
     expect((keys as string[])).toContain("verifyWebhookChallenge");

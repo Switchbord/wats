@@ -3,8 +3,8 @@
 // HTTP round-trip, then tears down.
 
 import { describe, expect, test } from "bun:test";
-import { createCryptoProvider } from "@wats/crypto";
-import { createNodeWebhookHandler, createWebhookAdapter } from "@wats/http";
+import { createCryptoProvider } from "@switchbord/crypto";
+import { createNodeWebhookHandler, createWebhookAdapter } from "@switchbord/http";
 
 const APP_SECRET = "test-app-secret";
 const VERIFY_TOKEN = "test-verify-token";

@@ -1,4 +1,4 @@
-// @wats/crypto — WebCrypto adapter.
+// @switchbord/crypto — WebCrypto adapter.
 //
 // Uses globalThis.crypto.subtle only — NO `node:*` imports. Works
 // unchanged on Bun, modern Node (>= 20), Deno, Cloudflare Workers,

@@ -1,4 +1,4 @@
-# OpenAPI Reference (`@wats/service`)
+# OpenAPI Reference (`@switchbord/service`)
 
 - status: experimental
 - applies-to: WATS-35
@@ -6,7 +6,7 @@
 
 ## Purpose
 
-`@wats/service` can generate and serve an OpenAPI 3.1 document for the standalone WATS service API that exists today.
+`@switchbord/service` can generate and serve an OpenAPI 3.1 document for the standalone WATS service API that exists today.
 
 This is not a Meta Graph API OpenAPI document. It describes only WATS service routes: status checks, configured webhook ingress, the current text-message service APIs, and `/openapi.json`.
 
@@ -16,7 +16,7 @@ This is not a Meta Graph API OpenAPI document. It describes only WATS service ro
 import {
   createWatsServiceOpenApiDocument,
   type WatsServiceOpenApiOptions
-} from "@wats/service";
+} from "@switchbord/service";
 
 const document = createWatsServiceOpenApiDocument(profile, {
   serverUrl: "https://service.example"
@@ -27,7 +27,7 @@ const document = createWatsServiceOpenApiDocument(profile, {
 
 Preconditions:
 
-- `profile` is an already validated `WatsProfileConfig` from `@wats/config`.
+- `profile` is an already validated `WatsProfileConfig` from `@switchbord/config`.
 - `profile.webhook.path` and `profile.service.apiPrefix` must be safe absolute paths: start with `/`, contain at least one segment, and contain no query string, hash, backslash, control character, dot segment, or encoded traversal marker.
 - `profile.webhook.path` must not collide with reserved service routes (`/healthz`, `/readyz`, `/openapi.json`) or generated message routes.
 - `profile.service.apiPrefix` must not collide with reserved service routes or the configured webhook path.
@@ -120,7 +120,7 @@ The document includes JSON schemas for:
 | --- | --- | --- | --- |
 | `POST {apiPrefix}/messages/text` | JSON object with non-empty `to`, non-empty `text`, optional boolean `previewUrl` | malformed JSON, arrays, primitives, missing fields, blank/control-character `to` or `text`, non-boolean `previewUrl` | no service-layer byte cap yet |
 | `POST {apiPrefix}/messages` | JSON object with `messaging_product: "whatsapp"`, non-empty `to`, `type: "text"`, and `text.body` non-empty; optional boolean `text.preview_url` | malformed JSON, arrays, primitives, non-text message types, missing fields, blank/control-character strings, non-boolean `preview_url` | no service-layer byte cap yet |
-| `POST profile.webhook.path` | Signed Meta webhook JSON delegated to `@wats/http` | malformed JSON/signature/envelope per WebhookAdapter taxonomy | `profile.webhook.maxBodyBytes`, default `1_048_576` |
+| `POST profile.webhook.path` | Signed Meta webhook JSON delegated to `@switchbord/http` | malformed JSON/signature/envelope per WebhookAdapter taxonomy | `profile.webhook.maxBodyBytes`, default `1_048_576` |
 
 Non-text message schemas are intentionally not included in WATS-35.
 

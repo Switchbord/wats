@@ -271,7 +271,7 @@ describe("WATS-37 media public exports", () => {
     expect(((media as { DEFAULT_MAX_MEDIA_UPLOAD_BYTES?: number }).DEFAULT_MAX_MEDIA_UPLOAD_BYTES ?? Infinity) < Infinity).toBe(true);
   });
 
-  test("root @wats/graph barrel exposes WATS-37 media runtime taxonomy", () => {
+  test("root @switchbord/graph barrel exposes WATS-37 media runtime taxonomy", () => {
     expect(typeof (graphRoot as Record<string, unknown>).uploadMedia).toBe("function");
     expect(typeof (graphRoot as Record<string, unknown>).downloadMedia).toBe("function");
     expect(typeof (graphRoot as Record<string, unknown>).deleteMedia).toBe("function");

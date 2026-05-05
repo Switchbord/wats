@@ -46,7 +46,7 @@ A pure, deterministic, side-effect-free function that sits above
 `parseWebhookUpdate`:
 
 ```ts
-import type { ParsedUpdateEvent } from "@wats/core/router";
+import type { ParsedUpdateEvent } from "@switchbord/core/router";
 
 export interface TypedUpdateMetadata {
   phoneNumberId: string;
@@ -544,9 +544,9 @@ Migration:
 
 - Existing D1 filter tests (`packages/core/tests/filters.test.ts`) stay
   green against the raw `UpdateFilter` primitives in
-  `@wats/core/filters`. They are retained as low-level regression
+  `@switchbord/core/filters`. They are retained as low-level regression
   coverage.
-- New typed-filter tests land under `@wats/core/filters/typed` (planned
+- New typed-filter tests land under `@switchbord/core/filters/typed` (planned
   file, not created in this ADR) and assert against `TypedUpdate`
   fixtures.
 
@@ -636,7 +636,7 @@ These seams are consumed by:
 ### 7. Discriminated unions for `WhatsAppMessage` / `WhatsAppMessageStatus`
    (WATS-23)
 
-`@wats/types/entities` currently defines `WhatsAppMessage` and
+`@switchbord/types/entities` currently defines `WhatsAppMessage` and
 `WhatsAppMessageStatus` as open-ended interfaces with an index signature.
 Post-pivot:
 
@@ -688,7 +688,7 @@ export interface WhatsAppMessageStatus {
 }
 ```
 
-Consequence: `@wats/types` callers that previously relied on
+Consequence: `@switchbord/types` callers that previously relied on
 `WhatsAppMessage[someUnknownKey]` will fail to compile. This is
 pre-release; it is the correct behavior and aligns with the WATS-23
 verdict. `TypedUpdate.raw` is the supported forward-compat escape hatch.
@@ -760,7 +760,7 @@ verdict. `TypedUpdate.raw` is the supported forward-compat escape hatch.
 - WATS-16 (Arch-B) typed update normalizer — specified here.
 - WATS-22 (Arch-H) listener substrate — specified here.
 - WATS-23 (Arch-I) discriminated unions for message/contact/status —
-  specified here; implemented in `@wats/types`.
+  specified here; implemented in `@switchbord/types`.
 - WATS-26 (Arch-L) Logger/Clock/IdGenerator injection — specified here;
   wired through `createWhatsApp(options)`.
 

@@ -1,4 +1,4 @@
-// @wats/core — filtersTyped/typedFilter.ts (F-9 GREEN)
+// @switchbord/core — filtersTyped/typedFilter.ts (F-9 GREEN)
 //
 // Branded TypedFilter surface above the F-8 TypedUpdate discriminated
 // union (see packages/core/src/webhookNormalizer.ts).
@@ -8,9 +8,9 @@
 //     FILTER_BRAND symbol, a user-defined type-guard predicate
 //     `(u: TypedUpdate) => u is T`, and a `describe()` label for
 //     logging / debugging.
-//   - The brand uses `Symbol.for("@wats/core/filter-brand")` so
+//   - The brand uses `Symbol.for("@switchbord/core/filter-brand")` so
 //     filters produced in a consumer package (or a sibling
-//     @wats/* module) still identify as filters across module
+//     @switchbord/* module) still identify as filters across module
 //     boundaries under Bun / Node.
 //   - All factories validate their inputs at construction time and
 //     throw `FilterValidationError` with a stable `.code`. Predicates
@@ -38,7 +38,7 @@ import type { TypedUpdate } from "../webhookNormalizer";
  * filter objects manufactured in a consumer workspace identify as
  * TypedFilter under this module's `isTypedFilter` guard.
  */
-export const FILTER_BRAND: unique symbol = Symbol.for("@wats/core/filter-brand");
+export const FILTER_BRAND: unique symbol = Symbol.for("@switchbord/core/filter-brand");
 
 export interface TypedFilter<T extends TypedUpdate = TypedUpdate> {
   readonly [FILTER_BRAND]: true;

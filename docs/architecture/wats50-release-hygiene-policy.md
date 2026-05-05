@@ -83,8 +83,8 @@ WATS should use changesets or equivalent for release intent once automation is a
 
 Target future automation:
 
-- fixed/linked alpha version group for publishable `@wats/*` packages
-- internal support package policy for `@wats/internal-utils` and private package guard for `@wats/testing`
+- fixed/linked alpha version group for publishable `@switchbord/*` packages
+- internal support package policy for `@switchbord/internal-utils` and private package guard for `@switchbord/testing`
 - changelog validation
 - package smoke tests from built artifacts
 - dry-run publication checks before any real registry publication

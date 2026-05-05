@@ -3,7 +3,7 @@ import {
   _setDefaultCryptoProviderFactory,
   verifyWebhookChallenge
 } from "../src/webhookServer";
-import { UnsupportedCapabilityError } from "@wats/crypto";
+import { UnsupportedCapabilityError } from "@switchbord/crypto";
 
 describe("C1 webhook challenge verification", () => {
   const invalidExpectedVerifyTokenError = {

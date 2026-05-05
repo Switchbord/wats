@@ -1,4 +1,4 @@
-// @wats/core — filtersTyped/template.ts (WATS-39)
+// @switchbord/core — filtersTyped/template.ts (WATS-39)
 //
 // Template account-event filters. These are sibling-safe: non-account updates
 // and account updates without normalized template helper fields return false.

@@ -14,7 +14,7 @@ Credential-free implementation status is separate from live Meta validation stat
 
 ## Current package surfaces
 
-### `@wats/types`
+### `@switchbord/types`
 
 Shared TypeScript contracts for WhatsApp domain payloads.
 
@@ -27,7 +27,7 @@ Primary exports:
 
 Status: foundations-complete for shared domain contracts; deeper runtime normalization continues under parity work.
 
-### `@wats/crypto`
+### `@switchbord/crypto`
 
 Portable crypto provider seam.
 
@@ -35,13 +35,13 @@ Primary exports:
 
 - `CryptoProvider`
 - `createCryptoProvider`
-- Node/Bun adapter subpath: `@wats/crypto/node`
-- WebCrypto adapter subpath: `@wats/crypto/webcrypto`
+- Node/Bun adapter subpath: `@switchbord/crypto/node`
+- WebCrypto adapter subpath: `@switchbord/crypto/webcrypto`
 - typed crypto errors
 
 Status: foundations-complete.
 
-### `@wats/graph`
+### `@switchbord/graph`
 
 Graph transport and endpoint substrate.
 
@@ -49,7 +49,7 @@ Primary exports:
 
 - `GraphClient`
 - `createFetchTransport`
-- `createMockTransport` via `@wats/graph/testing`
+- `createMockTransport` via `@switchbord/graph/testing`
 - `Transport` types
 - `defineEndpoint`
 - `sendMessage` for `POST /{phoneNumberId}/messages`
@@ -58,14 +58,14 @@ Primary exports:
 - `PhoneNumberClient` with `.sendMessage(...)`, `.sendText(...)`, WATS-38 composer helpers, WATS-41 calling lifecycle helpers, and WATS-42A read-only phone inventory/profile helpers (`getInfo`, `getSettings`, `getBusinessProfile`, `getCommerceSettings`)
 - `WABAClient` with `.getInfo(...)`, `.listSubscribedApps(...)`, and enhanced `.listPhoneNumbers({ fields?, limit?, after?, before? })`
 - read-only business/admin inventory callables and types: `getWabaInfo`, `listSubscribedApps`, enhanced `listPhoneNumbers`, `getPhoneNumberInfo`, `getPhoneNumberSettings`, `getBusinessProfile`, `getCommerceSettings`, exported at root and at `./endpoints/business-management`
-- public endpoint subpaths for already-shipped Graph families: WATS-53 added `@wats/graph/endpoints/media`, `@wats/graph/endpoints/templates`, and `@wats/graph/endpoints/flows`; the full checked set is `@wats/graph/endpoints/messages`, `@wats/graph/endpoints/media`, `@wats/graph/endpoints/templates`, `@wats/graph/endpoints/flows`, `@wats/graph/endpoints/calling`, and `@wats/graph/endpoints/business-management`; WATS-54 keeps package exports, fixture imports, docs, and changelog mentions aligned with `bun run api:check`
+- public endpoint subpaths for already-shipped Graph families: WATS-53 added `@switchbord/graph/endpoints/media`, `@switchbord/graph/endpoints/templates`, and `@switchbord/graph/endpoints/flows`; the full checked set is `@switchbord/graph/endpoints/messages`, `@switchbord/graph/endpoints/media`, `@switchbord/graph/endpoints/templates`, `@switchbord/graph/endpoints/flows`, `@switchbord/graph/endpoints/calling`, and `@switchbord/graph/endpoints/business-management`; WATS-54 keeps package exports, fixture imports, docs, and changelog mentions aligned with `bun run api:check`
 - `paginate` / `paginateAll`
 - Graph error classes and pywa-seeded error registry helpers
 - media runtime: `uploadMedia`, `downloadMedia`, `downloadMediaBytes`, `deleteMedia`, `decryptEncryptedMedia`, upload-session helpers, `MediaValidationError`, `MediaCryptoError`, `MediaIntegrityError`, and finite media cap constants
 
 Status: foundations-complete for Graph plumbing; endpoint breadth is expanding. WATS-37 media runtime, WATS-38 outbound composers, WATS-39 template management, WATS-40 Flow helpers, WATS-41 Calling API lifecycle requests, and WATS-42A read-only business/admin inventory are complete for credential-free MockTransport-backed behavior. Live Meta checks and mutating admin APIs remain credential-gated.
 
-### `@wats/core`
+### `@switchbord/core`
 
 Runtime orchestration and typed update handling.
 
@@ -73,8 +73,8 @@ Primary exports:
 
 - `normalizeWebhookEnvelope` with message/status/account/unknown plus WATS-41 calling update variants and WATS-43A deep camelCase normalization for common message body families
 - legacy raw parser/router helpers: `parseWebhookUpdate`, `createUpdateRouter`
-- typed filter namespace and `@wats/core/filtersTyped`, including `filtersTyped.call` and WATS-43A `message.*` helpers for media, location, reaction, interactive replies, and quick-reply buttons
-- legacy raw filter namespace and `@wats/core/filters`
+- typed filter namespace and `@switchbord/core/filtersTyped`, including `filtersTyped.call` and WATS-43A `message.*` helpers for media, location, reaction, interactive replies, and quick-reply buttons
+- legacy raw filter namespace and `@switchbord/core/filters`
 - `TypedRouter`
 - `createListenerRegistry`
 - `WhatsApp` facade, including `startChat(...)` and WATS-38 composer helpers when `phoneNumberId` is bound
@@ -89,7 +89,7 @@ The `WhatsApp` facade binds:
 
 Status: foundations-complete for typed routing/listening/facade behavior; calling webhook variants and calling typed filters are available for credential-free synthetic payloads.
 
-### `@wats/http`
+### `@switchbord/http`
 
 Webhook verification and HTTP adapter boundary.
 
@@ -105,7 +105,7 @@ Primary exports:
 
 Status: foundations-complete for runtime-neutral webhook ingestion.
 
-### `@wats/config`
+### `@switchbord/config`
 
 Application-edge config substrate.
 
@@ -120,7 +120,7 @@ Primary exports:
 
 Status: experimental baseline for YAML/JSON onboarding and env-secret references.
 
-### `@wats/cli`
+### `@switchbord/cli`
 
 Package-manager CLI surface for safe onboarding and local inspection.
 
@@ -148,7 +148,7 @@ Current commands:
 
 Status: experimental CLI foundation. It generates WATS config/env placeholder files with `wats init`, validates config files safely, exports WATS service OpenAPI, and generates local webhook verify tokens without resolving env-secret values or calling Meta Graph. It does not yet start a server process.
 
-### `@wats/service`
+### `@switchbord/service`
 
 Runtime-neutral standalone webhook/API service foundation.
 
@@ -176,8 +176,8 @@ Status: experimental service foundation. It composes config profile shape, expli
 
 ### Internal support and private packages
 
-- `@wats/internal-utils` — published internal support package required by public runtime packages such as `@wats/config`; application code should not treat it as a stable public API.
-- `@wats/testing` — private workspace fixtures and policy tests; not for external import or publication.
+- `@switchbord/internal-utils` — published internal support package required by public runtime packages such as `@switchbord/config`; application code should not treat it as a stable public API.
+- `@switchbord/testing` — private workspace fixtures and policy tests; not for external import or publication.
 
 ## Explicit non-surfaces today
 
@@ -190,7 +190,7 @@ These are not implemented as runtime APIs yet:
 - catalog/product management APIs beyond WATS-42A read-only getCommerceSettings
 - full Meta Graph API OpenAPI generation
 - CLI config generation / real `wats serve` server process
-- `@wats/persistence` package and SQLite/Postgres adapters are WATS-48 design targets only. In docs-lock wording, @wats/persistence package and SQLite/Postgres adapters are WATS-48 design targets only. No current package export, no service persistence integration, no config persistence schema, and no migration runner exists yet.
+- `@switchbord/persistence` package and SQLite/Postgres adapters are WATS-48 design targets only. In docs-lock wording, @switchbord/persistence package and SQLite/Postgres adapters are WATS-48 design targets only. No current package export, no service persistence integration, no config persistence schema, and no migration runner exists yet.
 - no supported Dockerfile, Compose file, container image, or container-registry publication yet. WATS-49 keeps Docker/deployment as a design scaffold until `wats serve` exists.
 - registry-publishable dist builds
 
@@ -198,8 +198,8 @@ Track these through Linear roadmap issues and `docs/architecture/roadmap-to-what
 
 ## Release compatibility labels
 
-- Stable foundations: `@wats/types`, `@wats/crypto`, Graph transport/client/error substrate, webhook adapter, normalizer, filters, router, listeners, facade.
+- Stable foundations: `@switchbord/types`, `@switchbord/crypto`, Graph transport/client/error substrate, webhook adapter, normalizer, filters, router, listeners, facade.
 - Experimental / expanding: endpoint catalog breadth, media runtime, template/Flow/calling management helpers, config, CLI, service, OpenAPI, docs site.
-- Internal support/private: `@wats/internal-utils` is published internal support for runtime dependency closure; `@wats/testing` remains private.
+- Internal support/private: `@switchbord/internal-utils` is published internal support for runtime dependency closure; `@switchbord/testing` remains private.
 
 See `docs/architecture/release-policy.md` for versioning rules.

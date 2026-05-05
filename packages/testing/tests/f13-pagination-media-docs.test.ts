@@ -124,10 +124,10 @@ describe("F-13 pagination.md reference guide", () => {
     expect(doc).toMatch(/stream|one at a time|no accumulation|never accumulates/i);
   });
 
-  test("contains a usage code sample importing from @wats/graph", () => {
+  test("contains a usage code sample importing from @switchbord/graph", () => {
     const doc = readFileSync(docPath, "utf8");
     expect(doc).toMatch(/```[ \t]*(ts|typescript)/i);
-    expect(doc).toContain("@wats/graph");
+    expect(doc).toContain("@switchbord/graph");
     expect(doc).toMatch(/for\s+await/);
   });
 
@@ -204,7 +204,7 @@ describe("F-13 media.md reference guide", () => {
   test("contains a usage code sample showing the runtime path", () => {
     const doc = readFileSync(docPath, "utf8");
     expect(doc).toMatch(/```[ \t]*(ts|typescript)/i);
-    expect(doc).toContain("@wats/graph");
+    expect(doc).toContain("@switchbord/graph");
     expect(doc).toMatch(/uploadMedia|downloadMedia/);
     expect(doc).toContain("DEFAULT_MAX_MEDIA_UPLOAD_BYTES");
   });
@@ -225,7 +225,7 @@ describe("F-13 media.md reference guide", () => {
 // ---------------------------------------------------------------------
 
 describe("F-13 graph-consumer fixture coverage", () => {
-  test("fixture imports paginate + media primitives from @wats/graph", () => {
+  test("fixture imports paginate + media primitives from @switchbord/graph", () => {
     const repoRoot = findRepoRoot(import.meta.dir);
     const verifyPath = join(
       repoRoot,
@@ -294,7 +294,7 @@ describe("F-13 graph-consumer fixture coverage", () => {
     expect(labels).toContain("deleteMedia DELETEs /{mediaId} and returns success");
     expect(labels).toContain("downloadMediaBytes fetches binary media and validates sha256");
     expect(labels).toContain("decryptEncryptedMedia rejects malformed bundle with MediaCryptoError");
-    expect(labels).toContain("resumable upload session helpers run through @wats/graph");
+    expect(labels).toContain("resumable upload session helpers run through @switchbord/graph");
     for (const [label, ok] of Object.entries(parsed.checks)) {
       expect(ok, `fixture check "${label}" must report true`).toBe(true);
     }

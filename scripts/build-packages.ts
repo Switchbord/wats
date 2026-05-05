@@ -125,15 +125,15 @@ function buildPackage(pkg: PackageName): void {
       ignoreDeprecations: "6.0",
       baseUrl: repoRoot,
       paths: {
-        "@wats/*": ["./packages/*/src/index.ts"],
-        "@wats/graph/*": ["./packages/graph/src/*"],
-        "@wats/core/*": ["./packages/core/src/*"],
-        "@wats/http/*": ["./packages/http/src/*"],
-        "@wats/crypto/*": ["./packages/crypto/src/*"],
-        "@wats/types/*": ["./packages/types/src/*"],
-        "@wats/config/*": ["./packages/config/src/*"],
-        "@wats/service/*": ["./packages/service/src/*"],
-        "@wats/cli/*": ["./packages/cli/src/*"]
+        "@switchbord/*": ["./packages/*/src/index.ts"],
+        "@switchbord/graph/*": ["./packages/graph/src/*"],
+        "@switchbord/core/*": ["./packages/core/src/*"],
+        "@switchbord/http/*": ["./packages/http/src/*"],
+        "@switchbord/crypto/*": ["./packages/crypto/src/*"],
+        "@switchbord/types/*": ["./packages/types/src/*"],
+        "@switchbord/config/*": ["./packages/config/src/*"],
+        "@switchbord/service/*": ["./packages/service/src/*"],
+        "@switchbord/cli/*": ["./packages/cli/src/*"]
       },
       rootDir: repoRoot,
       outDir: join(distDir, "__types")

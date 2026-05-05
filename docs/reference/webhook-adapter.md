@@ -4,7 +4,7 @@
 
 ## WebhookAdapter
 
-The **WebhookAdapter** is `@wats/http`'s runtime-neutral HTTP adapter
+The **WebhookAdapter** is `@switchbord/http`'s runtime-neutral HTTP adapter
 layer. It takes incoming HTTP requests, verifies their
 `X-Hub-Signature-256` via the F-3 signature primitives, normalizes
 their body via the F-8 `normalizeWebhookEnvelope`, dispatches the
@@ -16,10 +16,10 @@ runtime-neutral core:
 
 | Wrapper                           | Runtime              | Subpath export                  |
 | --------------------------------- | -------------------- | ------------------------------- |
-| `createWebhookAdapter`            | any (the core)       | `@wats/http/webhookAdapter`     |
-| `createFetchWebhookHandler`       | Workers / Deno / Bun | `@wats/http/adapters/fetch`     |
-| `createBunWebhookServer`          | Bun                  | `@wats/http/adapters/bun`       |
-| `createNodeWebhookHandler`        | Node                 | `@wats/http/adapters/node`      |
+| `createWebhookAdapter`            | any (the core)       | `@switchbord/http/webhookAdapter`     |
+| `createFetchWebhookHandler`       | Workers / Deno / Bun | `@switchbord/http/adapters/fetch`     |
+| `createBunWebhookServer`          | Bun                  | `@switchbord/http/adapters/bun`       |
+| `createNodeWebhookHandler`        | Node                 | `@switchbord/http/adapters/node`      |
 
 Every adapter wrapper is a thin marshalling layer. The verification,
 normalization, dispatch, and status-code decisions all live in the
@@ -31,8 +31,8 @@ core — so behavior is identical across runtimes.
 import {
   createWebhookAdapter,
   createFetchWebhookHandler
-} from "@wats/http";
-import { WhatsApp } from "@wats/core";
+} from "@switchbord/http";
+import { WhatsApp } from "@switchbord/core";
 
 const wa = new WhatsApp({ graphClient, phoneNumberId: "12345" });
 
@@ -68,7 +68,7 @@ export interface WebhookAdapter {
 | `verifyToken`     | `string`                                    | yes      | 1..512 chars, not whitespace-only, no CR / LF / NUL bytes   |
 | `appSecret`       | `string`                                    | yes      | non-empty, not whitespace-only, no CR / LF / NUL bytes      |
 | `whatsapp`        | object with `dispatch(update)` method       | yes      | a `WhatsApp` facade or any structural match                 |
-| `cryptoProvider`  | `CryptoProvider` (from `@wats/crypto`)      | no       | auto-selected when omitted                                  |
+| `cryptoProvider`  | `CryptoProvider` (from `@switchbord/crypto`)      | no       | auto-selected when omitted                                  |
 | `maxBodyBytes`    | positive integer                            | no       | default `1_048_576` (1 MiB); enforced at READ time by Node + Fetch wrappers |
 | `logger`          | `(event) => void`                           | no       | per-stage observability hook                                |
 
@@ -161,7 +161,7 @@ bad observability hook cannot crash the webhook response path.
 ### `createFetchWebhookHandler(adapter)`
 
 ```ts
-import { createFetchWebhookHandler } from "@wats/http";
+import { createFetchWebhookHandler } from "@switchbord/http";
 const handler = createFetchWebhookHandler(adapter);
 // (request: Request) => Promise<Response>
 ```
@@ -181,7 +181,7 @@ Use this directly under:
 ### `createBunWebhookServer(adapter, options?)`
 
 ```ts
-import { createBunWebhookServer } from "@wats/http";
+import { createBunWebhookServer } from "@switchbord/http";
 const server = createBunWebhookServer(adapter, {
   port: 8787,
   hostname: "0.0.0.0"
@@ -196,7 +196,7 @@ unavailable (e.g. plain Node).
 
 ```ts
 import { createServer } from "node:http";
-import { createNodeWebhookHandler } from "@wats/http";
+import { createNodeWebhookHandler } from "@switchbord/http";
 
 const handler = createNodeWebhookHandler(adapter);
 const server = createServer((req, res) => {

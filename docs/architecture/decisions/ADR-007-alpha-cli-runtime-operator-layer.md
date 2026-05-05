@@ -9,13 +9,13 @@
 
 WATS now has the raw spine needed for alpha operations:
 
-- `@wats/types` for domain contracts.
-- `@wats/crypto`, `@wats/http`, and `@wats/graph` for portable runtime seams and Graph execution.
-- `@wats/core` for routing, filters, listeners, and the `WhatsApp` facade.
-- `@wats/config` for YAML/JSON config with env-secret references.
-- `@wats/service` for a runtime-neutral standalone webhook/API app and OpenAPI document.
-- `@wats/cli` for package-manager UX around config validation, OpenAPI export, local token generation, and planned `init`/`doctor`/`serve` behavior.
-- `@wats/testing` as a private monorepo package and `@wats/internal-utils` as an internal support package published only when public runtime packages require it.
+- `@switchbord/types` for domain contracts.
+- `@switchbord/crypto`, `@switchbord/http`, and `@switchbord/graph` for portable runtime seams and Graph execution.
+- `@switchbord/core` for routing, filters, listeners, and the `WhatsApp` facade.
+- `@switchbord/config` for YAML/JSON config with env-secret references.
+- `@switchbord/service` for a runtime-neutral standalone webhook/API app and OpenAPI document.
+- `@switchbord/cli` for package-manager UX around config validation, OpenAPI export, local token generation, and planned `init`/`doctor`/`serve` behavior.
+- `@switchbord/testing` as a private monorepo package and `@switchbord/internal-utils` as an internal support package published only when public runtime packages require it.
 
 The alpha question is whether the release-alpha operational layer (CLI process wrapper, runtime service wrapper, Docker/deploy artifacts, persistence adapters, example configs, and release hygiene) should stay in this WATS monorepo or move to a second repository that imports the raw WATS spine as dependencies.
 
@@ -25,7 +25,7 @@ Default orientation: keep CLI/runtime/deployment in the monorepo unless a second
 
 Keep the WATS alpha CLI/runtime/operator layer in the existing WATS monorepo.
 
-The alpha release should continue to publish coordinated packages from this workspace (`@wats/config`, `@wats/cli`, `@wats/service`, and the raw spine packages). Do not create a second repository for alpha operations by default. A second repository is only justified later for independently versioned example applications, hosted templates, or deployment blueprints that can lag/lead the core SDK without defining WATS's public runtime contract.
+The alpha release should continue to publish coordinated packages from this workspace (`@switchbord/config`, `@switchbord/cli`, `@switchbord/service`, and the raw spine packages). Do not create a second repository for alpha operations by default. A second repository is only justified later for independently versioned example applications, hosted templates, or deployment blueprints that can lag/lead the core SDK without defining WATS's public runtime contract.
 
 The operational layer remains package-bounded inside the monorepo:
 
@@ -50,7 +50,7 @@ WATS monorepo
 
 ### Option A — Monorepo owns raw spine plus alpha operator layer
 
-The existing WATS workspace owns the public SDK packages and the alpha operational packages (`@wats/config`, `@wats/cli`, `@wats/service`). Docker/deploy docs, config templates, `.env.example`, and persistence adapters are added as monorepo work when their Linear issues land.
+The existing WATS workspace owns the public SDK packages and the alpha operational packages (`@switchbord/config`, `@switchbord/cli`, `@switchbord/service`). Docker/deploy docs, config templates, `.env.example`, and persistence adapters are added as monorepo work when their Linear issues land.
 
 Pros:
 
@@ -83,7 +83,7 @@ Cons:
 
 - Requires package publication or workspace linking before the operator layer can move quickly.
 - Increases alpha friction: two repos, two CI systems, cross-repo PR ordering, compatibility matrix, and more bootstrap docs.
-- Slows contract iteration across `@wats/config`, `@wats/cli`, and `@wats/service`, which are still experimental.
+- Slows contract iteration across `@switchbord/config`, `@switchbord/cli`, and `@switchbord/service`, which are still experimental.
 - Makes docs ownership ambiguous: CLI flags, config schema, service routes, and deployment examples would be split from their source.
 - Requires GitHub repo creation/push and auth that are explicitly out of scope here.
 - Weakens community value during alpha because the main repository would not show a coherent end-to-end path.
@@ -117,12 +117,12 @@ Cons:
 
 ## Architecture implications
 
-1. `@wats/config`, `@wats/cli`, and `@wats/service` stay publishable packages in this monorepo. They are not temporary wrappers for a different repository.
-2. The CLI remains the user-facing process and package-manager UX boundary. It composes `@wats/config` and `@wats/service` rather than duplicating config parsing or service routing.
+1. `@switchbord/config`, `@switchbord/cli`, and `@switchbord/service` stay publishable packages in this monorepo. They are not temporary wrappers for a different repository.
+2. The CLI remains the user-facing process and package-manager UX boundary. It composes `@switchbord/config` and `@switchbord/service` rather than duplicating config parsing or service routing.
 3. The service package remains runtime-neutral (`Request -> Response`) and does not read environment variables. CLI/server wrappers resolve env refs and pass explicit secrets in memory.
 4. Persistence is an alpha extension point, not a second-repo reason. SQLite and Postgres adapters should be designed behind explicit interfaces and can live in monorepo packages or subpaths once WATS-48 lands.
 5. Docker/deploy artifacts are release assets for this repository when implemented. They must remain credential-free in source: templates reference env vars and never contain live tokens.
-6. Examples and docs should use public package specifiers (`@wats/*`) and consumer fixtures should keep proving those specifiers. Internal relative imports must not leak into public docs.
+6. Examples and docs should use public package specifiers (`@switchbord/*`) and consumer fixtures should keep proving those specifiers. Internal relative imports must not leak into public docs.
 7. The public docs site may document the alpha operational path only for behavior that actually exists or is explicitly marked planned. Do not imply that `switchbord/wats` has been created or pushed.
 
 ## Release hygiene and semver implications
@@ -135,7 +135,7 @@ For alpha:
 - Docs-only, tests-only, and non-behavioral repository-hygiene changes are patch changes.
 - New CLI commands, config schema fields, service routes, persistence interfaces, deployment artifacts that define supported behavior, or package exports are minor changes on `0.x`.
 - Breaking alpha contract changes are still minor changes on `0.x`, but must be called out in `CHANGELOG.md`, release notes, migration docs when relevant, and public API/reference docs.
-- The root package remains private. `@wats/internal-utils` may publish only as internal support for public runtime packages; `@wats/testing` remains guarded against publication.
+- The root package remains private. `@switchbord/internal-utils` may publish only as internal support for public runtime packages; `@switchbord/testing` remains guarded against publication.
 - Release automation, npm/GitHub publication, Docker image publication, and GitHub repo creation are deferred to follow-up issues; this ADR must not be read as claiming those systems exist.
 
 ## WATS-47..52 sequencing

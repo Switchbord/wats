@@ -1,7 +1,7 @@
 // F-12 RED — edge-runtime sanity for the webhook fetch adapter.
 //
 // Closes WATS-25 (Arch-K edge-runtime harness). Asserts:
-//   - `createFetchWebhookHandler` is callable from @wats/http without
+//   - `createFetchWebhookHandler` is callable from @switchbord/http without
 //     any node:* imports flowing through its static import graph.
 //   - The returned handler takes a WHATWG Request and returns a
 //     Response that satisfies the edge-runtime contract.
@@ -11,8 +11,8 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { createCryptoProvider } from "@wats/crypto";
-import { createFetchWebhookHandler, createWebhookAdapter } from "@wats/http";
+import { createCryptoProvider } from "@switchbord/crypto";
+import { createFetchWebhookHandler, createWebhookAdapter } from "@switchbord/http";
 
 type JsonRecord = Record<string, unknown>;
 

@@ -7,7 +7,7 @@
     "verify-imports": "bun verify-imports.ts"
   },
   "dependencies": {
-    "@wats/service": "workspace:*",
-    "@wats/graph": "workspace:*"
+    "@switchbord/service": "workspace:*",
+    "@switchbord/graph": "workspace:*"
   }
 }

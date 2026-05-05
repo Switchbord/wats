@@ -1,13 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import type { WatsProfileConfig } from "@wats/config";
+import type { WatsProfileConfig } from "@switchbord/config";
 import {
   createWatsServiceApp,
   createWatsServiceOpenApiDocument,
   WatsServiceError,
   type WatsServiceConfig,
   type WatsServiceOpenApiOptions
-} from "@wats/service";
-import { createMockTransport } from "@wats/graph/testing";
+} from "@switchbord/service";
+import { createMockTransport } from "@switchbord/graph/testing";
 
 function profile(overrides: Partial<WatsProfileConfig> = {}): WatsProfileConfig {
   return {

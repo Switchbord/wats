@@ -93,7 +93,7 @@ describe("wats CLI help skeleton", () => {
     expectSuccessfulHelp(runCli(["config", "validate", "--help"]), [
       "Usage: wats config validate",
       "Validates a WATS config file",
-      "@wats/config"
+      "@switchbord/config"
     ]);
   });
 

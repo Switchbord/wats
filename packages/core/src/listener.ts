@@ -1,4 +1,4 @@
-// @wats/core — listener.ts (F-11 GREEN)
+// @switchbord/core — listener.ts (F-11 GREEN)
 //
 // Listener substrate for conversational patterns: "send a prompt,
 // wait for the user's next matching update". Closes WATS-22 (Arch-H)

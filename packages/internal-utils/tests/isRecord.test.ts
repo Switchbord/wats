@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { isRecord } from "@wats/internal-utils";
+import { isRecord } from "@switchbord/internal-utils";
 
 describe("isRecord — plain-object positives (adversarial battery §1 boundary)", () => {
   test("returns true for an empty plain object", () => {

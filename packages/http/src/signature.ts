@@ -1,4 +1,4 @@
-// @wats/http — webhook signature validation built on the @wats/crypto
+// @switchbord/http — webhook signature validation built on the @switchbord/crypto
 // CryptoProvider seam. This module intentionally contains ZERO static
 // `node:*` imports and ZERO references to the Node-only `Buffer` global.
 // All cryptographic primitives flow through the injected CryptoProvider
@@ -9,7 +9,7 @@ import {
   UnsupportedCapabilityError,
   createCryptoProvider,
   type CryptoProvider
-} from "@wats/crypto";
+} from "@switchbord/crypto";
 
 export type SignatureValidationErrorCode =
   | "invalid_app_secret"

@@ -77,7 +77,7 @@ describe("WATS 0.2.1 alpha launch release contract", () => {
   test("changelog starts 0.2.1 alpha launch with install guidance and boundaries", () => {
     const changelog = read("CHANGELOG.md");
     expect(changelog.startsWith("# Changelog\n\n## [0.2.1] - 2026-05-04\n\nAlpha launch release"));
-    expect(changelog).toContain("bun add @wats/cli");
+    expect(changelog).toContain("bun add @switchbord/cli");
     expect(changelog).toContain("bunx --bun wats --help");
     expect(changelog).toContain("npm publish --dry-run");
     expect(changelog).toContain("No live Meta calls");
@@ -87,8 +87,8 @@ describe("WATS 0.2.1 alpha launch release contract", () => {
   test("README announces alpha install path and credential boundary", () => {
     const readme = read("README.md");
     expect(readme).toContain("Current release: `0.2.1-alpha-launch`");
-    expect(readme).toContain("bun add @wats/cli");
-    expect(readme).toContain("bun add @wats/core @wats/graph @wats/http");
+    expect(readme).toContain("bun add @switchbord/cli");
+    expect(readme).toContain("bun add @switchbord/core @switchbord/graph @switchbord/http");
     expect(readme).toContain("test account credentials are not needed for default install or CI");
   });
 });

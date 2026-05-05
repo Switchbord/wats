@@ -35,18 +35,18 @@ docs/
   migration/      pywa-to-WATS notes
 ```
 
-The dependency direction is deliberate: low-level packages stay portable; `@wats/core` composes them; `@wats/config`, `@wats/cli`, and `@wats/service` form the first application-edge packages.
+The dependency direction is deliberate: low-level packages stay portable; `@switchbord/core` composes them; `@switchbord/config`, `@switchbord/cli`, and `@switchbord/service` form the first application-edge packages.
 
 ## Install
 
 After the alpha packages are published to the npm registry, Bun users can install them directly:
 
 ```bash
-bun add @wats/cli
+bun add @switchbord/cli
 bunx --bun wats --help
 
-bun add @wats/core @wats/graph @wats/http
-bun add @wats/config @wats/service
+bun add @switchbord/core @switchbord/graph @switchbord/http
+bun add @switchbord/config @switchbord/service
 ```
 
 test account credentials are not needed for default install or CI. Live Meta validation remains a separate credential-gated campaign.

@@ -6,6 +6,6 @@
     "verify-imports": "bun run ./verify-imports.ts"
   },
   "dependencies": {
-    "@wats/types": "file:../../../../packages/types"
+    "@switchbord/types": "file:../../../../packages/types"
   }
 }

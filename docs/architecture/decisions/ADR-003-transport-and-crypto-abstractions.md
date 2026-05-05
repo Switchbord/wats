@@ -7,11 +7,11 @@
 
 ## Context
 
-`@wats/graph` currently calls `globalThis.fetch` directly inside `GraphClient.request`
+`@switchbord/graph` currently calls `globalThis.fetch` directly inside `GraphClient.request`
 and classifies failures into `GraphNetworkError`, `GraphApiError`, `GraphAuthError`,
 `GraphRateLimitError`, `GraphSerializationError`, and `GraphRequestValidationError`.
-`@wats/http` imports `createHmac` and `timingSafeEqual` from `node:crypto` in
-`signature.ts` and `webhookServer.ts`. `@wats/crypto` is empty.
+`@switchbord/http` imports `createHmac` and `timingSafeEqual` from `node:crypto` in
+`signature.ts` and `webhookServer.ts`. `@switchbord/crypto` is empty.
 
 Pywa reference (`pywa/api.py`, `pywa/client.py`) takes an injectable `httpx.Client`,
 letting callers configure timeouts, proxies, connection pools, and retries; auth and
@@ -24,8 +24,8 @@ Three concrete drivers motivate this ADR:
 1. Arch-C (WATS-17): introduce a `Transport` seam beneath `GraphClient` so tests,
    instrumentation, and non-fetch runtimes can plug in without patching
    `globalThis.fetch`.
-2. Arch-F (WATS-20): materialise `@wats/crypto` as a `CryptoProvider` interface with
-   pluggable adapters; required to lift `@wats/http` off `node:crypto` so webhook
+2. Arch-F (WATS-20): materialise `@switchbord/crypto` as a `CryptoProvider` interface with
+   pluggable adapters; required to lift `@switchbord/http` off `node:crypto` so webhook
    signature verification runs on Edge/Workers.
 3. Construction-time input validation gaps raised by WATS-3 (accessToken CR/LF/NUL),
    WATS-4 (baseUrl path prefix silently dropped), and WATS-5 (baseUrl/apiVersion
@@ -41,9 +41,9 @@ from a Node buffer coercion, and transport failures must not leak arbitrary
 ## Decision
 
 WATS splits HTTP request/response and cryptographic primitives behind two narrow
-interfaces: `Transport` (owned by `@wats/graph`, consumed by `GraphClient`) and
-`CryptoProvider` (owned by `@wats/crypto`, consumed by `@wats/http` and, later,
-by flow/media decryption in `@wats/graph`).
+interfaces: `Transport` (owned by `@switchbord/graph`, consumed by `GraphClient`) and
+`CryptoProvider` (owned by `@switchbord/crypto`, consumed by `@switchbord/http` and, later,
+by flow/media decryption in `@switchbord/graph`).
 
 ### Seam diagram
 
@@ -53,14 +53,14 @@ by flow/media decryption in `@wats/graph`).
      v
  +---------------------+          +-------------------------+
  |  GraphClient        |          |  WebhookSignatureVerif. |
- |  (@wats/graph)      |          |  (@wats/http)           |
+ |  (@switchbord/graph)      |          |  (@switchbord/http)           |
  +----------+----------+          +------------+------------+
             |                                  |
             | request(TransportRequest)        | hmacSha256 / timingSafeEqual
             v                                  v
  +---------------------+          +-------------------------+
  |  Transport          |          |  CryptoProvider         |
- |  (interface)        |          |  (@wats/crypto)         |
+ |  (interface)        |          |  (@switchbord/crypto)         |
  +----------+----------+          +------------+------------+
             |                                  |
     +-------+-------+                  +-------+-------+
@@ -84,7 +84,7 @@ serialisation/deserialisation, error classification) remain in `GraphClient`
 above the seam.
 
 ```ts
-// @wats/graph/transport
+// @switchbord/graph/transport
 export interface TransportRequest {
   readonly method: string;
   readonly url: string;
@@ -156,7 +156,7 @@ call. It performs construction-time validation so WATS-3, WATS-4, and WATS-5
 are closed at the earliest possible point.
 
 ```ts
-// @wats/graph
+// @switchbord/graph
 export interface GraphClientConfig {
   readonly baseUrl: string;        // validated: origin-only, no path, no CR/LF/NUL
   readonly apiVersion: string;     // validated: /^v\d+\.\d+$/
@@ -190,12 +190,12 @@ Construction-time validation (WATS-3, WATS-4, WATS-5, WATS-8):
 
 ### CryptoProvider
 
-`@wats/crypto` exports a capability-oriented interface covering the primitives
+`@switchbord/crypto` exports a capability-oriented interface covering the primitives
 used across WATS today and the ones announced for Flows, Media, and Encrypted
 Payloads tomorrow.
 
 ```ts
-// @wats/crypto
+// @switchbord/crypto
 export interface CryptoProvider {
   readonly name: string;
   hmacSha256(key: Uint8Array | string, body: Uint8Array | string):
@@ -262,18 +262,18 @@ runtime sniff:
    `createNodeBunCryptoProvider()`.
 3. Otherwise throw `CryptoCapabilityUnavailableError` at construction time.
 
-Critically, `@wats/crypto` must never statically import `node:crypto`. The
+Critically, `@switchbord/crypto` must never statically import `node:crypto`. The
 dynamic import lives behind a factory and is only reached on the Node branch.
 This preserves tree-shaking and prevents bundler warnings on Workers/Edge
 builds that forbid `node:*`. WATS-20 is resolved by this split.
 
-### @wats/http interop
+### @switchbord/http interop
 
 `validateWebhookSignature` and `verifyWebhookChallenge` are refactored to
 accept an injected `CryptoProvider`:
 
 ```ts
-// @wats/http
+// @switchbord/http
 export interface ValidateWebhookSignatureInput {
   readonly appSecret: string;
   readonly rawBody: string | Uint8Array;
@@ -293,7 +293,7 @@ the H1 hazard where a malformed `ArrayBufferView` could surface a raw
 be coerced throw a typed `GraphSerializationError`-equivalent (see error
 taxonomy below) rather than bubbling a `TypeError`.
 
-`@wats/http` MUST run on Cloudflare Workers and Deno without `node:crypto`.
+`@switchbord/http` MUST run on Cloudflare Workers and Deno without `node:crypto`.
 That is a non-negotiable interop property tested by the edge-runtime sanity
 suite defined in ADR-006.
 
@@ -310,7 +310,7 @@ Errors flow across seams without loss of type identity.
 | CryptoProvider, no capability | missing subtle/node    | `CryptoCapabilityUnavailableError`    |
 | validateWebhookSignature | CryptoError                 | `SignatureValidationResult { ok:false, error:{ code:"crypto_failure" } }` |
 
-`@wats/http` MUST wrap its `CryptoProvider.hmacSha256` call in a typed-error
+`@switchbord/http` MUST wrap its `CryptoProvider.hmacSha256` call in a typed-error
 shell: any `CryptoError` becomes a new `SignatureValidationErrorCode`
 (`"crypto_failure"`); raw TypeErrors from argument coercion are caught and
 remapped to `"invalid_body_type"`. This resolves H1.
@@ -319,7 +319,7 @@ remapped to `"invalid_body_type"`. This resolves H1.
 (WATS-13): a helper `scrubErrorCause(cause: unknown): unknown` strips
 `Authorization`/`Cookie`/`Set-Cookie` headers from any embedded `Request`,
 redacts `url.searchParams.access_token`, and removes raw body buffers. The
-helper is exported from `@wats/graph/errors` and applied inside the
+helper is exported from `@switchbord/graph/errors` and applied inside the
 fetch-transport `onError` default interceptor.
 
 ## Consequences
@@ -330,7 +330,7 @@ Positive:
   assertions on request shape (URL, headers, body) without runtime-global
   mutation. The Bun test runner's parallelism becomes safe.
 - Webhook signature verification is portable. Cloudflare Workers and Vercel
-  Edge deployments of `@wats/http` become supported without a re-export shim.
+  Edge deployments of `@switchbord/http` become supported without a re-export shim.
 - Construction-time validation closes three M-tier issues in one surface
   change rather than patching validation into each endpoint.
 - Future encrypted-payload parity (Flows, Media, Calls) lands on the same
@@ -338,14 +338,14 @@ Positive:
 
 Negative:
 
-- `@wats/graph` gains a public surface (`Transport`, `TransportRequest`,
+- `@switchbord/graph` gains a public surface (`Transport`, `TransportRequest`,
   `TransportResponse`, `createFetchTransport`, `createMockTransport`). Once
   exported, semver compatibility applies.
 - `CryptoProvider` is intentionally larger than the current call sites need
   (two of six methods are forward-declared). Adapters must implement all
   methods, even if forward-declared ones throw `CryptoCapabilityUnavailableError`.
 - `validateWebhookSignature` becoming async is a breaking change for
-  `@wats/http`; migration is gated behind the unreleased 0.x line.
+  `@switchbord/http`; migration is gated behind the unreleased 0.x line.
 - `fetch` indirection costs a closure per request. Benchmarking during
   implementation will confirm the overhead is sub-microsecond on Bun.
 
@@ -355,8 +355,8 @@ Negative:
   retry, backoff, and interceptor concerns into the user's `fetch` wrapper and
   makes `MockTransport.calls` unrepresentable without proxying. Pywa's
   `httpx.Client` injection reflects the same value proposition.
-- **Publish `CryptoProvider` as the existing `@wats/crypto` default export
-  using `node:crypto` statically.** Rejected: breaks `@wats/http` on Workers,
+- **Publish `CryptoProvider` as the existing `@switchbord/crypto` default export
+  using `node:crypto` statically.** Rejected: breaks `@switchbord/http` on Workers,
   violates the ADR-003 interop guarantee, and makes the `prefer: "webcrypto"`
   knob meaningless.
 - **Adopt `undici` or another shared HTTP client.** Rejected: adds a Node-only
@@ -395,7 +395,7 @@ Negative:
 - **Deno**: WebCrypto provider only. `createFetchTransport()` binds to
   `globalThis.fetch`. Passes the edge-runtime sanity suite.
 - **Cloudflare Workers / Vercel Edge**: WebCrypto provider only.
-  `@wats/http` must not statically reference `node:crypto`. The `node:crypto`
+  `@switchbord/http` must not statically reference `node:crypto`. The `node:crypto`
   import in `signature.ts` is removed during the F-step that lands this ADR.
 - **React Native / browsers**: out of scope for 0.x but not foreclosed — the
   WebCrypto provider is sufficient where a polyfilled `crypto.subtle` exists.

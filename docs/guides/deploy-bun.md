@@ -11,7 +11,7 @@ edge runtimes, see `docs/guides/deploy-cloudflare-workers.md`.
 ## Install
 
 ```bash
-bun add @wats/http @wats/core @wats/graph @wats/crypto
+bun add @switchbord/http @switchbord/core @switchbord/graph @switchbord/crypto
 ```
 
 ## Minimal server
@@ -21,10 +21,10 @@ bun add @wats/http @wats/core @wats/graph @wats/crypto
 import {
   createBunWebhookServer,
   createWebhookAdapter
-} from "@wats/http";
-import { GraphClient } from "@wats/graph";
-import { WhatsApp, message } from "@wats/core";
-import { createFetchTransport } from "@wats/graph";
+} from "@switchbord/http";
+import { GraphClient } from "@switchbord/graph";
+import { WhatsApp, message } from "@switchbord/core";
+import { createFetchTransport } from "@switchbord/graph";
 
 const graphClient = new GraphClient({
   accessToken: process.env.META_ACCESS_TOKEN!,

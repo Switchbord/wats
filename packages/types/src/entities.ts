@@ -1,7 +1,7 @@
-// @wats/types — entities.ts
+// @switchbord/types — entities.ts
 //
 // Entity entrypoint retained from B1 so external consumers that import
-// from `@wats/types/entities` continue to resolve without change. F-1
+// from `@switchbord/types/entities` continue to resolve without change. F-1
 // tightens the WhatsAppMessage / WhatsAppContact / WhatsAppMessageStatus
 // shapes — see the messages/, contacts.ts, and statuses.ts modules for
 // the discriminated-union implementations.
@@ -47,7 +47,7 @@ export interface WhatsAppMessageText {
 
 /**
  * Legacy message-context shape carried over from B1. New code should
- * prefer `MessageContext` from `@wats/types/messages`.
+ * prefer `MessageContext` from `@switchbord/types/messages`.
  */
 export interface WhatsAppMessageContext {
   from?: string;

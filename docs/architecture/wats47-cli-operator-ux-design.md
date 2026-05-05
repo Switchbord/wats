@@ -7,9 +7,9 @@
 
 ## Purpose
 
-WATS-47 turns the WATS alpha operator path into an explicit CLI contract before the remaining runtime work lands. This document defines the target `@wats/cli` command surface, safety defaults, config/env precedence, side effects, error taxonomy, and test plan for alpha onboarding. The side-effect matrix below is the canonical quick scan for operator-visible reads, writes, network, and live behavior.
+WATS-47 turns the WATS alpha operator path into an explicit CLI contract before the remaining runtime work lands. This document defines the target `@switchbord/cli` command surface, safety defaults, config/env precedence, side effects, error taxonomy, and test plan for alpha onboarding. The side-effect matrix below is the canonical quick scan for operator-visible reads, writes, network, and live behavior.
 
-ADR-007 keeps this work in the existing WATS monorepo. The CLI composes `@wats/config` and `@wats/service`; it does not fork schema validation, duplicate service routing, or create a second repository.
+ADR-007 keeps this work in the existing WATS monorepo. The CLI composes `@switchbord/config` and `@switchbord/service`; it does not fork schema validation, duplicate service routing, or create a second repository.
 
 ## Scope ledger
 
@@ -70,7 +70,7 @@ The alpha default is credential-safe. Unless a command explicitly says otherwise
 | `wats --help` | no | no | no | no | no | no | static help only |
 | `wats init --dry-run` | no | no | no | no | no | no | previews generated files |
 | `wats init` | no | no | no | yes | no | no | writes templates with no overwrite by default |
-| `wats config validate` | yes | no | no | no | no | no | uses `@wats/config` |
+| `wats config validate` | yes | no | no | no | no | no | uses `@switchbord/config` |
 | `wats config print` | yes | no | no | optional explicit `--out` | no | no | redacted by default |
 | `wats config paths` | optional | no | no | no | no | no | explains discovery without secrets |
 | `wats doctor` | yes | no by default | no by default | no | no | no by default | offline diagnostics first |
@@ -170,7 +170,7 @@ profiles:
 
 ## `wats config validate`, `print`, and `paths`
 
-`wats config validate` remains credential-safe. It uses `@wats/config` and never resolves secret values.
+`wats config validate` remains credential-safe. It uses `@switchbord/config` and never resolves secret values.
 
 ```bash
 wats config validate
@@ -202,7 +202,7 @@ wats doctor --live --yes-live
 Default checks:
 
 - supported Bun/Node runtime
-- `@wats/cli` can import `@wats/config` and `@wats/service`
+- `@switchbord/cli` can import `@switchbord/config` and `@switchbord/service`
 - config file is discovered, readable, and valid
 - selected profile exists
 - route paths do not collide with `/healthz`, `/readyz`, `/openapi.json`, or message routes
@@ -216,7 +216,7 @@ Default checks:
 
 Target purpose: export WATS standalone service OpenAPI only.
 
-`wats openapi` remains credential-free. It reads config and produces the OpenAPI document for `@wats/service`; it is not a Meta Graph OpenAPI exporter.
+`wats openapi` remains credential-free. It reads config and produces the OpenAPI document for `@switchbord/service`; it is not a Meta Graph OpenAPI exporter.
 
 ```bash
 wats openapi --config wats.config.yaml
@@ -229,7 +229,7 @@ Explicit `--out` uses exclusive-create writes and no overwrite by default.
 
 ## `wats serve`
 
-Target purpose: process wrapper around `@wats/service`.
+Target purpose: process wrapper around `@switchbord/service`.
 
 ```bash
 wats serve
@@ -295,13 +295,13 @@ Named error families:
 
 - `CliUsageError`: unknown command, unknown option, missing argument, invalid option value, invalid path
 - `CliConfigError`: config not found, profile not found, discovery failure, route collision
-- `ConfigValidationError`: forwarded from `@wats/config`
+- `ConfigValidationError`: forwarded from `@switchbord/config`
 - `SecretResolutionError`: secret resolution disabled, missing env, invalid env, env-file errors
 - `LiveGuardError`: live not enabled, confirmation required, live check failed, mutation blocked
 - `OutputError`: output exists, output directory, write failed, unsafe output path
 - `DoctorError`: runtime unsupported, package import failed, config/env/service/live check failed
 - `ServeError`: bind failed, port in use, service start failed, shutdown failed
-- `WatsServiceError`: forwarded from `@wats/service`
+- `WatsServiceError`: forwarded from `@switchbord/service`
 
 ## Redaction policy
 
@@ -336,13 +336,13 @@ Forbidden in WATS-47:
 
 ## Package boundaries
 
-`@wats/cli` owns parsing, operator output, safe file writes, env resolution, process lifecycle, and live confirmation gates.
+`@switchbord/cli` owns parsing, operator output, safe file writes, env resolution, process lifecycle, and live confirmation gates.
 
-`@wats/config` owns config schema validation, parsing, and redaction helpers.
+`@switchbord/config` owns config schema validation, parsing, and redaction helpers.
 
-`@wats/service` owns runtime-neutral Request/Response routing, route validation, webhook integration, authenticated message routes, and service OpenAPI generation.
+`@switchbord/service` owns runtime-neutral Request/Response routing, route validation, webhook integration, authenticated message routes, and service OpenAPI generation.
 
-`@wats/graph` owns Graph request construction and transport use. CLI tests use mock transport; they do not call Meta.
+`@switchbord/graph` owns Graph request construction and transport use. CLI tests use mock transport; they do not call Meta.
 
 ## Implementation sequencing
 

@@ -1,14 +1,14 @@
 {
-  "name": "@wats/testing",
+  "name": "@switchbord/testing",
   "version": "0.2.0",
   "private": true,
   "license": "MIT",
   "type": "module",
   "dependencies": {
-    "@wats/internal-utils": "workspace:*",
-    "@wats/crypto": "workspace:*",
-    "@wats/http": "workspace:*",
-    "@wats/graph": "workspace:*",
-    "@wats/service": "workspace:*"
+    "@switchbord/internal-utils": "workspace:*",
+    "@switchbord/crypto": "workspace:*",
+    "@switchbord/http": "workspace:*",
+    "@switchbord/graph": "workspace:*",
+    "@switchbord/service": "workspace:*"
   }
 }

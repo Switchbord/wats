@@ -11,7 +11,7 @@ Deno, see `docs/guides/deploy-cloudflare-workers.md`.
 ## Install
 
 ```bash
-npm install @wats/http @wats/core @wats/graph @wats/crypto
+npm install @switchbord/http @switchbord/core @switchbord/graph @switchbord/crypto
 ```
 
 ## Minimal server
@@ -22,9 +22,9 @@ import { createServer } from "node:http";
 import {
   createNodeWebhookHandler,
   createWebhookAdapter
-} from "@wats/http";
-import { GraphClient, createFetchTransport } from "@wats/graph";
-import { WhatsApp, message } from "@wats/core";
+} from "@switchbord/http";
+import { GraphClient, createFetchTransport } from "@switchbord/graph";
+import { WhatsApp, message } from "@switchbord/core";
 
 const graphClient = new GraphClient({
   accessToken: process.env.META_ACCESS_TOKEN!,

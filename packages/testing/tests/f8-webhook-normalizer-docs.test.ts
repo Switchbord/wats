@@ -131,7 +131,7 @@ describe("F-8 webhook-normalizer.md reference guide", () => {
 });
 
 describe("F-8 core-consumer fixture", () => {
-  test("fixture manifest exists and declares @wats/core workspace dep", () => {
+  test("fixture manifest exists and declares @switchbord/core workspace dep", () => {
     const repoRoot = findRepoRoot(import.meta.dir);
     const fixtureDir = join(
       repoRoot,
@@ -149,17 +149,17 @@ describe("F-8 core-consumer fixture", () => {
     if (!isJsonRecord(dependencies)) {
       throw new Error("Fixture dependencies must be an object");
     }
-    expect(dependencies["@wats/core"]).toBe("workspace:*");
+    expect(dependencies["@switchbord/core"]).toBe("workspace:*");
   });
 
-  test("fixture imports normalizeWebhookEnvelope + error class via @wats/core", () => {
+  test("fixture imports normalizeWebhookEnvelope + error class via @switchbord/core", () => {
     const repoRoot = findRepoRoot(import.meta.dir);
     const verifyPath = join(
       repoRoot,
       "packages/testing/fixtures/core-consumer/verify-imports.ts"
     );
     const source = readFileSync(verifyPath, "utf8");
-    expect(source).toContain('from "@wats/core"');
+    expect(source).toContain('from "@switchbord/core"');
     expect(source).toContain("normalizeWebhookEnvelope");
     expect(source).toContain("WebhookNormalizationError");
     expect(source).toContain("TypedMessageUpdate");
@@ -208,7 +208,7 @@ describe("F-8 core-consumer fixture", () => {
       expect(ok, `fixture check "${label}" must report true`).toBe(true);
     }
 
-    const keys = parsed.moduleKeys["@wats/core"];
+    const keys = parsed.moduleKeys["@switchbord/core"];
     expect(Array.isArray(keys)).toBe(true);
     expect((keys as string[])).toContain("normalizeWebhookEnvelope");
     expect((keys as string[])).toContain("WebhookNormalizationError");

@@ -104,8 +104,8 @@ describe("F-9 createTypedFilter + brand + isTypedFilter", () => {
 
   test("FILTER_BRAND is a registered symbol across module boundaries", () => {
     // `Symbol.for` interns globally — any other module importing
-    // `@wats/core/filtersTyped` sees the same symbol.
-    expect(FILTER_BRAND).toBe(Symbol.for("@wats/core/filter-brand"));
+    // `@switchbord/core/filtersTyped` sees the same symbol.
+    expect(FILTER_BRAND).toBe(Symbol.for("@switchbord/core/filter-brand"));
     expect(typeof FILTER_BRAND).toBe("symbol");
   });
 

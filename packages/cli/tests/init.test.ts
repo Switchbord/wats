@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
-import { parseConfig } from "@wats/config";
+import { parseConfig } from "@switchbord/config";
 
 type CliResult = {
   exitCode: number;
@@ -146,7 +146,7 @@ describe("wats init", () => {
     }
   });
 
-  test("creates JSON config when requested and validates through @wats/config", () => {
+  test("creates JSON config when requested and validates through @switchbord/config", () => {
     const dir = makeTempDir();
     try {
       const result = runCli(["init", dir, "--format=json", "--profile", "prod"]);

@@ -1,7 +1,7 @@
 // F-4 graph-consumer harness.
 //
 // Spawns `bun run verify-imports` from the graph-consumer fixture
-// directory (which declares `@wats/graph: workspace:*`) and asserts
+// directory (which declares `@switchbord/graph: workspace:*`) and asserts
 // the success sentinel + runtime-shape report. Also validates that the
 // guide docs/guides/transport-and-testing.md exists and contains the
 // required recipes.
@@ -69,7 +69,7 @@ function runBun(args: string[], cwd: string): {
   };
 }
 
-describe("F-4 @wats/graph consumer fixture", () => {
+describe("F-4 @switchbord/graph consumer fixture", () => {
   test("fixture manifest exists and declares workspace dependencies", () => {
     const repoRoot = findRepoRoot(import.meta.dir);
     const fixtureDir = join(
@@ -89,7 +89,7 @@ describe("F-4 @wats/graph consumer fixture", () => {
     if (!isJsonRecord(dependencies)) {
       throw new Error("Fixture dependencies must be an object");
     }
-    expect(dependencies["@wats/graph"]).toBe("workspace:*");
+    expect(dependencies["@switchbord/graph"]).toBe("workspace:*");
   });
 
   test("running the fixture entry under bun emits the success sentinel", () => {
@@ -131,7 +131,7 @@ describe("F-4 @wats/graph consumer fixture", () => {
       expect(ok, `fixture check "${label}" must report true`).toBe(true);
     }
 
-    const keys = parsed.moduleKeys["@wats/graph"];
+    const keys = parsed.moduleKeys["@switchbord/graph"];
     expect(Array.isArray(keys)).toBe(true);
     expect((keys as string[])).toContain("GraphClient");
     expect((keys as string[])).toContain("createFetchTransport");
@@ -144,7 +144,7 @@ describe("F-4 @wats/graph consumer fixture", () => {
     expect((keys as string[])).toContain("buildSendTemplatePayload");
 
     const expectedSubpathKeys: Record<string, string[]> = {
-      "@wats/graph/endpoints/media": [
+      "@switchbord/graph/endpoints/media": [
         "uploadMedia",
         "downloadMedia",
         "downloadMediaBytes",
@@ -154,7 +154,7 @@ describe("F-4 @wats/graph consumer fixture", () => {
         "MediaValidationError",
         "DEFAULT_MAX_MEDIA_UPLOAD_BYTES"
       ],
-      "@wats/graph/endpoints/templates": [
+      "@switchbord/graph/endpoints/templates": [
         "listMessageTemplates",
         "getMessageTemplate",
         "createMessageTemplate",
@@ -163,7 +163,7 @@ describe("F-4 @wats/graph consumer fixture", () => {
         "buildTemplateHeaderComponent",
         "validateTemplateParameterCounts"
       ],
-      "@wats/graph/endpoints/flows": [
+      "@switchbord/graph/endpoints/flows": [
         "listFlows",
         "getFlow",
         "createFlow",
@@ -199,6 +199,6 @@ describe("F-4 @wats/graph consumer fixture", () => {
     expect(source).toContain("createMockTransport");
     expect(source).toContain("Custom Transport");
     expect(source).toContain("Interceptor");
-    expect(source).toContain("@wats/graph/testing");
+    expect(source).toContain("@switchbord/graph/testing");
   });
 });

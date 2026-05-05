@@ -53,12 +53,12 @@ function runBun(args: readonly string[], cwd: string): {
 const repoRoot = findRepoRoot(import.meta.dir);
 
 const expectedGraphEndpointSpecifiers = [
-  "@wats/graph/endpoints/messages",
-  "@wats/graph/endpoints/media",
-  "@wats/graph/endpoints/templates",
-  "@wats/graph/endpoints/flows",
-  "@wats/graph/endpoints/calling",
-  "@wats/graph/endpoints/business-management"
+  "@switchbord/graph/endpoints/messages",
+  "@switchbord/graph/endpoints/media",
+  "@switchbord/graph/endpoints/templates",
+  "@switchbord/graph/endpoints/flows",
+  "@switchbord/graph/endpoints/calling",
+  "@switchbord/graph/endpoints/business-management"
 ] as const;
 
 describe("WATS-54 public API consistency check", () => {
@@ -71,7 +71,7 @@ describe("WATS-54 public API consistency check", () => {
 
     const manifest = parseJsonFile(join(repoRoot, "scripts/public-api-consistency-manifest.json"));
     expect(manifest.schema).toBe("wats.public-api-consistency.v1");
-    expect(manifest.scope).toBe("@wats/graph endpoint subpaths");
+    expect(manifest.scope).toBe("@switchbord/graph endpoint subpaths");
     expect(Array.isArray(manifest.graphEndpointSubpaths)).toBe(true);
 
     const entries = manifest.graphEndpointSubpaths as unknown[];
@@ -84,7 +84,7 @@ describe("WATS-54 public API consistency check", () => {
 
     for (const entry of entries) {
       if (!isJsonRecord(entry)) throw new Error("manifest entry must be an object");
-      expect(entry.packageName).toBe("@wats/graph");
+      expect(entry.packageName).toBe("@switchbord/graph");
       expect(typeof entry.exportKey).toBe("string");
       expect(typeof entry.source).toBe("string");
       expect(Array.isArray(entry.fixtureChecks)).toBe(true);
@@ -121,7 +121,7 @@ describe("WATS-54 public API consistency check", () => {
     expect(result.exitCode).toBe(1);
     const combined = `${result.stdout}\n${result.stderr}`;
     expect(combined).toContain("public-api-consistency:fail");
-    expect(combined).toContain("@wats/graph/endpoints/messages");
+    expect(combined).toContain("@switchbord/graph/endpoints/messages");
     expect(combined).toContain("package export ./endpoints/messages");
     expect(combined).toContain("expected {\"types\":\"./dist/endpoints/not-real.d.ts\",\"import\":\"./dist/endpoints/not-real.js\"}");
     expect(combined).not.toMatch(/ACCESS_TOKEN|APP_SECRET|META|WHATSAPP|Bearer/u);

@@ -3,10 +3,10 @@
   "compilerOptions": {
     "types": [],
     "paths": {
-      "@wats/types": ["../types/src/index.ts"],
-      "@wats/types/*": ["../types/src/*"],
-      "@wats/graph": ["../graph/src/index.ts"],
-      "@wats/graph/*": ["../graph/src/*"]
+      "@switchbord/types": ["../types/src/index.ts"],
+      "@switchbord/types/*": ["../types/src/*"],
+      "@switchbord/graph": ["../graph/src/index.ts"],
+      "@switchbord/graph/*": ["../graph/src/*"]
     }
   },
   "include": ["src"]
