@@ -204,6 +204,22 @@ This troubleshooting matrix is safe to publish because it names failure classes 
 
 No live Meta calls by default. The credential gate requires an explicit live flag plus a confirmation such as `--yes-live` or `WATS_LIVE_ENABLE=1`. CI/docs/tests remain credential-free.
 
+## Webhook onboarding checklist
+
+Use `wats onboarding` after you know the public HTTPS URL for your local tunnel or deployed WATS service:
+
+```bash
+wats onboarding --public-url https://example.test/wats
+wats onboarding --public-url https://example.test --webhook-path /webhooks/whatsapp
+```
+
+The command prints the webhook callback address to paste into Meta App Dashboard > WhatsApp > Configuration. It also prints two locally generated values:
+
+- `WATS_VERIFY_TOKEN` — use as the Meta webhook verify token and store in your local env/secret manager.
+- `WATS_SERVICE_TOKEN` — use as the bearer token for protected WATS service routes.
+
+The checklist also names the user-side values you must copy from Meta/WhatsApp without WATS generating them: `WATS_ACCESS_TOKEN`, `WATS_APP_SECRET`, `WATS_WABA_ID`, and `WATS_PHONE_NUMBER_ID`. The command prints generated values to stdout only; it does not write files, read `.env.local`, resolve existing secrets, or call Meta Graph APIs.
+
 ## Safety defaults
 
 The CLI remains credential-safe by default:

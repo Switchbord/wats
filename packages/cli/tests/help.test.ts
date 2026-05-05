@@ -77,6 +77,7 @@ describe("wats CLI help skeleton", () => {
       "wats config validate",
       "wats doctor",
       "wats openapi",
+      "wats onboarding",
       "wats webhook token"
     ]);
   });

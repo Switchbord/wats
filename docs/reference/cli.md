@@ -49,6 +49,26 @@ Failure behavior:
 - diagnostics do not echo attacker-supplied paths or token-like values;
 - no raw secrets are generated.
 
+### `wats onboarding --public-url <https URL> [--webhook-path /webhooks/whatsapp]`
+
+Prints an operator-facing onboarding checklist for Meta webhook setup. The command accepts the public HTTPS base URL for the WATS service or tunnel, combines it with the configured webhook path, and prints the callback address to paste into Meta App Dashboard > WhatsApp > Configuration.
+
+Example:
+
+```bash
+wats onboarding --public-url https://example.test/wats
+wats onboarding --public-url https://example.test --webhook-path /webhooks/whatsapp
+```
+
+Output includes:
+
+- `webhook callback address: https://example.test/wats/webhooks/whatsapp`
+- a locally generated `WATS_VERIFY_TOKEN` for Meta webhook verification;
+- a locally generated `WATS_SERVICE_TOKEN` for protected WATS service routes;
+- user-side values to copy from Meta/WhatsApp: `WATS_ACCESS_TOKEN`, `WATS_APP_SECRET`, `WATS_WABA_ID`, and `WATS_PHONE_NUMBER_ID`.
+
+The generated tokens are printed to stdout only. The command does not write files, read `.env.local`, resolve existing environment secrets, or call Meta Graph APIs. `--public-url` must be HTTPS, cannot include raw whitespace, credentials, query strings, or fragments, and `--webhook-path` must be an absolute safe path with no traversal segments.
+
 ### `wats config validate <path>`
 
 Loads and validates a JSON/YAML WATS config file through `@switchbord/config` and exits 0 when valid.

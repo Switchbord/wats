@@ -20,7 +20,7 @@ The packages are standard npm registry packages, so Bun can install them with `b
 
 - Ships the WATS TypeScript/Bun foundations: Graph client, endpoint definitions, error taxonomy, pagination, media runtime, template/Flow/calling helpers, read-only business-management inventory, webhook verification/adapters, typed update normalization, filters, router, listeners, and the `WhatsApp` facade.
 - Adds safe app-layer onboarding packages: `@switchbord/config`, `@switchbord/cli`, and `@switchbord/service`.
-- Implements `wats init [dir] --dry-run --format yaml|json --profile <name>` for credential-safe config/env placeholder generation.
+- Implements `wats init [dir] --dry-run --format yaml|json --profile <name>` for credential-safe config/env placeholder generation, plus `wats onboarding --public-url <https URL>` to print the webhook callback address, locally generated verify/service tokens, and the Meta-side credentials the user must provide.
 - Adds public release hygiene from WATS-31, WATS-36A, WATS-83, WATS-84, WATS-85, and WATS-82: `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`, public docs site checks, builds and verifies `dist` package artifacts during release checks, packed-output smoke tests, internal support/private package guards, credential-free release dry-run workflow, credential-free provenance preflight, and first-release readiness documentation, including WATS-82 sanitized public repository gating.
 - Prepares the publication-ready package set at version `0.2.1`: `@switchbord/types`, `@switchbord/crypto`, `@switchbord/graph`, `@switchbord/core`, `@switchbord/http`, `@switchbord/internal-utils`, `@switchbord/config`, `@switchbord/service`, and `@switchbord/cli`.
 
