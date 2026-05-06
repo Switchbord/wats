@@ -5,6 +5,7 @@ import {
   buildSendDocumentPayload,
   buildRemoveReactionPayload,
   buildSendImagePayload,
+  buildSendContactsPayload,
   buildSendLocationPayload,
   buildSendReactionPayload,
   buildSendStickerPayload,
@@ -430,6 +431,17 @@ function createOpenApiSchemas(): Record<string, Record<string, unknown>> {
         { required: ["link"], not: { required: ["mediaId"] } }
       ]
     },
+    ContactsMessageBody: {
+      type: "object",
+      additionalProperties: false,
+      required: ["type", "to", "contacts"],
+      properties: {
+        type: { type: "string", const: "contacts" },
+        to: { type: "string", minLength: 1, description: "WhatsApp recipient phone number or wa_id." },
+        contacts: { type: "array", minItems: 1, items: { type: "object", additionalProperties: true } },
+        replyToMessageId: { type: "string", minLength: 1, description: "Optional message ID to send as a reply context." }
+      }
+    },
     LocationMessageBody: {
       type: "object",
       additionalProperties: false,
@@ -474,9 +486,10 @@ function createOpenApiSchemas(): Record<string, Record<string, unknown>> {
         schemaRef("GenericTextMessageBody"),
         schemaRef("MediaMessageBody"),
         schemaRef("LocationMessageBody"),
+        schemaRef("ContactsMessageBody"),
         schemaRef("ReactionMessageBody")
       ],
-      description: "Supported POST /messages bodies: generic Graph-native text, WATS media composer, location, reaction, or remove-reaction bodies."
+      description: "Supported POST /messages bodies: generic Graph-native text, WATS media composer, location, reaction, remove-reaction, or contacts bodies."
     },
     GraphResponsePassthrough: {
       type: "object",
@@ -578,7 +591,7 @@ export function createWatsServiceOpenApiDocument(
         post: messageOperation("Send a text message", "TextMessageBody")
       },
       [messagesPath]: {
-        post: messageOperation("Send a supported text, media, location, or reaction message body", "SupportedMessageBody")
+        post: messageOperation("Send a supported text, media, location, reaction, or contacts message body", "SupportedMessageBody")
       },
       [OPENAPI_PATH]: {
         get: {
@@ -621,6 +634,7 @@ function validateTextBody(body: unknown): { to: string; text: string; previewUrl
 
 type ServiceMediaMessageKind = "image" | "video" | "audio" | "document" | "sticker";
 type ServiceLocationReactionMessageKind = "location" | "reaction" | "removeReaction";
+type ServiceContactsMessageKind = "contacts";
 
 interface ServiceMediaMessageInput {
   readonly type: ServiceMediaMessageKind;
@@ -641,6 +655,13 @@ interface ServiceLocationReactionMessageInput {
   readonly address?: string;
   readonly messageId?: string;
   readonly emoji?: string;
+  readonly replyToMessageId?: string;
+}
+
+interface ServiceContactsMessageInput {
+  readonly type: ServiceContactsMessageKind;
+  readonly to: string;
+  readonly contacts: readonly Record<string, unknown>[];
   readonly replyToMessageId?: string;
 }
 
@@ -718,6 +739,22 @@ function validateServiceLocationReactionMessageBody(body: unknown): ServiceLocat
   return { type: "removeReaction", to: body.to, messageId: body.messageId };
 }
 
+function validateServiceContactsMessageBody(body: unknown): ServiceContactsMessageInput | null {
+  if (!isRecord(body)) return null;
+  if (body.type !== "contacts") return null;
+  if (!hasOnlyKeys(body, ["type", "to", "contacts", "replyToMessageId"])) return null;
+  if (!isNonEmptyString(body.to)) return null;
+  if (!Array.isArray(body.contacts) || body.contacts.length === 0) return null;
+  if (body.replyToMessageId !== undefined && !isNonEmptyString(body.replyToMessageId)) return null;
+  const out: { type: "contacts"; to: string; contacts: readonly Record<string, unknown>[]; replyToMessageId?: string } = {
+    type: "contacts",
+    to: body.to,
+    contacts: body.contacts as readonly Record<string, unknown>[]
+  };
+  if (body.replyToMessageId !== undefined) out.replyToMessageId = body.replyToMessageId;
+  return out;
+}
+
 function buildServiceMediaMessagePayload(input: ServiceMediaMessageInput): GraphMessagesSendBody {
   switch (input.type) {
     case "image":
@@ -744,14 +781,21 @@ function buildServiceLocationReactionPayload(input: ServiceLocationReactionMessa
   }
 }
 
+function buildServiceContactsPayload(input: ServiceContactsMessageInput): GraphMessagesSendBody {
+  return buildSendContactsPayload(input as unknown as Parameters<typeof buildSendContactsPayload>[0]) as GraphMessagesSendBody;
+}
+
 function buildSupportedMessageBody(body: unknown): GraphMessagesSendBody | null {
   const text = validateGenericTextMessageBody(body);
   if (text !== null) return text;
   const media = validateServiceMediaMessageBody(body);
   const locationReaction = media === null ? validateServiceLocationReactionMessageBody(body) : null;
-  if (media === null && locationReaction === null) return null;
+  const contacts = media === null && locationReaction === null ? validateServiceContactsMessageBody(body) : null;
+  if (media === null && locationReaction === null && contacts === null) return null;
   try {
-    return media !== null ? buildServiceMediaMessagePayload(media) : buildServiceLocationReactionPayload(locationReaction as ServiceLocationReactionMessageInput);
+    if (media !== null) return buildServiceMediaMessagePayload(media);
+    if (locationReaction !== null) return buildServiceLocationReactionPayload(locationReaction);
+    return buildServiceContactsPayload(contacts as ServiceContactsMessageInput);
   } catch (error) {
     if (error instanceof GraphRequestValidationError) return null;
     throw error;

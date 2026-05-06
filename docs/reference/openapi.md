@@ -8,7 +8,7 @@
 
 `@switchbord/service` can generate and serve an OpenAPI 3.1 document for the standalone WATS service API that exists today.
 
-This is not a Meta Graph API OpenAPI document. It describes only WATS service routes: status checks, configured webhook ingress, the current text, media, location, and reaction service APIs, and `/openapi.json`.
+This is not a Meta Graph API OpenAPI document. It describes only WATS service routes: status checks, configured webhook ingress, the current text, media, location, reaction, and contacts service APIs, and `/openapi.json`.
 
 ## Public API
 
@@ -113,8 +113,9 @@ The document includes JSON schemas for:
 - `GenericTextMessageBody`: generic Graph-native text body for `POST {apiPrefix}/messages`
 - `MediaMessageBody`: WATS media composer bodies for image, video, audio, document, and sticker messages
 - `LocationMessageBody`: WATS location composer body for `POST {apiPrefix}/messages`
+- `ContactsMessageBody`: WATS contacts composer body for `POST {apiPrefix}/messages`
 - `ReactionMessageBody`: WATS reaction/remove-reaction composer bodies for `POST {apiPrefix}/messages`
-- `SupportedMessageBody`: `oneOf` wrapper for text, media, location, or reaction bodies on `POST {apiPrefix}/messages`
+- `SupportedMessageBody`: `oneOf` wrapper for text, media, location, contacts, or reaction bodies on `POST {apiPrefix}/messages`
 - `GraphResponsePassthrough`: open object for unmodified Graph JSON responses
 - webhook response helpers for the verify challenge and accepted dispatch envelope
 
@@ -123,10 +124,10 @@ The document includes JSON schemas for:
 | Route | Accepted body | Rejected body classes | Size limit |
 | --- | --- | --- | --- |
 | `POST {apiPrefix}/messages/text` | JSON object with non-empty `to`, non-empty `text`, optional boolean `previewUrl` | malformed JSON, arrays, primitives, missing fields, blank/control-character `to` or `text`, non-boolean `previewUrl` | no service-layer byte cap yet |
-| `POST {apiPrefix}/messages` | Generic Graph-native text, media composer body, location composer body, or reaction/remove-reaction composer body | malformed JSON, arrays, primitives, unsupported message types, missing fields, blank/control-character strings, both/missing media references, caption on audio/sticker, filename outside document, invalid links, out-of-range/non-finite coordinates, invalid reaction message ids or emoji | no service-layer byte cap yet |
+| `POST {apiPrefix}/messages` | Generic Graph-native text, media composer body, location composer body, contacts composer body, or reaction/remove-reaction composer body | malformed JSON, arrays, primitives, unsupported message types, missing fields, blank/control-character strings, both/missing media references, caption on audio/sticker, filename outside document, invalid links, out-of-range/non-finite coordinates, invalid reaction message ids or emoji | no service-layer byte cap yet |
 | `POST profile.webhook.path` | Signed Meta webhook JSON delegated to `@switchbord/http` | malformed JSON/signature/envelope per WebhookAdapter taxonomy | `profile.webhook.maxBodyBytes`, default `1_048_576` |
 
-Contacts and interactive service message schemas remain follow-up WATS-73 slices.
+Interactive service message schemas remain a follow-up WATS-73 slice.
 
 ## Error taxonomy
 
@@ -149,7 +150,7 @@ Common OpenAPI-related HTTP statuses:
 The WATS service OpenAPI surface still does not add:
 
 - a full Meta Graph API OpenAPI document
-- contacts and interactive message request schemas beyond the current WATS-73 media/location/reaction slices
+- interactive message request schemas beyond the current WATS-73 media/location/reaction/contacts slices
 - live Meta credential checks or WABA mutations
 
 WATS-36A adds a separate static Scalar UI page at [`reference/openapi-ui.md`](./openapi-ui.md) that renders this local service OpenAPI document; it does not change the generated OpenAPI scope.
