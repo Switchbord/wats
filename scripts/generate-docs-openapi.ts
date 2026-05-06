@@ -22,7 +22,7 @@ const FORBIDDEN_OPENAPI_STRINGS = [
 
 const profile: WatsProfileConfig = Object.freeze({
   graph: Object.freeze({
-    apiVersion: "v21.0",
+    apiVersion: "v25.0",
     baseUrl: "https://graph.facebook.com"
   }),
   whatsapp: Object.freeze({

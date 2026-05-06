@@ -33,7 +33,7 @@ type MockHandle = ReturnType<typeof createMockTransport>;
 function buildClient(handle: MockHandle): GraphClient {
   return new GraphClient({
     accessToken: "test-token",
-    apiVersion: "v20.0",
+    apiVersion: "v25.0",
     baseUrl: "https://graph.facebook.com",
     transport: handle.transport as Transport
   });
@@ -72,7 +72,7 @@ async function expectMultipartUploadRequest(
   expectedFileText: string
 ): Promise<void> {
   expect(req.method).toBe("POST");
-  expect(req.url).toBe("https://graph.facebook.com/v20.0/555000111/media");
+  expect(req.url).toBe("https://graph.facebook.com/v25.0/555000111/media");
   expect(req.headers.get("authorization")).toBe("Bearer test-token");
   const contentType = req.headers.get("content-type") ?? "";
   expect(contentType).toMatch(/^multipart\/form-data; boundary=[A-Za-z0-9_.-]+$/);
@@ -572,7 +572,7 @@ describe("WATS-37 downloadMedia metadata runtime", () => {
     });
     expect(handle.requests.length).toBe(1);
     expect(handle.requests[0]!.method).toBe("GET");
-    expect(handle.requests[0]!.url).toBe("https://graph.facebook.com/v20.0/media123");
+    expect(handle.requests[0]!.url).toBe("https://graph.facebook.com/v25.0/media123");
     expect(handle.requests[0]!.body).toBeNull();
   });
 
@@ -642,7 +642,7 @@ describe("WATS-37 deleteMedia runtime", () => {
     expect(result).toEqual({ success: true });
     expect(handle.requests.length).toBe(1);
     expect(handle.requests[0]!.method).toBe("DELETE");
-    expect(handle.requests[0]!.url).toBe("https://graph.facebook.com/v20.0/media123");
+    expect(handle.requests[0]!.url).toBe("https://graph.facebook.com/v25.0/media123");
     expect(handle.requests[0]!.body).toBeNull();
   });
 
@@ -719,7 +719,7 @@ describe("WATS-37 downloadMediaBytes runtime", () => {
     };
     const client = new GraphClient({
       accessToken: "test-token",
-      apiVersion: "v20.0",
+      apiVersion: "v25.0",
       baseUrl: "https://graph.facebook.com",
       transport
     });
@@ -767,7 +767,7 @@ describe("WATS-37 downloadMediaBytes runtime", () => {
     };
     const client = new GraphClient({
       accessToken: "test-token",
-      apiVersion: "v20.0",
+      apiVersion: "v25.0",
       baseUrl: "https://graph.facebook.com",
       transport
     });
@@ -800,7 +800,7 @@ describe("WATS-37 downloadMediaBytes runtime", () => {
     };
     const client = new GraphClient({
       accessToken: "test-token",
-      apiVersion: "v20.0",
+      apiVersion: "v25.0",
       baseUrl: "https://graph.facebook.com",
       transport
     });
@@ -989,7 +989,7 @@ describe("WATS-37 resumable upload sessions", () => {
     expect(handle.requests.length).toBe(1);
     expect(handle.requests[0]!.method).toBe("POST");
     const reqUrl = new URL(handle.requests[0]!.url);
-    expect(`${reqUrl.origin}${reqUrl.pathname}`).toBe("https://graph.facebook.com/v20.0/1234567890/uploads");
+    expect(`${reqUrl.origin}${reqUrl.pathname}`).toBe("https://graph.facebook.com/v25.0/1234567890/uploads");
     expect(reqUrl.searchParams.get("file_name")).toBe("résumé final.pdf");
     expect(reqUrl.searchParams.get("file_length")).toBe("1234");
     expect(reqUrl.searchParams.get("file_type")).toBe("application/pdf");
@@ -1033,7 +1033,7 @@ describe("WATS-37 resumable upload sessions", () => {
 
     expect(result).toEqual({ id: "upload:session:1", fileOffset: 42 });
     expect(handle.requests[0]!.method).toBe("GET");
-    expect(handle.requests[0]!.url).toBe("https://graph.facebook.com/v20.0/upload%3Asession%3A1");
+    expect(handle.requests[0]!.url).toBe("https://graph.facebook.com/v25.0/upload%3Asession%3A1");
   });
 
   test("uploadFileToSession supports Uint8Array, ArrayBuffer, Blob, and ReadableStream bodies", async () => {
@@ -1059,7 +1059,7 @@ describe("WATS-37 resumable upload sessions", () => {
       expect(result).toEqual({ h: `handle-${label}` });
       expect(handle.requests.length).toBe(1);
       expect(handle.requests[0]!.method).toBe("POST");
-      expect(handle.requests[0]!.url).toBe("https://graph.facebook.com/v20.0/upload%3Asession%3A1");
+      expect(handle.requests[0]!.url).toBe("https://graph.facebook.com/v25.0/upload%3Asession%3A1");
       expect(handle.requests[0]!.headers.get("file_offset")).toBe("2");
       if (contentLength !== undefined) {
         expect(handle.requests[0]!.headers.get("content-length")).toBe(String(contentLength));
@@ -1105,7 +1105,7 @@ describe("WATS-37 resumable upload sessions", () => {
     };
     const client = new GraphClient({
       accessToken: "test-token",
-      apiVersion: "v20.0",
+      apiVersion: "v25.0",
       baseUrl: "https://graph.facebook.com",
       transport
     });
@@ -1154,7 +1154,7 @@ describe("WATS-37 resumable upload sessions", () => {
     };
     const client = new GraphClient({
       accessToken: "test-token",
-      apiVersion: "v20.0",
+      apiVersion: "v25.0",
       baseUrl: "https://graph.facebook.com",
       transport
     });

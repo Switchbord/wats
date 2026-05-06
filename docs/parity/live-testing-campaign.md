@@ -46,7 +46,7 @@ Baseline environment placeholders:
 ```text
 WATS_LIVE_ENABLE=1
 WATS_GRAPH_BASE_URL=https://graph.facebook.com
-WATS_GRAPH_API_VERSION=v21.0
+WATS_GRAPH_API_VERSION=v25.0
 WATS_ACCESS_TOKEN=<redacted>
 WATS_WABA_ID=<redacted>
 WATS_PHONE_NUMBER_ID=<redacted>

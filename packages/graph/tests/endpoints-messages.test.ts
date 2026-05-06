@@ -35,7 +35,7 @@ function clientWith(
   );
   const client = new GraphClient({
     baseUrl: "https://graph.facebook.com",
-    apiVersion: "v20.0",
+    apiVersion: "v25.0",
     accessToken: "test-token",
     transport: handle.transport
   });
@@ -67,7 +67,7 @@ describe("F-6 sendMessage (endpoint-registry form)", () => {
     const rec = handle.requests[0];
     expect(rec?.method).toBe("POST");
     expect(rec?.url).toBe(
-      "https://graph.facebook.com/v20.0/123/messages"
+      "https://graph.facebook.com/v25.0/123/messages"
     );
     expect(rec?.headers.get("authorization")).toBe("Bearer test-token");
     expect(rec?.headers.get("content-type")).toBe("application/json");
@@ -137,7 +137,7 @@ describe("F-6 GraphMessagesEndpoint class (backward-compat)", () => {
     const rec = handle.requests[0];
     expect(rec?.method).toBe("POST");
     expect(rec?.url).toBe(
-      "https://graph.facebook.com/v20.0/123/messages"
+      "https://graph.facebook.com/v25.0/123/messages"
     );
     expect(rec?.headers.get("content-type")).toBe("application/json");
     const parsed = JSON.parse(String(rec?.body)) as {

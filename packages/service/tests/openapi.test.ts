@@ -11,7 +11,7 @@ import { createMockTransport } from "@switchbord/graph/testing";
 
 function profile(overrides: Partial<WatsProfileConfig> = {}): WatsProfileConfig {
   return {
-    graph: { apiVersion: "v21.0", baseUrl: "https://graph.test/root/" },
+    graph: { apiVersion: "v25.0", baseUrl: "https://graph.test/root/" },
     whatsapp: { wabaId: "123456789012345", phoneNumberId: "15551234567" },
     auth: { accessToken: { env: "WATS_ACCESS_TOKEN" } },
     webhook: {

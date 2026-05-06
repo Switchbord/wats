@@ -35,7 +35,7 @@ function clientWith(
   );
   const client = new GraphClient({
     baseUrl: "https://graph.facebook.com",
-    apiVersion: "v20.0",
+    apiVersion: "v25.0",
     accessToken: "test-token",
     transport: handle.transport
   });
@@ -352,7 +352,7 @@ describe("F-6 defineEndpoint call-time validation", () => {
     await ep(client, {});
     expect(handle.requests.length).toBe(1);
     const url = handle.requests[0]?.url ?? "";
-    expect(url).toBe("https://graph.facebook.com/v20.0/feed");
+    expect(url).toBe("https://graph.facebook.com/v25.0/feed");
   });
 
   test("query param with CR/LF rejected", async () => {
@@ -394,7 +394,7 @@ describe("F-6 defineEndpoint call-time validation", () => {
     const rec = handle.requests[0];
     expect(rec?.method).toBe("POST");
     expect(rec?.url).toBe(
-      "https://graph.facebook.com/v20.0/123/messages"
+      "https://graph.facebook.com/v25.0/123/messages"
     );
     expect(rec?.headers.get("content-type")).toBe("application/json");
     expect(rec?.body).toBe(JSON.stringify({ a: 1, b: "x" }));
@@ -471,7 +471,7 @@ describe("F-6 defineEndpoint call-time validation", () => {
     };
     const client = new GraphClient({
       baseUrl: "https://graph.facebook.com",
-      apiVersion: "v20.0",
+      apiVersion: "v25.0",
       accessToken: "test-token",
       transport: transport as unknown as import("../src/transport").Transport
     });
@@ -553,7 +553,7 @@ describe("F-6 defineEndpoint integration with GraphClient + F-5 registry", () =>
     const rec = handle.requests[0];
     expect(rec?.method).toBe("POST");
     expect(rec?.url).toBe(
-      "https://graph.facebook.com/v20.0/123/messages"
+      "https://graph.facebook.com/v25.0/123/messages"
     );
     expect(rec?.headers.get("authorization")).toBe("Bearer test-token");
     expect(rec?.headers.get("content-type")).toBe("application/json");

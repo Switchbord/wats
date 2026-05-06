@@ -25,7 +25,7 @@ const transport = createMockTransport({
 
 const graph = new GraphClient({
   accessToken: process.env.WATS_ACCESS_TOKEN ?? "offline",
-  apiVersion: "v21.0",
+  apiVersion: "v25.0",
   baseUrl: "https://graph.test/",
   transport: transport.transport
 });

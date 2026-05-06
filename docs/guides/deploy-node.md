@@ -28,7 +28,7 @@ import { WhatsApp, message } from "@switchbord/core";
 
 const graphClient = new GraphClient({
   accessToken: process.env.META_ACCESS_TOKEN!,
-  apiVersion: "v21.0",
+  apiVersion: "v25.0",
   transport: createFetchTransport()
 });
 

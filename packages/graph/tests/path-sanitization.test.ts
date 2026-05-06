@@ -22,7 +22,7 @@ function makeClient(): { client: GraphClient; handle: ReturnType<typeof createMo
   });
   const client = new GraphClient({
     accessToken: "t",
-    apiVersion: "v20.0",
+    apiVersion: "v25.0",
     baseUrl: "https://graph.facebook.com",
     transport: handle.transport
   });

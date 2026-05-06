@@ -50,7 +50,7 @@ const handle = createMockTransport({
 
 const client = new GraphClient({
   accessToken: "test-token",
-  apiVersion: "v20.0",
+  apiVersion: "v25.0",
   baseUrl: "https://graph.facebook.com",
   transport: handle.transport
 });
@@ -64,7 +64,7 @@ const res = await client.messages.sendMessage({
 // Assert on the recorded request — method/url/headers/body — verbatim.
 expect(handle.requests.length).toBe(1);
 expect(handle.requests[0]?.url).toBe(
-  "https://graph.facebook.com/v20.0/123/messages"
+  "https://graph.facebook.com/v25.0/123/messages"
 );
 expect(handle.requests[0]?.headers.get("authorization")).toBe("Bearer test-token");
 ```
@@ -124,7 +124,7 @@ const base = createFetchTransport();
 const retry = createRetryingTransport(base, { retries: 3, baseDelayMs: 200 });
 const client = new GraphClient({
   accessToken: token,
-  apiVersion: "v20.0",
+  apiVersion: "v25.0",
   transport: retry
 });
 ```

@@ -43,7 +43,7 @@ function makeGraphClient(): GraphClient {
   });
   return new GraphClient({
     accessToken: "token-AAA",
-    apiVersion: "v21.0",
+    apiVersion: "v25.0",
     transport: handle.transport
   });
 }
@@ -62,7 +62,7 @@ function makeGraphClientWithHandle(): {
   return {
     graphClient: new GraphClient({
       accessToken: "token-AAA",
-      apiVersion: "v21.0",
+      apiVersion: "v25.0",
       transport: handle.transport
     }),
     handle
@@ -241,7 +241,7 @@ describe("WATS-30 WhatsApp.startChat", () => {
     );
     expect(handle.requests.length).toBe(1);
     expect(handle.requests[0]?.url).toBe(
-      "https://graph.facebook.com/v21.0/1234567890/messages"
+      "https://graph.facebook.com/v25.0/1234567890/messages"
     );
     const body = JSON.parse(String(handle.requests[0]?.body)) as {
       messaging_product: string;
@@ -387,7 +387,7 @@ describe("WATS-38 WhatsApp outbound media helpers", () => {
       );
       expect(handle.requests.length).toBe(1);
       expect(handle.requests[0]?.url).toBe(
-        "https://graph.facebook.com/v21.0/1234567890/messages"
+        "https://graph.facebook.com/v25.0/1234567890/messages"
       );
       expect(JSON.parse(String(handle.requests[0]?.body))).toEqual(c.expected);
     }
@@ -691,7 +691,7 @@ describe("WATS-38 remaining WhatsApp facade composer helpers", () => {
       const wa = new WhatsApp({ graphClient, phoneNumberId: "1234567890" });
       const res = await facadeMethodOf(wa, c.method)(c.input);
       expect((res as { messages?: Array<{ id: string }>; success?: boolean }).messages?.[0]?.id ?? (res as { success?: boolean }).success).toBeTruthy();
-      expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v21.0/1234567890/messages");
+      expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v25.0/1234567890/messages");
       const body = JSON.parse(String(handle.requests[0]?.body)) as { type?: string; status?: string };
       if (c.expectedType !== undefined) expect(body.type).toBe(c.expectedType);
       else expect(body.status).toBe("read");

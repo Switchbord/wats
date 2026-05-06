@@ -35,7 +35,7 @@ function clientWith(
   );
   const client = new GraphClient({
     baseUrl: "https://graph.facebook.com",
-    apiVersion: "v20.0",
+    apiVersion: "v25.0",
     accessToken: "test-token",
     transport: handle.transport
   });
@@ -198,7 +198,7 @@ describe("WATS-60 PhoneNumberClient optional params validation", () => {
 
     await pnc.getInfo({ phoneNumberId: "OVERRIDE", fields: undefined } as never);
 
-    expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v20.0/BOUND-PHONE");
+    expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v25.0/BOUND-PHONE");
   });
 });
 
@@ -256,7 +256,7 @@ describe("F-7 PhoneNumberClient.sendMessage round-trip", () => {
       text: { body: "x" }
     });
     expect(handle.requests[0]?.url).toBe(
-      "https://graph.facebook.com/v20.0/987/messages"
+      "https://graph.facebook.com/v25.0/987/messages"
     );
   });
 
@@ -309,7 +309,7 @@ describe("F-7 PhoneNumberClient.sendMessage round-trip", () => {
     });
     const client = new GraphClient({
       baseUrl: "https://graph.facebook.com",
-      apiVersion: "v20.0",
+      apiVersion: "v25.0",
       accessToken: "t",
       transport: handle.transport
     });
@@ -459,7 +459,7 @@ describe("WATS-38 PhoneNumberClient outbound media helpers", () => {
       );
       expect(handle.requests.length).toBe(1);
       expect(handle.requests[0]?.method).toBe("POST");
-      expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v20.0/123/messages");
+      expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v25.0/123/messages");
       expect(JSON.parse(String(handle.requests[0]?.body))).toEqual(c.expected);
     }
   });
@@ -551,7 +551,7 @@ describe("WATS-30 PhoneNumberClient.sendText", () => {
     expect(handle.requests.length).toBe(1);
     const req = handle.requests[0];
     expect(req?.method).toBe("POST");
-    expect(req?.url).toBe("https://graph.facebook.com/v20.0/123/messages");
+    expect(req?.url).toBe("https://graph.facebook.com/v25.0/123/messages");
     const body = JSON.parse(String(req?.body)) as {
       messaging_product: string;
       to: string;
@@ -835,7 +835,7 @@ describe("WATS-38 remaining PhoneNumberClient composer helpers", () => {
       await methodOf(pnc, c.method)(c.input);
       expect(handle.requests.length).toBe(1);
       expect(handle.requests[0]?.method).toBe("POST");
-      expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v20.0/123/messages");
+      expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v25.0/123/messages");
       expect(JSON.parse(String(handle.requests[0]?.body))).toEqual(c.expected);
     }
   });

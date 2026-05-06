@@ -480,7 +480,7 @@ function parseInitArgs(args: readonly string[]): InitArgs {
 
 function initConfigObject(profileName: string): WatsConfig {
   const profile = Object.freeze({
-    graph: Object.freeze({ apiVersion: "v21.0", baseUrl: "https://graph.facebook.com" }),
+    graph: Object.freeze({ apiVersion: "v25.0", baseUrl: "https://graph.facebook.com" }),
     whatsapp: Object.freeze({ wabaId: "000000000000000", phoneNumberId: "00000000000" }),
     auth: Object.freeze({ accessToken: Object.freeze({ env: "WATS_ACCESS_TOKEN" }) }),
     webhook: Object.freeze({

@@ -10,7 +10,7 @@ import {
 
 function profile(overrides: Partial<WatsProfileConfig> = {}): WatsProfileConfig {
   return {
-    graph: { apiVersion: "v21.0", baseUrl: "https://graph.test/root/" },
+    graph: { apiVersion: "v25.0", baseUrl: "https://graph.test/root/" },
     whatsapp: { wabaId: "123456789012345", phoneNumberId: "15551234567" },
     auth: { accessToken: { env: "WATS_ACCESS_TOKEN" } },
     webhook: {
@@ -206,7 +206,7 @@ describe("WATS-34 service bearer auth and message APIs", () => {
     expect(mock.requests.length).toBe(1);
     const req = mock.requests[0]!;
     expect(req.method).toBe("POST");
-    expect(req.url).toContain("/root/v21.0/15551234567/messages");
+    expect(req.url).toContain("/root/v25.0/15551234567/messages");
     expect(req.headers.get("authorization")).toBe("Bearer graph-access-token");
     expect(req.headers.get("authorization")).not.toBe("Bearer service-bearer");
     expect(JSON.parse(String(req.body))).toEqual({
@@ -308,7 +308,7 @@ describe("WATS-34 service bearer auth and message APIs", () => {
       expect(mock.requests.length, testCase.label).toBe(1);
       const req = mock.requests[0]!;
       expect(req.method, testCase.label).toBe("POST");
-      expect(req.url, testCase.label).toContain("/root/v21.0/15551234567/messages");
+      expect(req.url, testCase.label).toContain("/root/v25.0/15551234567/messages");
       expect(req.headers.get("authorization"), testCase.label).toBe("Bearer graph-access-token");
       expect(req.headers.get("authorization"), testCase.label).not.toBe("Bearer service-bearer");
       expect(JSON.parse(String(req.body)), testCase.label).toEqual(testCase.expected);
@@ -402,7 +402,7 @@ describe("WATS-34 service bearer auth and message APIs", () => {
       expect(mock.requests.length, testCase.label).toBe(1);
       const req = mock.requests[0]!;
       expect(req.method, testCase.label).toBe("POST");
-      expect(req.url, testCase.label).toContain("/root/v21.0/15551234567/messages");
+      expect(req.url, testCase.label).toContain("/root/v25.0/15551234567/messages");
       expect(req.headers.get("authorization"), testCase.label).toBe("Bearer graph-access-token");
       expect(req.headers.get("authorization"), testCase.label).not.toBe("Bearer service-bearer");
       expect(JSON.parse(String(req.body)), testCase.label).toEqual(testCase.expected);
@@ -462,7 +462,7 @@ describe("WATS-34 service bearer auth and message APIs", () => {
     expect(mock.requests.length).toBe(1);
     const req = mock.requests[0]!;
     expect(req.method).toBe("POST");
-    expect(req.url).toContain("/root/v21.0/15551234567/messages");
+    expect(req.url).toContain("/root/v25.0/15551234567/messages");
     expect(req.headers.get("authorization")).toBe("Bearer graph-access-token");
     expect(req.headers.get("authorization")).not.toBe("Bearer service-bearer");
     expect(JSON.parse(String(req.body))).toEqual({

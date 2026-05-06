@@ -39,7 +39,7 @@ function clientWith(responses: MockTransportResponseSpec[] | MockTransportRespon
   );
   const client = new GraphClient({
     baseUrl: "https://graph.facebook.com",
-    apiVersion: "v20.0",
+    apiVersion: "v25.0",
     accessToken: "test-token",
     transport: handle.transport
   });
@@ -129,13 +129,13 @@ describe("WATS-42A read-only business/admin endpoint callables", () => {
     expect(profile.data?.[0]?.about).toBe("hello");
     expect(commerce.data?.[0]?.is_cart_enabled).toBe(true);
     expect(handle.requests.map((r) => `${r.method} ${r.url}`)).toEqual([
-      "GET https://graph.facebook.com/v20.0/waba-1?fields=id%2Cname%2Cbusiness_verification_status",
-      "GET https://graph.facebook.com/v20.0/waba-1/subscribed_apps",
-      "GET https://graph.facebook.com/v20.0/waba-1/phone_numbers?fields=id%2Cdisplay_phone_number%2Cquality_rating&limit=25&after=AFTER&before=BEFORE",
-      "GET https://graph.facebook.com/v20.0/pn-1?fields=id%2Cdisplay_phone_number%2Cquality_rating",
-      "GET https://graph.facebook.com/v20.0/pn-1/settings?fields=calling&include_sip_credentials=true",
-      "GET https://graph.facebook.com/v20.0/pn-1/whatsapp_business_profile?fields=about%2Caddress%2Cwebsites",
-      "GET https://graph.facebook.com/v20.0/pn-1/whatsapp_commerce_settings?fields=is_cart_enabled%2Cis_catalog_visible"
+      "GET https://graph.facebook.com/v25.0/waba-1?fields=id%2Cname%2Cbusiness_verification_status",
+      "GET https://graph.facebook.com/v25.0/waba-1/subscribed_apps",
+      "GET https://graph.facebook.com/v25.0/waba-1/phone_numbers?fields=id%2Cdisplay_phone_number%2Cquality_rating&limit=25&after=AFTER&before=BEFORE",
+      "GET https://graph.facebook.com/v25.0/pn-1?fields=id%2Cdisplay_phone_number%2Cquality_rating",
+      "GET https://graph.facebook.com/v25.0/pn-1/settings?fields=calling&include_sip_credentials=true",
+      "GET https://graph.facebook.com/v25.0/pn-1/whatsapp_business_profile?fields=about%2Caddress%2Cwebsites",
+      "GET https://graph.facebook.com/v25.0/pn-1/whatsapp_commerce_settings?fields=is_cart_enabled%2Cis_catalog_visible"
     ]);
   });
 
@@ -144,8 +144,8 @@ describe("WATS-42A read-only business/admin endpoint callables", () => {
     await getPhoneNumberSettings(client, { phoneNumberId: "pn-1" });
     await getPhoneNumberSettings(client, { phoneNumberId: "pn-1", includeSipCredentials: false });
     expect(handle.requests.map((r) => r.url)).toEqual([
-      "https://graph.facebook.com/v20.0/pn-1/settings",
-      "https://graph.facebook.com/v20.0/pn-1/settings?include_sip_credentials=false"
+      "https://graph.facebook.com/v25.0/pn-1/settings",
+      "https://graph.facebook.com/v25.0/pn-1/settings?include_sip_credentials=false"
     ]);
   });
 });
@@ -173,13 +173,13 @@ describe("WATS-42A scoped WABAClient and PhoneNumberClient methods", () => {
     await phone.getCommerceSettings({ phoneNumberId: "OVERRIDE", fields: ["is_cart_enabled"] } as never);
 
     expect(handle.requests.map((r) => r.url)).toEqual([
-      "https://graph.facebook.com/v20.0/BOUND-WABA?fields=id",
-      "https://graph.facebook.com/v20.0/BOUND-WABA/subscribed_apps",
-      "https://graph.facebook.com/v20.0/BOUND-WABA/phone_numbers?limit=5",
-      "https://graph.facebook.com/v20.0/BOUND-PHONE?fields=id",
-      "https://graph.facebook.com/v20.0/BOUND-PHONE/settings?include_sip_credentials=true",
-      "https://graph.facebook.com/v20.0/BOUND-PHONE/whatsapp_business_profile?fields=about",
-      "https://graph.facebook.com/v20.0/BOUND-PHONE/whatsapp_commerce_settings?fields=is_cart_enabled"
+      "https://graph.facebook.com/v25.0/BOUND-WABA?fields=id",
+      "https://graph.facebook.com/v25.0/BOUND-WABA/subscribed_apps",
+      "https://graph.facebook.com/v25.0/BOUND-WABA/phone_numbers?limit=5",
+      "https://graph.facebook.com/v25.0/BOUND-PHONE?fields=id",
+      "https://graph.facebook.com/v25.0/BOUND-PHONE/settings?include_sip_credentials=true",
+      "https://graph.facebook.com/v25.0/BOUND-PHONE/whatsapp_business_profile?fields=about",
+      "https://graph.facebook.com/v25.0/BOUND-PHONE/whatsapp_commerce_settings?fields=is_cart_enabled"
     ]);
   });
 
@@ -368,7 +368,7 @@ describe("WATS-42A request-shape validation and fail-closed sanitization", () =>
     const fields = ["id", "name"];
     await getWabaInfo(client, { wabaId: "waba-1", fields });
     fields[0] = "MUTATED";
-    expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v20.0/waba-1?fields=id%2Cname");
+    expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v25.0/waba-1?fields=id%2Cname");
 
     const sparse = ["id", , "name"] as unknown[];
     const accessorArray = ["id"] as unknown[];

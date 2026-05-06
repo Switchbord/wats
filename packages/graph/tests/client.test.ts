@@ -29,7 +29,7 @@ function clientWith(responses: MockTransportResponseSpec[] | MockTransportRespon
   );
   const client = new GraphClient({
     baseUrl: "https://graph.facebook.com",
-    apiVersion: "v20.0",
+    apiVersion: "v25.0",
     accessToken: "test-token",
     transport: handle.transport
   });
@@ -135,7 +135,7 @@ describe("B2 graph client primitive", () => {
 
     const rec = handle.requests[0];
     expect(rec?.url).toBe(
-      "https://graph.facebook.com/v20.0/123/messages?debug=true"
+      "https://graph.facebook.com/v25.0/123/messages?debug=true"
     );
     expect(rec?.method).toBe("POST");
     expect(rec?.headers.get("authorization")).toBe("Bearer test-token");
@@ -224,7 +224,7 @@ describe("B2 graph client primitive", () => {
     const handle = createMockTransport({ fail: new Error("socket hang up") });
     const client = new GraphClient({
       baseUrl: "https://graph.facebook.com",
-      apiVersion: "v20.0",
+      apiVersion: "v25.0",
       accessToken: "test-token",
       transport: handle.transport
     });
@@ -337,7 +337,7 @@ describe("B2 graph client primitive", () => {
 
     expect(handle.requests.length).toBe(1);
     expect(handle.requests[0]?.url).toBe(
-      "https://graph.facebook.com/v20.0/123/messages"
+      "https://graph.facebook.com/v25.0/123/messages"
     );
 
     const requestBody = JSON.parse(String(handle.requests[0]?.body)) as {
@@ -455,7 +455,7 @@ describe("F-4 GraphClient construction-time validation", () => {
   }> = {}): () => GraphClient {
     const base = {
       accessToken: "test-token",
-      apiVersion: "v20.0",
+      apiVersion: "v25.0",
       baseUrl: "https://graph.facebook.com"
     };
     const merged = { ...base, ...overrides };
@@ -492,11 +492,11 @@ describe("F-4 GraphClient construction-time validation", () => {
       "",
       "20.0",
       "v",
-      "v20.0/foo",
-      "v20.0?x=1",
-      "v20.0#frag",
+      "v25.0/foo",
+      "v25.0?x=1",
+      "v25.0#frag",
       "v..20",
-      "v20.0\n"
+      "v25.0\n"
     ]) {
       expect(build({ apiVersion: v }), `apiVersion ${JSON.stringify(v)}`)
         .toThrow(GraphRequestValidationError);
@@ -505,7 +505,7 @@ describe("F-4 GraphClient construction-time validation", () => {
 
   test("accepts canonical apiVersion shapes", () => {
     expect(build({ apiVersion: "v20" })).not.toThrow();
-    expect(build({ apiVersion: "v20.0" })).not.toThrow();
+    expect(build({ apiVersion: "v25.0" })).not.toThrow();
     expect(build({ apiVersion: "v1.2" })).not.toThrow();
   });
 
@@ -525,14 +525,14 @@ describe("F-4 GraphClient construction-time validation", () => {
     });
     const client = new GraphClient({
       accessToken: "t",
-      apiVersion: "v20.0",
+      apiVersion: "v25.0",
       baseUrl: "https://proxy.example.com/api",
       transport: handle.transport
     });
     await client.request({ method: "GET", path: "/me" });
     expect(handle.requests.length).toBe(1);
     expect(handle.requests[0]?.url).toBe(
-      "https://proxy.example.com/api/v20.0/me"
+      "https://proxy.example.com/api/v25.0/me"
     );
   });
 
@@ -546,13 +546,13 @@ describe("F-4 GraphClient construction-time validation", () => {
     });
     const client = new GraphClient({
       accessToken: "t",
-      apiVersion: "v20.0",
+      apiVersion: "v25.0",
       baseUrl: "https://proxy.example.com/tenant/42/graph/",
       transport: handle.transport
     });
     await client.request({ method: "GET", path: "/me" });
     expect(handle.requests[0]?.url).toBe(
-      "https://proxy.example.com/tenant/42/graph/v20.0/me"
+      "https://proxy.example.com/tenant/42/graph/v25.0/me"
     );
   });
 
@@ -603,7 +603,7 @@ describe("F-4 remediation: baseUrl protocol allowlist", () => {
     return () =>
       new GraphClient({
         accessToken: "t",
-        apiVersion: "v20.0",
+        apiVersion: "v25.0",
         baseUrl
       });
   }
@@ -642,7 +642,7 @@ describe("F-4 remediation: baseUrl protocol allowlist", () => {
       () =>
         new GraphClient({
           accessToken: "   ",
-          apiVersion: "v20.0",
+          apiVersion: "v25.0",
           baseUrl: "https://graph.facebook.com"
         })
     ).toThrow(GraphRequestValidationError);
@@ -650,7 +650,7 @@ describe("F-4 remediation: baseUrl protocol allowlist", () => {
       () =>
         new GraphClient({
           accessToken: "\t\t",
-          apiVersion: "v20.0",
+          apiVersion: "v25.0",
           baseUrl: "https://graph.facebook.com"
         })
     ).toThrow(GraphRequestValidationError);
@@ -756,7 +756,7 @@ describe("WATS-37 GraphClient.requestRaw validation", () => {
     expect(handle.requests.length).toBe(1);
     const rec = handle.requests[0];
     expect(rec?.url).toBe("https://lookaside.example.test/media/abc?token=resolved");
-    expect(rec?.url).not.toContain("/v20.0/");
+    expect(rec?.url).not.toContain("/v25.0/");
     expect(rec?.method).toBe("GET");
     expect(rec?.headers.get("authorization")).toBe("Bearer test-token");
   });

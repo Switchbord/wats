@@ -78,7 +78,7 @@ function validConfig(): JsonRecord {
     defaultProfile: "local",
     profiles: {
       local: {
-        graph: { apiVersion: "v21.0", baseUrl: "https://graph.facebook.com" },
+        graph: { apiVersion: "v25.0", baseUrl: "https://graph.facebook.com" },
         whatsapp: { wabaId: "123456789012345", phoneNumberId: "15551234567" },
         auth: { accessToken: { env: "WATS_ACCESS_TOKEN" } },
         webhook: {
@@ -95,7 +95,7 @@ function validConfig(): JsonRecord {
         }
       },
       alternate: {
-        graph: { apiVersion: "v21.0", baseUrl: "https://graph.facebook.com" },
+        graph: { apiVersion: "v25.0", baseUrl: "https://graph.facebook.com" },
         whatsapp: { wabaId: "999999999999999", phoneNumberId: "19998887777" },
         auth: { accessToken: { env: "WATS_ACCESS_TOKEN" } },
         webhook: {

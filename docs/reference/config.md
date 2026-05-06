@@ -28,7 +28,7 @@ defaultProfile: local
 profiles:
   local:
     graph:
-      apiVersion: v21.0
+      apiVersion: v25.0
       baseUrl: https://graph.facebook.com
     whatsapp:
       wabaId: "1234567890"
@@ -125,7 +125,7 @@ Use this for logs, diagnostics, and `wats config print`-style output.
 | `version` | Must be exactly `1`. |
 | `defaultProfile` | Non-empty string and must exist in `profiles`. |
 | `profiles` | Object map of profile names to profile configs. |
-| `graph.apiVersion` | Must match `vNN.N`, for example `v21.0`. |
+| `graph.apiVersion` | Must match `vNN.N`, for example `v25.0`. |
 | `graph.baseUrl` | Absolute `http:` or `https:` URL. |
 | `whatsapp.wabaId` | Non-empty string; no CR/LF/NUL. |
 | `whatsapp.phoneNumberId` | Non-empty string; no CR/LF/NUL. |
@@ -178,7 +178,7 @@ defaultProfile: live-test
 profiles:
   live-test:
     graph:
-      apiVersion: v21.0
+      apiVersion: v25.0
       baseUrl: https://graph.facebook.com
     whatsapp:
       wabaId: "${WATS_WABA_ID_FROM_ENV_OR_SECRET_STORE}"

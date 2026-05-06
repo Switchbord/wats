@@ -25,7 +25,7 @@ async function main(): Promise<void> {
   });
   const config: WatsServiceConfig = {
     profile: {
-      graph: { apiVersion: "v21.0", baseUrl: "https://graph.test/" },
+      graph: { apiVersion: "v25.0", baseUrl: "https://graph.test/" },
       whatsapp: { wabaId: "1234567890", phoneNumberId: "15551234567" },
       auth: { accessToken: { env: "WATS_ACCESS_TOKEN" } },
       webhook: {

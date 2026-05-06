@@ -68,7 +68,7 @@ let handler: ((req: Request) => Promise<Response>) | undefined;
 function buildHandler(env: Env) {
   const graphClient = new GraphClient({
     accessToken: env.META_ACCESS_TOKEN,
-    apiVersion: "v21.0",
+    apiVersion: "v25.0",
     transport: createFetchTransport()
   });
 
