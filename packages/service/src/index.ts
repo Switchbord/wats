@@ -9,6 +9,10 @@ import {
   buildSendContactsPayload,
   buildSendCtaUrlPayload,
   buildSendListPayload,
+  buildSendProductPayload,
+  buildSendProductsPayload,
+  buildSendCatalogPayload,
+  buildRequestLocationPayload,
   buildSendLocationPayload,
   buildSendReactionPayload,
   buildSendStickerPayload,
@@ -481,6 +485,14 @@ function createOpenApiSchemas(): Record<string, Record<string, unknown>> {
         }
       ]
     },
+    CommerceInteractiveMessageBody: {
+      oneOf: [
+        { type: "object", additionalProperties: false, required: ["type", "to", "catalogId", "productRetailerId"], properties: { type: { type: "string", const: "interactiveProduct" }, to: { type: "string", minLength: 1 }, catalogId: { type: "string", minLength: 1 }, productRetailerId: { type: "string", minLength: 1 }, bodyText: { type: "string", minLength: 1 }, footerText: { type: "string", minLength: 1 }, replyToMessageId: { type: "string", minLength: 1 } } },
+        { type: "object", additionalProperties: false, required: ["type", "to", "catalogId", "headerText", "bodyText", "sections"], properties: { type: { type: "string", const: "interactiveProducts" }, to: { type: "string", minLength: 1 }, catalogId: { type: "string", minLength: 1 }, headerText: { type: "string", minLength: 1 }, bodyText: { type: "string", minLength: 1 }, sections: { type: "array", minItems: 1, items: { type: "object", additionalProperties: true } }, footerText: { type: "string", minLength: 1 }, replyToMessageId: { type: "string", minLength: 1 } } },
+        { type: "object", additionalProperties: false, required: ["type", "to", "bodyText"], properties: { type: { type: "string", const: "interactiveCatalog" }, to: { type: "string", minLength: 1 }, bodyText: { type: "string", minLength: 1 }, thumbnailProductRetailerId: { type: "string", minLength: 1 }, headerText: { type: "string", minLength: 1 }, footerText: { type: "string", minLength: 1 }, replyToMessageId: { type: "string", minLength: 1 } } },
+        { type: "object", additionalProperties: false, required: ["type", "to", "bodyText"], properties: { type: { type: "string", const: "interactiveLocationRequest" }, to: { type: "string", minLength: 1 }, bodyText: { type: "string", minLength: 1 }, replyToMessageId: { type: "string", minLength: 1 } } }
+      ]
+    },
     ContactsMessageBody: {
       type: "object",
       additionalProperties: false,
@@ -538,9 +550,10 @@ function createOpenApiSchemas(): Record<string, Record<string, unknown>> {
         schemaRef("LocationMessageBody"),
         schemaRef("ContactsMessageBody"),
         schemaRef("ReactionMessageBody"),
-        schemaRef("BasicInteractiveMessageBody")
+        schemaRef("BasicInteractiveMessageBody"),
+        schemaRef("CommerceInteractiveMessageBody")
       ],
-      description: "Supported POST /messages bodies: generic Graph-native text, WATS media composer, location, reaction, remove-reaction, contacts, or basic interactive bodies."
+      description: "Supported POST /messages bodies: generic Graph-native text, WATS media composer, location, reaction, remove-reaction, contacts, basic interactive, or commerce interactive bodies."
     },
     GraphResponsePassthrough: {
       type: "object",
@@ -642,7 +655,7 @@ export function createWatsServiceOpenApiDocument(
         post: messageOperation("Send a text message", "TextMessageBody")
       },
       [messagesPath]: {
-        post: messageOperation("Send a supported text, media, location, reaction, contacts, or basic interactive message body", "SupportedMessageBody")
+        post: messageOperation("Send a supported text, media, location, reaction, contacts, or interactive message body", "SupportedMessageBody")
       },
       [OPENAPI_PATH]: {
         get: {
@@ -687,6 +700,7 @@ type ServiceMediaMessageKind = "image" | "video" | "audio" | "document" | "stick
 type ServiceLocationReactionMessageKind = "location" | "reaction" | "removeReaction";
 type ServiceContactsMessageKind = "contacts";
 type ServiceBasicInteractiveMessageKind = "interactiveButtons" | "interactiveList" | "interactiveCtaUrl";
+type ServiceCommerceInteractiveMessageKind = "interactiveProduct" | "interactiveProducts" | "interactiveCatalog" | "interactiveLocationRequest";
 
 interface ServiceMediaMessageInput {
   readonly type: ServiceMediaMessageKind;
@@ -719,6 +733,11 @@ interface ServiceContactsMessageInput {
 
 type ServiceBasicInteractiveMessageInput = Record<string, unknown> & {
   readonly type: ServiceBasicInteractiveMessageKind;
+  readonly to: string;
+};
+
+type ServiceCommerceInteractiveMessageInput = Record<string, unknown> & {
+  readonly type: ServiceCommerceInteractiveMessageKind;
   readonly to: string;
 };
 
@@ -794,6 +813,41 @@ function validateServiceLocationReactionMessageBody(body: unknown): ServiceLocat
   }
   if (!hasOnlyKeys(body, ["type", "to", "messageId"])) return null;
   return { type: "removeReaction", to: body.to, messageId: body.messageId };
+}
+
+function validateServiceCommerceInteractiveMessageBody(body: unknown): ServiceCommerceInteractiveMessageInput | null {
+  if (!isRecord(body)) return null;
+  if (body.type !== "interactiveProduct" && body.type !== "interactiveProducts" && body.type !== "interactiveCatalog" && body.type !== "interactiveLocationRequest") return null;
+  if (!isNonEmptyString(body.to)) return null;
+  if (body.type === "interactiveProduct") {
+    if (!hasOnlyKeys(body, ["type", "to", "catalogId", "productRetailerId", "bodyText", "footerText", "replyToMessageId"])) return null;
+    if (!isNonEmptyString(body.catalogId) || !isNonEmptyString(body.productRetailerId)) return null;
+    if (body.bodyText !== undefined && !isNonEmptyString(body.bodyText)) return null;
+    if (body.footerText !== undefined && !isNonEmptyString(body.footerText)) return null;
+    if (body.replyToMessageId !== undefined && !isNonEmptyString(body.replyToMessageId)) return null;
+    return body as ServiceCommerceInteractiveMessageInput;
+  }
+  if (body.type === "interactiveProducts") {
+    if (!hasOnlyKeys(body, ["type", "to", "catalogId", "headerText", "bodyText", "sections", "footerText", "replyToMessageId"])) return null;
+    if (!isNonEmptyString(body.catalogId) || !isNonEmptyString(body.headerText) || !isNonEmptyString(body.bodyText)) return null;
+    if (!Array.isArray(body.sections) || body.sections.length === 0) return null;
+    if (body.footerText !== undefined && !isNonEmptyString(body.footerText)) return null;
+    if (body.replyToMessageId !== undefined && !isNonEmptyString(body.replyToMessageId)) return null;
+    return body as ServiceCommerceInteractiveMessageInput;
+  }
+  if (body.type === "interactiveCatalog") {
+    if (!hasOnlyKeys(body, ["type", "to", "bodyText", "thumbnailProductRetailerId", "headerText", "footerText", "replyToMessageId"])) return null;
+    if (!isNonEmptyString(body.bodyText)) return null;
+    if (body.thumbnailProductRetailerId !== undefined && !isNonEmptyString(body.thumbnailProductRetailerId)) return null;
+    if (body.headerText !== undefined && !isNonEmptyString(body.headerText)) return null;
+    if (body.footerText !== undefined && !isNonEmptyString(body.footerText)) return null;
+    if (body.replyToMessageId !== undefined && !isNonEmptyString(body.replyToMessageId)) return null;
+    return body as ServiceCommerceInteractiveMessageInput;
+  }
+  if (!hasOnlyKeys(body, ["type", "to", "bodyText", "replyToMessageId"])) return null;
+  if (!isNonEmptyString(body.bodyText)) return null;
+  if (body.replyToMessageId !== undefined && !isNonEmptyString(body.replyToMessageId)) return null;
+  return body as ServiceCommerceInteractiveMessageInput;
 }
 
 function validateServiceBasicInteractiveMessageBody(body: unknown): ServiceBasicInteractiveMessageInput | null {
@@ -880,6 +934,19 @@ function buildServiceBasicInteractivePayload(input: ServiceBasicInteractiveMessa
   }
 }
 
+function buildServiceCommerceInteractivePayload(input: ServiceCommerceInteractiveMessageInput): GraphMessagesSendBody {
+  switch (input.type) {
+    case "interactiveProduct":
+      return buildSendProductPayload(input as unknown as Parameters<typeof buildSendProductPayload>[0]) as GraphMessagesSendBody;
+    case "interactiveProducts":
+      return buildSendProductsPayload(input as unknown as Parameters<typeof buildSendProductsPayload>[0]) as GraphMessagesSendBody;
+    case "interactiveCatalog":
+      return buildSendCatalogPayload(input as unknown as Parameters<typeof buildSendCatalogPayload>[0]) as GraphMessagesSendBody;
+    case "interactiveLocationRequest":
+      return buildRequestLocationPayload(input as unknown as Parameters<typeof buildRequestLocationPayload>[0]) as GraphMessagesSendBody;
+  }
+}
+
 function buildSupportedMessageBody(body: unknown): GraphMessagesSendBody | null {
   const text = validateGenericTextMessageBody(body);
   if (text !== null) return text;
@@ -887,12 +954,14 @@ function buildSupportedMessageBody(body: unknown): GraphMessagesSendBody | null 
   const locationReaction = media === null ? validateServiceLocationReactionMessageBody(body) : null;
   const contacts = media === null && locationReaction === null ? validateServiceContactsMessageBody(body) : null;
   const interactive = media === null && locationReaction === null && contacts === null ? validateServiceBasicInteractiveMessageBody(body) : null;
-  if (media === null && locationReaction === null && contacts === null && interactive === null) return null;
+  const commerceInteractive = media === null && locationReaction === null && contacts === null && interactive === null ? validateServiceCommerceInteractiveMessageBody(body) : null;
+  if (media === null && locationReaction === null && contacts === null && interactive === null && commerceInteractive === null) return null;
   try {
     if (media !== null) return buildServiceMediaMessagePayload(media);
     if (locationReaction !== null) return buildServiceLocationReactionPayload(locationReaction);
     if (contacts !== null) return buildServiceContactsPayload(contacts);
-    return buildServiceBasicInteractivePayload(interactive as ServiceBasicInteractiveMessageInput);
+    if (interactive !== null) return buildServiceBasicInteractivePayload(interactive);
+    return buildServiceCommerceInteractivePayload(commerceInteractive as ServiceCommerceInteractiveMessageInput);
   } catch (error) {
     if (error instanceof GraphRequestValidationError) return null;
     throw error;
