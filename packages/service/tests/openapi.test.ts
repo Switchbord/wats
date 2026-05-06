@@ -106,6 +106,7 @@ describe("WATS-35 OpenAPI document generator", () => {
       "GenericTextMessageBody",
       "GraphResponsePassthrough",
       "HealthResponse",
+      "ContactsMessageBody",
       "LocationMessageBody",
       "MediaMessageBody",
       "ReactionMessageBody",
@@ -122,6 +123,7 @@ describe("WATS-35 OpenAPI document generator", () => {
       { "$ref": "#/components/schemas/GenericTextMessageBody" },
       { "$ref": "#/components/schemas/MediaMessageBody" },
       { "$ref": "#/components/schemas/LocationMessageBody" },
+      { "$ref": "#/components/schemas/ContactsMessageBody" },
       { "$ref": "#/components/schemas/ReactionMessageBody" }
     ]);
     const mediaSchema = jsonRecord(doc.components.schemas.MediaMessageBody, "MediaMessageBody schema");
@@ -136,6 +138,8 @@ describe("WATS-35 OpenAPI document generator", () => {
     ]);
     const locationSchema = jsonRecord(doc.components.schemas.LocationMessageBody, "LocationMessageBody schema");
     expect(locationSchema.required).toEqual(["type", "to", "latitude", "longitude"]);
+    const contactsSchema = jsonRecord(doc.components.schemas.ContactsMessageBody, "ContactsMessageBody schema");
+    expect(contactsSchema.required).toEqual(["type", "to", "contacts"]);
     const reactionSchema = jsonRecord(doc.components.schemas.ReactionMessageBody, "ReactionMessageBody schema");
     expect(Array.isArray(reactionSchema.oneOf)).toBe(true);
   });
