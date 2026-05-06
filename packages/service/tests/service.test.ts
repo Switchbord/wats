@@ -435,6 +435,73 @@ describe("WATS-34 service bearer auth and message APIs", () => {
     }
     expect(mock.requests.length).toBe(0);
   });
+
+
+  test("POST /messages accepts contacts composer bodies", async () => {
+    const mock = createMockTransport({
+      defaultResponse: { status: 200, body: { messages: [{ id: "wamid.CONTACTS" }] } }
+    });
+    const app = createWatsServiceApp(config({ transport: mock.transport }));
+    const input = {
+      type: "contacts",
+      to: "15550001111",
+      contacts: [{
+        name: { formattedName: "Ada Lovelace", firstName: "Ada", lastName: "Lovelace" },
+        phones: [{ phone: "+15550002222", type: "CELL" }],
+        emails: [{ email: "ada@example.test", type: "WORK" }],
+        urls: [{ url: "https://example.test/ada", type: "WORK" }],
+        org: { company: "Analytical Engines", title: "Programmer" },
+        birthday: "1815-12-10"
+      }],
+      replyToMessageId: "wamid.PARENT"
+    };
+
+    const res = await app.fetch(new Request("https://service.test/api/messages", authed(input)));
+
+    expect(res.status).toBe(200);
+    expect(mock.requests.length).toBe(1);
+    const req = mock.requests[0]!;
+    expect(req.method).toBe("POST");
+    expect(req.url).toContain("/root/v21.0/15551234567/messages");
+    expect(req.headers.get("authorization")).toBe("Bearer graph-access-token");
+    expect(req.headers.get("authorization")).not.toBe("Bearer service-bearer");
+    expect(JSON.parse(String(req.body))).toEqual({
+      messaging_product: "whatsapp",
+      to: "15550001111",
+      type: "contacts",
+      contacts: [{
+        name: { formatted_name: "Ada Lovelace", first_name: "Ada", last_name: "Lovelace" },
+        phones: [{ phone: "+15550002222", type: "CELL" }],
+        emails: [{ email: "ada@example.test", type: "WORK" }],
+        urls: [{ url: "https://example.test/ada", type: "WORK" }],
+        org: { company: "Analytical Engines", title: "Programmer" },
+        birthday: "1815-12-10"
+      }],
+      context: { message_id: "wamid.PARENT" }
+    });
+  });
+
+  test("POST /messages contacts bodies fail closed", async () => {
+    const mock = createMockTransport({
+      defaultResponse: { status: 200, body: { messages: [{ id: "wamid.NOPE" }] } }
+    });
+    const app = createWatsServiceApp(config({ transport: mock.transport }));
+    const invalidBodies: unknown[] = [
+      { type: "contacts", to: "15550001111" },
+      { type: "contacts", to: "15550001111", contacts: [] },
+      { type: "contacts", to: "15550001111", contacts: [{ name: {} }] },
+      { type: "contacts", to: "15550001111", contacts: [{ name: { formattedName: "Ada" }, phones: [{ type: "CELL" }] }] },
+      { type: "contacts", to: "15550001111", contacts: [{ name: { formattedName: "Ada" }, urls: [{ url: "file:///tmp/a" }] }] },
+      { type: "contacts", to: "15550001111", contacts: [{ name: { formattedName: "Ada" } }], extra: "not allowed" }
+    ];
+
+    for (const body of invalidBodies) {
+      const res = await app.fetch(new Request("https://service.test/api/messages", authed(body)));
+      expect(res.status, JSON.stringify(body)).toBe(400);
+      expect(await res.text()).not.toContain("service-bearer");
+    }
+    expect(mock.requests.length).toBe(0);
+  });
 });
 
 describe("WATS-34 webhook composition", () => {
