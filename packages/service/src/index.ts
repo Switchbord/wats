@@ -3,7 +3,10 @@ import { WhatsApp } from "@switchbord/core";
 import {
   buildSendAudioPayload,
   buildSendDocumentPayload,
+  buildRemoveReactionPayload,
   buildSendImagePayload,
+  buildSendLocationPayload,
+  buildSendReactionPayload,
   buildSendStickerPayload,
   buildSendVideoPayload,
   GraphClient,
@@ -427,9 +430,53 @@ function createOpenApiSchemas(): Record<string, Record<string, unknown>> {
         { required: ["link"], not: { required: ["mediaId"] } }
       ]
     },
+    LocationMessageBody: {
+      type: "object",
+      additionalProperties: false,
+      required: ["type", "to", "latitude", "longitude"],
+      properties: {
+        type: { type: "string", const: "location" },
+        to: { type: "string", minLength: 1, description: "WhatsApp recipient phone number or wa_id." },
+        latitude: { type: "number", minimum: -90, maximum: 90 },
+        longitude: { type: "number", minimum: -180, maximum: 180 },
+        name: { type: "string", minLength: 1 },
+        address: { type: "string", minLength: 1 },
+        replyToMessageId: { type: "string", minLength: 1, description: "Optional message ID to send as a reply context." }
+      }
+    },
+    ReactionMessageBody: {
+      oneOf: [
+        {
+          type: "object",
+          additionalProperties: false,
+          required: ["type", "to", "messageId", "emoji"],
+          properties: {
+            type: { type: "string", const: "reaction" },
+            to: { type: "string", minLength: 1, description: "WhatsApp recipient phone number or wa_id." },
+            messageId: { type: "string", minLength: 1, description: "Message ID to react to." },
+            emoji: { type: "string", minLength: 1, description: "Emoji reaction to apply." }
+          }
+        },
+        {
+          type: "object",
+          additionalProperties: false,
+          required: ["type", "to", "messageId"],
+          properties: {
+            type: { type: "string", const: "removeReaction" },
+            to: { type: "string", minLength: 1, description: "WhatsApp recipient phone number or wa_id." },
+            messageId: { type: "string", minLength: 1, description: "Message ID whose reaction should be removed." }
+          }
+        }
+      ]
+    },
     SupportedMessageBody: {
-      oneOf: [schemaRef("GenericTextMessageBody"), schemaRef("MediaMessageBody")],
-      description: "Supported POST /messages bodies: generic Graph-native text or WATS media composer bodies."
+      oneOf: [
+        schemaRef("GenericTextMessageBody"),
+        schemaRef("MediaMessageBody"),
+        schemaRef("LocationMessageBody"),
+        schemaRef("ReactionMessageBody")
+      ],
+      description: "Supported POST /messages bodies: generic Graph-native text, WATS media composer, location, reaction, or remove-reaction bodies."
     },
     GraphResponsePassthrough: {
       type: "object",
@@ -531,7 +578,7 @@ export function createWatsServiceOpenApiDocument(
         post: messageOperation("Send a text message", "TextMessageBody")
       },
       [messagesPath]: {
-        post: messageOperation("Send a supported text or media message body", "SupportedMessageBody")
+        post: messageOperation("Send a supported text, media, location, or reaction message body", "SupportedMessageBody")
       },
       [OPENAPI_PATH]: {
         get: {
@@ -573,6 +620,7 @@ function validateTextBody(body: unknown): { to: string; text: string; previewUrl
 }
 
 type ServiceMediaMessageKind = "image" | "video" | "audio" | "document" | "sticker";
+type ServiceLocationReactionMessageKind = "location" | "reaction" | "removeReaction";
 
 interface ServiceMediaMessageInput {
   readonly type: ServiceMediaMessageKind;
@@ -581,6 +629,18 @@ interface ServiceMediaMessageInput {
   readonly link?: string;
   readonly caption?: string;
   readonly filename?: string;
+  readonly replyToMessageId?: string;
+}
+
+interface ServiceLocationReactionMessageInput {
+  readonly type: ServiceLocationReactionMessageKind;
+  readonly to: string;
+  readonly latitude?: number;
+  readonly longitude?: number;
+  readonly name?: string;
+  readonly address?: string;
+  readonly messageId?: string;
+  readonly emoji?: string;
   readonly replyToMessageId?: string;
 }
 
@@ -623,6 +683,41 @@ function validateServiceMediaMessageBody(body: unknown): ServiceMediaMessageInpu
   return out;
 }
 
+
+function hasOnlyKeys(record: Record<string, unknown>, allowed: readonly string[]): boolean {
+  const allowedSet = new Set(allowed);
+  return Object.keys(record).every((key) => allowedSet.has(key));
+}
+
+function validateServiceLocationReactionMessageBody(body: unknown): ServiceLocationReactionMessageInput | null {
+  if (!isRecord(body)) return null;
+  if (body.type !== "location" && body.type !== "reaction" && body.type !== "removeReaction") return null;
+  if (!isNonEmptyString(body.to)) return null;
+
+  if (body.type === "location") {
+    if (!hasOnlyKeys(body, ["type", "to", "latitude", "longitude", "name", "address", "replyToMessageId"])) return null;
+    if (typeof body.latitude !== "number" || !Number.isFinite(body.latitude) || body.latitude < -90 || body.latitude > 90) return null;
+    if (typeof body.longitude !== "number" || !Number.isFinite(body.longitude) || body.longitude < -180 || body.longitude > 180) return null;
+    if (body.name !== undefined && !isNonEmptyString(body.name)) return null;
+    if (body.address !== undefined && !isNonEmptyString(body.address)) return null;
+    if (body.replyToMessageId !== undefined && !isNonEmptyString(body.replyToMessageId)) return null;
+    const out: ServiceLocationReactionMessageInput = { type: "location", to: body.to, latitude: body.latitude, longitude: body.longitude };
+    if (body.name !== undefined) (out as { name?: string }).name = body.name;
+    if (body.address !== undefined) (out as { address?: string }).address = body.address;
+    if (body.replyToMessageId !== undefined) (out as { replyToMessageId?: string }).replyToMessageId = body.replyToMessageId;
+    return out;
+  }
+
+  if (!isNonEmptyString(body.messageId)) return null;
+  if (body.type === "reaction") {
+    if (!hasOnlyKeys(body, ["type", "to", "messageId", "emoji"])) return null;
+    if (!isNonEmptyString(body.emoji)) return null;
+    return { type: "reaction", to: body.to, messageId: body.messageId, emoji: body.emoji };
+  }
+  if (!hasOnlyKeys(body, ["type", "to", "messageId"])) return null;
+  return { type: "removeReaction", to: body.to, messageId: body.messageId };
+}
+
 function buildServiceMediaMessagePayload(input: ServiceMediaMessageInput): GraphMessagesSendBody {
   switch (input.type) {
     case "image":
@@ -638,13 +733,25 @@ function buildServiceMediaMessagePayload(input: ServiceMediaMessageInput): Graph
   }
 }
 
+function buildServiceLocationReactionPayload(input: ServiceLocationReactionMessageInput): GraphMessagesSendBody {
+  switch (input.type) {
+    case "location":
+      return buildSendLocationPayload(input as Parameters<typeof buildSendLocationPayload>[0]) as GraphMessagesSendBody;
+    case "reaction":
+      return buildSendReactionPayload(input as Parameters<typeof buildSendReactionPayload>[0]) as GraphMessagesSendBody;
+    case "removeReaction":
+      return buildRemoveReactionPayload(input as Parameters<typeof buildRemoveReactionPayload>[0]) as GraphMessagesSendBody;
+  }
+}
+
 function buildSupportedMessageBody(body: unknown): GraphMessagesSendBody | null {
   const text = validateGenericTextMessageBody(body);
   if (text !== null) return text;
   const media = validateServiceMediaMessageBody(body);
-  if (media === null) return null;
+  const locationReaction = media === null ? validateServiceLocationReactionMessageBody(body) : null;
+  if (media === null && locationReaction === null) return null;
   try {
-    return buildServiceMediaMessagePayload(media);
+    return media !== null ? buildServiceMediaMessagePayload(media) : buildServiceLocationReactionPayload(locationReaction as ServiceLocationReactionMessageInput);
   } catch (error) {
     if (error instanceof GraphRequestValidationError) return null;
     throw error;

@@ -106,7 +106,9 @@ describe("WATS-35 OpenAPI document generator", () => {
       "GenericTextMessageBody",
       "GraphResponsePassthrough",
       "HealthResponse",
+      "LocationMessageBody",
       "MediaMessageBody",
+      "ReactionMessageBody",
       "ReadyResponse",
       "SupportedMessageBody",
       "TextMessageBody"
@@ -118,7 +120,9 @@ describe("WATS-35 OpenAPI document generator", () => {
     expect(json.schema).toEqual({ "$ref": "#/components/schemas/SupportedMessageBody" });
     expect(doc.components.schemas.SupportedMessageBody.oneOf).toEqual([
       { "$ref": "#/components/schemas/GenericTextMessageBody" },
-      { "$ref": "#/components/schemas/MediaMessageBody" }
+      { "$ref": "#/components/schemas/MediaMessageBody" },
+      { "$ref": "#/components/schemas/LocationMessageBody" },
+      { "$ref": "#/components/schemas/ReactionMessageBody" }
     ]);
     const mediaSchema = jsonRecord(doc.components.schemas.MediaMessageBody, "MediaMessageBody schema");
     const mediaProperties = jsonRecord(mediaSchema.properties, "MediaMessageBody properties");
@@ -130,6 +134,10 @@ describe("WATS-35 OpenAPI document generator", () => {
       { required: ["mediaId"], not: { required: ["link"] } },
       { required: ["link"], not: { required: ["mediaId"] } }
     ]);
+    const locationSchema = jsonRecord(doc.components.schemas.LocationMessageBody, "LocationMessageBody schema");
+    expect(locationSchema.required).toEqual(["type", "to", "latitude", "longitude"]);
+    const reactionSchema = jsonRecord(doc.components.schemas.ReactionMessageBody, "ReactionMessageBody schema");
+    expect(Array.isArray(reactionSchema.oneOf)).toBe(true);
   });
 
   test("marks only service message routes with bearer security", () => {

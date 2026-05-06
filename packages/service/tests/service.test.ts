@@ -337,7 +337,6 @@ describe("WATS-34 service bearer auth and message APIs", () => {
       { type: "audio", to: "15550001111", mediaId: "media-audio", caption: "not allowed" },
       { type: "sticker", to: "15550001111", mediaId: "media-sticker", filename: "nope.webp" },
       { type: "document", to: "15550001111", link: "file:///tmp/secret.pdf" },
-      { type: "location", to: "15550001111", latitude: 1, longitude: 2 },
       { type: "interactive", to: "15550001111" }
     ];
 
@@ -347,6 +346,92 @@ describe("WATS-34 service bearer auth and message APIs", () => {
       const text = await res.text();
       expect(text).not.toContain("graph-access-token");
       expect(text).not.toContain("service-bearer");
+    }
+    expect(mock.requests.length).toBe(0);
+  });
+
+
+  test("POST /messages accepts location and reaction composer bodies", async () => {
+    const cases: Array<{
+      readonly label: string;
+      readonly input: Record<string, unknown>;
+      readonly expected: Record<string, unknown>;
+    }> = [
+      {
+        label: "location",
+        input: { type: "location", to: "15550001111", latitude: 37.422, longitude: -122.084, name: "HQ", address: "1600 Amphitheatre", replyToMessageId: "wamid.PARENT" },
+        expected: {
+          messaging_product: "whatsapp",
+          to: "15550001111",
+          type: "location",
+          location: { latitude: 37.422, longitude: -122.084, name: "HQ", address: "1600 Amphitheatre" },
+          context: { message_id: "wamid.PARENT" }
+        }
+      },
+      {
+        label: "reaction",
+        input: { type: "reaction", to: "15550001111", messageId: "wamid.TARGET", emoji: "👍" },
+        expected: {
+          messaging_product: "whatsapp",
+          to: "15550001111",
+          type: "reaction",
+          reaction: { message_id: "wamid.TARGET", emoji: "👍" }
+        }
+      },
+      {
+        label: "remove reaction",
+        input: { type: "removeReaction", to: "15550001111", messageId: "wamid.TARGET" },
+        expected: {
+          messaging_product: "whatsapp",
+          to: "15550001111",
+          type: "reaction",
+          reaction: { message_id: "wamid.TARGET", emoji: "" }
+        }
+      }
+    ];
+
+    for (const testCase of cases) {
+      const mock = createMockTransport({
+        defaultResponse: { status: 200, body: { messages: [{ id: `wamid.${testCase.label}` }] } }
+      });
+      const app = createWatsServiceApp(config({ transport: mock.transport }));
+
+      const res = await app.fetch(new Request("https://service.test/api/messages", authed(testCase.input)));
+
+      expect(res.status, testCase.label).toBe(200);
+      expect(mock.requests.length, testCase.label).toBe(1);
+      const req = mock.requests[0]!;
+      expect(req.method, testCase.label).toBe("POST");
+      expect(req.url, testCase.label).toContain("/root/v21.0/15551234567/messages");
+      expect(req.headers.get("authorization"), testCase.label).toBe("Bearer graph-access-token");
+      expect(req.headers.get("authorization"), testCase.label).not.toBe("Bearer service-bearer");
+      expect(JSON.parse(String(req.body)), testCase.label).toEqual(testCase.expected);
+    }
+  });
+
+  test("POST /messages location and reaction bodies fail closed", async () => {
+    const mock = createMockTransport({
+      defaultResponse: { status: 200, body: { messages: [{ id: "wamid.NOPE" }] } }
+    });
+    const app = createWatsServiceApp(config({ transport: mock.transport }));
+    const invalidBodies: unknown[] = [
+      { type: "location", to: "15550001111", latitude: Number.NaN, longitude: 2 },
+      { type: "location", to: "15550001111", latitude: 91, longitude: 2 },
+      { type: "location", to: "15550001111", latitude: 1, longitude: -181 },
+      { type: "location", to: "15550001111", latitude: 1, longitude: 2, name: "" },
+      { type: "location", to: "15550001111", latitude: 1, longitude: 2, extra: "not allowed" },
+      { type: "reaction", to: "15550001111", messageId: "", emoji: "👍" },
+      { type: "reaction", to: "15550001111", messageId: "wamid.TARGET", emoji: "" },
+      { type: "reaction", to: "15550001111", messageId: "wamid.TARGET", emoji: "👍", extra: "not allowed" },
+      { type: "removeReaction", to: "15550001111" },
+      { type: "removeReaction", to: "15550001111", messageId: "wamid.TARGET", emoji: "👍" },
+      { type: "removeReaction", to: "15550001111", messageId: "wamid.TARGET", extra: "not allowed" }
+    ];
+
+    for (const body of invalidBodies) {
+      const res = await app.fetch(new Request("https://service.test/api/messages", authed(body)));
+      expect(res.status, JSON.stringify(body)).toBe(400);
+      expect(await res.text()).not.toContain("service-bearer");
     }
     expect(mock.requests.length).toBe(0);
   });
