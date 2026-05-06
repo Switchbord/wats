@@ -1,14 +1,14 @@
 # OpenAPI Reference (`@switchbord/service`)
 
 - status: experimental
-- applies-to: WATS-35
-- lastReviewed: 2026-04-28
+- applies-to: WATS-35/WATS-73
+- lastReviewed: 2026-05-06
 
 ## Purpose
 
 `@switchbord/service` can generate and serve an OpenAPI 3.1 document for the standalone WATS service API that exists today.
 
-This is not a Meta Graph API OpenAPI document. It describes only WATS service routes: status checks, configured webhook ingress, the current text-message service APIs, and `/openapi.json`.
+This is not a Meta Graph API OpenAPI document. It describes only WATS service routes: status checks, configured webhook ingress, the current text and media-message service APIs, and `/openapi.json`.
 
 ## Public API
 
@@ -110,7 +110,9 @@ The document includes JSON schemas for:
 - `ReadyResponse`: `{ ok: true, service: "wats" }`
 - `ErrorEnvelope`: `{ error: { code, message? } }`
 - `TextMessageBody`: convenience body for `POST {apiPrefix}/messages/text`
-- `GenericTextMessageBody`: currently supported generic text body for `POST {apiPrefix}/messages`
+- `GenericTextMessageBody`: generic Graph-native text body for `POST {apiPrefix}/messages`
+- `MediaMessageBody`: WATS media composer bodies for image, video, audio, document, and sticker messages
+- `SupportedMessageBody`: `oneOf` wrapper for text or media bodies on `POST {apiPrefix}/messages`
 - `GraphResponsePassthrough`: open object for unmodified Graph JSON responses
 - webhook response helpers for the verify challenge and accepted dispatch envelope
 
@@ -119,10 +121,10 @@ The document includes JSON schemas for:
 | Route | Accepted body | Rejected body classes | Size limit |
 | --- | --- | --- | --- |
 | `POST {apiPrefix}/messages/text` | JSON object with non-empty `to`, non-empty `text`, optional boolean `previewUrl` | malformed JSON, arrays, primitives, missing fields, blank/control-character `to` or `text`, non-boolean `previewUrl` | no service-layer byte cap yet |
-| `POST {apiPrefix}/messages` | JSON object with `messaging_product: "whatsapp"`, non-empty `to`, `type: "text"`, and `text.body` non-empty; optional boolean `text.preview_url` | malformed JSON, arrays, primitives, non-text message types, missing fields, blank/control-character strings, non-boolean `preview_url` | no service-layer byte cap yet |
+| `POST {apiPrefix}/messages` | Either generic Graph-native text body, or media composer body with `type` in `image`/`video`/`audio`/`document`/`sticker`, non-empty `to`, and exactly one of `mediaId` or `link` | malformed JSON, arrays, primitives, unsupported message types, missing fields, blank/control-character strings, both/missing media references, caption on audio/sticker, filename outside document, invalid links rejected by SDK builders | no service-layer byte cap yet |
 | `POST profile.webhook.path` | Signed Meta webhook JSON delegated to `@switchbord/http` | malformed JSON/signature/envelope per WebhookAdapter taxonomy | `profile.webhook.maxBodyBytes`, default `1_048_576` |
 
-Non-text message schemas are intentionally not included in WATS-35.
+Location, contacts, reaction, and interactive service message schemas remain follow-up WATS-73 slices.
 
 ## Error taxonomy
 
@@ -145,7 +147,7 @@ Common OpenAPI-related HTTP statuses:
 The WATS service OpenAPI surface still does not add:
 
 - a full Meta Graph API OpenAPI document
-- non-text message request schemas
+- location, contacts, reaction, and interactive message request schemas beyond the WATS-73 media first slice
 - live Meta credential checks or WABA mutations
 
 WATS-36A adds a separate static Scalar UI page at [`reference/openapi-ui.md`](./openapi-ui.md) that renders this local service OpenAPI document; it does not change the generated OpenAPI scope.

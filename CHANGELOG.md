@@ -51,6 +51,11 @@ Design-only/docs-only boundaries preserved in this launch: WATS-46/WATS-47/WATS-
 - `bun run docs:build`
 - targeted release policy tests including `packages/testing/tests/wats021-alpha-release.test.ts`
 
+
+### Service message routes
+
+- `@switchbord/service` `POST {apiPrefix}/messages` now accepts WATS media composer bodies for image, video, audio, document, and sticker messages, converts them through the existing SDK builders, preserves generic text body compatibility, and keeps location/contacts/reaction/interactive service route expansion as later WATS-73 slices.
+
 ### CLI diagnostics
 
 - `wats doctor --config <path>` now runs offline diagnostics for runtime/package imports, config/profile checks, service route collisions, OpenAPI generation, and optional env presence counts without printing env names or values.

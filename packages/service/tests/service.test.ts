@@ -235,6 +235,121 @@ describe("WATS-34 service bearer auth and message APIs", () => {
     expect(await json(res)).toEqual({ messages: [{ id: "wamid.GENERIC" }] });
     expect(JSON.parse(String(mock.requests[0]!.body))).toEqual(body);
   });
+
+
+  test("POST /messages accepts media composer bodies and sends SDK-built Graph payloads", async () => {
+    const cases: Array<{
+      readonly label: string;
+      readonly input: Record<string, unknown>;
+      readonly expected: Record<string, unknown>;
+    }> = [
+      {
+        label: "image media id",
+        input: { type: "image", to: "15550001111", mediaId: "media-image", caption: "hello", replyToMessageId: "wamid.PARENT" },
+        expected: {
+          messaging_product: "whatsapp",
+          to: "15550001111",
+          type: "image",
+          image: { id: "media-image", caption: "hello" },
+          context: { message_id: "wamid.PARENT" }
+        }
+      },
+      {
+        label: "video link",
+        input: { type: "video", to: "15550001111", link: "https://cdn.example/video.mp4", caption: "watch" },
+        expected: {
+          messaging_product: "whatsapp",
+          to: "15550001111",
+          type: "video",
+          video: { link: "https://cdn.example/video.mp4", caption: "watch" }
+        }
+      },
+      {
+        label: "audio media id",
+        input: { type: "audio", to: "15550001111", mediaId: "media-audio" },
+        expected: {
+          messaging_product: "whatsapp",
+          to: "15550001111",
+          type: "audio",
+          audio: { id: "media-audio" }
+        }
+      },
+      {
+        label: "document link",
+        input: { type: "document", to: "15550001111", link: "https://cdn.example/doc.pdf", caption: "read", filename: "doc.pdf" },
+        expected: {
+          messaging_product: "whatsapp",
+          to: "15550001111",
+          type: "document",
+          document: { link: "https://cdn.example/doc.pdf", caption: "read", filename: "doc.pdf" }
+        }
+      },
+      {
+        label: "sticker media id",
+        input: { type: "sticker", to: "15550001111", mediaId: "media-sticker" },
+        expected: {
+          messaging_product: "whatsapp",
+          to: "15550001111",
+          type: "sticker",
+          sticker: { id: "media-sticker" }
+        }
+      }
+    ];
+
+    for (const testCase of cases) {
+      const mock = createMockTransport({
+        defaultResponse: { status: 200, body: { messages: [{ id: `wamid.${testCase.label}` }] } }
+      });
+      const app = createWatsServiceApp(config({ transport: mock.transport }));
+
+      const res = await app.fetch(new Request("https://service.test/api/messages", authed(testCase.input)));
+
+      expect(res.status, testCase.label).toBe(200);
+      expect(mock.requests.length, testCase.label).toBe(1);
+      const req = mock.requests[0]!;
+      expect(req.method, testCase.label).toBe("POST");
+      expect(req.url, testCase.label).toContain("/root/v21.0/15551234567/messages");
+      expect(req.headers.get("authorization"), testCase.label).toBe("Bearer graph-access-token");
+      expect(req.headers.get("authorization"), testCase.label).not.toBe("Bearer service-bearer");
+      expect(JSON.parse(String(req.body)), testCase.label).toEqual(testCase.expected);
+    }
+  });
+
+  test("POST /messages media bodies fail closed for auth, validation, and secret redaction", async () => {
+    const mock = createMockTransport({
+      defaultResponse: { status: 200, body: { messages: [{ id: "wamid.MEDIA" }] } }
+    });
+    const app = createWatsServiceApp(config({ transport: mock.transport }));
+    const valid = { type: "image", to: "15550001111", mediaId: "media-image" };
+
+    const unauthorized = await app.fetch(new Request("https://service.test/api/messages", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(valid)
+    }));
+    expect(unauthorized.status).toBe(401);
+    expect(await unauthorized.text()).not.toContain("service-bearer");
+    expect(mock.requests.length).toBe(0);
+
+    const invalidBodies: unknown[] = [
+      { type: "image", to: "15550001111" },
+      { type: "image", to: "15550001111", mediaId: "media-image", link: "https://cdn.example/image.jpg" },
+      { type: "audio", to: "15550001111", mediaId: "media-audio", caption: "not allowed" },
+      { type: "sticker", to: "15550001111", mediaId: "media-sticker", filename: "nope.webp" },
+      { type: "document", to: "15550001111", link: "file:///tmp/secret.pdf" },
+      { type: "location", to: "15550001111", latitude: 1, longitude: 2 },
+      { type: "interactive", to: "15550001111" }
+    ];
+
+    for (const body of invalidBodies) {
+      const res = await app.fetch(new Request("https://service.test/api/messages", authed(body)));
+      expect(res.status, JSON.stringify(body)).toBe(400);
+      const text = await res.text();
+      expect(text).not.toContain("graph-access-token");
+      expect(text).not.toContain("service-bearer");
+    }
+    expect(mock.requests.length).toBe(0);
+  });
 });
 
 describe("WATS-34 webhook composition", () => {
