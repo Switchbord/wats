@@ -419,10 +419,13 @@ describe("WATS-34 service bearer auth and message APIs", () => {
       { type: "location", to: "15550001111", latitude: 91, longitude: 2 },
       { type: "location", to: "15550001111", latitude: 1, longitude: -181 },
       { type: "location", to: "15550001111", latitude: 1, longitude: 2, name: "" },
+      { type: "location", to: "15550001111", latitude: 1, longitude: 2, extra: "not allowed" },
       { type: "reaction", to: "15550001111", messageId: "", emoji: "👍" },
       { type: "reaction", to: "15550001111", messageId: "wamid.TARGET", emoji: "" },
+      { type: "reaction", to: "15550001111", messageId: "wamid.TARGET", emoji: "👍", extra: "not allowed" },
       { type: "removeReaction", to: "15550001111" },
-      { type: "removeReaction", to: "15550001111", messageId: "wamid.TARGET", emoji: "👍" }
+      { type: "removeReaction", to: "15550001111", messageId: "wamid.TARGET", emoji: "👍" },
+      { type: "removeReaction", to: "15550001111", messageId: "wamid.TARGET", extra: "not allowed" }
     ];
 
     for (const body of invalidBodies) {
