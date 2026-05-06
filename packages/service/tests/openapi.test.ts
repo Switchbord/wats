@@ -103,6 +103,7 @@ describe("WATS-35 OpenAPI document generator", () => {
     });
     expect(Object.keys(doc.components.schemas)).toEqual(expect.arrayContaining([
       "BasicInteractiveMessageBody",
+      "CommerceInteractiveMessageBody",
       "ErrorEnvelope",
       "GenericTextMessageBody",
       "GraphResponsePassthrough",
@@ -126,7 +127,8 @@ describe("WATS-35 OpenAPI document generator", () => {
       { "$ref": "#/components/schemas/LocationMessageBody" },
       { "$ref": "#/components/schemas/ContactsMessageBody" },
       { "$ref": "#/components/schemas/ReactionMessageBody" },
-      { "$ref": "#/components/schemas/BasicInteractiveMessageBody" }
+      { "$ref": "#/components/schemas/BasicInteractiveMessageBody" },
+      { "$ref": "#/components/schemas/CommerceInteractiveMessageBody" }
     ]);
     const mediaSchema = jsonRecord(doc.components.schemas.MediaMessageBody, "MediaMessageBody schema");
     const mediaProperties = jsonRecord(mediaSchema.properties, "MediaMessageBody properties");
@@ -146,6 +148,8 @@ describe("WATS-35 OpenAPI document generator", () => {
     expect(Array.isArray(reactionSchema.oneOf)).toBe(true);
     const interactiveSchema = jsonRecord(doc.components.schemas.BasicInteractiveMessageBody, "BasicInteractiveMessageBody schema");
     expect(Array.isArray(interactiveSchema.oneOf)).toBe(true);
+    const commerceInteractiveSchema = jsonRecord(doc.components.schemas.CommerceInteractiveMessageBody, "CommerceInteractiveMessageBody schema");
+    expect(Array.isArray(commerceInteractiveSchema.oneOf)).toBe(true);
   });
 
   test("marks only service message routes with bearer security", () => {

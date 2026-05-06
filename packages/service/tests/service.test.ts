@@ -577,6 +577,73 @@ describe("WATS-34 service bearer auth and message APIs", () => {
     }
     expect(mock.requests.length).toBe(0);
   });
+
+
+  test("POST /messages accepts commerce interactive composer bodies", async () => {
+    const cases: Array<{
+      readonly label: string;
+      readonly input: Record<string, unknown>;
+      readonly expectedInteractive: Record<string, unknown>;
+    }> = [
+      {
+        label: "product",
+        input: { type: "interactiveProduct", to: "15550001111", catalogId: "catalog-1", productRetailerId: "sku-1", bodyText: "One product", footerText: "Footer", replyToMessageId: "wamid.PARENT" },
+        expectedInteractive: { type: "product", action: { catalog_id: "catalog-1", product_retailer_id: "sku-1" }, body: { text: "One product" }, footer: { text: "Footer" } }
+      },
+      {
+        label: "products",
+        input: { type: "interactiveProducts", to: "15550001111", catalogId: "catalog-1", headerText: "Products", bodyText: "Pick", sections: [{ title: "Set", productItems: [{ productRetailerId: "sku-1" }] }] },
+        expectedInteractive: { type: "product_list", header: { type: "text", text: "Products" }, body: { text: "Pick" }, action: { catalog_id: "catalog-1", sections: [{ title: "Set", product_items: [{ product_retailer_id: "sku-1" }] }] } }
+      },
+      {
+        label: "catalog",
+        input: { type: "interactiveCatalog", to: "15550001111", bodyText: "Browse", thumbnailProductRetailerId: "sku-thumb" },
+        expectedInteractive: { type: "catalog_message", body: { text: "Browse" }, action: { name: "catalog_message", parameters: { thumbnail_product_retailer_id: "sku-thumb" } } }
+      },
+      {
+        label: "location request",
+        input: { type: "interactiveLocationRequest", to: "15550001111", bodyText: "Share your location" },
+        expectedInteractive: { type: "location_request_message", body: { text: "Share your location" }, action: { name: "send_location" } }
+      }
+    ];
+
+    for (const testCase of cases) {
+      const mock = createMockTransport({ defaultResponse: { status: 200, body: { messages: [{ id: `wamid.${testCase.label}` }] } } });
+      const app = createWatsServiceApp(config({ transport: mock.transport }));
+      const res = await app.fetch(new Request("https://service.test/api/messages", authed(testCase.input)));
+      expect(res.status, testCase.label).toBe(200);
+      expect(mock.requests.length, testCase.label).toBe(1);
+      const body = JSON.parse(String(mock.requests[0]!.body));
+      expect(body.messaging_product, testCase.label).toBe("whatsapp");
+      expect(body.to, testCase.label).toBe("15550001111");
+      expect(body.type, testCase.label).toBe("interactive");
+      expect(body.interactive, testCase.label).toEqual(testCase.expectedInteractive);
+      expect(mock.requests[0]!.headers.get("authorization"), testCase.label).toBe("Bearer graph-access-token");
+      expect(mock.requests[0]!.headers.get("authorization"), testCase.label).not.toBe("Bearer service-bearer");
+    }
+  });
+
+  test("POST /messages commerce interactive bodies fail closed", async () => {
+    const mock = createMockTransport({ defaultResponse: { status: 200, body: { messages: [{ id: "wamid.NOPE" }] } } });
+    const app = createWatsServiceApp(config({ transport: mock.transport }));
+    const invalidBodies: unknown[] = [
+      { type: "interactiveProduct", to: "15550001111", catalogId: "catalog-1" },
+      { type: "interactiveProduct", to: "15550001111", catalogId: "catalog-1", productRetailerId: "sku-1", extra: "not allowed" },
+      { type: "interactiveProducts", to: "15550001111", catalogId: "catalog-1", headerText: "Products", bodyText: "Pick", sections: [] },
+      { type: "interactiveProducts", to: "15550001111", catalogId: "catalog-1", headerText: "Products", bodyText: "Pick", sections: [{ title: "Set", productItems: [] }] },
+      { type: "interactiveCatalog", to: "15550001111" },
+      { type: "interactiveCatalog", to: "15550001111", bodyText: "Browse", extra: "not allowed" },
+      { type: "interactiveLocationRequest", to: "15550001111", bodyText: "" },
+      { type: "interactiveLocationRequest", to: "15550001111", bodyText: "Share", extra: "not allowed" }
+    ];
+
+    for (const body of invalidBodies) {
+      const res = await app.fetch(new Request("https://service.test/api/messages", authed(body)));
+      expect(res.status, JSON.stringify(body)).toBe(400);
+      expect(await res.text()).not.toContain("service-bearer");
+    }
+    expect(mock.requests.length).toBe(0);
+  });
 });
 
 describe("WATS-34 webhook composition", () => {
