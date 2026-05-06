@@ -16,7 +16,7 @@ import { GraphClient, createFetchTransport } from "@switchbord/graph";
 
 const graphClient = new GraphClient({
   accessToken: process.env.META_WA_TOKEN!,
-  apiVersion: "v21.0",
+  apiVersion: "v25.0",
   transport: createFetchTransport()
 });
 

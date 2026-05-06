@@ -59,7 +59,7 @@ function makePage(
       nextCursor !== undefined
         ? {
             cursors: { after: nextCursor },
-            next: `https://graph.facebook.com/v20.0/100/items?after=${nextCursor}`
+            next: `https://graph.facebook.com/v25.0/100/items?after=${nextCursor}`
           }
         : { cursors: {} }
   };
@@ -77,7 +77,7 @@ function buildClientAndHandle(pages: ReturnType<typeof makePage>[]): {
   const handle = createMockTransport({ responses: pages });
   const client = new GraphClient({
     accessToken: "t",
-    apiVersion: "v20.0",
+    apiVersion: "v25.0",
     baseUrl: "https://graph.facebook.com",
     transport: handle.transport as Transport
   });
@@ -412,7 +412,7 @@ describe("F-13 paginate — error wrapping", () => {
     });
     const client = new GraphClient({
       accessToken: "t",
-      apiVersion: "v20.0",
+      apiVersion: "v25.0",
       baseUrl: "https://graph.facebook.com",
       transport: handle.transport as Transport
     });

@@ -557,7 +557,7 @@ async function verify(): Promise<VerifyReportOk> {
   });
   const graphClient = new GraphClient({
     accessToken: "fixture-token",
-    apiVersion: "v21.0",
+    apiVersion: "v25.0",
     transport: mockHandle.transport
   });
   const facade = new WhatsApp({
@@ -588,7 +588,7 @@ async function verify(): Promise<VerifyReportOk> {
     startChatRes.messages?.[0]?.id === "wamid.CORE";
   checks["WhatsApp.startChat sends arbitrary recipient through @switchbord/core"] =
     mockHandle.requests[0]?.url ===
-      "https://graph.facebook.com/v21.0/1234567890/messages" &&
+      "https://graph.facebook.com/v25.0/1234567890/messages" &&
     startChatBody.to === "15551230002" &&
     startChatBody.type === "text" &&
     startChatBody.text?.body === "fixture start chat" &&
@@ -610,7 +610,7 @@ async function verify(): Promise<VerifyReportOk> {
     sendImageRes.messages?.[0]?.id === "wamid.CORE";
   checks["WhatsApp.sendImage sends exact media payload through @switchbord/core"] =
     mockHandle.requests[0]?.url ===
-      "https://graph.facebook.com/v21.0/1234567890/messages" &&
+      "https://graph.facebook.com/v25.0/1234567890/messages" &&
     sendImageBody.to === "15551230003" &&
     sendImageBody.type === "image" &&
     sendImageBody.image?.id === "IMG_ID" &&

@@ -81,11 +81,11 @@ describe("F-7 graph-consumer fixture extension", () => {
   });
 
   test("fixture asserts PhoneNumberClient URL substitution", () => {
-    expect(verifyImports).toMatch(/v20\.0\/555000111\/messages/);
+    expect(verifyImports).toMatch(/v25\.0\/555000111\/messages/);
   });
 
   test("fixture asserts WABAClient URL substitution (phone_numbers)", () => {
-    expect(verifyImports).toMatch(/v20\.0\/9876543210\/phone_numbers/);
+    expect(verifyImports).toMatch(/v25\.0\/9876543210\/phone_numbers/);
   });
 
   test("fixture asserts construction-time rejection of invalid phoneNumberId", () => {

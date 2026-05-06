@@ -52,7 +52,7 @@ import { WhatsApp } from "@switchbord/core";
 
 const graphClient = new GraphClient({
   accessToken: process.env.WATS_ACCESS_TOKEN!,
-  apiVersion: "v21.0",
+  apiVersion: "v25.0",
   transport: createFetchTransport()
 });
 

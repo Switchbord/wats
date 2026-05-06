@@ -248,7 +248,7 @@ async function verify(): Promise<VerifyReportOk> {
   try {
     new GraphClient({
       accessToken: "",
-      apiVersion: "v20.0",
+      apiVersion: "v25.0",
       baseUrl: "https://graph.facebook.com"
     });
   } catch (error) {
@@ -270,7 +270,7 @@ async function verify(): Promise<VerifyReportOk> {
   });
   const mockClient = new GraphClient({
     accessToken: "test-token",
-    apiVersion: "v20.0",
+    apiVersion: "v25.0",
     baseUrl: "https://graph.facebook.com",
     transport: handle.transport as Transport
   });
@@ -294,7 +294,7 @@ async function verify(): Promise<VerifyReportOk> {
   });
   const rawClient = new GraphClient({
     accessToken: "test-token",
-    apiVersion: "v20.0",
+    apiVersion: "v25.0",
     baseUrl: "https://graph.facebook.com",
     transport: rawHandle.transport as Transport
   });
@@ -333,14 +333,14 @@ async function verify(): Promise<VerifyReportOk> {
   });
   const proxyClient = new GraphClient({
     accessToken: "t",
-    apiVersion: "v20.0",
+    apiVersion: "v25.0",
     baseUrl: "https://proxy.example.com/api",
     transport: proxyHandle.transport as Transport
   });
   await proxyClient.request({ method: "GET", path: "/me" });
   const proxyUrl = proxyHandle.requests[0]?.url ?? "";
-  checks["baseUrl pathname preserved (/api/v20.0/me)"] =
-    proxyUrl === "https://proxy.example.com/api/v20.0/me";
+  checks["baseUrl pathname preserved (/api/v25.0/me)"] =
+    proxyUrl === "https://proxy.example.com/api/v25.0/me";
 
   // scrubErrorCause: Bearer token in string input redacted.
   const scrubbedString = scrubErrorCause(
@@ -529,7 +529,7 @@ async function verify(): Promise<VerifyReportOk> {
   });
   const callingClient = new GraphClient({
     accessToken: "t",
-    apiVersion: "v20.0",
+    apiVersion: "v25.0",
     baseUrl: "https://graph.facebook.com",
     transport: callingHandle.transport
   });
@@ -547,9 +547,9 @@ async function verify(): Promise<VerifyReportOk> {
   await phoneForCalls.terminateCall({ callId: "call-fixture" });
   checks["Calling callables and PhoneNumberClient methods emit /calls Graph paths"] =
     initiatedCall.id === "call-fixture" &&
-    callingHandle.requests[0]?.url === "https://graph.facebook.com/v20.0/555000111/calls" &&
-    callingHandle.requests[1]?.url === "https://graph.facebook.com/v20.0/555000111/calls" &&
-    callingHandle.requests[2]?.url === "https://graph.facebook.com/v20.0/555000111/calls";
+    callingHandle.requests[0]?.url === "https://graph.facebook.com/v25.0/555000111/calls" &&
+    callingHandle.requests[1]?.url === "https://graph.facebook.com/v25.0/555000111/calls" &&
+    callingHandle.requests[2]?.url === "https://graph.facebook.com/v25.0/555000111/calls";
   const initiatedCallBody = JSON.parse(String(callingHandle.requests[0]?.body)) as {
     readonly action?: string;
     readonly session?: { readonly sdp_type?: string; readonly sdp?: string };
@@ -569,7 +569,7 @@ async function verify(): Promise<VerifyReportOk> {
   });
   const templateClient = new GraphClient({
     accessToken: "t",
-    apiVersion: "v20.0",
+    apiVersion: "v25.0",
     baseUrl: "https://graph.facebook.com",
     transport: templateHandle.transport
   });
@@ -583,11 +583,11 @@ async function verify(): Promise<VerifyReportOk> {
   await wabaClient.deleteMessageTemplate({ name: "order_ready", templateId: "tpl1" });
   checks["template callables and WABAClient emit Graph paths"] =
     templateHandle.requests[0]?.url ===
-      "https://graph.facebook.com/v20.0/999/message_templates?status=APPROVED" &&
+      "https://graph.facebook.com/v25.0/999/message_templates?status=APPROVED" &&
     templateHandle.requests[1]?.url ===
-      "https://graph.facebook.com/v20.0/999/message_templates" &&
+      "https://graph.facebook.com/v25.0/999/message_templates" &&
     templateHandle.requests[2]?.url ===
-      "https://graph.facebook.com/v20.0/999/message_templates?name=order_ready&hsm_id=tpl1";
+      "https://graph.facebook.com/v25.0/999/message_templates?name=order_ready&hsm_id=tpl1";
 
   // Define a trivial custom endpoint and invoke it via MockTransport to
   // verify the path-template + query-encoding + body-passthrough contract
@@ -614,7 +614,7 @@ async function verify(): Promise<VerifyReportOk> {
   });
   const customClient = new GraphClient({
     accessToken: "t",
-    apiVersion: "v20.0",
+    apiVersion: "v25.0",
     baseUrl: "https://graph.facebook.com",
     transport: customHandle.transport as Transport
   });
@@ -627,7 +627,7 @@ async function verify(): Promise<VerifyReportOk> {
     customRes.ok === true;
   const customUrl = customHandle.requests[0]?.url ?? "";
   checks["custom defineEndpoint builds path + query correctly"] =
-    customUrl === "https://graph.facebook.com/v20.0/42/custom?cursor=abc";
+    customUrl === "https://graph.facebook.com/v25.0/42/custom?cursor=abc";
   const customBody = customHandle.requests[0]?.body;
   checks["custom defineEndpoint passes body through as JSON"] =
     typeof customBody === "string" &&
@@ -651,7 +651,7 @@ async function verify(): Promise<VerifyReportOk> {
     });
     const c = new GraphClient({
       accessToken: "t",
-      apiVersion: "v20.0",
+      apiVersion: "v25.0",
       baseUrl: "https://graph.facebook.com",
       transport: h.transport as Transport
     });
@@ -672,7 +672,7 @@ async function verify(): Promise<VerifyReportOk> {
   });
   const pnGraphClient = new GraphClient({
     accessToken: "t",
-    apiVersion: "v20.0",
+    apiVersion: "v25.0",
     baseUrl: "https://graph.facebook.com",
     transport: pnHandle.transport as Transport
   });
@@ -690,7 +690,7 @@ async function verify(): Promise<VerifyReportOk> {
     pnRes.messages?.[0]?.id === "wamid.P";
   checks["PhoneNumberClient.sendMessage URL contains bound phoneNumberId"] =
     pnHandle.requests[0]?.url ===
-    "https://graph.facebook.com/v20.0/555000111/messages";
+    "https://graph.facebook.com/v25.0/555000111/messages";
 
   pnHandle.reset();
   const pnTextRes = await phone.sendText({
@@ -707,7 +707,7 @@ async function verify(): Promise<VerifyReportOk> {
     pnTextRes.messages?.[0]?.id === "wamid.P";
   checks["PhoneNumberClient.sendText accepts arbitrary recipient via @switchbord/graph"] =
     pnHandle.requests[0]?.url ===
-      "https://graph.facebook.com/v20.0/555000111/messages" &&
+      "https://graph.facebook.com/v25.0/555000111/messages" &&
     pnTextBody.to === "15551230001" &&
     pnTextBody.type === "text" &&
     pnTextBody.text?.body === "fixture start chat" &&
@@ -725,7 +725,7 @@ async function verify(): Promise<VerifyReportOk> {
   };
   checks["PhoneNumberClient.sendImage sends exact media payload via @switchbord/graph"] =
     pnHandle.requests[0]?.url ===
-      "https://graph.facebook.com/v20.0/555000111/messages" &&
+      "https://graph.facebook.com/v25.0/555000111/messages" &&
     pnImageBody.type === "image" &&
     pnImageBody.image?.link === "https://cdn.example.test/image.jpg" &&
     pnImageBody.image?.caption === "fixture image";
@@ -755,7 +755,7 @@ async function verify(): Promise<VerifyReportOk> {
   });
   const wabaGraphClient = new GraphClient({
     accessToken: "t",
-    apiVersion: "v20.0",
+    apiVersion: "v25.0",
     baseUrl: "https://graph.facebook.com",
     transport: wabaHandle.transport as Transport
   });
@@ -768,7 +768,7 @@ async function verify(): Promise<VerifyReportOk> {
     (wabaRes.data?.length ?? 0) === 2;
   checks["WABAClient.listPhoneNumbers URL contains bound wabaId"] =
     wabaHandle.requests[0]?.url ===
-    "https://graph.facebook.com/v20.0/9876543210/phone_numbers";
+    "https://graph.facebook.com/v25.0/9876543210/phone_numbers";
   checks["WABAClient.listPhoneNumbers method is GET"] =
     wabaHandle.requests[0]?.method === "GET";
 
@@ -817,7 +817,7 @@ async function verify(): Promise<VerifyReportOk> {
         nextCursor !== undefined
           ? {
               cursors: { after: nextCursor },
-              next: `https://graph.facebook.com/v20.0/acct/items?after=${nextCursor}`
+              next: `https://graph.facebook.com/v25.0/acct/items?after=${nextCursor}`
             }
           : { cursors: {} }
     }
@@ -832,7 +832,7 @@ async function verify(): Promise<VerifyReportOk> {
   });
   const pageClient = new GraphClient({
     accessToken: "t",
-    apiVersion: "v20.0",
+    apiVersion: "v25.0",
     baseUrl: "https://graph.facebook.com",
     transport: pageHandle.transport as Transport
   });
@@ -862,7 +862,7 @@ async function verify(): Promise<VerifyReportOk> {
   });
   const allClient = new GraphClient({
     accessToken: "t",
-    apiVersion: "v20.0",
+    apiVersion: "v25.0",
     baseUrl: "https://graph.facebook.com",
     transport: allHandle.transport as Transport
   });
@@ -945,7 +945,7 @@ async function verify(): Promise<VerifyReportOk> {
   });
   const mediaClient = new GraphClient({
     accessToken: "t",
-    apiVersion: "v20.0",
+    apiVersion: "v25.0",
     baseUrl: "https://graph.facebook.com",
     transport: mediaHandle.transport as Transport
   });
@@ -965,7 +965,7 @@ async function verify(): Promise<VerifyReportOk> {
     uploadRes.id === "fixture-media-1";
   checks["uploadMedia POSTs multipart to /{phoneNumberId}/media"] =
     uploadReq?.method === "POST" &&
-    uploadReq.url === "https://graph.facebook.com/v20.0/555/media" &&
+    uploadReq.url === "https://graph.facebook.com/v25.0/555/media" &&
     uploadContentType.startsWith("multipart/form-data; boundary=") &&
     uploadReq.body instanceof Uint8Array;
 
@@ -973,7 +973,7 @@ async function verify(): Promise<VerifyReportOk> {
   checks["downloadMedia resolves metadata via GET /{mediaId}"] =
     mediaHandle.requests[1]?.method === "GET" &&
     mediaHandle.requests[1]?.url ===
-      "https://graph.facebook.com/v20.0/fixture_media_1" &&
+      "https://graph.facebook.com/v25.0/fixture_media_1" &&
     downloadRes.messagingProduct === "whatsapp" &&
     downloadRes.mimeType === "image/jpeg" &&
     downloadRes.fileSize === 3;
@@ -982,7 +982,7 @@ async function verify(): Promise<VerifyReportOk> {
   checks["deleteMedia DELETEs /{mediaId} and returns success"] =
     mediaHandle.requests[2]?.method === "DELETE" &&
     mediaHandle.requests[2]?.url ===
-      "https://graph.facebook.com/v20.0/fixture_media_1" &&
+      "https://graph.facebook.com/v25.0/fixture_media_1" &&
     deleteRes.success === true;
 
   let uploadValidationThrew: unknown;
@@ -1014,7 +1014,7 @@ async function verify(): Promise<VerifyReportOk> {
   });
   const bytesClient = new GraphClient({
     accessToken: "t",
-    apiVersion: "v20.0",
+    apiVersion: "v25.0",
     baseUrl: "https://graph.facebook.com",
     transport: bytesHandle.transport as Transport
   });
@@ -1057,7 +1057,7 @@ async function verify(): Promise<VerifyReportOk> {
   });
   const sessionClient = new GraphClient({
     accessToken: "t",
-    apiVersion: "v20.0",
+    apiVersion: "v25.0",
     baseUrl: "https://graph.facebook.com",
     transport: sessionHandle.transport as Transport
   });
@@ -1108,7 +1108,7 @@ async function verify(): Promise<VerifyReportOk> {
   });
   const businessClient = new GraphClient({
     accessToken: "t",
-    apiVersion: "v20.0",
+    apiVersion: "v25.0",
     baseUrl: "https://graph.facebook.com",
     transport: businessHandle.transport as Transport
   });
@@ -1129,7 +1129,7 @@ async function verify(): Promise<VerifyReportOk> {
     businessProfile.data?.[0]?.about === "Fixture" &&
     commerceSettings.data?.[0]?.is_cart_enabled === true &&
     businessHandle.requests.map((request) => request.url).join("|") ===
-      "https://graph.facebook.com/v20.0/waba-1?fields=id%2Cname|https://graph.facebook.com/v20.0/waba-1/subscribed_apps|https://graph.facebook.com/v20.0/waba-1/phone_numbers?fields=id&limit=5|https://graph.facebook.com/v20.0/pn-1?fields=id%2Cdisplay_phone_number|https://graph.facebook.com/v20.0/pn-1/settings?include_sip_credentials=false|https://graph.facebook.com/v20.0/pn-1/whatsapp_business_profile?fields=about|https://graph.facebook.com/v20.0/pn-1/whatsapp_commerce_settings?fields=is_cart_enabled";
+      "https://graph.facebook.com/v25.0/waba-1?fields=id%2Cname|https://graph.facebook.com/v25.0/waba-1/subscribed_apps|https://graph.facebook.com/v25.0/waba-1/phone_numbers?fields=id&limit=5|https://graph.facebook.com/v25.0/pn-1?fields=id%2Cdisplay_phone_number|https://graph.facebook.com/v25.0/pn-1/settings?include_sip_credentials=false|https://graph.facebook.com/v25.0/pn-1/whatsapp_business_profile?fields=about|https://graph.facebook.com/v25.0/pn-1/whatsapp_commerce_settings?fields=is_cart_enabled";
 
   for (const [label, ok] of Object.entries(checks)) {
     if (!ok) {

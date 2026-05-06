@@ -43,7 +43,7 @@ function clientWith(responses: MockTransportResponseSpec[] | MockTransportRespon
   );
   const client = new GraphClient({
     baseUrl: "https://graph.facebook.com",
-    apiVersion: "v20.0",
+    apiVersion: "v25.0",
     accessToken: "test-token",
     transport: handle.transport
   });
@@ -95,7 +95,7 @@ describe("WATS-40 Flow endpoint callables", () => {
     expect(res.data?.[0]?.id).toBe("flow1");
     expect(handle.requests[0]?.method).toBe("GET");
     expect(handle.requests[0]?.url).toBe(
-      "https://graph.facebook.com/v20.0/999/flows?fields=id%2Cname%2Cstatus%2Ccategories&status=PUBLISHED&name=signup&invalidate_preview=true&phone_number_id=555&limit=10&after=CURSOR"
+      "https://graph.facebook.com/v25.0/999/flows?fields=id%2Cname%2Cstatus%2Ccategories&status=PUBLISHED&name=signup&invalidate_preview=true&phone_number_id=555&limit=10&after=CURSOR"
     );
   });
 
@@ -110,7 +110,7 @@ describe("WATS-40 Flow endpoint callables", () => {
     expect(res.id).toBe("flow1");
     expect(handle.requests[0]?.method).toBe("GET");
     expect(handle.requests[0]?.url).toBe(
-      "https://graph.facebook.com/v20.0/flow1?fields=id%2Cname%2Cstatus%2Cvalidation_errors&invalidate_preview=true&phone_number_id=555"
+      "https://graph.facebook.com/v25.0/flow1?fields=id%2Cname%2Cstatus%2Cvalidation_errors&invalidate_preview=true&phone_number_id=555"
     );
   });
 
@@ -131,7 +131,7 @@ describe("WATS-40 Flow endpoint callables", () => {
     );
     expect(res.success).toBe(true);
     expect(handle.requests[0]?.method).toBe("POST");
-    expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v20.0/999/flows");
+    expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v25.0/999/flows");
     expect(handle.requests[0]?.headers.get("content-type")).toBe("application/json");
     expect(parseBody(handle.requests[0]?.body)).toEqual({
       name: "signup_flow",
@@ -155,7 +155,7 @@ describe("WATS-40 Flow endpoint callables", () => {
       unused: undefined
     } as never);
     expect(handle.requests[0]?.method).toBe("POST");
-    expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v20.0/flow1");
+    expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v25.0/flow1");
     expect(parseBody(handle.requests[0]?.body)).toEqual({
       name: "renamed_flow",
       categories: ["APPOINTMENT_BOOKING"],
@@ -169,7 +169,7 @@ describe("WATS-40 Flow endpoint callables", () => {
     const { client, handle } = clientWith(ok({ success: true }));
     await updateFlowJson(client, { flowId: "flow1" }, { flowJson });
     expect(handle.requests[0]?.method).toBe("POST");
-    expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v20.0/flow1/assets");
+    expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v25.0/flow1/assets");
     expect(handle.requests[0]?.headers.get("content-type")).toBe("application/json");
     expect(parseBody(handle.requests[0]?.body)).toEqual({
       name: "flow.json",
@@ -190,10 +190,10 @@ describe("WATS-40 Flow endpoint callables", () => {
     await deprecateFlow(client, { flowId: "flow1" });
     await getFlowAssets(client, { flowId: "flow1", fields: "name,asset_type", limit: "25", after: "NEXT" });
     expect(handle.requests.map((r) => `${r.method} ${r.url}`)).toEqual([
-      "POST https://graph.facebook.com/v20.0/flow1/publish",
-      "DELETE https://graph.facebook.com/v20.0/flow1",
-      "POST https://graph.facebook.com/v20.0/flow1/deprecate",
-      "GET https://graph.facebook.com/v20.0/flow1/assets?fields=name%2Casset_type&limit=25&after=NEXT"
+      "POST https://graph.facebook.com/v25.0/flow1/publish",
+      "DELETE https://graph.facebook.com/v25.0/flow1",
+      "POST https://graph.facebook.com/v25.0/flow1/deprecate",
+      "GET https://graph.facebook.com/v25.0/flow1/assets?fields=name%2Casset_type&limit=25&after=NEXT"
     ]);
   });
 
@@ -240,15 +240,15 @@ describe("WATS-40 WABAClient Flow methods", () => {
     await waba.deprecateFlow({ flowId: "flow1" });
     await waba.getFlowAssets({ flowId: "flow1" });
     expect(handle.requests.map((r) => `${r.method} ${r.url}`)).toEqual([
-      "GET https://graph.facebook.com/v20.0/999/flows?status=DRAFT",
-      "GET https://graph.facebook.com/v20.0/999/flows?status=PUBLISHED",
-      "POST https://graph.facebook.com/v20.0/999/flows",
-      "GET https://graph.facebook.com/v20.0/flow1?fields=id%2Cname",
-      "POST https://graph.facebook.com/v20.0/flow1",
-      "POST https://graph.facebook.com/v20.0/flow1/assets",
-      "POST https://graph.facebook.com/v20.0/flow1/publish",
-      "POST https://graph.facebook.com/v20.0/flow1/deprecate",
-      "GET https://graph.facebook.com/v20.0/flow1/assets"
+      "GET https://graph.facebook.com/v25.0/999/flows?status=DRAFT",
+      "GET https://graph.facebook.com/v25.0/999/flows?status=PUBLISHED",
+      "POST https://graph.facebook.com/v25.0/999/flows",
+      "GET https://graph.facebook.com/v25.0/flow1?fields=id%2Cname",
+      "POST https://graph.facebook.com/v25.0/flow1",
+      "POST https://graph.facebook.com/v25.0/flow1/assets",
+      "POST https://graph.facebook.com/v25.0/flow1/publish",
+      "POST https://graph.facebook.com/v25.0/flow1/deprecate",
+      "GET https://graph.facebook.com/v25.0/flow1/assets"
     ]);
   });
 

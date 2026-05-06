@@ -22,7 +22,7 @@ function buildRequest(overrides: Partial<TransportRequest> = {}): TransportReque
   const headers = new Headers({ authorization: "Bearer test" });
   return {
     method: "GET",
-    url: "https://graph.facebook.com/v20.0/me",
+    url: "https://graph.facebook.com/v25.0/me",
     headers,
     body: null,
     ...overrides
@@ -49,7 +49,7 @@ describe("createFetchTransport", () => {
     expect(calls.length).toBe(1);
     const first = calls[0];
     expect(first).toBeDefined();
-    expect(first?.url).toBe("https://graph.facebook.com/v20.0/me");
+    expect(first?.url).toBe("https://graph.facebook.com/v25.0/me");
     expect(first?.init.method).toBe("GET");
     const h = new Headers(first?.init.headers);
     expect(h.get("authorization")).toBe("Bearer test");
@@ -164,7 +164,7 @@ describe("createMockTransport", () => {
     headers.set("content-type", "application/json");
     await handle.transport.request({
       method: "POST",
-      url: "https://example.test/v20.0/123/messages",
+      url: "https://example.test/v25.0/123/messages",
       headers,
       body: JSON.stringify({ hello: "world" })
     });
@@ -173,7 +173,7 @@ describe("createMockTransport", () => {
     const rec = handle.requests[0];
     expect(rec).toBeDefined();
     expect(rec?.method).toBe("POST");
-    expect(rec?.url).toBe("https://example.test/v20.0/123/messages");
+    expect(rec?.url).toBe("https://example.test/v25.0/123/messages");
     expect(rec?.headers.get("authorization")).toBe("Bearer xyz");
     expect(rec?.headers.get("content-type")).toBe("application/json");
     expect(rec?.body).toBe(JSON.stringify({ hello: "world" }));

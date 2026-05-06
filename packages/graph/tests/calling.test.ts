@@ -48,7 +48,7 @@ function clientWith(responses: MockTransportResponseSpec[] | MockTransportRespon
   );
   const client = new GraphClient({
     baseUrl: "https://graph.facebook.com",
-    apiVersion: "v20.0",
+    apiVersion: "v25.0",
     accessToken: "test-token",
     transport: handle.transport
   });
@@ -79,7 +79,7 @@ describe("WATS-41 Calling endpoint callables", () => {
     );
     expect(response.id).toBe("call-123");
     expect(handle.requests[0]?.method).toBe("POST");
-    expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v20.0/555/calls");
+    expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v25.0/555/calls");
     expect(handle.requests[0]?.headers.get("content-type")).toBe("application/json");
     expect(parseBody(handle.requests[0]?.body)).toEqual({
       messaging_product: "whatsapp",
@@ -100,10 +100,10 @@ describe("WATS-41 Calling endpoint callables", () => {
     await rejectCall(client, { phoneNumberId: "555" }, { callId: "call-1" });
     await terminateCall(client, { phoneNumberId: "555" }, { callId: "call-1" });
     expect(handle.requests.map((r) => `${r.method} ${r.url}`)).toEqual([
-      "POST https://graph.facebook.com/v20.0/555/calls",
-      "POST https://graph.facebook.com/v20.0/555/calls",
-      "POST https://graph.facebook.com/v20.0/555/calls",
-      "POST https://graph.facebook.com/v20.0/555/calls"
+      "POST https://graph.facebook.com/v25.0/555/calls",
+      "POST https://graph.facebook.com/v25.0/555/calls",
+      "POST https://graph.facebook.com/v25.0/555/calls",
+      "POST https://graph.facebook.com/v25.0/555/calls"
     ]);
     expect(handle.requests.map((r) => parseBody(r.body))).toEqual([
       { messaging_product: "whatsapp", call_id: "call-1", action: "pre_accept", session: { sdp_type: "offer", sdp: session.sdp } },
@@ -145,11 +145,11 @@ describe("WATS-41 PhoneNumberClient Calling methods", () => {
     await phone.rejectCall({ phoneNumberId: "OVERRIDE", callId: "call-1" } as never);
     await phone.terminateCall({ phoneNumberId: "OVERRIDE", callId: "call-1" } as never);
     expect(handle.requests.map((r) => r.url)).toEqual([
-      "https://graph.facebook.com/v20.0/BOUND/calls",
-      "https://graph.facebook.com/v20.0/BOUND/calls",
-      "https://graph.facebook.com/v20.0/BOUND/calls",
-      "https://graph.facebook.com/v20.0/BOUND/calls",
-      "https://graph.facebook.com/v20.0/BOUND/calls"
+      "https://graph.facebook.com/v25.0/BOUND/calls",
+      "https://graph.facebook.com/v25.0/BOUND/calls",
+      "https://graph.facebook.com/v25.0/BOUND/calls",
+      "https://graph.facebook.com/v25.0/BOUND/calls",
+      "https://graph.facebook.com/v25.0/BOUND/calls"
     ]);
   });
 

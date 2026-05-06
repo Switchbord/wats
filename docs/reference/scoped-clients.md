@@ -72,7 +72,7 @@ import {
 
 const graphClient = new GraphClient({
   accessToken: process.env.WHATSAPP_TOKEN!,
-  apiVersion: "v20.0"
+  apiVersion: "v25.0"
 });
 
 const phone = new PhoneNumberClient({

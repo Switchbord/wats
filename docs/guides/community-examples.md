@@ -63,7 +63,7 @@ const mock = createMockTransport({
 
 const client = new GraphClient({
   accessToken: process.env.WATS_ACCESS_TOKEN ?? "offline",
-  apiVersion: "v21.0",
+  apiVersion: "v25.0",
   baseUrl: "https://graph.test/",
   transport: mock.transport
 });
@@ -86,7 +86,7 @@ import { createMockTransport } from "@switchbord/graph/testing";
 import { createWatsServiceApp, createWatsServiceOpenApiDocument } from "@switchbord/service";
 
 const profile: WatsProfileConfig = {
-  graph: { apiVersion: "v21.0", baseUrl: "https://graph.test/" },
+  graph: { apiVersion: "v25.0", baseUrl: "https://graph.test/" },
   whatsapp: { wabaId: "000000000000000", phoneNumberId: "00000000000" },
   auth: { accessToken: { env: "WATS_ACCESS_TOKEN" } },
   webhook: {

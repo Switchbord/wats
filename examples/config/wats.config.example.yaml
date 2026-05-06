@@ -3,7 +3,7 @@ defaultProfile: local
 profiles:
   local:
     graph:
-      apiVersion: v21.0
+      apiVersion: v25.0
       baseUrl: https://graph.facebook.com
     whatsapp:
       wabaId: "000000000000000"
@@ -26,7 +26,7 @@ profiles:
         env: WATS_SERVICE_TOKEN
   prod:
     graph:
-      apiVersion: v21.0
+      apiVersion: v25.0
       baseUrl: https://graph.facebook.com
     whatsapp:
       wabaId: "000000000000000"

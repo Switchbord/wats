@@ -62,7 +62,7 @@ const handle = createMockTransport({
 
 const graphClient = new GraphClient({
   accessToken: "test-token",
-  apiVersion: "v21.0",
+  apiVersion: "v25.0",
   baseUrl: "https://graph.facebook.com",
   transport: handle.transport
 });
@@ -97,7 +97,7 @@ const res = await wa.phoneNumberClient!.sendMessage({
   text: { body: "hello from WATS" }
 });
 // Against MockTransport the URL captured is:
-//   https://graph.facebook.com/v21.0/1234567890/messages
+//   https://graph.facebook.com/v25.0/1234567890/messages
 ```
 
 Errors route through the F-5 registry. Narrow via `instanceof`:
@@ -303,7 +303,7 @@ const handle = createMockTransport({
 });
 const graphClient = new GraphClient({
   accessToken: "t",
-  apiVersion: "v21.0",
+  apiVersion: "v25.0",
   transport: handle.transport
 });
 const wa = new WhatsApp({ graphClient, phoneNumberId: "555" });
@@ -386,7 +386,7 @@ const page = (ids: string[], next?: string) => ({
     paging: next !== undefined
       ? {
           cursors: { after: next },
-          next: `https://graph.facebook.com/v21.0/acct/items?after=${next}`
+          next: `https://graph.facebook.com/v25.0/acct/items?after=${next}`
         }
       : { cursors: {} }
   }
@@ -396,7 +396,7 @@ const mock = createMockTransport({
 });
 const client = new GraphClient({
   accessToken: "t",
-  apiVersion: "v21.0",
+  apiVersion: "v25.0",
   transport: mock.transport
 });
 

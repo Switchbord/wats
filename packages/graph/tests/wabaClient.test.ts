@@ -33,7 +33,7 @@ function clientWith(
   );
   const client = new GraphClient({
     baseUrl: "https://graph.facebook.com",
-    apiVersion: "v20.0",
+    apiVersion: "v25.0",
     accessToken: "test-token",
     transport: handle.transport
   });
@@ -136,7 +136,7 @@ describe("F-7 WABAClient.listPhoneNumbers round-trip", () => {
     const rec = handle.requests[0];
     expect(rec?.method).toBe("GET");
     expect(rec?.url).toBe(
-      "https://graph.facebook.com/v20.0/999/phone_numbers"
+      "https://graph.facebook.com/v25.0/999/phone_numbers"
     );
     expect(rec?.headers.get("authorization")).toBe("Bearer test-token");
   });
@@ -274,6 +274,6 @@ describe("WATS-61 WABAClient params validation utility migration", () => {
 
     await waba.listPhoneNumbers({ wabaId: "OVERRIDE", limit: undefined } as never);
 
-    expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v20.0/BOUND-WABA/phone_numbers");
+    expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v25.0/BOUND-WABA/phone_numbers");
   });
 });

@@ -40,10 +40,10 @@ B2 introduced a minimal Graph API client primitive in `@switchbord/graph`; F-4 r
 
 Required fields:
 - `accessToken: string` — non-empty; max 4096 characters; MUST NOT be whitespace-only; MUST NOT contain CR (U+000D), LF (U+000A), NUL (U+0000), or any other control character (U+0000..U+001F, U+007F). Invalid tokens throw `GraphRequestValidationError` at construction time.
-- `apiVersion: string` — MUST match `/^v\d+(\.\d+)?$/` (for example `v20` or `v20.0`). Values containing `/`, `?`, `#`, `..`, or control characters are rejected with `GraphRequestValidationError`.
+- `apiVersion: string` — MUST match `/^v\d+(\.\d+)?$/` (for example `v20` or `v25.0`). Values containing `/`, `?`, `#`, `..`, or control characters are rejected with `GraphRequestValidationError`.
 
 Optional fields:
-- `baseUrl?: string` — defaults to `DEFAULT_GRAPH_BASE_URL` (`"https://graph.facebook.com/"`). MUST parse via `new URL(...)` AND the parsed `protocol` MUST be `http:` or `https:`; every other scheme (`javascript:`, `file:`, `ftp:`, `data:`, `about:`, `blob:`, …) is rejected with `GraphRequestValidationError`. The pathname of `baseUrl` is PRESERVED in resolved request URLs: `baseUrl: "https://proxy.example.com/api"` + `path: "/me"` + `apiVersion: "v20.0"` resolves to `"https://proxy.example.com/api/v20.0/me"`. This matches Open Question #11's default (preserve, not reject).
+- `baseUrl?: string` — defaults to `DEFAULT_GRAPH_BASE_URL` (`"https://graph.facebook.com/"`). MUST parse via `new URL(...)` AND the parsed `protocol` MUST be `http:` or `https:`; every other scheme (`javascript:`, `file:`, `ftp:`, `data:`, `about:`, `blob:`, …) is rejected with `GraphRequestValidationError`. The pathname of `baseUrl` is PRESERVED in resolved request URLs: `baseUrl: "https://proxy.example.com/api"` + `path: "/me"` + `apiVersion: "v25.0"` resolves to `"https://proxy.example.com/api/v25.0/me"`. This matches Open Question #11's default (preserve, not reject).
 - `transport?: Transport` — defaults to `createFetchTransport()`. Inject a custom `Transport` to add retry, auth-refresh, tracing, or to mock requests in tests. See the [Transport and Testing guide](../guides/transport-and-testing.md).
 
 `DEFAULT_GRAPH_BASE_URL` is exported for consumers that want to reference the default explicitly.
@@ -243,7 +243,7 @@ import { WhatsApp } from "@switchbord/core";
 
 const graphClient = new GraphClient({
   accessToken: process.env.WHATSAPP_TOKEN!,
-  apiVersion: "v21.0"
+  apiVersion: "v25.0"
 });
 
 const wa = new WhatsApp({

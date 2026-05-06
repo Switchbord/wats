@@ -145,7 +145,7 @@ defaultProfile: local
 profiles:
   local:
     graph:
-      apiVersion: v21.0
+      apiVersion: v25.0
       baseUrl: https://graph.facebook.com
     whatsapp:
       wabaId: replace-with-waba-id

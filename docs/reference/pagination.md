@@ -60,7 +60,7 @@ const listPhoneNumbers = defineEndpoint<
 
 const client = new GraphClient({
   accessToken: "...",
-  apiVersion: "v20.0"
+  apiVersion: "v25.0"
 });
 
 // 2. Stream items one at a time (recommended for large result sets).

@@ -30,7 +30,7 @@ import { GraphClient } from "@switchbord/graph";
 
 const graphClient = new GraphClient({
   baseUrl: "https://graph.facebook.com",
-  apiVersion: "v20.0",
+  apiVersion: "v25.0",
   accessToken: process.env.WHATSAPP_GRAPH_TOKEN as string
 });
 

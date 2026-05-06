@@ -42,7 +42,7 @@ function clientWith(
   );
   const client = new GraphClient({
     baseUrl: "https://graph.facebook.com",
-    apiVersion: "v20.0",
+    apiVersion: "v25.0",
     accessToken: "test-token",
     transport: handle.transport
   });
@@ -79,7 +79,7 @@ describe("WATS-39 message template endpoint callables", () => {
     expect(res.data?.[0]?.id).toBe("tpl1");
     expect(handle.requests[0]?.method).toBe("GET");
     expect(handle.requests[0]?.url).toBe(
-      "https://graph.facebook.com/v20.0/999/message_templates?fields=id%2Cname%2Cstatus&status=APPROVED&category=UTILITY&language=en_US&name=hello_world&content=hello&name_or_content=world&quality_score=GREEN&limit=25&after=CURSOR"
+      "https://graph.facebook.com/v25.0/999/message_templates?fields=id%2Cname%2Cstatus&status=APPROVED&category=UTILITY&language=en_US&name=hello_world&content=hello&name_or_content=world&quality_score=GREEN&limit=25&after=CURSOR"
     );
   });
 
@@ -92,7 +92,7 @@ describe("WATS-39 message template endpoint callables", () => {
     expect(res.id).toBe("tpl1");
     expect(handle.requests[0]?.method).toBe("GET");
     expect(handle.requests[0]?.url).toBe(
-      "https://graph.facebook.com/v20.0/tpl1?fields=id%2Cname%2Cstatus%2Ccomponents"
+      "https://graph.facebook.com/v25.0/tpl1?fields=id%2Cname%2Cstatus%2Ccomponents"
     );
   });
 
@@ -117,7 +117,7 @@ describe("WATS-39 message template endpoint callables", () => {
     );
     expect(res.success).toBe(true);
     expect(handle.requests[0]?.method).toBe("POST");
-    expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v20.0/999/message_templates");
+    expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v25.0/999/message_templates");
     expect(handle.requests[0]?.headers.get("content-type")).toBe("application/json");
     expect(parseBody(handle.requests[0]?.body)).toEqual({
       name: "order_ready",
@@ -147,7 +147,7 @@ describe("WATS-39 message template endpoint callables", () => {
       }
     );
     expect(handle.requests[0]?.method).toBe("POST");
-    expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v20.0/tpl1");
+    expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v25.0/tpl1");
     expect(parseBody(handle.requests[0]?.body)).toEqual({
       category: "MARKETING",
       components: [{ type: "BODY", text: "Sale {{code}}" }],
@@ -165,7 +165,7 @@ describe("WATS-39 message template endpoint callables", () => {
     });
     expect(handle.requests[0]?.method).toBe("DELETE");
     expect(handle.requests[0]?.url).toBe(
-      "https://graph.facebook.com/v20.0/999/message_templates?name=order_ready&hsm_id=tpl1"
+      "https://graph.facebook.com/v25.0/999/message_templates?name=order_ready&hsm_id=tpl1"
     );
   });
 
@@ -214,11 +214,11 @@ describe("WATS-39 WABAClient template methods", () => {
     await waba.deleteMessageTemplate({ name: "hello_world", templateId: "tpl1" });
     await waba.deleteMessageTemplate({ wabaId: "OVERRIDE", name: "override", templateId: "tpl2" } as never);
     expect(handle.requests.map((r) => `${r.method} ${r.url}`)).toEqual([
-      "GET https://graph.facebook.com/v20.0/999/message_templates?status=APPROVED",
-      "GET https://graph.facebook.com/v20.0/999/message_templates?status=PENDING",
-      "POST https://graph.facebook.com/v20.0/999/message_templates",
-      "DELETE https://graph.facebook.com/v20.0/999/message_templates?name=hello_world&hsm_id=tpl1",
-      "DELETE https://graph.facebook.com/v20.0/999/message_templates?name=override&hsm_id=tpl2"
+      "GET https://graph.facebook.com/v25.0/999/message_templates?status=APPROVED",
+      "GET https://graph.facebook.com/v25.0/999/message_templates?status=PENDING",
+      "POST https://graph.facebook.com/v25.0/999/message_templates",
+      "DELETE https://graph.facebook.com/v25.0/999/message_templates?name=hello_world&hsm_id=tpl1",
+      "DELETE https://graph.facebook.com/v25.0/999/message_templates?name=override&hsm_id=tpl2"
     ]);
   });
 
@@ -230,8 +230,8 @@ describe("WATS-39 WABAClient template methods", () => {
       templateId: "tpl1",
       category: "UTILITY"
     });
-    expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v20.0/tpl1?fields=id%2Cname");
-    expect(handle.requests[1]?.url).toBe("https://graph.facebook.com/v20.0/tpl1");
+    expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v25.0/tpl1?fields=id%2Cname");
+    expect(handle.requests[1]?.url).toBe("https://graph.facebook.com/v25.0/tpl1");
   });
 
   test("WABAClient methods reject accessor-backed params before spread/destructuring", async () => {

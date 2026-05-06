@@ -35,7 +35,7 @@ function buildContext(
     payload,
     status,
     headers: new Headers(),
-    requestUrl: "https://graph.facebook.com/v20.0/me"
+    requestUrl: "https://graph.facebook.com/v25.0/me"
   };
 }
 

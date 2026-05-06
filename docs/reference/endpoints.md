@@ -213,7 +213,7 @@ import { GraphClient, sendMessage } from "@switchbord/graph";
 
 const client = new GraphClient({
   accessToken: process.env.WATS_TOKEN!,
-  apiVersion: "v20.0"
+  apiVersion: "v25.0"
 });
 
 const result = await sendMessage(
@@ -272,7 +272,7 @@ export const getAnalytics = defineEndpoint<
 // call it:
 const client = new GraphClient({
   accessToken: "…",
-  apiVersion: "v20.0"
+  apiVersion: "v25.0"
 });
 const report = await getAnalytics(client, {
   businessId: "987654321",

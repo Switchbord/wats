@@ -41,7 +41,7 @@ defaultProfile: default
 profiles:
   default:
     graph:
-      apiVersion: v21.0
+      apiVersion: v25.0
       baseUrl: https://graph.facebook.com
 
     whatsapp:
