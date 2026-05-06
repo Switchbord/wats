@@ -5,7 +5,10 @@ import {
   buildSendDocumentPayload,
   buildRemoveReactionPayload,
   buildSendImagePayload,
+  buildSendButtonsPayload,
   buildSendContactsPayload,
+  buildSendCtaUrlPayload,
+  buildSendListPayload,
   buildSendLocationPayload,
   buildSendReactionPayload,
   buildSendStickerPayload,
@@ -431,6 +434,53 @@ function createOpenApiSchemas(): Record<string, Record<string, unknown>> {
         { required: ["link"], not: { required: ["mediaId"] } }
       ]
     },
+    BasicInteractiveMessageBody: {
+      oneOf: [
+        {
+          type: "object",
+          additionalProperties: false,
+          required: ["type", "to", "bodyText", "buttons"],
+          properties: {
+            type: { type: "string", const: "interactiveButtons" },
+            to: { type: "string", minLength: 1 },
+            bodyText: { type: "string", minLength: 1 },
+            buttons: { type: "array", minItems: 1, items: { type: "object", additionalProperties: true } },
+            headerText: { type: "string", minLength: 1 },
+            footerText: { type: "string", minLength: 1 },
+            replyToMessageId: { type: "string", minLength: 1 }
+          }
+        },
+        {
+          type: "object",
+          additionalProperties: false,
+          required: ["type", "to", "bodyText", "buttonText", "sections"],
+          properties: {
+            type: { type: "string", const: "interactiveList" },
+            to: { type: "string", minLength: 1 },
+            bodyText: { type: "string", minLength: 1 },
+            buttonText: { type: "string", minLength: 1 },
+            sections: { type: "array", minItems: 1, items: { type: "object", additionalProperties: true } },
+            headerText: { type: "string", minLength: 1 },
+            footerText: { type: "string", minLength: 1 },
+            replyToMessageId: { type: "string", minLength: 1 }
+          }
+        },
+        {
+          type: "object",
+          additionalProperties: false,
+          required: ["type", "to", "bodyText", "displayText", "url"],
+          properties: {
+            type: { type: "string", const: "interactiveCtaUrl" },
+            to: { type: "string", minLength: 1 },
+            bodyText: { type: "string", minLength: 1 },
+            displayText: { type: "string", minLength: 1 },
+            url: { type: "string", minLength: 1 },
+            footerText: { type: "string", minLength: 1 },
+            replyToMessageId: { type: "string", minLength: 1 }
+          }
+        }
+      ]
+    },
     ContactsMessageBody: {
       type: "object",
       additionalProperties: false,
@@ -487,9 +537,10 @@ function createOpenApiSchemas(): Record<string, Record<string, unknown>> {
         schemaRef("MediaMessageBody"),
         schemaRef("LocationMessageBody"),
         schemaRef("ContactsMessageBody"),
-        schemaRef("ReactionMessageBody")
+        schemaRef("ReactionMessageBody"),
+        schemaRef("BasicInteractiveMessageBody")
       ],
-      description: "Supported POST /messages bodies: generic Graph-native text, WATS media composer, location, reaction, remove-reaction, or contacts bodies."
+      description: "Supported POST /messages bodies: generic Graph-native text, WATS media composer, location, reaction, remove-reaction, contacts, or basic interactive bodies."
     },
     GraphResponsePassthrough: {
       type: "object",
@@ -591,7 +642,7 @@ export function createWatsServiceOpenApiDocument(
         post: messageOperation("Send a text message", "TextMessageBody")
       },
       [messagesPath]: {
-        post: messageOperation("Send a supported text, media, location, reaction, or contacts message body", "SupportedMessageBody")
+        post: messageOperation("Send a supported text, media, location, reaction, contacts, or basic interactive message body", "SupportedMessageBody")
       },
       [OPENAPI_PATH]: {
         get: {
@@ -635,6 +686,7 @@ function validateTextBody(body: unknown): { to: string; text: string; previewUrl
 type ServiceMediaMessageKind = "image" | "video" | "audio" | "document" | "sticker";
 type ServiceLocationReactionMessageKind = "location" | "reaction" | "removeReaction";
 type ServiceContactsMessageKind = "contacts";
+type ServiceBasicInteractiveMessageKind = "interactiveButtons" | "interactiveList" | "interactiveCtaUrl";
 
 interface ServiceMediaMessageInput {
   readonly type: ServiceMediaMessageKind;
@@ -664,6 +716,11 @@ interface ServiceContactsMessageInput {
   readonly contacts: readonly Record<string, unknown>[];
   readonly replyToMessageId?: string;
 }
+
+type ServiceBasicInteractiveMessageInput = Record<string, unknown> & {
+  readonly type: ServiceBasicInteractiveMessageKind;
+  readonly to: string;
+};
 
 function validateGenericTextMessageBody(body: unknown): GraphMessagesSendBody | null {
   if (!isRecord(body)) return null;
@@ -739,6 +796,33 @@ function validateServiceLocationReactionMessageBody(body: unknown): ServiceLocat
   return { type: "removeReaction", to: body.to, messageId: body.messageId };
 }
 
+function validateServiceBasicInteractiveMessageBody(body: unknown): ServiceBasicInteractiveMessageInput | null {
+  if (!isRecord(body)) return null;
+  if (body.type !== "interactiveButtons" && body.type !== "interactiveList" && body.type !== "interactiveCtaUrl") return null;
+  if (!isNonEmptyString(body.to)) return null;
+  if (body.type === "interactiveButtons") {
+    if (!hasOnlyKeys(body, ["type", "to", "bodyText", "buttons", "headerText", "footerText", "replyToMessageId"])) return null;
+    if (!isNonEmptyString(body.bodyText) || !Array.isArray(body.buttons) || body.buttons.length === 0) return null;
+    if (body.headerText !== undefined && !isNonEmptyString(body.headerText)) return null;
+    if (body.footerText !== undefined && !isNonEmptyString(body.footerText)) return null;
+    if (body.replyToMessageId !== undefined && !isNonEmptyString(body.replyToMessageId)) return null;
+    return body as ServiceBasicInteractiveMessageInput;
+  }
+  if (body.type === "interactiveList") {
+    if (!hasOnlyKeys(body, ["type", "to", "bodyText", "buttonText", "sections", "headerText", "footerText", "replyToMessageId"])) return null;
+    if (!isNonEmptyString(body.bodyText) || !isNonEmptyString(body.buttonText) || !Array.isArray(body.sections) || body.sections.length === 0) return null;
+    if (body.headerText !== undefined && !isNonEmptyString(body.headerText)) return null;
+    if (body.footerText !== undefined && !isNonEmptyString(body.footerText)) return null;
+    if (body.replyToMessageId !== undefined && !isNonEmptyString(body.replyToMessageId)) return null;
+    return body as ServiceBasicInteractiveMessageInput;
+  }
+  if (!hasOnlyKeys(body, ["type", "to", "bodyText", "displayText", "url", "footerText", "replyToMessageId"])) return null;
+  if (!isNonEmptyString(body.bodyText) || !isNonEmptyString(body.displayText) || !isNonEmptyString(body.url)) return null;
+  if (body.footerText !== undefined && !isNonEmptyString(body.footerText)) return null;
+  if (body.replyToMessageId !== undefined && !isNonEmptyString(body.replyToMessageId)) return null;
+  return body as ServiceBasicInteractiveMessageInput;
+}
+
 function validateServiceContactsMessageBody(body: unknown): ServiceContactsMessageInput | null {
   if (!isRecord(body)) return null;
   if (body.type !== "contacts") return null;
@@ -785,17 +869,30 @@ function buildServiceContactsPayload(input: ServiceContactsMessageInput): GraphM
   return buildSendContactsPayload(input as unknown as Parameters<typeof buildSendContactsPayload>[0]) as GraphMessagesSendBody;
 }
 
+function buildServiceBasicInteractivePayload(input: ServiceBasicInteractiveMessageInput): GraphMessagesSendBody {
+  switch (input.type) {
+    case "interactiveButtons":
+      return buildSendButtonsPayload(input as unknown as Parameters<typeof buildSendButtonsPayload>[0]) as GraphMessagesSendBody;
+    case "interactiveList":
+      return buildSendListPayload(input as unknown as Parameters<typeof buildSendListPayload>[0]) as GraphMessagesSendBody;
+    case "interactiveCtaUrl":
+      return buildSendCtaUrlPayload(input as unknown as Parameters<typeof buildSendCtaUrlPayload>[0]) as GraphMessagesSendBody;
+  }
+}
+
 function buildSupportedMessageBody(body: unknown): GraphMessagesSendBody | null {
   const text = validateGenericTextMessageBody(body);
   if (text !== null) return text;
   const media = validateServiceMediaMessageBody(body);
   const locationReaction = media === null ? validateServiceLocationReactionMessageBody(body) : null;
   const contacts = media === null && locationReaction === null ? validateServiceContactsMessageBody(body) : null;
-  if (media === null && locationReaction === null && contacts === null) return null;
+  const interactive = media === null && locationReaction === null && contacts === null ? validateServiceBasicInteractiveMessageBody(body) : null;
+  if (media === null && locationReaction === null && contacts === null && interactive === null) return null;
   try {
     if (media !== null) return buildServiceMediaMessagePayload(media);
     if (locationReaction !== null) return buildServiceLocationReactionPayload(locationReaction);
-    return buildServiceContactsPayload(contacts as ServiceContactsMessageInput);
+    if (contacts !== null) return buildServiceContactsPayload(contacts);
+    return buildServiceBasicInteractivePayload(interactive as ServiceBasicInteractiveMessageInput);
   } catch (error) {
     if (error instanceof GraphRequestValidationError) return null;
     throw error;
