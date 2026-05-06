@@ -1,6 +1,16 @@
 import type { WatsProfileConfig } from "@switchbord/config";
 import { WhatsApp } from "@switchbord/core";
-import { GraphClient, type GraphMessagesSendBody, type Transport } from "@switchbord/graph";
+import {
+  buildSendAudioPayload,
+  buildSendDocumentPayload,
+  buildSendImagePayload,
+  buildSendStickerPayload,
+  buildSendVideoPayload,
+  GraphClient,
+  GraphRequestValidationError,
+  type GraphMessagesSendBody,
+  type Transport
+} from "@switchbord/graph";
 import type { CryptoProvider } from "@switchbord/crypto";
 import {
   createFetchWebhookHandler,
@@ -399,6 +409,28 @@ function createOpenApiSchemas(): Record<string, Record<string, unknown>> {
         }
       }
     },
+    MediaMessageBody: {
+      type: "object",
+      additionalProperties: false,
+      required: ["type", "to"],
+      properties: {
+        type: { type: "string", enum: ["image", "video", "audio", "document", "sticker"] },
+        to: { type: "string", minLength: 1, description: "WhatsApp recipient phone number or wa_id." },
+        mediaId: { type: "string", minLength: 1, description: "Uploaded Graph media ID. Mutually exclusive with link." },
+        link: { type: "string", minLength: 1, description: "HTTPS media URL. Mutually exclusive with mediaId." },
+        caption: { type: "string", minLength: 1, description: "Allowed for image, video, and document bodies." },
+        filename: { type: "string", minLength: 1, description: "Allowed for document bodies only." },
+        replyToMessageId: { type: "string", minLength: 1, description: "Optional message ID to send as a reply context." }
+      },
+      oneOf: [
+        { required: ["mediaId"], not: { required: ["link"] } },
+        { required: ["link"], not: { required: ["mediaId"] } }
+      ]
+    },
+    SupportedMessageBody: {
+      oneOf: [schemaRef("GenericTextMessageBody"), schemaRef("MediaMessageBody")],
+      description: "Supported POST /messages bodies: generic Graph-native text or WATS media composer bodies."
+    },
     GraphResponsePassthrough: {
       type: "object",
       additionalProperties: true,
@@ -499,7 +531,7 @@ export function createWatsServiceOpenApiDocument(
         post: messageOperation("Send a text message", "TextMessageBody")
       },
       [messagesPath]: {
-        post: messageOperation("Send a supported generic text message body", "GenericTextMessageBody")
+        post: messageOperation("Send a supported text or media message body", "SupportedMessageBody")
       },
       [OPENAPI_PATH]: {
         get: {
@@ -540,7 +572,19 @@ function validateTextBody(body: unknown): { to: string; text: string; previewUrl
   return out;
 }
 
-function validateGenericMessageBody(body: unknown): GraphMessagesSendBody | null {
+type ServiceMediaMessageKind = "image" | "video" | "audio" | "document" | "sticker";
+
+interface ServiceMediaMessageInput {
+  readonly type: ServiceMediaMessageKind;
+  readonly to: string;
+  readonly mediaId?: string;
+  readonly link?: string;
+  readonly caption?: string;
+  readonly filename?: string;
+  readonly replyToMessageId?: string;
+}
+
+function validateGenericTextMessageBody(body: unknown): GraphMessagesSendBody | null {
   if (!isRecord(body)) return null;
   if (body.messaging_product !== "whatsapp") return null;
   if (!isNonEmptyString(body.to)) return null;
@@ -548,6 +592,63 @@ function validateGenericMessageBody(body: unknown): GraphMessagesSendBody | null
   if (!isRecord(body.text) || !isNonEmptyString(body.text.body)) return null;
   if (body.text.preview_url !== undefined && typeof body.text.preview_url !== "boolean") return null;
   return body as unknown as GraphMessagesSendBody;
+}
+
+function validateServiceMediaMessageBody(body: unknown): ServiceMediaMessageInput | null {
+  if (!isRecord(body)) return null;
+  if (body.type !== "image" && body.type !== "video" && body.type !== "audio" && body.type !== "document" && body.type !== "sticker") return null;
+  if (!isNonEmptyString(body.to)) return null;
+  if (body.mediaId !== undefined && !isNonEmptyString(body.mediaId)) return null;
+  if (body.link !== undefined && !isNonEmptyString(body.link)) return null;
+  if ((body.mediaId === undefined) === (body.link === undefined)) return null;
+  if (body.caption !== undefined && !isNonEmptyString(body.caption)) return null;
+  if (body.filename !== undefined && !isNonEmptyString(body.filename)) return null;
+  if (body.replyToMessageId !== undefined && !isNonEmptyString(body.replyToMessageId)) return null;
+  if ((body.type === "audio" || body.type === "sticker") && body.caption !== undefined) return null;
+  if (body.type !== "document" && body.filename !== undefined) return null;
+  const out: {
+    type: ServiceMediaMessageKind;
+    to: string;
+    mediaId?: string;
+    link?: string;
+    caption?: string;
+    filename?: string;
+    replyToMessageId?: string;
+  } = { type: body.type, to: body.to };
+  if (body.mediaId !== undefined) out.mediaId = body.mediaId;
+  if (body.link !== undefined) out.link = body.link;
+  if (body.caption !== undefined) out.caption = body.caption;
+  if (body.filename !== undefined) out.filename = body.filename;
+  if (body.replyToMessageId !== undefined) out.replyToMessageId = body.replyToMessageId;
+  return out;
+}
+
+function buildServiceMediaMessagePayload(input: ServiceMediaMessageInput): GraphMessagesSendBody {
+  switch (input.type) {
+    case "image":
+      return buildSendImagePayload(input) as GraphMessagesSendBody;
+    case "video":
+      return buildSendVideoPayload(input) as GraphMessagesSendBody;
+    case "audio":
+      return buildSendAudioPayload(input) as GraphMessagesSendBody;
+    case "document":
+      return buildSendDocumentPayload(input) as GraphMessagesSendBody;
+    case "sticker":
+      return buildSendStickerPayload(input) as GraphMessagesSendBody;
+  }
+}
+
+function buildSupportedMessageBody(body: unknown): GraphMessagesSendBody | null {
+  const text = validateGenericTextMessageBody(body);
+  if (text !== null) return text;
+  const media = validateServiceMediaMessageBody(body);
+  if (media === null) return null;
+  try {
+    return buildServiceMediaMessagePayload(media);
+  } catch (error) {
+    if (error instanceof GraphRequestValidationError) return null;
+    throw error;
+  }
 }
 
 async function handleTextMessage(ctx: RuntimeConfig, request: Request): Promise<Response> {
@@ -578,7 +679,7 @@ async function handleTextMessage(ctx: RuntimeConfig, request: Request): Promise<
 async function handleGenericMessage(ctx: RuntimeConfig, request: Request): Promise<Response> {
   const parsed = await parseJsonRequest(request);
   if (parsed === "malformed") return errorResponse(400, "malformed_json", "Request body must be valid JSON.");
-  const body = validateGenericMessageBody(parsed);
+  const body = buildSupportedMessageBody(parsed);
   if (body === null) return errorResponse(400, "malformed_body", "Message body is invalid or unsupported.");
   try {
     const result = await ctx.graphClient.request({

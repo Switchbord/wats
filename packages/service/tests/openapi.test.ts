@@ -106,9 +106,30 @@ describe("WATS-35 OpenAPI document generator", () => {
       "GenericTextMessageBody",
       "GraphResponsePassthrough",
       "HealthResponse",
+      "MediaMessageBody",
       "ReadyResponse",
+      "SupportedMessageBody",
       "TextMessageBody"
     ]));
+    const genericMessagesOperation = operation(doc, "/api/messages", "post");
+    const requestBody = jsonRecord(genericMessagesOperation.requestBody, "POST /messages requestBody");
+    const content = jsonRecord(requestBody.content, "POST /messages content");
+    const json = jsonRecord(content["application/json"], "POST /messages application/json");
+    expect(json.schema).toEqual({ "$ref": "#/components/schemas/SupportedMessageBody" });
+    expect(doc.components.schemas.SupportedMessageBody.oneOf).toEqual([
+      { "$ref": "#/components/schemas/GenericTextMessageBody" },
+      { "$ref": "#/components/schemas/MediaMessageBody" }
+    ]);
+    const mediaSchema = jsonRecord(doc.components.schemas.MediaMessageBody, "MediaMessageBody schema");
+    const mediaProperties = jsonRecord(mediaSchema.properties, "MediaMessageBody properties");
+    expect(mediaProperties.type).toEqual({
+      type: "string",
+      enum: ["image", "video", "audio", "document", "sticker"]
+    });
+    expect(mediaSchema.oneOf).toEqual([
+      { required: ["mediaId"], not: { required: ["link"] } },
+      { required: ["link"], not: { required: ["mediaId"] } }
+    ]);
   });
 
   test("marks only service message routes with bearer security", () => {
