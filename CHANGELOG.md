@@ -54,7 +54,7 @@ Design-only/docs-only boundaries preserved in this launch: WATS-46/WATS-47/WATS-
 
 ### Service message routes
 
-- `@switchbord/service` `POST {apiPrefix}/messages` now accepts WATS media composer bodies for image, video, audio, document, sticker, location, contacts, reaction, and remove-reaction messages, converts them through the existing SDK builders, preserves generic text body compatibility, and keeps interactive service route expansion as later WATS-73 slices.
+- `@switchbord/service` `POST {apiPrefix}/messages` now accepts WATS media composer bodies for image, video, audio, document, sticker, location, contacts, reaction, remove-reaction, and basic interactive button/list/CTA URL messages, converts them through the existing SDK builders, preserves generic text body compatibility, and keeps product/product-list/catalog/location-request service route expansion as later WATS-73 slices.
 
 ### CLI diagnostics
 

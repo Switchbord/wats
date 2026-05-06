@@ -62,7 +62,7 @@ The service package does not read environment variables. Callers resolve env ref
 | `profile.webhook.path` | GET | Meta verify token | Delegates to `createWebhookAdapter`. |
 | `profile.webhook.path` | POST | Meta signature | Delegates to `createWebhookAdapter`. |
 | `${profile.service.apiPrefix}/messages/text` | POST | service bearer | Sends a text message through Graph. |
-| `${profile.service.apiPrefix}/messages` | POST | service bearer | Sends a supported generic text, media, location, reaction, or contacts message body through Graph. |
+| `${profile.service.apiPrefix}/messages` | POST | service bearer | Sends a supported generic text, media, location, reaction, contacts, or basic interactive message body through Graph. |
 
 Unknown routes return `404`. Unsupported methods return `405` with an `Allow` header.
 
@@ -133,9 +133,9 @@ or WATS-73 media composer bodies that are converted through the SDK media builde
 
 Supported media `type` values are `image`, `video`, `audio`, `document`, and `sticker`. Each media body must provide exactly one of `mediaId` or `link`. `caption` is accepted for image, video, and document bodies. `filename` is accepted for document bodies only. `replyToMessageId` maps to Graph `context.message_id`.
 
-Location bodies use `type: "location"`, finite `latitude`/`longitude` values in Graph-supported ranges, and optional `name`, `address`, and `replyToMessageId`. Reaction bodies use `type: "reaction"` with `messageId` and non-empty `emoji`. Remove-reaction bodies use `type: "removeReaction"` with `messageId` and map to Graph reaction payloads with an empty emoji. Contacts bodies use `type: "contacts"`, a non-empty `contacts` array, and the same camelCase contact input objects as the SDK composer helper.
+Location bodies use `type: "location"`, finite `latitude`/`longitude` values in Graph-supported ranges, and optional `name`, `address`, and `replyToMessageId`. Reaction bodies use `type: "reaction"` with `messageId` and non-empty `emoji`. Remove-reaction bodies use `type: "removeReaction"` with `messageId` and map to Graph reaction payloads with an empty emoji. Contacts bodies use `type: "contacts"`, a non-empty `contacts` array, and the same camelCase contact input objects as the SDK composer helper. Basic interactive bodies support `interactiveButtons`, `interactiveList`, and `interactiveCtaUrl` and map through the corresponding SDK builders.
 
-The route preserves the service bearer boundary: the service bearer token authorizes the local service route, is never forwarded to Graph, and builder/validation failures return `400` without echoing tokens or request secrets. Interactive message families remain follow-up WATS-73 slices.
+The route preserves the service bearer boundary: the service bearer token authorizes the local service route, is never forwarded to Graph, and builder/validation failures return `400` without echoing tokens or request secrets. Product/product-list/catalog/location-request interactive variants remain follow-up WATS-73 slices.
 
 ## Webhook route
 
@@ -192,7 +192,7 @@ WATS-35/WATS-48/WATS-49 do not implement:
 - `wats serve` process execution (`wats openapi` already exports the service OpenAPI document)
 - live Meta credential checks
 - persistence integration, queues, metrics, Docker, TLS, or rate limiting
-- interactive service message schemas beyond the current WATS-73 media/location/reaction/contacts slices
+- product/product-list/catalog/location-request interactive service message schemas beyond the current WATS-73 basic interactive slice
 
 ## Related
 
