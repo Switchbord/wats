@@ -502,6 +502,81 @@ describe("WATS-34 service bearer auth and message APIs", () => {
     }
     expect(mock.requests.length).toBe(0);
   });
+
+
+  test("POST /messages accepts basic interactive composer bodies", async () => {
+    const cases: Array<{
+      readonly label: string;
+      readonly input: Record<string, unknown>;
+      readonly expectedInteractive: Record<string, unknown>;
+    }> = [
+      {
+        label: "buttons",
+        input: { type: "interactiveButtons", to: "15550001111", bodyText: "Choose", buttons: [{ id: "yes", title: "Yes" }], headerText: "Header", footerText: "Footer", replyToMessageId: "wamid.PARENT" },
+        expectedInteractive: {
+          type: "button",
+          body: { text: "Choose" },
+          action: { buttons: [{ type: "reply", reply: { id: "yes", title: "Yes" } }] },
+          header: { type: "text", text: "Header" },
+          footer: { text: "Footer" }
+        }
+      },
+      {
+        label: "list",
+        input: { type: "interactiveList", to: "15550001111", bodyText: "Pick", buttonText: "Open", sections: [{ title: "A", rows: [{ id: "row-1", title: "Row 1", description: "First" }] }] },
+        expectedInteractive: {
+          type: "list",
+          body: { text: "Pick" },
+          action: { button: "Open", sections: [{ rows: [{ id: "row-1", title: "Row 1", description: "First" }], title: "A" }] }
+        }
+      },
+      {
+        label: "cta url",
+        input: { type: "interactiveCtaUrl", to: "15550001111", bodyText: "Visit", displayText: "Open", url: "https://example.test/offer" },
+        expectedInteractive: {
+          type: "cta_url",
+          body: { text: "Visit" },
+          action: { name: "cta_url", parameters: { display_text: "Open", url: "https://example.test/offer" } }
+        }
+      }
+    ];
+
+    for (const testCase of cases) {
+      const mock = createMockTransport({ defaultResponse: { status: 200, body: { messages: [{ id: `wamid.${testCase.label}` }] } } });
+      const app = createWatsServiceApp(config({ transport: mock.transport }));
+      const res = await app.fetch(new Request("https://service.test/api/messages", authed(testCase.input)));
+      expect(res.status, testCase.label).toBe(200);
+      expect(mock.requests.length, testCase.label).toBe(1);
+      const body = JSON.parse(String(mock.requests[0]!.body));
+      expect(body.messaging_product, testCase.label).toBe("whatsapp");
+      expect(body.to, testCase.label).toBe("15550001111");
+      expect(body.type, testCase.label).toBe("interactive");
+      expect(body.interactive, testCase.label).toEqual(testCase.expectedInteractive);
+      expect(mock.requests[0]!.headers.get("authorization"), testCase.label).toBe("Bearer graph-access-token");
+      expect(mock.requests[0]!.headers.get("authorization"), testCase.label).not.toBe("Bearer service-bearer");
+    }
+  });
+
+  test("POST /messages basic interactive bodies fail closed", async () => {
+    const mock = createMockTransport({ defaultResponse: { status: 200, body: { messages: [{ id: "wamid.NOPE" }] } } });
+    const app = createWatsServiceApp(config({ transport: mock.transport }));
+    const invalidBodies: unknown[] = [
+      { type: "interactiveButtons", to: "15550001111", bodyText: "Choose", buttons: [] },
+      { type: "interactiveButtons", to: "15550001111", bodyText: "Choose", buttons: [{ id: "yes" }] },
+      { type: "interactiveButtons", to: "15550001111", bodyText: "Choose", buttons: [{ id: "yes", title: "Yes" }], extra: "not allowed" },
+      { type: "interactiveList", to: "15550001111", bodyText: "Pick", buttonText: "Open", sections: [] },
+      { type: "interactiveList", to: "15550001111", bodyText: "Pick", buttonText: "Open", sections: [{ rows: [] }] },
+      { type: "interactiveCtaUrl", to: "15550001111", bodyText: "Visit", displayText: "Open", url: "file:///tmp/a" },
+      { type: "interactiveCtaUrl", to: "15550001111", bodyText: "Visit", displayText: "Open", url: "https://example.test", extra: "not allowed" }
+    ];
+
+    for (const body of invalidBodies) {
+      const res = await app.fetch(new Request("https://service.test/api/messages", authed(body)));
+      expect(res.status, JSON.stringify(body)).toBe(400);
+      expect(await res.text()).not.toContain("service-bearer");
+    }
+    expect(mock.requests.length).toBe(0);
+  });
 });
 
 describe("WATS-34 webhook composition", () => {
