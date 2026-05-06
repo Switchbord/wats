@@ -131,6 +131,7 @@ describe("wats init", () => {
       const envText = read(envPath);
       expect(configText).toContain("version: 1");
       expect(configText).toContain("defaultProfile: local");
+      expect(configText).toContain("apiVersion: v25.0");
       expect(configText).toContain("env: WATS_ACCESS_TOKEN");
       expect(envText).toContain("WATS_ACCESS_TOKEN=");
       expect(envText).toContain("WATS_SERVICE_TOKEN=");
