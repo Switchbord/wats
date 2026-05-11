@@ -19,8 +19,17 @@ function findRepoRoot(startDir: string): string {
 
 const repoRoot = findRepoRoot(dirname(fileURLToPath(import.meta.url)));
 
+interface PublicDocsManifest {
+  pages: string[];
+  exclude: string[];
+}
+
 function read(path: string): string {
   return readFileSync(join(repoRoot, path), "utf8");
+}
+
+function readJson<T>(path: string): T {
+  return JSON.parse(read(path)) as T;
 }
 
 function expectAll(text: string, snippets: readonly string[]): void {
@@ -150,16 +159,15 @@ describe("WATS-48 persistence contract design docs", () => {
     ]);
   });
 
-  test("public docs manifest, reference index, roadmap, and changelog include WATS-48 artifacts", () => {
-    const manifest = read("docs/public-docs-manifest.json");
+  test("public docs manifest keeps WATS-48 reference public and planning design excluded", () => {
+    const manifest = readJson<PublicDocsManifest>("docs/public-docs-manifest.json");
     const referenceIndex = read("docs/reference/index.md");
     const roadmap = read("docs/architecture/roadmap-to-whatsapp-pywa-parity.md");
     const changelog = read("CHANGELOG.md");
 
-    expectAll(manifest, [
-      "reference/persistence.md",
-      "architecture/wats48-persistence-contract-design.md"
-    ]);
+    expect(manifest.pages).toContain("reference/persistence.md");
+    expect(manifest.pages).not.toContain("architecture/wats48-persistence-contract-design.md");
+    expect(manifest.exclude).toContain("architecture/wats48-persistence-contract-design.md");
 
     expectAll(referenceIndex, [
       "reference/persistence.md",

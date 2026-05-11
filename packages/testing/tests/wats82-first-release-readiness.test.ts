@@ -7,6 +7,11 @@ import { fileURLToPath } from "node:url";
 
 type JsonRecord = Record<string, unknown>;
 
+interface PublicDocsManifest {
+  pages: string[];
+  exclude: string[];
+}
+
 function findRepoRoot(startDir: string): string {
   let current = startDir;
   for (;;) {
@@ -23,8 +28,8 @@ function read(path: string): string {
   return readFileSync(join(repoRoot, path), "utf8");
 }
 
-function readJson(path: string): JsonRecord {
-  return JSON.parse(read(path)) as JsonRecord;
+function readJson<T = JsonRecord>(path: string): T {
+  return JSON.parse(read(path)) as T;
 }
 
 function expectAll(text: string, snippets: readonly string[]): void {
@@ -66,10 +71,12 @@ describe("WATS-82 first-release readiness", () => {
     ]);
   });
 
-  test("public docs manifest and changelog include WATS-82 readiness artifact", () => {
-    const manifest = read("docs/public-docs-manifest.json");
+  test("public docs manifest excludes WATS-82 readiness plan while changelog retains release gate summary", () => {
+    const manifest = readJson<PublicDocsManifest>("docs/public-docs-manifest.json");
     const changelog = read("CHANGELOG.md");
-    expect(manifest).toContain("architecture/wats82-first-release-readiness.md");
+    expect(manifest.pages).toContain("architecture/release-policy.md");
+    expect(manifest.pages).not.toContain("architecture/wats82-first-release-readiness.md");
+    expect(manifest.exclude).toContain("architecture/wats82-first-release-readiness.md");
     expectAll(changelog, [
       "WATS-82",
       "first-release readiness documentation",

@@ -21,6 +21,29 @@ const STALE_ISSUE_LEVEL_PUBLIC_PAGES = [
   "guides/getting-started.md"
 ] as const;
 
+const LEGACY_DOCS_LOCK_MANIFEST_ASSERTIONS = [
+  {
+    testFile: "packages/testing/tests/wats47-cli-operator-ux-docs.test.ts",
+    retiredPaths: ["architecture/wats47-cli-operator-ux-design.md"]
+  },
+  {
+    testFile: "packages/testing/tests/wats48-persistence-contract-docs.test.ts",
+    retiredPaths: ["architecture/wats48-persistence-contract-design.md"]
+  },
+  {
+    testFile: "packages/testing/tests/wats49-docker-deployment-docs.test.ts",
+    retiredPaths: ["architecture/wats49-docker-deployment-design.md"]
+  },
+  {
+    testFile: "packages/testing/tests/wats50-release-hygiene-policy.test.ts",
+    retiredPaths: ["architecture/wats50-release-hygiene-policy.md"]
+  },
+  {
+    testFile: "packages/testing/tests/wats82-first-release-readiness.test.ts",
+    retiredPaths: ["architecture/wats82-first-release-readiness.md"]
+  }
+] as const;
+
 const LOCAL_TEMP_SOURCE_CITATIONS = [
   /\/tmp\/wats-research\b/u,
   /\/root\/wats-research\b/u,
@@ -42,6 +65,10 @@ const docsRoot = join(repoRoot, "docs");
 
 function read(path: string): string {
   return readFileSync(join(repoRoot, path), "utf8");
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 }
 
 function manifest(): PublicDocsManifest {
@@ -90,6 +117,24 @@ describe("docs planning surface consolidation", () => {
     for (const stalePage of STALE_ISSUE_LEVEL_PUBLIC_PAGES) {
       expect(pages, `${stalePage} must be deleted, consolidated, or manifest-excluded`).not.toContain(stalePage);
     }
+  });
+
+  test("legacy docs-lock manifest assertions distinguish public pages from excluded issue-level docs", () => {
+    const offenders = LEGACY_DOCS_LOCK_MANIFEST_ASSERTIONS.flatMap(({ testFile, retiredPaths }) => {
+      const source = read(testFile);
+      return retiredPaths.flatMap((retiredPath) => {
+        const escapedPath = escapeRegExp(retiredPath);
+        const rawStringManifestMatchers = [
+          new RegExp(`expectAll\\(manifest,\\s*\\[[\\s\\S]*?["'\`]${escapedPath}["'\`]`, "u"),
+          new RegExp(`expect\\(manifest\\)\\.toContain\\(["'\`]${escapedPath}["'\`]\\)`, "u")
+        ];
+
+        if (!rawStringManifestMatchers.some((matcher) => matcher.test(source))) return [];
+        return [`${testFile}: raw string manifest assertion for ${retiredPath}`];
+      });
+    });
+
+    expect(offenders).toEqual([]);
   });
 
   test("public docs do not cite local temp research paths", () => {
