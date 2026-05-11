@@ -247,7 +247,7 @@ appended unless the pywa class already ends in `Error` or `Exception`.
 So `AuthException` stays as-is; `ExpiredAccessToken` →
 `ExpiredAccessTokenError`; `MediaDownloadError` stays.
 
-Source: `/tmp/wats-research/pywa/pywa/errors.py`. Adding a new code is
+Source: pywa `pywa/errors.py`. Adding a new code is
 a data change — a new entry in
 `packages/graph/src/errorSubclasses.ts`'s `BUILT_IN_SEEDS` array plus
 a class definition.

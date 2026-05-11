@@ -63,14 +63,9 @@
     "parity/pywa-parity-matrix.md",
     "parity/live-testing-campaign.md",
     "architecture/overview.md",
+    "architecture/package-map.md",
     "architecture/public-api-surface.md",
     "architecture/roadmap-to-whatsapp-pywa-parity.md",
-    "architecture/alpha-cli-runtime-operations-plan.md",
-    "architecture/wats47-cli-operator-ux-design.md",
-    "architecture/wats48-persistence-contract-design.md",
-    "architecture/wats49-docker-deployment-design.md",
-    "architecture/wats50-release-hygiene-policy.md",
-    "architecture/wats82-first-release-readiness.md",
     "architecture/release-policy.md"
   ],
   "exclude": [
@@ -80,6 +75,23 @@
     "guides/getting-started.md",
     "architecture/cli-service-openapi-options.md",
     "architecture/wats57-graph-endpoint-module-split-plan.md",
-    "architecture/wats58-graph-validation-utility-reuse-plan.md"
+    "architecture/wats58-graph-validation-utility-reuse-plan.md",
+    "guides/filters-recipes.md",
+    "guides/handlers-overview.md",
+    "guides/webhook-with-bun.md",
+    "reference/handlers.md",
+    "architecture/alpha-cli-runtime-operations-plan.md",
+    "architecture/wats47-cli-operator-ux-design.md",
+    "architecture/wats48-persistence-contract-design.md",
+    "architecture/wats49-docker-deployment-design.md",
+    "architecture/wats50-release-hygiene-policy.md",
+    "architecture/wats82-first-release-readiness.md",
+    "architecture/decisions/ADR-001-api-shape.md",
+    "architecture/decisions/ADR-002-foundations-pivot.md",
+    "architecture/decisions/ADR-003-transport-and-crypto-abstractions.md",
+    "architecture/decisions/ADR-004-typed-updates-and-handler-model.md",
+    "architecture/decisions/ADR-005-endpoint-registry-and-error-taxonomy.md",
+    "architecture/decisions/ADR-006-testing-and-consumer-fixture-strategy.md",
+    "architecture/decisions/ADR-007-alpha-cli-runtime-operator-layer.md"
   ]
 }
