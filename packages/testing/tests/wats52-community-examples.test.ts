@@ -61,8 +61,8 @@ function expectMentionsCommunitySafety(text: string): void {
 }
 
 const falseAvailabilityClaims = [
-  /wats serve\s+(?:live|production|with live credentials|with real credentials|with Docker|in Docker)/iu,
-  /wats serve\s+(?:is|now|currently)\s+(?:live|production-ready|dockerized|credentialed)/iu,
+  /(?:run|start|use)\s+`?wats serve`?\s+(?:to|for|in|with|as)\s+(?:live|production|production-ready|Docker|credentialed|live credentials|real credentials)/iu,
+  /`?wats serve`?\s+(?:is|now|currently)\s+(?:live|production-ready|dockerized|credentialed|ready for production)/iu,
   /Docker image\s+(?:is|has been|was)\s+published/iu,
   /published\s+Docker image/iu,
   /GitHub release\s+(?:is|has been|was)\s+published/iu,
@@ -74,6 +74,10 @@ function expectNoFalseAvailabilityClaims(text: string): void {
   for (const pattern of falseAvailabilityClaims) {
     expect(text).not.toMatch(pattern);
   }
+}
+
+function expectFalseAvailabilityClaimIsCaught(text: string): void {
+  expect(falseAvailabilityClaims.some((pattern) => pattern.test(text)), text).toBe(true);
 }
 
 const rawSecretPatterns = [
@@ -131,6 +135,17 @@ describe("WATS-52 community examples docs scaffold", () => {
 
     expectNoFalseAvailabilityClaims(guide);
     expectNoFalseAvailabilityClaims(examplesReadme);
+  });
+
+  test("false availability guard still catches live, Docker, and production serve claims", () => {
+    for (const claim of [
+      "run `wats serve` in production",
+      "use `wats serve` with live credentials",
+      "start `wats serve` with Docker",
+      "`wats serve` is production-ready"
+    ]) {
+      expectFalseAvailabilityClaimIsCaught(claim);
+    }
   });
 
   test("example code imports only public WATS package specifiers", () => {

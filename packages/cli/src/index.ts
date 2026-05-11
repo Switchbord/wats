@@ -5,6 +5,7 @@ export type CliCommandResult = Readonly<{
   exitCode: number;
   stdout: string;
   stderr: string;
+  shutdown?: () => void;
 }>;
 
 export type CliCommandContext = Readonly<{
@@ -997,19 +998,14 @@ function getBunRuntime(): BunLike | null {
   return maybeBun as BunLike;
 }
 
-function installServeShutdown(server: BunServer): void {
-  const proc = (globalThis as { process?: { once?(event: string, listener: () => void): unknown; exit?(code?: number): never } }).process;
-  if (proc === undefined || typeof proc.once !== "function") return;
+function createServeShutdown(server: BunServer): () => void {
   let stopped = false;
-  const stopAndExit = (): void => {
+  return () => {
     if (!stopped) {
       stopped = true;
       server.stop(true);
     }
-    proc.exit?.(0);
   };
-  proc.once("SIGINT", stopAndExit);
-  proc.once("SIGTERM", stopAndExit);
 }
 
 async function serveCommand(args: readonly string[]): Promise<CliCommandResult> {
@@ -1034,8 +1030,7 @@ async function serveCommand(args: readonly string[]): Promise<CliCommandResult> 
 
     const app = createWatsServiceApp(syntheticServiceConfig(profile));
     const server = bunRuntime.serve({ hostname: profile.service.host, port: profile.service.port, fetch: app.fetch });
-    installServeShutdown(server);
-    return ok(formatServeReady(profile.service.host, server.port));
+    return Object.freeze({ ...ok(formatServeReady(profile.service.host, server.port)), shutdown: createServeShutdown(server) });
   } catch (error) {
     if (error instanceof ConfigValidationError) {
       return fail(formatConfigValidationError(error, "wats serve --help"));
