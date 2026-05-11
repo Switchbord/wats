@@ -35,4 +35,4 @@ The community examples guide is published at `docs/guides/community-examples.md`
 
 ## Runtime boundary
 
-This examples scaffold predates the current CLI runtime. WATS now implements real `wats init` and offline `wats doctor` diagnostics, but the examples scaffold still does not implement real `wats serve`, Docker images, Compose files, release automation, or live Meta validation. Service examples should call the public Request-to-Response app directly with synthetic inputs unless a later behavior-bearing slice adds and verifies a process wrapper.
+This examples scaffold predates the current CLI runtime. WATS now implements real `wats init`, offline `wats doctor` diagnostics, and dry-run `wats serve` for local service smoke checks. The examples scaffold still does not implement Docker images, Compose files, release automation, credential-gated live serve mode, or live Meta validation. Service examples may call the public Request-to-Response app directly with synthetic inputs or use `wats serve --dry-run` for local route smoke checks.

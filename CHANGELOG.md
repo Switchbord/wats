@@ -56,13 +56,14 @@ Design-only/docs-only boundaries preserved in this launch: WATS-46/WATS-47/WATS-
 
 - `@switchbord/service` `POST {apiPrefix}/messages` now accepts WATS media composer bodies for image, video, audio, document, sticker, location, contacts, reaction, remove-reaction, and interactive button/list/CTA URL/product/product-list/catalog/location-request messages, converts them through the existing SDK builders, preserves generic text body compatibility, and keeps remaining non-message service route expansion as later issues.
 
-### CLI diagnostics
+### CLI diagnostics and dry-run service
 
 - `wats doctor --config <path>` now runs offline diagnostics for runtime/package imports, config/profile checks, service route collisions, OpenAPI generation, and optional env presence counts without printing env names or values.
+- `wats serve --config <path> --dry-run` now starts the standalone `@switchbord/service` app through a local Bun process wrapper with synthetic in-memory secrets, a no-network Graph transport, health/readiness/OpenAPI routes, `--print-routes`, and graceful shutdown. Live serve mode, env-file secret resolution, Docker packaging, and Meta Graph calls remain outside the dry-run slice.
 
 ### Not included
 
-- No real `wats serve` process wrapper yet.
+- No credential-gated live `wats serve` mode or `--env-file` secret resolution yet.
 - No live Meta validation campaign execution yet.
 - No Docker image publication.
 - No GitHub release/tag creation until the sanitized public repository is pushed and reviewed.

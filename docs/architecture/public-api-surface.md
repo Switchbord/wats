@@ -143,10 +143,11 @@ Current commands:
 - `wats openapi --config <path> --server-url <url>`
 - `wats openapi --config <path> --out <path>`
 - `wats openapi --help`
+- `wats serve --config <path> --dry-run [--profile <name>] [--host <host>] [--port <port>] [--print-routes]`
 - `wats serve --help`
 - `wats webhook token`
 
-Status: experimental CLI foundation. It generates WATS config/env placeholder files with `wats init`, validates config files safely, exports WATS service OpenAPI, and generates local webhook verify tokens without resolving env-secret values or calling Meta Graph. It does not yet start a server process.
+Status: experimental CLI foundation. It generates WATS config/env placeholder files with `wats init`, validates config files safely, exports WATS service OpenAPI, runs offline diagnostics, starts a dry-run local service process with `wats serve --dry-run`, and generates local webhook verify tokens without resolving env-secret values or calling Meta Graph.
 
 ### `@switchbord/service`
 
@@ -172,7 +173,7 @@ Current routes:
 - `POST {profile.service.apiPrefix}/messages/text`
 - `POST {profile.service.apiPrefix}/messages`
 
-Status: experimental service foundation. It composes config profile shape, explicit resolved secrets, Graph client, WebhookAdapter, WhatsApp facade, and a generated OpenAPI 3.1 document for current WATS service routes. It does not yet provide server process wrappers or a public docs UI.
+Status: experimental service foundation. It composes config profile shape, explicit resolved secrets, Graph client, WebhookAdapter, WhatsApp facade, and a generated OpenAPI 3.1 document for current WATS service routes. The `@switchbord/cli` dry-run wrapper can serve it locally; production/live wrappers and public docs UI remain later work.
 
 ### Internal support and private packages
 
@@ -189,10 +190,9 @@ These are not implemented as runtime APIs yet:
 - mutating WABA/phone-number/business-management/admin APIs beyond WATS-42A read-only inventory
 - catalog/product management APIs beyond WATS-42A read-only getCommerceSettings
 - full Meta Graph API OpenAPI generation
-- CLI config generation / real `wats serve` server process
+- credential-gated live `wats serve` mode and env-file secret resolution
 - `@switchbord/persistence` package and SQLite/Postgres adapters are WATS-48 design targets only. In docs-lock wording, @switchbord/persistence package and SQLite/Postgres adapters are WATS-48 design targets only. No current package export, no service persistence integration, no config persistence schema, and no migration runner exists yet.
-- no supported Dockerfile, Compose file, container image, or container-registry publication yet. WATS-49 keeps Docker/deployment as a design scaffold until `wats serve` exists.
-- registry-publishable dist builds
+- no supported Dockerfile, Compose file, container image, or container-registry publication yet. WATS-49 keeps Docker/deployment as a design scaffold until live/deploy packaging is explicitly authorized.
 
 Track these through Linear roadmap issues and `docs/architecture/roadmap-to-whatsapp-pywa-parity.md`.
 

@@ -61,8 +61,8 @@ function expectMentionsCommunitySafety(text: string): void {
 }
 
 const falseAvailabilityClaims = [
-  /(?:run|start|use)\s+`?wats serve`?\s+(?:to|for|in|with|as)\b/iu,
-  /wats serve\s+(?:is|now|currently|will start|starts|runs)/iu,
+  /wats serve\s+(?:live|production|with live credentials|with real credentials|with Docker|in Docker)/iu,
+  /wats serve\s+(?:is|now|currently)\s+(?:live|production-ready|dockerized|credentialed)/iu,
   /Docker image\s+(?:is|has been|was)\s+published/iu,
   /published\s+Docker image/iu,
   /GitHub release\s+(?:is|has been|was)\s+published/iu,

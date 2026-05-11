@@ -21,9 +21,7 @@ const SENTINELS = [
   "EAA_TEST_ACCESS_TOKEN_DO_NOT_PRINT_1234567890",
   "APP_SECRET_DO_NOT_PRINT",
   "raw-service-bearer-token-do-not-print",
-  "../../.env.local",
-  "local",
-  "alternate"
+  "../../.env.local"
 ] as const;
 
 function isJsonRecord(value: unknown): value is JsonRecord {
@@ -139,6 +137,8 @@ function expectNoLeaks(output: string, configPath?: string): void {
     expect(output).not.toContain(sentinel);
   }
   if (configPath !== undefined) expect(output).not.toContain(configPath);
+  expect(output).not.toContain("profile: local");
+  expect(output).not.toContain("profile: alternate");
   expect(output).not.toMatch(/EAA[A-Za-z0-9_-]{20,}/u);
   expect(output).not.toMatch(/wats_(?:wh|srv)_[A-Za-z0-9_-]+/u);
   expect(output).not.toMatch(/raw-[A-Za-z0-9_-]*token[A-Za-z0-9_-]*/iu);

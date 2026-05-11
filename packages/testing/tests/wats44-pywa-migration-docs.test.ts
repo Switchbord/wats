@@ -131,7 +131,7 @@ describe("WATS-44 pywa migration docs", () => {
 
     const service = read("docs/reference/service.md");
     expect(service).not.toContain("CLI `wats openapi` / `wats serve` execution");
-    expect(service).toContain("`wats serve` process execution");
+    expect(service).toContain("credential-gated live `wats serve` execution");
 
     const config = read("docs/reference/config.md");
     expect(config).toContain("Live testing profile");
