@@ -19,8 +19,17 @@ function findRepoRoot(startDir: string): string {
 
 const repoRoot = findRepoRoot(dirname(fileURLToPath(import.meta.url)));
 
+interface PublicDocsManifest {
+  pages: string[];
+  exclude: string[];
+}
+
 function read(path: string): string {
   return readFileSync(join(repoRoot, path), "utf8");
+}
+
+function readJson<T>(path: string): T {
+  return JSON.parse(read(path)) as T;
 }
 
 function expectAll(text: string, snippets: readonly string[]): void {
@@ -89,14 +98,17 @@ describe("WATS-50 release hygiene policy and skill", () => {
     expect(plan).not.toContain("WATS-50 — Config and environment templates");
   });
 
-  test("public manifest, reference index, roadmap, and changelog include WATS-50 artifacts", () => {
-    const manifest = read("docs/public-docs-manifest.json");
+  test("public manifest excludes WATS-50 planning policy while reference docs retain release hygiene links", () => {
+    const manifest = readJson<PublicDocsManifest>("docs/public-docs-manifest.json");
     const referenceIndex = read("docs/reference/index.md");
     const roadmap = read("docs/architecture/roadmap-to-whatsapp-pywa-parity.md");
     const changelog = read("CHANGELOG.md");
 
-    expectAll(manifest, ["architecture/wats50-release-hygiene-policy.md"]);
-    expect(manifest).not.toContain(".hermes/skills/wats-release-hygiene/SKILL.md");
+    expect(manifest.pages).toContain("architecture/release-policy.md");
+    expect(manifest.pages).not.toContain("architecture/wats50-release-hygiene-policy.md");
+    expect(manifest.exclude).toContain("architecture/wats50-release-hygiene-policy.md");
+    expect(manifest.pages).not.toContain(".hermes/skills/wats-release-hygiene/SKILL.md");
+    expect(manifest.exclude).not.toContain(".hermes/skills/wats-release-hygiene/SKILL.md");
 
     expectAll(referenceIndex, ["wats50-release-hygiene-policy.md"]);
     expectAll(roadmap, ["WATS-50", "release hygiene"]);
