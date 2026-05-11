@@ -3,6 +3,7 @@ import manifest from "../public-docs-manifest.json" with { type: "json" };
 
 const pages = manifest.pages as string[];
 const publicPageSet = new Set(pages);
+const excludedPages = (manifest.exclude ?? []) as string[];
 const allCandidatePages = [
   "guides/getting-started.md",
   "api/index.md",
@@ -47,6 +48,7 @@ export default defineConfig({
   ignoreDeadLinks: false,
   srcExclude: [
     ...nonPublicPages,
+    ...excludedPages,
     "handoff-context-compression-*.md",
     "handoff-reviewer-*.md"
   ],

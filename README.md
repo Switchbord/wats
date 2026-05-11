@@ -65,26 +65,13 @@ Useful references:
 - `docs/parity/pywa-parity-matrix.md` — implemented vs deferred coverage
 - `docs/architecture/package-map.md` — package boundaries
 - `docs/architecture/release-policy.md` — version and release rules
-- `docs/architecture/wats50-release-hygiene-policy.md` — alpha PR/release hygiene policy
+- `docs/architecture/roadmap-to-whatsapp-pywa-parity.md` — high-level milestone roadmap; issue-level work lives in Linear
 - `CONTRIBUTING.md` — contribution workflow, docs/tests expectations, and credential-free defaults
 - `SECURITY.md` — vulnerability reporting and live-credential safety policy
 
 ## Roadmap
 
-The next milestone is a publishable WhatsApp/pywa parity line:
-
-1. clean package distribution and CI release plumbing
-2. config schema + CLI onboarding
-3. standalone webhook/API service with OpenAPI 3.1 reference
-4. media runtime
-5. full message composer coverage
-6. templates
-7. flows
-8. calling
-9. business-management/admin endpoints — WATS-42A read-only inventory is implemented; mutating/admin credential-gated slices remain
-10. deeper typed webhook normalization and pywa migration coverage
-
-Roadmap items live in Linear, not in deferred-work files inside the repo.
+The next milestone is a publishable WhatsApp/pywa parity line. See `docs/architecture/roadmap-to-whatsapp-pywa-parity.md` for the maintained roadmap summary and `docs/parity/pywa-parity-matrix.md` for capability status. Issue-level status and deferrals live in Linear, not in deferred-work files inside the repo.
 
 ## Design principles
 
