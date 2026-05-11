@@ -154,6 +154,6 @@ Community examples should prefer existing public seams:
 
 ## What is not implemented yet
 
-This WATS-52A scaffold predates WATS-69/WATS-70. Current WATS now implements safe local `wats init` config/env placeholder generation and real offline `wats doctor` diagnostics, while real `wats serve`, Dockerfiles, Compose files, release automation, image publication, live Meta validation, and a full community gallery remain outside the WATS-52A scaffold.
+This WATS-52A scaffold predates WATS-69/WATS-70/WATS-71. Current WATS now implements safe local `wats init` config/env placeholder generation, real offline `wats doctor` diagnostics, and dry-run `wats serve` for local service smoke checks. Dockerfiles, Compose files, release automation, image publication, credential-gated live serve mode, live Meta validation, and a full community gallery remain outside the WATS-52A scaffold.
 
 Use Linear issue scope for future backlog. Do not add repo-local deferred ledgers for WATS-52 follow-up work.

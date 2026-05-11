@@ -8,7 +8,7 @@
 
 `@switchbord/service` is the first standalone WATS application boundary. It exposes a runtime-neutral `Request -> Response` app that composes the existing Graph client, webhook adapter, config profile shape, and WhatsApp facade.
 
-It is not a production server by itself. Bun/Node/Docker wrappers, persistence, metrics, and public docs UI remain separate roadmap items. WATS-35 adds a generated OpenAPI 3.1 document for the routes listed below.
+It is not a production server by itself. WATS-71 adds a CLI-owned Bun dry-run process wrapper around this app for local smoke checks. Credential-gated live wrappers, Node/Docker packaging, persistence, metrics, and public docs UI remain separate roadmap items. WATS-35 adds a generated OpenAPI 3.1 document for the routes listed below.
 
 ## Public API
 
@@ -178,18 +178,20 @@ WATS-48 documents a future injected PersistenceStore for service runtimes. There
 
 Future service integration should accept an injected PersistenceStore instead of reading database environment variables directly. The service must not log secrets or raw webhook bodies through persistence diagnostics, and persistence failures must not expose database URLs, access tokens, app secrets, webhook verify tokens, service bearer tokens, message text, or raw webhook envelopes.
 
+## WATS-71 CLI dry-run wrapper
+
+`wats serve --config <path> --dry-run` wraps this app in a local Bun process with synthetic in-memory secrets and a no-network Graph transport. The wrapper belongs to `@switchbord/cli`; `@switchbord/service` remains the runtime-neutral Request-to-Response app and does not read env vars, `.env.local`, or live credential values.
+
 ## WATS-49 Docker/deployment design target
 
-WATS-49 documents the future container deployment contract. There is no supported Dockerfile/Compose/container image yet, and current @switchbord/service has no process wrapper/Docker integration.
-
-Future containers should wrap `wats serve` rather than duplicating service routing. WATS-49 does not add image publication, registry credentials, live Meta startup checks, or release automation. In docs-lock wording: no image publication and no registry credentials.
+WATS-49 documents the future container deployment contract. There is no supported Dockerfile/Compose/container image yet. Future containers should wrap the implemented `wats serve` contract rather than duplicating service routing. WATS-49 does not add image publication, registry credentials, live Meta startup checks, or release automation. In docs-lock wording: no image publication and no registry credentials.
 
 ## Non-goals
 
 WATS-35/WATS-48/WATS-49 do not implement:
 
 - a full Meta Graph API OpenAPI document
-- `wats serve` process execution (`wats openapi` already exports the service OpenAPI document)
+- credential-gated live `wats serve` execution and env-file secret resolution
 - live Meta credential checks
 - persistence integration, queues, metrics, Docker, TLS, or rate limiting
 - additional future service message schemas beyond the current WATS-73 text/media/location/contacts/reaction/interactive slices

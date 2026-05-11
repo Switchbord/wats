@@ -75,7 +75,7 @@ describe("WATS-49 Docker/deployment scaffold design docs", () => {
       "status: design/scaffold",
       "applies-to: WATS-49",
       "Current implementation status",
-      "`wats serve` is not implemented yet",
+      "`wats serve --config <path> --dry-run` is implemented for local Bun smoke checks",
       "no supported root Dockerfile",
       "no supported Compose file",
       "future Dockerfile shape",
@@ -103,7 +103,7 @@ describe("WATS-49 Docker/deployment scaffold design docs", () => {
     expectAll(service, [
       "WATS-49",
       "no supported Dockerfile/Compose/container image yet",
-      "current @switchbord/service has no process wrapper/Docker integration",
+      "CLI-owned Bun dry-run process wrapper",
       "no image publication",
       "no registry credentials"
     ]);
@@ -111,7 +111,7 @@ describe("WATS-49 Docker/deployment scaffold design docs", () => {
     expectAll(cli, [
       "WATS-49",
       "Docker packaging must target implemented `wats serve`",
-      "current CLI does not start a server process"
+      "dry-run serve usage"
     ]);
 
     expectAll(publicSurface, [

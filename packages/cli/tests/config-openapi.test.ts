@@ -400,14 +400,16 @@ describe("wats openapi", () => {
   });
 });
 
-describe("wats serve help handoff", () => {
-  test("serve --help documents handoff without starting a server", () => {
+describe("wats serve dry-run help", () => {
+  test("serve --help documents the real dry-run process wrapper", () => {
     const result = runCli(["serve", "--help"]);
 
     expect(result.exitCode, result.stderr).toBe(0);
     expect(result.stderr).toBe("");
-    expect(result.stdout).toContain("Usage: wats serve --help");
-    expect(result.stdout).toContain("server runtime is not implemented");
+    expect(result.stdout).toContain("Usage: wats serve --config <path> --dry-run");
+    expect(result.stdout).toContain("--print-routes");
+    expect(result.stdout).toContain("dry-run mock transport");
+    expect(result.stdout).not.toContain("server runtime is not implemented");
     expect(result.stdout).toContain("No live credentials are read or required");
   });
 });

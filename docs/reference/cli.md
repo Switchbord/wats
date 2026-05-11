@@ -5,7 +5,7 @@
 - package: `@switchbord/cli`
 - lastReviewed: 2026-05-04
 
-`@switchbord/cli` provides the `wats` command for safe local onboarding and inspection. WATS-33 ships real offline config validation and OpenAPI export. WATS-69 adds safe `wats init` config/env placeholder generation. WATS-70 adds real offline `wats doctor` diagnostics. `serve` remains a planned/help-only surface until its runtime slice lands.
+`@switchbord/cli` provides the `wats` command for safe local onboarding and inspection. WATS-33 ships real offline config validation and OpenAPI export. WATS-69 adds safe `wats init` config/env placeholder generation. WATS-70 adds real offline `wats doctor` diagnostics. WATS-71 adds a real dry-run `wats serve` process wrapper around `@switchbord/service`.
 
 ## No-live-credentials default
 
@@ -165,11 +165,38 @@ Failure behavior:
 
 Prints OpenAPI export help and exits 0. OpenAPI export remains service-only: it describes the WATS standalone service API, not Meta Graph.
 
+### `wats serve --config <path> --dry-run [--profile <name>] [--host <host>] [--port <port>] [--print-routes]`
+
+Starts the `@switchbord/service` Request-to-Response app as a local Bun process in dry-run mode. The command loads a WATS config file, selects the default or named profile, optionally overrides `profile.service.host` and `profile.service.port`, injects synthetic in-memory secrets plus a no-network Graph transport, and exposes:
+
+- `GET /healthz`
+- `GET /readyz`
+- `GET /openapi.json`
+- configured webhook GET/POST route
+- protected service message routes under `profile.service.apiPrefix`
+
+Example:
+
+```bash
+wats serve --config wats.config.yaml --dry-run --host 127.0.0.1 --port 3000
+curl -fsS http://127.0.0.1:3000/healthz
+curl -fsS http://127.0.0.1:3000/readyz
+curl -fsS http://127.0.0.1:3000/openapi.json
+```
+
+`--print-routes` validates the config/profile and prints the safe route inventory without binding a port:
+
+```bash
+wats serve --config wats.config.yaml --dry-run --print-routes
+```
+
+Dry-run serve never resolves env-secret values, reads `.env.local`, calls Meta Graph APIs, or prints config paths, profile names, env names, synthetic secret values, or token-like arguments. `--live`, `--yes-live`, and `--env-file` intentionally fail closed until the credential-gated live serve slice lands.
+
 ### `wats serve --help`
 
-Prints service-runtime handoff help and exits 0. WATS-33 does not start a process/server; the current runtime-neutral app remains available programmatically through `@switchbord/service`.
+Prints dry-run serve usage and exits 0.
 
-WATS-49 deployment note: Docker packaging must target implemented `wats serve`, not this help-only handoff. The current CLI does not start a server process.
+WATS-49 deployment note: Docker packaging must target implemented `wats serve`, but the current dry-run serve usage is not a supported Docker or live-production contract.
 
 ### `wats webhook token`
 
@@ -227,7 +254,7 @@ WATS-47 target error families include `CliUsageError`, `CliConfigError`, `Config
 
 Future implementation work may add:
 
-- a real `wats serve` process wrapper;
+- credential-gated live `wats serve` mode behind explicit flags;
 - optional live checks behind explicit credential-gated flags;
 - deeper doctor integrations beyond the current offline runtime/package/config/profile/routes/OpenAPI/env-presence checks.
 

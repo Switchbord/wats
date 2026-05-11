@@ -6,9 +6,9 @@
 
 ## Current implementation status
 
-`wats serve` is not implemented yet. There is no supported root Dockerfile, no supported Compose file, no container image release, and no container-registry workflow in WATS today.
+`wats serve --config <path> --dry-run` is implemented for local Bun smoke checks. There is still no supported root Dockerfile, no supported Compose file, no credential-gated live serve mode, no container image release, and no container-registry workflow in WATS today.
 
-This guide is the WATS-49 deployment contract scaffold. It documents the shape the real Docker artifacts should take after the serve process exists.
+This guide is the WATS-49 deployment contract scaffold. It documents the shape future Docker artifacts should take around the implemented serve contract once live/deploy packaging is explicitly authorized.
 
 ## Safety defaults
 
@@ -25,7 +25,7 @@ This guide is the WATS-49 deployment contract scaffold. It documents the shape t
 
 This is the future Dockerfile shape for WATS-49.
 
-A future Bun-first Dockerfile should follow this pattern after `wats serve` lands:
+A future Bun-first Dockerfile should follow this pattern after credential-gated live serve packaging lands:
 
 ```Dockerfile
 FROM oven/bun:1 AS deps

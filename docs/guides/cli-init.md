@@ -6,7 +6,7 @@
 
 ## Purpose
 
-The WATS CLI is the package-manager entry point for safe local onboarding and inspection. WATS-33 ships credential-safe help surfaces, local verify-token generation, offline config validation, OpenAPI export, and a `serve --help` handoff. WATS-69 implements the safe `wats init` bootstrap for config/env placeholder generation. WATS-70 implements real offline `wats doctor` diagnostics. `serve` remains a future runtime slice.
+The WATS CLI is the package-manager entry point for safe local onboarding and inspection. WATS-33 ships credential-safe help surfaces, local verify-token generation, offline config validation, and OpenAPI export. WATS-69 implements the safe `wats init` bootstrap for config/env placeholder generation. WATS-70 implements real offline `wats doctor` diagnostics. WATS-71 implements a dry-run `wats serve` process wrapper for local service smoke checks without live credentials.
 
 ## Current commands
 
@@ -24,6 +24,8 @@ wats openapi --config <path> --profile <name>
 wats openapi --config <path> --server-url https://service.example
 wats openapi --config <path> --out openapi.json
 wats openapi --help
+wats serve --config <path> --dry-run
+wats serve --config <path> --dry-run --print-routes
 wats serve --help
 wats webhook token
 wats webhook token --help
@@ -35,7 +37,7 @@ The CLI still does not:
 - read or resolve live credentials
 - call Meta Graph APIs
 - validate tokens against Meta
-- start a server process
+- start live/credentialed service mode
 - overwrite output files
 
 ## WATS-47 first-run operator flow
@@ -56,7 +58,7 @@ The first-run flow must be safe for local onboarding:
 2. Generate config/env placeholder files only when the operator runs `wats init` without dry-run.
 3. Validate the generated config through `@switchbord/config`.
 4. Run doctor offline diagnostics.
-5. Start a local dry-run service wrapper around `@switchbord/service` when implemented.
+5. Start a local dry-run service wrapper around `@switchbord/service`.
 
 ## Env placeholder policy
 
