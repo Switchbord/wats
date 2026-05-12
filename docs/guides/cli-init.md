@@ -196,13 +196,14 @@ wats serve --config wats.config.yaml --profile local --host 127.0.0.1 --port 300
 
 Alpha `serve` should default to dry-run/mock mode. In dry-run mode it loads config, starts the `@switchbord/service` process wrapper with synthetic in-memory secrets, exposes health/readiness/OpenAPI/webhook routes, and makes no live Meta calls by default.
 
-Live service mode is explicitly credential-gated:
+Live service mode is explicitly credential-gated, but the current build only ships the guard contract and still fails closed before secret resolution or service bind:
 
 ```bash
-wats serve --config wats.config.yaml --profile prod --live --yes-live --env-file .env.local
+wats serve --config wats.config.yaml --profile prod --live --yes-live
+WATS_LIVE_ENABLE=1 WATS_YES_LIVE=1 wats serve --config wats.config.yaml --profile prod --live --yes-live
 ```
 
-Live mode should resolve required secret values only after explicit opt-in. Startup should not call Meta by default, but authenticated service routes may send real WhatsApp messages once live credentials are loaded.
+`--live` declares live intent and `--yes-live` acknowledges live Graph/API side effects; `WATS_LIVE_ENABLE=1` and `WATS_YES_LIVE=1` are the equivalent environment-level gate. The follow-up secret-resolution slice will decide and implement explicit `--env-file <path>` support. Until then, `--env-file` is rejected, `.env.local` is never read implicitly, startup makes no Meta Graph call, and authenticated service routes cannot run in live mode.
 
 ## Troubleshooting matrix
 
@@ -212,14 +213,14 @@ This troubleshooting matrix is safe to publish because it names failure classes 
 | --- | --- | --- |
 | `config_not_found` | no config discovered | pass `--config wats.config.yaml` or run `wats init --dry-run` |
 | `profile_not_found` | selected profile missing | check `--profile`, `WATS_PROFILE`, and `defaultProfile` |
-| `missing_secret_env` | live mode requested without required env value | set the env var outside the CLI or use explicit `--env-file` |
+| `missing_secret_env` | future live mode requested without required env value | set the env var outside the CLI; explicit `--env-file` support is a follow-up slice |
 | `output_exists` | generated file already exists | inspect the file; do not overwrite unless a future command documents safe force behavior |
 | `port_in_use` | service bind port already taken | choose another `--port` or stop the existing process |
 | `live_confirmation_required` | live check/service requested without acknowledgement | rerun only after reviewing side effects and adding `--yes-live` |
 
 ## Credential gate
 
-No live Meta calls by default. The credential gate requires an explicit live flag plus a confirmation such as `--yes-live` or `WATS_LIVE_ENABLE=1`. CI/docs/tests remain credential-free.
+No live Meta calls by default. The live guard requires both live intent and acknowledgement (`--live` plus `--yes-live`, or the paired `WATS_LIVE_ENABLE=1` / `WATS_YES_LIVE=1` environment gate). In the current guard-only slice the command still fails closed after recognizing the gate, so CI/docs/tests remain credential-free and no secrets are resolved.
 
 ## Webhook onboarding checklist
 

@@ -190,7 +190,9 @@ curl -fsS http://127.0.0.1:3000/openapi.json
 wats serve --config wats.config.yaml --dry-run --print-routes
 ```
 
-Dry-run serve never resolves env-secret values, reads `.env.local`, calls Meta Graph APIs, or prints config paths, profile names, env names, synthetic secret values, or token-like arguments. `--live`, `--yes-live`, and `--env-file` intentionally fail closed until the credential-gated live serve slice lands.
+Dry-run serve never resolves env-secret values, reads `.env.local`, calls Meta Graph APIs, or prints config paths, profile names, env names, synthetic secret values, or token-like arguments.
+
+WATS-72 adds the live-mode guard contract without enabling live service startup yet. `--live` declares live intent and `--yes-live` acknowledges live Graph/API side effects. Operators may also set `WATS_LIVE_ENABLE=1` and `WATS_YES_LIVE=1` for the same intent/acknowledgement pair. In this build every live-guard path still fails closed before env-secret resolution, env-file parsing, service binding, or Meta Graph calls. `--env-file` remains rejected until the separate secret-resolution slice lands; `.env.local` is never read implicitly.
 
 ### `wats serve --help`
 
@@ -254,7 +256,8 @@ WATS-47 target error families include `CliUsageError`, `CliConfigError`, `Config
 
 Future implementation work may add:
 
-- credential-gated live `wats serve` mode behind explicit flags;
+- live-capable `wats serve` startup after explicit flags and resolved secrets;
+- explicit `--env-file` secret resolution with unsafe-path/duplicate-key/value-shape rejection;
 - optional live checks behind explicit credential-gated flags;
 - deeper doctor integrations beyond the current offline runtime/package/config/profile/routes/OpenAPI/env-presence checks.
 

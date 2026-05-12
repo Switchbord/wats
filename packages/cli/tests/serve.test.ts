@@ -86,7 +86,7 @@ afterEach(() => {
 });
 
 
-function runCli(args: readonly string[], cwd = repoRoot): CliResult {
+function runCli(args: readonly string[], cwd = repoRoot, env: Record<string, string | undefined> = {}): CliResult {
   const completed = Bun.spawnSync(["bun", entrypoint, ...args], {
     cwd,
     stdout: "pipe",
@@ -95,7 +95,8 @@ function runCli(args: readonly string[], cwd = repoRoot): CliResult {
       ...process.env,
       WATS_ACCESS_TOKEN: "EAA_TEST_ACCESS_TOKEN_DO_NOT_PRINT_1234567890",
       WATS_WEBHOOK_APP_SECRET: "APP_SECRET_DO_NOT_PRINT",
-      WATS_SERVICE_BEARER_TOKEN: "raw-service-bearer-token-do-not-print"
+      WATS_SERVICE_BEARER_TOKEN: "raw-service-bearer-token-do-not-print",
+      ...env
     }
   });
   return {
@@ -414,15 +415,7 @@ describe("wats serve dry-run process wrapper", () => {
       ["--config", configPath, "--dry-run", "--host", "../../.env.local"],
       ["--config", configPath, "--dry-run", "--profile", "../../.env.local"],
       ["--config", configPath, "--dry-run", "--profile", "EAA_TEST_ACCESS_TOKEN_DO_NOT_PRINT_1234567890"],
-      ["--config", configPath, "--dry-run", "--unknown=../../.env.local"],
-      ["--config", configPath, "--dry-run", "--live"],
-      ["--config", configPath, "--dry-run", "--yes-live"],
-      ["--config", configPath, "--dry-run", "--live", "--yes-live"],
-      ["--config", configPath, "--live", "--yes-live"],
-      ["--config", configPath, "--live"],
-      ["--config", configPath, "--yes-live"],
-      ["--config", configPath, "--dry-run", "--env-file", "../../.env.local"],
-      ["--config", configPath, "--live", "--yes-live", "--env-file", "../../.env.local"]
+      ["--config", configPath, "--dry-run", "--unknown=../../.env.local"]
     ];
 
     try {
@@ -455,16 +448,19 @@ describe("wats serve dry-run process wrapper", () => {
       expect(help.stdout).toContain("WATS_YES_LIVE=1");
       expect(help.stdout).toContain("env-file secret resolution is not implemented");
 
-      const cases = [
-        ["--config", configPath, "--live"],
-        ["--config", configPath, "--yes-live"],
-        ["--config", configPath, "--live", "--yes-live"],
-        ["--config", configPath, "--dry-run", "--live", "--yes-live"],
-        ["--config", configPath, "--live", "--yes-live", "--env-file", "../../.env.local"]
+      const cases: readonly Readonly<{ args: readonly string[]; env?: Record<string, string | undefined> }>[] = [
+        { args: ["--config", configPath, "--live"] },
+        { args: ["--config", configPath, "--yes-live"] },
+        { args: ["--config", configPath, "--live", "--yes-live"] },
+        { args: ["--config", configPath, "--dry-run", "--live", "--yes-live"] },
+        { args: ["--config", configPath, "--live", "--yes-live", "--env-file", "../../.env.local"] },
+        { args: ["--config", configPath, "--dry-run"], env: { WATS_LIVE_ENABLE: "1", WATS_YES_LIVE: undefined } },
+        { args: ["--config", configPath, "--dry-run"], env: { WATS_LIVE_ENABLE: undefined, WATS_YES_LIVE: "1" } },
+        { args: ["--config", configPath, "--dry-run"], env: { WATS_LIVE_ENABLE: "1", WATS_YES_LIVE: "1" } }
       ] as const;
 
-      for (const args of cases) {
-        const result = runCli(["serve", ...args, "--host", "127.0.0.1", "--port", String(port)]);
+      for (const { args, env } of cases) {
+        const result = runCli(["serve", ...args, "--host", "127.0.0.1", "--port", String(port)], repoRoot, env);
         expect(result.exitCode, `args=${JSON.stringify(args)} stdout=${result.stdout}`).toBe(1);
         expect(result.stdout).toBe("");
         expect(result.stderr).toContain("Live serve mode is gated and not available in this build");
