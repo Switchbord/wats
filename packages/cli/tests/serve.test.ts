@@ -454,6 +454,10 @@ describe("wats serve dry-run process wrapper", () => {
         { args: ["--config", configPath, "--live", "--yes-live"] },
         { args: ["--config", configPath, "--dry-run", "--live", "--yes-live"] },
         { args: ["--config", configPath, "--live", "--yes-live", "--env-file", "../../.env.local"] },
+        { args: ["--config", configPath, "--live", "--yes-live", "--env-file", "EAA_TEST_ACCESS_TOKEN_DO_NOT_PRINT_1234567890"] },
+        { args: ["--config", configPath, "--live", "--yes-live", "--env-file"] },
+        { args: ["--config", configPath, "--live", "--yes-live", "--env-file", "safe.env", "--env-file", "other.env"] },
+        { args: ["--config", configPath, "--live", "--yes-live", "--env-file=../../.env.local"] },
         { args: ["--config", configPath, "--dry-run"], env: { WATS_LIVE_ENABLE: "1", WATS_YES_LIVE: undefined } },
         { args: ["--config", configPath, "--dry-run"], env: { WATS_LIVE_ENABLE: undefined, WATS_YES_LIVE: "1" } },
         { args: ["--config", configPath, "--dry-run"], env: { WATS_LIVE_ENABLE: "1", WATS_YES_LIVE: "1" } }
@@ -467,6 +471,9 @@ describe("wats serve dry-run process wrapper", () => {
         expect(result.stderr).toContain("wats serve --help");
         expect(result.stderr).not.toContain("Invalid serve arguments");
         expect(result.stderr).not.toContain("../../.env.local");
+        expect(result.stderr).not.toContain("EAA_TEST_ACCESS_TOKEN_DO_NOT_PRINT_1234567890");
+        expect(result.stderr).not.toContain("safe.env");
+        expect(result.stderr).not.toContain("other.env");
         expect(await canBind(port)).toBe(true);
         expectNoLeaks(result.stderr, configPath);
       }
