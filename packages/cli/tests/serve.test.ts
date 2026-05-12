@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
@@ -12,6 +12,21 @@ interface CliResult {
 
 type JsonRecord = Record<string, unknown>;
 type ServeProcess = ReturnType<typeof Bun.spawn>;
+type ProcessSignalMethod = (event: string | symbol, listener: (...args: unknown[]) => void) => typeof process;
+
+type ProcessLikeWithSignals = typeof process & {
+  addListener: ProcessSignalMethod;
+  on: ProcessSignalMethod;
+  once: ProcessSignalMethod;
+  prependListener: ProcessSignalMethod;
+  prependOnceListener: ProcessSignalMethod;
+  exit(code?: number): never;
+};
+
+type SignalListenerRegistration = Readonly<{
+  event: string | symbol;
+  listener: (...args: unknown[]) => void;
+}>;
 
 const SENTINELS = [
   "WATS_ACCESS_TOKEN",
@@ -50,6 +65,25 @@ function findRepoRoot(startDir: string): string {
 
 const repoRoot = findRepoRoot(import.meta.dir);
 const entrypoint = join(repoRoot, "packages/cli/dist/bin.js");
+
+const originalProcessSignalMethods = Object.freeze({
+  addListener: process.addListener,
+  on: process.on,
+  once: process.once,
+  prependListener: process.prependListener,
+  prependOnceListener: process.prependOnceListener
+});
+const originalProcessExit = process.exit;
+
+afterEach(() => {
+  const mutableProcess = process as ProcessLikeWithSignals;
+  mutableProcess.addListener = originalProcessSignalMethods.addListener.bind(process) as ProcessLikeWithSignals["addListener"];
+  mutableProcess.on = originalProcessSignalMethods.on.bind(process) as ProcessLikeWithSignals["on"];
+  mutableProcess.once = originalProcessSignalMethods.once.bind(process) as ProcessLikeWithSignals["once"];
+  mutableProcess.prependListener = originalProcessSignalMethods.prependListener.bind(process) as ProcessLikeWithSignals["prependListener"];
+  mutableProcess.prependOnceListener = originalProcessSignalMethods.prependOnceListener.bind(process) as ProcessLikeWithSignals["prependOnceListener"];
+  mutableProcess.exit = originalProcessExit.bind(process) as ProcessLikeWithSignals["exit"];
+});
 
 
 function runCli(args: readonly string[], cwd = repoRoot): CliResult {
@@ -217,6 +251,47 @@ async function canBind(port: number): Promise<boolean> {
     }
   }
 }
+
+describe("exported runCli process side effects", () => {
+  test("does not install process signal handlers or call process.exit for direct programmatic serve use", async () => {
+    const dir = makeTempDir();
+    const configPath = writeConfig(dir);
+    const port = await getFreePort();
+    const registrations: SignalListenerRegistration[] = [];
+    const mutableProcess = process as ProcessLikeWithSignals;
+    const recordSignalRegistration: ProcessSignalMethod = (event, listener) => {
+      registrations.push({ event, listener });
+      return process;
+    };
+    mutableProcess.addListener = recordSignalRegistration as ProcessLikeWithSignals["addListener"];
+    mutableProcess.on = recordSignalRegistration as ProcessLikeWithSignals["on"];
+    mutableProcess.once = recordSignalRegistration as ProcessLikeWithSignals["once"];
+    mutableProcess.prependListener = recordSignalRegistration as ProcessLikeWithSignals["prependListener"];
+    mutableProcess.prependOnceListener = recordSignalRegistration as ProcessLikeWithSignals["prependOnceListener"];
+    mutableProcess.exit = ((code?: number) => {
+      throw new Error(`process.exit should not be called by exported runCli, got ${code ?? "undefined"}`);
+    }) as ProcessLikeWithSignals["exit"];
+
+    let result: Awaited<ReturnType<(typeof import("../src/index"))["runCli"]>> | undefined;
+    try {
+      const cliModule = await import("../src/index");
+      result = await cliModule.runCli(["serve", "--config", configPath, "--dry-run", "--host", "127.0.0.1", "--port", String(port)]);
+
+      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.stderr).toBe("");
+      expect(result.stdout).toContain("serve dry-run");
+      expect(result.stdout).toContain("status: listening");
+      expect(typeof result.shutdown).toBe("function");
+      expect(registrations).toEqual([]);
+      const response = await waitForHttpStatus({ exited: new Promise<never>(() => {}) } as ServeProcess, `http://127.0.0.1:${port}/healthz`, 200);
+      expect(response.status).toBe(200);
+    } finally {
+      result?.shutdown?.();
+      expect(await canBind(port)).toBe(true);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
 
 describe("wats serve dry-run process wrapper", () => {
   test("--help documents real dry-run usage instead of the old handoff", () => {

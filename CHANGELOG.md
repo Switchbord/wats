@@ -60,6 +60,7 @@ Design-only/docs-only boundaries preserved in this launch: WATS-46/WATS-47/WATS-
 
 - `wats doctor --config <path>` now runs offline diagnostics for runtime/package imports, config/profile checks, service route collisions, OpenAPI generation, and optional env presence counts without printing env names or values.
 - `wats serve --config <path> --dry-run` now starts the standalone `@switchbord/service` app through a local Bun process wrapper with synthetic in-memory secrets, a no-network Graph transport, health/readiness/OpenAPI routes, `--print-routes`, and graceful shutdown. Live serve mode, env-file secret resolution, Docker packaging, and Meta Graph calls remain outside the dry-run slice.
+- The exported `runCli` helper remains embeddable: process signal handling and `process.exit` stay isolated to the executable bin wrapper, with regression coverage in both direct tests and the external `@switchbord/cli` consumer fixture.
 
 ### Not included
 
