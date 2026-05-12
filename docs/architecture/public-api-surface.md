@@ -144,10 +144,11 @@ Current commands:
 - `wats openapi --config <path> --out <path>`
 - `wats openapi --help`
 - `wats serve --config <path> --dry-run [--profile <name>] [--host <host>] [--port <port>] [--print-routes]`
+- `wats serve --config <path> --live --yes-live ...` guard recognition only; still fails closed before secret resolution or service bind
 - `wats serve --help`
 - `wats webhook token`
 
-Status: experimental CLI foundation. It generates WATS config/env placeholder files with `wats init`, validates config files safely, exports WATS service OpenAPI, runs offline diagnostics, starts a dry-run local service process with `wats serve --dry-run`, and generates local webhook verify tokens without resolving env-secret values or calling Meta Graph.
+Status: experimental CLI foundation. It generates WATS config/env placeholder files with `wats init`, validates config files safely, exports WATS service OpenAPI, runs offline diagnostics, starts a dry-run local service process with `wats serve --dry-run`, recognizes the WATS-72 live-intent/acknowledgement guard while still failing closed, and generates local webhook verify tokens without resolving env-secret values or calling Meta Graph.
 
 ### `@switchbord/service`
 
@@ -190,7 +191,7 @@ These are not implemented as runtime APIs yet:
 - mutating WABA/phone-number/business-management/admin APIs beyond WATS-42A read-only inventory
 - catalog/product management APIs beyond WATS-42A read-only getCommerceSettings
 - full Meta Graph API OpenAPI generation
-- credential-gated live `wats serve` mode and env-file secret resolution
+- live-capable credentialed `wats serve` startup and env-file secret resolution; the guard-only `--live`/`--yes-live` contract is recognized but fails closed
 - `@switchbord/persistence` package and SQLite/Postgres adapters are WATS-48 design targets only. In docs-lock wording, @switchbord/persistence package and SQLite/Postgres adapters are WATS-48 design targets only. No current package export, no service persistence integration, no config persistence schema, and no migration runner exists yet.
 - no supported Dockerfile, Compose file, container image, or container-registry publication yet. WATS-49 keeps Docker/deployment as a design scaffold until live/deploy packaging is explicitly authorized.
 

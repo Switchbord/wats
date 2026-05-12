@@ -82,6 +82,9 @@ describe("WATS-47 CLI operator UX design docs", () => {
       "no overwrite by default",
       "credential-gated live validation",
       "OpenAPI export remains service-only",
+      "WATS-72 adds the live-mode guard contract",
+      "WATS_LIVE_ENABLE=1",
+      "fails closed before env-secret resolution",
       "Design-only note"
     ]);
   });
@@ -98,7 +101,9 @@ describe("WATS-47 CLI operator UX design docs", () => {
       "serve local flow",
       "troubleshooting matrix",
       "no raw secrets",
-      "credential gate",
+      "live guard",
+      "WATS_LIVE_ENABLE=1",
+      "current build only ships the guard contract",
       "WATS_ACCESS_TOKEN"
     ]);
   });
