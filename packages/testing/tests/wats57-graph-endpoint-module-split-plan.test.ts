@@ -128,4 +128,27 @@ describe("WATS-57 graph endpoint module split plan", () => {
     expect(packageMap).toContain("WATS-65");
     expect(packageMap).toContain("packages/graph/src/endpoints/templates/");
   });
+
+  test("WATS-66 Flow split implementation keeps Flow runtime outside wabaEndpoints", () => {
+    const flowBarrel = read("packages/graph/src/endpoints/flows.ts");
+    const flowIndex = read("packages/graph/src/endpoints/flows/index.ts");
+    const wabaEndpoints = read("packages/graph/src/endpoints/wabaEndpoints.ts");
+    const changelog = read("CHANGELOG.md");
+    const packageMap = read("docs/architecture/package-map.md");
+
+    expect(flowBarrel).toContain('from "./flows/index"');
+    expect(flowIndex).toContain('from "./callables"');
+    expect(flowIndex).toContain('from "./flowJson"');
+    expect(flowIndex).toContain('from "./dataExchange"');
+    expect(wabaEndpoints).toContain('from "./flows/index"');
+    expect(wabaEndpoints).not.toContain("function normalizeListFlowsParams");
+    expect(wabaEndpoints).not.toContain("const listFlowsRaw");
+    expect(wabaEndpoints).not.toContain("function flowJsonClone");
+    expect(wabaEndpoints).not.toContain("function buildFlowScreenResponse");
+    expect(changelog).toContain("WATS-66");
+    expect(changelog).toContain("Flow endpoint family");
+    expect(packageMap).toContain("WATS-66");
+    expect(packageMap).toContain("packages/graph/src/endpoints/flows/");
+  });
+
 });
