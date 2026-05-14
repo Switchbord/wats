@@ -80,6 +80,26 @@ function minimalFlowJson(extra: Record<string, unknown> = {}) {
 }
 
 describe("WATS-40 Flow endpoint callables", () => {
+
+  test("WATS-66 root and Flow subpath exports keep identical callables after module split", async () => {
+    const root = await import("../src");
+    const flows = await import("../src/endpoints/flows");
+    expect(flows.listFlows).toBe(root.listFlows);
+    expect(flows.getFlow).toBe(root.getFlow);
+    expect(flows.createFlow).toBe(root.createFlow);
+    expect(flows.updateFlowMetadata).toBe(root.updateFlowMetadata);
+    expect(flows.updateFlowJson).toBe(root.updateFlowJson);
+    expect(flows.publishFlow).toBe(root.publishFlow);
+    expect(flows.deleteFlow).toBe(root.deleteFlow);
+    expect(flows.deprecateFlow).toBe(root.deprecateFlow);
+    expect(flows.getFlowAssets).toBe(root.getFlowAssets);
+    expect(flows.buildFlowJson).toBe(root.buildFlowJson);
+    expect(flows.validateFlowJson).toBe(root.validateFlowJson);
+    expect(flows.buildFlowScreenResponse).toBe(root.buildFlowScreenResponse);
+    expect(flows.buildFlowCloseResponse).toBe(root.buildFlowCloseResponse);
+    expect(flows.buildFlowErrorResponse).toBe(root.buildFlowErrorResponse);
+  });
+
   test("listFlows GETs /{wabaId}/flows with pywa-oriented query mapping", async () => {
     const { client, handle } = clientWith(ok({ data: [{ id: "flow1", name: "signup" }] }));
     const res: FlowListResponse = await listFlows(client, {
