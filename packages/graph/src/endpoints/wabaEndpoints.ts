@@ -5,35 +5,13 @@
 // layered on defineEndpoint and MockTransport-testable without live WABA
 // credentials.
 
-import { defineEndpoint } from "../endpoint";
-import { GraphRequestValidationError } from "../errors";
-import type { EndpointInvokeOptions } from "../endpoint";
-import {
-  normalizeListPhoneNumbersParams,
-  sanitizeBusinessManagementOptions,
-  type ListPhoneNumbersInput
-} from "./businessManagement";
+export { listPhoneNumbers } from "./waba/index";
 
-export interface PhoneNumberListEntry {
-  readonly id: string;
-  readonly display_phone_number?: string;
-  readonly verified_name?: string;
-  readonly quality_rating?: string;
-}
-
-export interface PhoneNumberListResponse {
-  readonly data?: readonly PhoneNumberListEntry[];
-  readonly paging?: GraphPaging;
-}
-
-export interface GraphPaging {
-  readonly cursors?: {
-    readonly before?: string;
-    readonly after?: string;
-  };
-  readonly next?: string;
-  readonly previous?: string;
-}
+export type {
+  GraphPaging,
+  PhoneNumberListEntry,
+  PhoneNumberListResponse
+} from "./waba/index";
 
 export {
   buildCreateMessageTemplateBody,
@@ -76,45 +54,6 @@ export type {
   UpdateMessageTemplateBody
 } from "./templates/index";
 
-
-const listPhoneNumbersRaw = defineEndpoint<
-  { wabaId: string; fields?: string; limit?: string; after?: string; before?: string },
-  never,
-  PhoneNumberListResponse
->({
-  method: "GET",
-  pathTemplate: "/{wabaId}/phone_numbers",
-  params: {
-    wabaId: { in: "path", required: true },
-    fields: { in: "query" },
-    limit: { in: "query" },
-    after: { in: "query" },
-    before: { in: "query" }
-  }
-});
-
-export const listPhoneNumbers = Object.assign(
-  async function listPhoneNumbers(
-    client: Parameters<typeof listPhoneNumbersRaw>[0],
-    params: ListPhoneNumbersInput,
-    body?: never,
-    opts?: EndpointInvokeOptions
-  ) {
-    if (body !== undefined) {
-      throw new GraphRequestValidationError("Invalid listPhoneNumbers input: GET endpoints do not accept a body.");
-    }
-    return listPhoneNumbersRaw(
-      client,
-      normalizeListPhoneNumbersParams(params) as Parameters<typeof listPhoneNumbersRaw>[1],
-      undefined,
-      sanitizeBusinessManagementOptions(opts, "listPhoneNumbers")
-    );
-  },
-  { definition: listPhoneNumbersRaw.definition }
-) as unknown as {
-  (client: Parameters<typeof listPhoneNumbersRaw>[0], params: ListPhoneNumbersInput, body?: never, opts?: EndpointInvokeOptions): Promise<PhoneNumberListResponse>;
-  readonly definition: typeof listPhoneNumbersRaw.definition;
-};
 
 // ---------------------------------------------------------------------------
 // WATS-40 WhatsApp Flows endpoint parity.

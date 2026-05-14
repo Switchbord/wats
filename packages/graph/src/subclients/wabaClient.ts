@@ -19,16 +19,19 @@ import {
   getWabaInfo as getWabaInfoEndpoint,
   listSubscribedApps as listSubscribedAppsEndpoint,
   type GetWabaInfoInput,
-  type ListPhoneNumbersInput,
   type SubscribedAppsResponse,
   type WabaInfo
 } from "../endpoints/businessManagement";
+import {
+  listPhoneNumbers as listPhoneNumbersEndpoint,
+  type ListPhoneNumbersInput,
+  type PhoneNumberListResponse
+} from "../endpoints/waba";
 import {
   createMessageTemplate as createMessageTemplateEndpoint,
   deleteMessageTemplate as deleteMessageTemplateEndpoint,
   getMessageTemplate as getMessageTemplateEndpoint,
   listMessageTemplates as listMessageTemplatesEndpoint,
-  listPhoneNumbers as listPhoneNumbersEndpoint,
   updateMessageTemplate as updateMessageTemplateEndpoint,
   listFlows as listFlowsEndpoint,
   getFlow as getFlowEndpoint,
@@ -51,7 +54,6 @@ import {
   type GetMessageTemplateInput,
   type ListFlowsInput,
   type ListMessageTemplatesInput,
-  type PhoneNumberListResponse,
   type TemplateDetails,
   type TemplateListResponse,
   type TemplateMutationResponse,
