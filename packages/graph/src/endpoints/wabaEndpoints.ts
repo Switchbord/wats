@@ -5,10 +5,9 @@
 // layered on defineEndpoint and MockTransport-testable without live WABA
 // credentials.
 
-import { defineEndpoint, type EndpointCallable } from "../endpoint";
+import { defineEndpoint } from "../endpoint";
 import { GraphRequestValidationError } from "../errors";
 import type { EndpointInvokeOptions } from "../endpoint";
-import { TemplateParamCountMismatchError } from "../errorSubclasses";
 import {
   normalizeListPhoneNumbersParams,
   sanitizeBusinessManagementOptions,
@@ -36,476 +35,47 @@ export interface GraphPaging {
   readonly previous?: string;
 }
 
-export type TemplateCategory = "MARKETING" | "UTILITY" | "AUTHENTICATION";
-export type TemplateStatus =
-  | "APPROVED"
-  | "IN_APPEAL"
-  | "PENDING"
-  | "REJECTED"
-  | "PENDING_DELETION"
-  | "DELETED"
-  | "DISABLED"
-  | "PAUSED"
-  | "LIMIT_EXCEEDED";
-export type TemplateLanguageCode = string;
-export type TemplateParameterFormat = "POSITIONAL" | "NAMED";
-export type TemplateQualityScore = "GREEN" | "YELLOW" | "RED" | "UNKNOWN" | string;
-export type TemplateHeaderFormat = "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT" | "LOCATION";
-export type TemplateButtonType =
-  | "QUICK_REPLY"
-  | "URL"
-  | "PHONE_NUMBER"
-  | "COPY_CODE"
-  | "CATALOG"
-  | "FLOW";
+export {
+  buildCreateMessageTemplateBody,
+  buildUpdateMessageTemplateBody,
+  buildTemplateBodyComponent,
+  buildTemplateButtonComponent,
+  buildTemplateFooterComponent,
+  buildTemplateHeaderComponent,
+  createMessageTemplate,
+  deleteMessageTemplate,
+  getMessageTemplate,
+  listMessageTemplates,
+  updateMessageTemplate,
+  validateTemplateParameterCounts
+} from "./templates/index";
 
-export interface TemplateComponent {
-  readonly type: string;
-  readonly [key: string]: unknown;
-}
+export type {
+  CreateMessageTemplateBody,
+  DeleteMessageTemplateInput,
+  GetMessageTemplateInput,
+  ListMessageTemplatesInput,
+  SendTemplateComponentForValidation,
+  TemplateBodyComponentInput,
+  TemplateButtonInput,
+  TemplateButtonsComponentInput,
+  TemplateButtonType,
+  TemplateCategory,
+  TemplateComponent,
+  TemplateDefinitionForValidation,
+  TemplateDetails,
+  TemplateFooterComponentInput,
+  TemplateHeaderComponentInput,
+  TemplateHeaderFormat,
+  TemplateLanguageCode,
+  TemplateListResponse,
+  TemplateMutationResponse,
+  TemplateParameterFormat,
+  TemplateQualityScore,
+  TemplateStatus,
+  UpdateMessageTemplateBody
+} from "./templates/index";
 
-export interface TemplateDetails {
-  readonly id?: string;
-  readonly name?: string;
-  readonly language?: string;
-  readonly status?: TemplateStatus | string;
-  readonly category?: TemplateCategory | string;
-  readonly components?: readonly TemplateComponent[];
-  readonly parameter_format?: TemplateParameterFormat;
-  readonly message_send_ttl_seconds?: number;
-  readonly quality_score?: TemplateQualityScore | Record<string, unknown>;
-  readonly [key: string]: unknown;
-}
-
-export interface TemplateListResponse {
-  readonly data?: readonly TemplateDetails[];
-  readonly paging?: GraphPaging;
-}
-
-export interface TemplateMutationResponse {
-  readonly id?: string;
-  readonly success?: boolean;
-  readonly [key: string]: unknown;
-}
-
-export interface ListMessageTemplatesInput {
-  readonly wabaId: string;
-  readonly fields?: string;
-  readonly status?: TemplateStatus | string;
-  readonly category?: TemplateCategory | string;
-  readonly language?: TemplateLanguageCode;
-  readonly name?: string;
-  readonly content?: string;
-  readonly nameOrContent?: string;
-  readonly qualityScore?: string;
-  readonly limit?: string;
-  readonly after?: string;
-}
-
-export interface GetMessageTemplateInput {
-  readonly templateId: string;
-  readonly fields?: string;
-}
-
-export interface CreateMessageTemplateBody {
-  readonly name: string;
-  readonly language: TemplateLanguageCode;
-  readonly category: TemplateCategory | string;
-  readonly components: readonly TemplateComponent[];
-  readonly parameterFormat?: TemplateParameterFormat;
-  readonly messageSendTtlSeconds?: number;
-  readonly [key: string]: unknown;
-}
-
-export interface UpdateMessageTemplateBody {
-  readonly category?: TemplateCategory | string;
-  readonly components?: readonly TemplateComponent[];
-  readonly parameterFormat?: TemplateParameterFormat;
-  readonly messageSendTtlSeconds?: number;
-  readonly [key: string]: unknown;
-}
-
-export interface DeleteMessageTemplateInput {
-  readonly wabaId: string;
-  readonly name: string;
-  /** Maps to Graph query parameter `hsm_id`. */
-  readonly templateId?: string;
-}
-
-export interface TemplateHeaderComponentInput {
-  readonly format: TemplateHeaderFormat;
-  readonly text?: string;
-  readonly example?: unknown;
-  readonly [key: string]: unknown;
-}
-
-export interface TemplateBodyComponentInput {
-  readonly text: string;
-  readonly example?: unknown;
-  readonly [key: string]: unknown;
-}
-
-export interface TemplateFooterComponentInput {
-  readonly text: string;
-  readonly [key: string]: unknown;
-}
-
-export type TemplateButtonInput =
-  | { readonly type: "QUICK_REPLY"; readonly text: string; readonly [key: string]: unknown }
-  | { readonly type: "URL"; readonly text: string; readonly url: string; readonly [key: string]: unknown }
-  | { readonly type: "PHONE_NUMBER"; readonly text: string; readonly phoneNumber: string; readonly [key: string]: unknown }
-  | { readonly type: "COPY_CODE"; readonly example: string; readonly [key: string]: unknown }
-  | { readonly type: "CATALOG"; readonly text?: string; readonly [key: string]: unknown }
-  | { readonly type: "FLOW"; readonly text: string; readonly flowId?: string; readonly flowName?: string; readonly flowAction?: string; readonly navigateScreen?: string; readonly [key: string]: unknown };
-
-export interface TemplateButtonsComponentInput {
-  readonly buttons: readonly TemplateButtonInput[];
-  readonly [key: string]: unknown;
-}
-
-export interface TemplateDefinitionForValidation {
-  readonly parameterFormat?: TemplateParameterFormat;
-  readonly parameter_format?: TemplateParameterFormat;
-  readonly components: readonly TemplateComponent[];
-}
-
-export type SendTemplateComponentForValidation = {
-  readonly type: string;
-  readonly subType?: string;
-  readonly sub_type?: string;
-  readonly index?: string;
-  readonly parameters?: readonly unknown[];
-  readonly [key: string]: unknown;
-};
-
-const TEMPLATE_NAME_MAX_LENGTH = 512;
-const TEMPLATE_TEXT_MAX_LENGTH = 4096;
-const TEMPLATE_SHORT_TEXT_MAX_LENGTH = 1024;
-const TEMPLATE_MAX_COMPONENTS = 20;
-const TEMPLATE_MAX_BUTTONS = 10;
-const TEMPLATE_MAX_ARRAY = 100;
-const TEMPLATE_MAX_DEPTH = 8;
-
-function hasControlChar(value: string): boolean {
-  for (let i = 0; i < value.length; i += 1) {
-    const code = value.charCodeAt(i);
-    if (code < 0x20 || code === 0x7f) return true;
-  }
-  return false;
-}
-
-function validationError(message: string): GraphRequestValidationError {
-  return new GraphRequestValidationError(message);
-}
-
-function mismatchError(message: string): TemplateParamCountMismatchError {
-  return new TemplateParamCountMismatchError({
-    status: 400,
-    payload: { message, type: "ValidationError", code: 132000 },
-    headers: new Headers(),
-    requestUrl: "wats://local/template-parameter-validation"
-  });
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function assertPlainRecord(value: unknown, helperName: string, path = "input"): Record<string, unknown> {
-  if (!isPlainObject(value)) {
-    throw validationError(`Invalid ${helperName} input: ${path} must be an object.`);
-  }
-  const proto = Object.getPrototypeOf(value);
-  if (proto !== Object.prototype && proto !== null) {
-    throw validationError(`Invalid ${helperName} input: ${path} must be a plain object.`);
-  }
-  const descriptors = Object.getOwnPropertyDescriptors(value);
-  if (Object.prototype.hasOwnProperty.call(descriptors, "toJSON") || "toJSON" in value) {
-    throw validationError(`Invalid ${helperName} input: ${path} must not define toJSON.`);
-  }
-  for (const [key, descriptor] of Object.entries(descriptors)) {
-    if (typeof descriptor.get === "function" || typeof descriptor.set === "function") {
-      throw validationError(`Invalid ${helperName} input: ${path}.${key} must not use accessors.`);
-    }
-    if (typeof descriptor.value === "function" || typeof descriptor.value === "symbol") {
-      throw validationError(`Invalid ${helperName} input: ${path}.${key} must be JSON-serializable.`);
-    }
-  }
-  return value;
-}
-
-function assertString(value: unknown, fieldName: string, helperName: string, maxLength = TEMPLATE_NAME_MAX_LENGTH): string {
-  if (typeof value !== "string") {
-    throw validationError(`Invalid ${helperName} input: ${fieldName} must be a string.`);
-  }
-  if (value.length === 0 || value.trim().length === 0) {
-    throw validationError(`Invalid ${helperName} input: ${fieldName} must be non-empty.`);
-  }
-  if (hasControlChar(value)) {
-    throw validationError(`Invalid ${helperName} input: ${fieldName} must not contain control characters (CR/LF/NUL/etc.).`);
-  }
-  if (value.length > maxLength) {
-    throw validationError(`Invalid ${helperName} input: ${fieldName} exceeds ${maxLength}-character limit.`);
-  }
-  return value;
-}
-
-function maybeString(value: unknown, fieldName: string, helperName: string, maxLength = TEMPLATE_NAME_MAX_LENGTH): string | undefined {
-  if (value === undefined) return undefined;
-  return assertString(value, fieldName, helperName, maxLength);
-}
-
-function assertArray(value: unknown, fieldName: string, min: number, max: number, helperName: string): readonly unknown[] {
-  if (!Array.isArray(value)) {
-    throw validationError(`Invalid ${helperName} input: ${fieldName} must be an array.`);
-  }
-  if (value.length < min || value.length > max) {
-    throw validationError(`Invalid ${helperName} input: ${fieldName} length must be between ${min} and ${max}.`);
-  }
-  if (Object.getPrototypeOf(value) !== Array.prototype) {
-    throw validationError(`Invalid ${helperName} input: ${fieldName} must use Array.prototype.`);
-  }
-  if (Object.prototype.hasOwnProperty.call(value, Symbol.iterator) || Object.prototype.hasOwnProperty.call(value, "map")) {
-    throw validationError(`Invalid ${helperName} input: ${fieldName} must not override Array.prototype methods.`);
-  }
-  const descriptors = Object.getOwnPropertyDescriptors(value);
-  if (Object.prototype.hasOwnProperty.call(descriptors, "toJSON") || "toJSON" in value) {
-    throw validationError(`Invalid ${helperName} input: ${fieldName} must not define toJSON.`);
-  }
-  const copy: unknown[] = [];
-  for (let i = 0; i < value.length; i += 1) {
-    if (!Object.prototype.hasOwnProperty.call(value, i)) {
-      throw validationError(`Invalid ${helperName} input: ${fieldName} must not contain sparse array holes.`);
-    }
-    const descriptor = descriptors[String(i)];
-    if (descriptor === undefined || typeof descriptor.get === "function" || typeof descriptor.set === "function") {
-      throw validationError(`Invalid ${helperName} input: ${fieldName} must not use accessors.`);
-    }
-    copy.push(descriptor.value);
-  }
-  return copy;
-}
-
-function safeJsonClone(value: unknown, helperName: string, path = "input", seen = new WeakSet<object>(), depth = 0): unknown {
-  if (depth > TEMPLATE_MAX_DEPTH) {
-    throw validationError(`Invalid ${helperName} input: ${path} exceeds maximum nesting depth.`);
-  }
-  if (value === null || typeof value === "boolean") return value;
-  if (typeof value === "string") {
-    if (hasControlChar(value)) throw validationError(`Invalid ${helperName} input: ${path} contains control characters.`);
-    if (value.length > TEMPLATE_TEXT_MAX_LENGTH) throw validationError(`Invalid ${helperName} input: ${path} string exceeds limit.`);
-    return value;
-  }
-  if (typeof value === "number") {
-    if (!Number.isFinite(value)) throw validationError(`Invalid ${helperName} input: ${path} contains a non-finite number.`);
-    return value;
-  }
-  if (value === undefined) return undefined;
-  if (Array.isArray(value)) {
-    if (seen.has(value)) throw validationError(`Invalid ${helperName} input: ${path} must not contain cycles.`);
-    seen.add(value);
-    const arr = assertArray(value, path, 0, TEMPLATE_MAX_ARRAY, helperName);
-    const out: unknown[] = [];
-    for (let index = 0; index < arr.length; index += 1) {
-      out.push(safeJsonClone(arr[index], helperName, `${path}[${index}]`, seen, depth + 1));
-    }
-    seen.delete(value);
-    return out;
-  }
-  const record = assertPlainRecord(value, helperName, path);
-  if (seen.has(record)) throw validationError(`Invalid ${helperName} input: ${path} must not contain cycles.`);
-  seen.add(record);
-  const out: Record<string, unknown> = {};
-  for (const [key, nested] of Object.entries(record)) {
-    if (key.length === 0 || hasControlChar(key) || key.length > TEMPLATE_SHORT_TEXT_MAX_LENGTH) {
-      throw validationError(`Invalid ${helperName} input: ${path} contains an invalid key.`);
-    }
-    const cloned = safeJsonClone(nested, helperName, `${path}.${key}`, seen, depth + 1);
-    if (cloned !== undefined) out[key] = cloned;
-  }
-  seen.delete(record);
-  return out;
-}
-
-function maybeExample(value: unknown, helperName: string): unknown {
-  if (value === undefined) return undefined;
-  const cloned = safeJsonClone(value, helperName, "example");
-  if (isPlainObject(cloned)) {
-    const rec = cloned as Record<string, unknown>;
-    const out: Record<string, unknown> = {};
-    for (const [key, nested] of Object.entries(rec)) {
-      if (key === "headerHandle") out.header_handle = nested;
-      else if (key === "bodyText") out.body_text = nested;
-      else out[key] = nested;
-    }
-    return out;
-  }
-  return cloned;
-}
-
-function normalizeComponent(value: unknown, helperName: string): TemplateComponent {
-  const cloned = safeJsonClone(value, helperName, "component");
-  const record = assertPlainRecord(cloned, helperName, "component");
-  const type = assertString(record.type, "component.type", helperName, TEMPLATE_SHORT_TEXT_MAX_LENGTH).toUpperCase();
-  const out: Record<string, unknown> = { ...record, type };
-  return out as TemplateComponent;
-}
-
-function normalizeComponents(value: unknown, helperName: string, required: boolean): TemplateComponent[] | undefined {
-  if (value === undefined) {
-    if (required) throw validationError(`Invalid ${helperName} input: components must be provided.`);
-    return undefined;
-  }
-  const arr = assertArray(value, "components", required ? 1 : 0, TEMPLATE_MAX_COMPONENTS, helperName);
-  const out: TemplateComponent[] = [];
-  for (const entry of arr) {
-    out.push(normalizeComponent(entry, helperName));
-  }
-  return out;
-}
-
-function mapCommonBodyFields(record: Record<string, unknown>, helperName: string): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(record)) {
-    if (value === undefined) continue;
-    if (key === "parameterFormat") out.parameter_format = assertString(value, "parameterFormat", helperName, 32);
-    else if (key === "messageSendTtlSeconds") {
-      if (typeof value !== "number" || !Number.isInteger(value) || value < 0) {
-        throw validationError(`Invalid ${helperName} input: messageSendTtlSeconds must be a non-negative integer.`);
-      }
-      out.message_send_ttl_seconds = value;
-    } else if (key === "components") {
-      const components = normalizeComponents(value, helperName, helperName === "createMessageTemplate");
-      if (components !== undefined) out.components = components;
-    } else {
-      out[key] = safeJsonClone(value, helperName, key);
-    }
-  }
-  return out;
-}
-
-export function buildCreateMessageTemplateBody(input: CreateMessageTemplateBody): Record<string, unknown> {
-  const record = assertPlainRecord(input, "createMessageTemplate");
-  const out = mapCommonBodyFields(record, "createMessageTemplate");
-  out.name = assertString(record.name, "name", "createMessageTemplate");
-  out.language = assertString(record.language, "language", "createMessageTemplate", 64);
-  out.category = assertString(record.category, "category", "createMessageTemplate", 64);
-  out.components = normalizeComponents(record.components, "createMessageTemplate", true);
-  return out;
-}
-
-export function buildUpdateMessageTemplateBody(input: UpdateMessageTemplateBody): Record<string, unknown> {
-  const record = assertPlainRecord(input, "updateMessageTemplate");
-  const out = mapCommonBodyFields(record, "updateMessageTemplate");
-  if (record.category !== undefined) out.category = assertString(record.category, "category", "updateMessageTemplate", 64);
-  return out;
-}
-
-export function buildTemplateHeaderComponent(input: TemplateHeaderComponentInput | TemplateComponent): TemplateComponent {
-  const record = assertPlainRecord(input, "buildTemplateHeaderComponent");
-  const format = assertString(record.format, "format", "buildTemplateHeaderComponent", 32).toUpperCase();
-  const out: Record<string, unknown> = { type: "HEADER", format };
-  if (format === "TEXT") out.text = assertString(record.text, "text", "buildTemplateHeaderComponent", TEMPLATE_TEXT_MAX_LENGTH);
-  else if (record.text !== undefined) out.text = assertString(record.text, "text", "buildTemplateHeaderComponent", TEMPLATE_TEXT_MAX_LENGTH);
-  const example = maybeExample(record.example, "buildTemplateHeaderComponent");
-  if (example !== undefined) out.example = example;
-  return out as TemplateComponent;
-}
-
-export function buildTemplateBodyComponent(input: TemplateBodyComponentInput | TemplateComponent): TemplateComponent {
-  const record = assertPlainRecord(input, "buildTemplateBodyComponent");
-  const out: Record<string, unknown> = { type: "BODY", text: assertString(record.text, "text", "buildTemplateBodyComponent", TEMPLATE_TEXT_MAX_LENGTH) };
-  const example = maybeExample(record.example, "buildTemplateBodyComponent");
-  if (example !== undefined) out.example = example;
-  return out as TemplateComponent;
-}
-
-export function buildTemplateFooterComponent(input: TemplateFooterComponentInput | TemplateComponent): TemplateComponent {
-  const record = assertPlainRecord(input, "buildTemplateFooterComponent");
-  return { type: "FOOTER", text: assertString(record.text, "text", "buildTemplateFooterComponent", TEMPLATE_SHORT_TEXT_MAX_LENGTH) };
-}
-
-function normalizeButton(input: unknown, index: number): Record<string, unknown> {
-  const record = assertPlainRecord(input, "buildTemplateButtonComponent", `buttons[${index}]`);
-  const type = assertString(record.type, "button.type", "buildTemplateButtonComponent", 32).toUpperCase();
-  const out: Record<string, unknown> = { type };
-  if (record.text !== undefined) out.text = assertString(record.text, "button.text", "buildTemplateButtonComponent", TEMPLATE_SHORT_TEXT_MAX_LENGTH);
-  switch (type) {
-    case "QUICK_REPLY":
-      out.text = assertString(record.text, "button.text", "buildTemplateButtonComponent", TEMPLATE_SHORT_TEXT_MAX_LENGTH);
-      break;
-    case "URL":
-      out.text = assertString(record.text, "button.text", "buildTemplateButtonComponent", TEMPLATE_SHORT_TEXT_MAX_LENGTH);
-      out.url = assertString(record.url, "button.url", "buildTemplateButtonComponent", TEMPLATE_TEXT_MAX_LENGTH);
-      break;
-    case "PHONE_NUMBER":
-      out.text = assertString(record.text, "button.text", "buildTemplateButtonComponent", TEMPLATE_SHORT_TEXT_MAX_LENGTH);
-      out.phone_number = assertString(record.phoneNumber, "button.phoneNumber", "buildTemplateButtonComponent", TEMPLATE_SHORT_TEXT_MAX_LENGTH);
-      break;
-    case "COPY_CODE":
-      out.example = assertString(record.example, "button.example", "buildTemplateButtonComponent", TEMPLATE_SHORT_TEXT_MAX_LENGTH);
-      break;
-    case "CATALOG":
-      break;
-    case "FLOW":
-      out.text = assertString(record.text, "button.text", "buildTemplateButtonComponent", TEMPLATE_SHORT_TEXT_MAX_LENGTH);
-      if (record.flowId !== undefined) out.flow_id = assertString(record.flowId, "button.flowId", "buildTemplateButtonComponent", TEMPLATE_SHORT_TEXT_MAX_LENGTH);
-      if (record.flowName !== undefined) out.flow_name = assertString(record.flowName, "button.flowName", "buildTemplateButtonComponent", TEMPLATE_SHORT_TEXT_MAX_LENGTH);
-      if (record.flowAction !== undefined) out.flow_action = assertString(record.flowAction, "button.flowAction", "buildTemplateButtonComponent", TEMPLATE_SHORT_TEXT_MAX_LENGTH);
-      if (record.navigateScreen !== undefined) out.navigate_screen = assertString(record.navigateScreen, "button.navigateScreen", "buildTemplateButtonComponent", TEMPLATE_SHORT_TEXT_MAX_LENGTH);
-      break;
-    default:
-      throw validationError(`Invalid buildTemplateButtonComponent input: unsupported button type ${JSON.stringify(type)}.`);
-  }
-  return out;
-}
-
-export function buildTemplateButtonComponent(input: TemplateButtonsComponentInput | TemplateComponent): TemplateComponent & { readonly buttons: readonly Record<string, unknown>[] } {
-  const record = assertPlainRecord(input, "buildTemplateButtonComponent");
-  const rawButtons = assertArray(record.buttons, "buttons", 1, TEMPLATE_MAX_BUTTONS, "buildTemplateButtonComponent");
-  const buttons: Record<string, unknown>[] = [];
-  for (let index = 0; index < rawButtons.length; index += 1) {
-    buttons.push(normalizeButton(rawButtons[index], index));
-  }
-  return { type: "BUTTONS", buttons };
-}
-
-function normalizeListParams(input: ListMessageTemplatesInput): Record<string, string> {
-  const record = assertPlainRecord(input, "listMessageTemplates");
-  const out: Record<string, string> = { wabaId: assertString(record.wabaId, "wabaId", "listMessageTemplates") };
-  for (const [publicKey, graphKey] of [
-    ["fields", "fields"],
-    ["status", "status"],
-    ["category", "category"],
-    ["language", "language"],
-    ["name", "name"],
-    ["content", "content"],
-    ["nameOrContent", "name_or_content"],
-    ["qualityScore", "quality_score"],
-    ["limit", "limit"],
-    ["after", "after"]
-  ] as const) {
-    if (record[publicKey] !== undefined) out[graphKey] = assertString(record[publicKey], publicKey, "listMessageTemplates");
-  }
-  return out;
-}
-
-function normalizeGetParams(input: GetMessageTemplateInput): Record<string, string> {
-  const record = assertPlainRecord(input, "getMessageTemplate");
-  const out: Record<string, string> = { templateId: assertString(record.templateId, "templateId", "getMessageTemplate") };
-  if (record.fields !== undefined) out.fields = assertString(record.fields, "fields", "getMessageTemplate");
-  return out;
-}
-
-function normalizeDeleteParams(input: DeleteMessageTemplateInput): Record<string, string> {
-  const record = assertPlainRecord(input, "deleteMessageTemplate");
-  const out: Record<string, string> = {
-    wabaId: assertString(record.wabaId, "wabaId", "deleteMessageTemplate"),
-    name: assertString(record.name, "name", "deleteMessageTemplate")
-  };
-  if (record.templateId !== undefined) out.hsm_id = assertString(record.templateId, "templateId", "deleteMessageTemplate");
-  return out;
-}
 
 const listPhoneNumbersRaw = defineEndpoint<
   { wabaId: string; fields?: string; limit?: string; after?: string; before?: string },
@@ -545,218 +115,6 @@ export const listPhoneNumbers = Object.assign(
   (client: Parameters<typeof listPhoneNumbersRaw>[0], params: ListPhoneNumbersInput, body?: never, opts?: EndpointInvokeOptions): Promise<PhoneNumberListResponse>;
   readonly definition: typeof listPhoneNumbersRaw.definition;
 };
-
-const listMessageTemplatesRaw = defineEndpoint<
-  {
-    wabaId: string;
-    fields?: string;
-    status?: string;
-    category?: string;
-    language?: string;
-    name?: string;
-    content?: string;
-    name_or_content?: string;
-    quality_score?: string;
-    limit?: string;
-    after?: string;
-  },
-  never,
-  TemplateListResponse
->({
-  method: "GET",
-  pathTemplate: "/{wabaId}/message_templates",
-  params: {
-    wabaId: { in: "path", required: true },
-    fields: { in: "query" },
-    status: { in: "query" },
-    category: { in: "query" },
-    language: { in: "query" },
-    name: { in: "query" },
-    content: { in: "query" },
-    name_or_content: { in: "query" },
-    quality_score: { in: "query" },
-    limit: { in: "query" },
-    after: { in: "query" }
-  }
-});
-
-export const listMessageTemplates = Object.assign(
-  async function listMessageTemplates(client: Parameters<typeof listMessageTemplatesRaw>[0], params: ListMessageTemplatesInput, body?: never, opts?: Parameters<typeof listMessageTemplatesRaw>[3]) {
-    return listMessageTemplatesRaw(client, normalizeListParams(params) as Parameters<typeof listMessageTemplatesRaw>[1], body, opts);
-  },
-  { definition: listMessageTemplatesRaw.definition }
-) as unknown as {
-  (client: Parameters<typeof listMessageTemplatesRaw>[0], params: ListMessageTemplatesInput, body?: never, opts?: Parameters<typeof listMessageTemplatesRaw>[3]): Promise<TemplateListResponse>;
-  readonly definition: typeof listMessageTemplatesRaw.definition;
-};
-
-const getMessageTemplateRaw = defineEndpoint<{ templateId: string; fields?: string }, never, TemplateDetails>({
-  method: "GET",
-  pathTemplate: "/{templateId}",
-  params: { templateId: { in: "path", required: true }, fields: { in: "query" } }
-});
-
-export const getMessageTemplate = Object.assign(
-  async function getMessageTemplate(client: Parameters<typeof getMessageTemplateRaw>[0], params: GetMessageTemplateInput, body?: never, opts?: Parameters<typeof getMessageTemplateRaw>[3]) {
-    return getMessageTemplateRaw(client, normalizeGetParams(params) as Parameters<typeof getMessageTemplateRaw>[1], body, opts);
-  },
-  { definition: getMessageTemplateRaw.definition }
-) as unknown as {
-  (client: Parameters<typeof getMessageTemplateRaw>[0], params: GetMessageTemplateInput, body?: never, opts?: Parameters<typeof getMessageTemplateRaw>[3]): Promise<TemplateDetails>;
-  readonly definition: typeof getMessageTemplateRaw.definition;
-};
-
-const createMessageTemplateRaw = defineEndpoint<
-  { wabaId: string },
-  CreateMessageTemplateBody,
-  TemplateMutationResponse
->({
-  method: "POST",
-  pathTemplate: "/{wabaId}/message_templates",
-  params: { wabaId: { in: "path", required: true } },
-  bodyContentType: "application/json",
-  buildBody: buildCreateMessageTemplateBody
-});
-
-export const createMessageTemplate = Object.assign(
-  async function createMessageTemplate(client: Parameters<typeof createMessageTemplateRaw>[0], params: { readonly wabaId: string }, body: CreateMessageTemplateBody, opts?: Parameters<typeof createMessageTemplateRaw>[3]) {
-    const record = assertPlainRecord(params, "createMessageTemplate", "params");
-    return createMessageTemplateRaw(client, { wabaId: assertString(record.wabaId, "wabaId", "createMessageTemplate") }, body, opts);
-  },
-  { definition: createMessageTemplateRaw.definition }
-) as unknown as {
-  (client: Parameters<typeof createMessageTemplateRaw>[0], params: { readonly wabaId: string }, body: CreateMessageTemplateBody, opts?: Parameters<typeof createMessageTemplateRaw>[3]): Promise<TemplateMutationResponse>;
-  readonly definition: typeof createMessageTemplateRaw.definition;
-};
-
-const updateMessageTemplateRaw = defineEndpoint<
-  { templateId: string },
-  UpdateMessageTemplateBody,
-  TemplateMutationResponse
->({
-  method: "POST",
-  pathTemplate: "/{templateId}",
-  params: { templateId: { in: "path", required: true } },
-  bodyContentType: "application/json",
-  buildBody: buildUpdateMessageTemplateBody
-});
-
-export const updateMessageTemplate = Object.assign(
-  async function updateMessageTemplate(client: Parameters<typeof updateMessageTemplateRaw>[0], params: { readonly templateId: string }, body: UpdateMessageTemplateBody, opts?: Parameters<typeof updateMessageTemplateRaw>[3]) {
-    const record = assertPlainRecord(params, "updateMessageTemplate", "params");
-    return updateMessageTemplateRaw(client, { templateId: assertString(record.templateId, "templateId", "updateMessageTemplate") }, body, opts);
-  },
-  { definition: updateMessageTemplateRaw.definition }
-) as unknown as {
-  (client: Parameters<typeof updateMessageTemplateRaw>[0], params: { readonly templateId: string }, body: UpdateMessageTemplateBody, opts?: Parameters<typeof updateMessageTemplateRaw>[3]): Promise<TemplateMutationResponse>;
-  readonly definition: typeof updateMessageTemplateRaw.definition;
-};
-
-const deleteMessageTemplateRaw = defineEndpoint<{ wabaId: string; name: string; hsm_id?: string }, never, TemplateMutationResponse>({
-  method: "DELETE",
-  pathTemplate: "/{wabaId}/message_templates",
-  params: { wabaId: { in: "path", required: true }, name: { in: "query", required: true }, hsm_id: { in: "query" } }
-});
-
-export const deleteMessageTemplate = Object.assign(
-  async function deleteMessageTemplate(client: Parameters<typeof deleteMessageTemplateRaw>[0], params: DeleteMessageTemplateInput, body?: never, opts?: Parameters<typeof deleteMessageTemplateRaw>[3]) {
-    return deleteMessageTemplateRaw(client, normalizeDeleteParams(params) as Parameters<typeof deleteMessageTemplateRaw>[1], body, opts);
-  },
-  { definition: deleteMessageTemplateRaw.definition }
-) as unknown as {
-  (client: Parameters<typeof deleteMessageTemplateRaw>[0], params: DeleteMessageTemplateInput, body?: never, opts?: Parameters<typeof deleteMessageTemplateRaw>[3]): Promise<TemplateMutationResponse>;
-  readonly definition: typeof deleteMessageTemplateRaw.definition;
-};
-
-function componentText(component: unknown): string | undefined {
-  if (!isPlainObject(component)) return undefined;
-  const safe = safeJsonClone(component, "validateTemplateParameterCounts", "definition.component");
-  if (!isPlainObject(safe)) return undefined;
-  const type = typeof safe.type === "string" ? safe.type.toUpperCase() : "";
-  if (type !== "HEADER" && type !== "BODY") return undefined;
-  return typeof safe.text === "string" ? safe.text : undefined;
-}
-
-function placeholders(text: string, format: TemplateParameterFormat): string[] {
-  const found: string[] = [];
-  const rx = /\{\{\s*([^{}\s]+)\s*\}\}/g;
-  let match: RegExpExecArray | null;
-  while ((match = rx.exec(text)) !== null) {
-    const token = match[1] ?? "";
-    if (format === "POSITIONAL" && /^\d+$/.test(token)) found.push(token);
-    else if (format === "NAMED" && !/^\d+$/.test(token)) found.push(token);
-  }
-  return Array.from(new Set(found));
-}
-
-function getComponentKind(component: unknown): string | undefined {
-  if (!isPlainObject(component)) return undefined;
-  const safe = safeJsonClone(component, "validateTemplateParameterCounts", "definition.component");
-  if (!isPlainObject(safe) || typeof safe.type !== "string") return undefined;
-  return safe.type.toUpperCase();
-}
-
-function getSendParameterNames(component: SendTemplateComponentForValidation, helperName: string): string[] {
-  const safeComponent = safeJsonClone(component, helperName, "sendComponent");
-  if (!isPlainObject(safeComponent)) {
-    throw validationError(`Invalid ${helperName} input: sendComponent must be an object.`);
-  }
-  const params = safeComponent.parameters;
-  if (params === undefined) return [];
-  const arr = assertArray(params, "component.parameters", 0, TEMPLATE_MAX_ARRAY, helperName);
-  const names: string[] = [];
-  for (let index = 0; index < arr.length; index += 1) {
-    const entry = arr[index];
-    if (!isPlainObject(entry)) continue;
-    const value = entry.parameter_name;
-    if (value === undefined) continue;
-    if (typeof value !== "string" || value.length === 0 || hasControlChar(value)) {
-      throw validationError(`Invalid ${helperName} input: component.parameters[${index}].parameter_name must be a safe string.`);
-    }
-    names.push(value);
-  }
-  return names;
-}
-
-export function validateTemplateParameterCounts(
-  definition: TemplateDefinitionForValidation,
-  sendComponents: readonly SendTemplateComponentForValidation[]
-): void {
-  const helperName = "validateTemplateParameterCounts";
-  const defRecord = assertPlainRecord(definition, helperName, "definition");
-  const formatRaw = defRecord.parameterFormat ?? defRecord.parameter_format ?? "POSITIONAL";
-  const format = assertString(formatRaw, "parameterFormat", helperName, 32).toUpperCase() as TemplateParameterFormat;
-  if (format !== "POSITIONAL" && format !== "NAMED") throw validationError(`Invalid ${helperName} input: parameterFormat must be POSITIONAL or NAMED.`);
-  const defComponents = assertArray(defRecord.components, "definition.components", 0, TEMPLATE_MAX_COMPONENTS, helperName);
-  const sendArr = assertArray(sendComponents, "sendComponents", 0, TEMPLATE_MAX_COMPONENTS, helperName);
-  const byType = new Map<string, SendTemplateComponentForValidation>();
-  for (const entry of sendArr) {
-    const safeEntry = safeJsonClone(entry, helperName, "sendComponent");
-    const rec = assertPlainRecord(safeEntry, helperName, "sendComponent");
-    const kind = assertString(rec.type, "sendComponent.type", helperName, 32).toUpperCase();
-    if (kind === "HEADER" || kind === "BODY") byType.set(kind, rec as SendTemplateComponentForValidation);
-  }
-  for (const defComponent of defComponents) {
-    const kind = getComponentKind(defComponent);
-    const text = componentText(defComponent);
-    if ((kind !== "HEADER" && kind !== "BODY") || text === undefined) continue;
-    const expectedTokens = placeholders(text, format);
-    const sendComponent = byType.get(kind);
-    const actual = sendComponent?.parameters === undefined
-      ? []
-      : assertArray(sendComponent.parameters, "component.parameters", 0, TEMPLATE_MAX_ARRAY, helperName);
-    if (format === "NAMED") {
-      const names = getSendParameterNames(sendComponent ?? { type: kind, parameters: [] }, helperName);
-      const missing = expectedTokens.filter((token) => !names.includes(token));
-      const extra = names.filter((name) => !expectedTokens.includes(name));
-      if (missing.length > 0 || extra.length > 0 || names.length !== expectedTokens.length) {
-        throw mismatchError(`Template ${kind} named parameters mismatch: expected [${expectedTokens.join(",")}] got [${names.join(",")}].`);
-      }
-    } else if (actual.length !== expectedTokens.length) {
-      throw mismatchError(`Template ${kind} parameter count mismatch: expected ${expectedTokens.length}, got ${actual.length}.`);
-    }
-  }
-}
 
 // ---------------------------------------------------------------------------
 // WATS-40 WhatsApp Flows endpoint parity.
@@ -952,7 +310,7 @@ function flowAssertPlainRecord(value: unknown, helperName: string, path = "input
   return value;
 }
 
-function flowString(value: unknown, fieldName: string, helperName: string, maxLength = TEMPLATE_NAME_MAX_LENGTH): string {
+function flowString(value: unknown, fieldName: string, helperName: string, maxLength = 512): string {
   if (typeof value !== "string") {
     throw flowError(`Invalid ${helperName} input: ${fieldName} must be a string.`);
   }
@@ -968,7 +326,7 @@ function flowString(value: unknown, fieldName: string, helperName: string, maxLe
   return value;
 }
 
-function flowMaybeString(value: unknown, fieldName: string, helperName: string, maxLength = TEMPLATE_NAME_MAX_LENGTH): string | undefined {
+function flowMaybeString(value: unknown, fieldName: string, helperName: string, maxLength = 512): string | undefined {
   if (value === undefined) return undefined;
   return flowString(value, fieldName, helperName, maxLength);
 }
@@ -1069,7 +427,7 @@ function flowJsonClone(value: unknown, helperName: string, path = "input", state
     if (flowIsUnsafeObjectKey(key)) {
       throw flowError(`Invalid ${helperName} input: ${path} contains an unsafe prototype key.`);
     }
-    if (key.length === 0 || key.length > TEMPLATE_SHORT_TEXT_MAX_LENGTH || flowHasControlChar(key)) {
+    if (key.length === 0 || key.length > 1024 || flowHasControlChar(key)) {
       throw flowError(`Invalid ${helperName} input: ${path} contains an invalid key.`);
     }
     const cloned = flowJsonClone(nested, helperName, `${path}.${key}`, state, depth + 1, key);

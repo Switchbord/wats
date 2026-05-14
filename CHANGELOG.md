@@ -56,6 +56,10 @@ Design-only/docs-only boundaries preserved in this launch: WATS-46/WATS-47/WATS-
 
 - `@switchbord/service` `POST {apiPrefix}/messages` now accepts WATS media composer bodies for image, video, audio, document, sticker, location, contacts, reaction, remove-reaction, and interactive button/list/CTA URL/product/product-list/catalog/location-request messages, converts them through the existing SDK builders, preserves generic text body compatibility, and keeps remaining non-message service route expansion as later issues.
 
+### Graph endpoint internals
+
+- WATS-65 moves the message-template endpoint family into `packages/graph/src/endpoints/templates/` modules while preserving root `@switchbord/graph`, `@switchbord/graph/endpoints/templates`, and `WABAClient` behavior. This is an internal template endpoint family split only: no Flow split, WABA phone-number listing split, validation utility consolidation, live Meta calls, or package publication.
+
 ### CLI diagnostics and dry-run service
 
 - `wats doctor --config <path>` now runs offline diagnostics for runtime/package imports, config/profile checks, service route collisions, OpenAPI generation, and optional env presence counts without printing env names or values.
