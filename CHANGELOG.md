@@ -59,7 +59,8 @@ Design-only/docs-only boundaries preserved in this launch: WATS-46/WATS-47/WATS-
 ### Graph endpoint internals
 
 - WATS-65 moves the message-template endpoint family into `packages/graph/src/endpoints/templates/` modules while preserving root `@switchbord/graph`, `@switchbord/graph/endpoints/templates`, and `WABAClient` behavior. This is an internal template endpoint family split only: no WABA phone-number listing split, validation utility consolidation, live Meta calls, or package publication.
-- WATS-66 moves the Flow endpoint family into `packages/graph/src/endpoints/flows/` modules while preserving root `@switchbord/graph`, `@switchbord/graph/endpoints/flows`, and `WABAClient` behavior. This is an internal Flow endpoint family split only: no WABA phone-number listing split, message composer split, Flow DSL/encrypted runtime expansion, validation utility consolidation, live Meta calls, or package publication.
+- WATS-66 moves the Flow endpoint family into `packages/graph/src/endpoints/flows/` modules while preserving root `@switchbord/graph`, `@switchbord/graph/endpoints/flows`, and `WABAClient` behavior. This is an internal Flow endpoint family split only: no message composer split, Flow DSL/encrypted runtime expansion, validation utility consolidation, live Meta calls, or package publication.
+- WATS-67 moves WABA phone-number listing into `packages/graph/src/endpoints/waba/` modules while preserving root `@switchbord/graph`, `wabaEndpoints.ts`, and `WABAClient.listPhoneNumbers` behavior. This is an internal WABA phone-number listing split only: no new WABA endpoints, business-management refactor beyond type-import cleanup, message composer split, live Meta calls, or package publication.
 
 ### CLI diagnostics and dry-run service
 

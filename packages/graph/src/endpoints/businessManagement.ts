@@ -20,7 +20,7 @@ import {
   ownDataValue as ownInternalDataValue
 } from "../internal/validation/records";
 import type { GraphClient } from "../client";
-import type { GraphPaging } from "./wabaEndpoints";
+import type { GraphPaging } from "./waba/types";
 
 export type BusinessManagementFields = string | readonly string[];
 
