@@ -82,7 +82,7 @@ Current endpoint subpaths:
 
 Run `bun run api:check` after changing this list. WATS-54 checks package exports, target source files, graph-consumer package-specifier imports, `docs/reference/index.md`, `docs/architecture/public-api-surface.md`, this package map, `docs/migration/pywa-to-wats.md`, and `CHANGELOG.md` for the same Graph endpoint subpaths.
 
-WATS-57 records the graph endpoint module split plan. WATS-65 implements the first runtime slice by moving the message-template endpoint family into `packages/graph/src/endpoints/templates/` while preserving the public `@switchbord/graph/endpoints/templates` subpath and root exports. Flow, WABA phone-number listing, and message-composer splits remain separate follow-up slices.
+WATS-57 records the graph endpoint module split plan. WATS-65 implements the first runtime slice by moving the message-template endpoint family into `packages/graph/src/endpoints/templates/` while preserving the public `@switchbord/graph/endpoints/templates` subpath and root exports. WATS-66 implements the second runtime slice by moving the Flow endpoint family into `packages/graph/src/endpoints/flows/` while preserving the public `@switchbord/graph/endpoints/flows` subpath and root exports. WABA phone-number listing and message-composer splits remain separate follow-up slices.
 
 WATS-58 records the graph validation utility reuse plan. It is a graph validation utility reuse plan only: design/test-planner guidance for future private `packages/graph/src/internal/validation/` helpers, with no current runtime source movement and no public utility exports.
 
