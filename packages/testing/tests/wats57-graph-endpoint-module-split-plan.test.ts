@@ -107,7 +107,6 @@ describe("WATS-57 graph endpoint module split plan", () => {
     expect(changelog).toContain("design/docs/test-planner only");
     expect(changelog).toContain("no runtime code movement");
   });
-});
 
   test("WATS-65 template split implementation keeps template runtime outside wabaEndpoints", () => {
     const templateBarrel = read("packages/graph/src/endpoints/templates.ts");
@@ -129,4 +128,4 @@ describe("WATS-57 graph endpoint module split plan", () => {
     expect(packageMap).toContain("WATS-65");
     expect(packageMap).toContain("packages/graph/src/endpoints/templates/");
   });
-
+});

@@ -1,6 +1,12 @@
-// WATS-53/WATS-65 public message-template endpoint subpath.
-//
-// Thin compatibility barrel over the WATS-65 template endpoint family modules.
+// WATS-65 message-template endpoint family barrel.
+
+export {
+  createMessageTemplate,
+  deleteMessageTemplate,
+  getMessageTemplate,
+  listMessageTemplates,
+  updateMessageTemplate
+} from "./callables";
 
 export {
   buildCreateMessageTemplateBody,
@@ -8,20 +14,17 @@ export {
   buildTemplateBodyComponent,
   buildTemplateButtonComponent,
   buildTemplateFooterComponent,
-  buildTemplateHeaderComponent,
-  createMessageTemplate,
-  deleteMessageTemplate,
-  getMessageTemplate,
-  listMessageTemplates,
-  updateMessageTemplate,
-  validateTemplateParameterCounts
-} from "./templates/index";
+  buildTemplateHeaderComponent
+} from "./builders";
+
+export { validateTemplateParameterCounts } from "./validation";
+
+export type { GraphPaging } from "../wabaEndpoints";
 
 export type {
   CreateMessageTemplateBody,
   DeleteMessageTemplateInput,
   GetMessageTemplateInput,
-  GraphPaging,
   ListMessageTemplatesInput,
   SendTemplateComponentForValidation,
   TemplateBodyComponentInput,
@@ -42,4 +45,4 @@ export type {
   TemplateQualityScore,
   TemplateStatus,
   UpdateMessageTemplateBody
-} from "./templates/index";
+} from "./types";
