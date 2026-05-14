@@ -61,6 +61,24 @@ function parseBody(body: unknown): unknown {
 }
 
 describe("WATS-39 message template endpoint callables", () => {
+
+  test("WATS-65 root and template subpath exports keep identical callables after module split", async () => {
+    const root = await import("../src");
+    const templates = await import("../src/endpoints/templates");
+    expect(templates.listMessageTemplates).toBe(root.listMessageTemplates);
+    expect(templates.getMessageTemplate).toBe(root.getMessageTemplate);
+    expect(templates.createMessageTemplate).toBe(root.createMessageTemplate);
+    expect(templates.updateMessageTemplate).toBe(root.updateMessageTemplate);
+    expect(templates.deleteMessageTemplate).toBe(root.deleteMessageTemplate);
+    expect(templates.buildCreateMessageTemplateBody).toBe(root.buildCreateMessageTemplateBody);
+    expect(templates.buildUpdateMessageTemplateBody).toBe(root.buildUpdateMessageTemplateBody);
+    expect(templates.buildTemplateHeaderComponent).toBe(root.buildTemplateHeaderComponent);
+    expect(templates.buildTemplateBodyComponent).toBe(root.buildTemplateBodyComponent);
+    expect(templates.buildTemplateFooterComponent).toBe(root.buildTemplateFooterComponent);
+    expect(templates.buildTemplateButtonComponent).toBe(root.buildTemplateButtonComponent);
+    expect(templates.validateTemplateParameterCounts).toBe(root.validateTemplateParameterCounts);
+  });
+
   test("listMessageTemplates GETs /{wabaId}/message_templates with camelCase query mapped to Graph names", async () => {
     const { client, handle } = clientWith(ok({ data: [{ id: "tpl1", name: "hello_world" }] }));
     const res: TemplateListResponse = await listMessageTemplates(client, {
