@@ -151,4 +151,24 @@ describe("WATS-57 graph endpoint module split plan", () => {
     expect(packageMap).toContain("packages/graph/src/endpoints/flows/");
   });
 
+
+  test("WATS-67 WABA phone-number split leaves wabaEndpoints as compatibility barrel", () => {
+    const wabaIndex = read("packages/graph/src/endpoints/waba/index.ts");
+    const phoneNumbers = read("packages/graph/src/endpoints/waba/phoneNumbers.ts");
+    const wabaEndpoints = read("packages/graph/src/endpoints/wabaEndpoints.ts");
+    const changelog = read("CHANGELOG.md");
+    const packageMap = read("docs/architecture/package-map.md");
+
+    expect(wabaIndex).toContain('from "./phoneNumbers"');
+    expect(phoneNumbers).toContain("listPhoneNumbers");
+    expect(wabaEndpoints).toContain('from "./waba/index"');
+    expect(wabaEndpoints).not.toContain("const listPhoneNumbersRaw");
+    expect(wabaEndpoints).not.toContain("function listPhoneNumbers");
+    expect(wabaEndpoints).not.toContain("interface PhoneNumberListEntry");
+    expect(changelog).toContain("WATS-67");
+    expect(changelog).toContain("WABA phone-number listing");
+    expect(packageMap).toContain("WATS-67");
+    expect(packageMap).toContain("packages/graph/src/endpoints/waba/");
+  });
+
 });

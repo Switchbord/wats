@@ -14,6 +14,7 @@ import {
   WABAClient,
   listPhoneNumbers
 } from "../src";
+import * as wabaEndpoints from "../src/endpoints/wabaEndpoints";
 import {
   ExpiredAccessTokenError,
   InvalidParameterError
@@ -115,6 +116,13 @@ describe("F-7 WABAClient construction validation", () => {
 });
 
 describe("F-7 WABAClient.listPhoneNumbers round-trip", () => {
+
+  test("WATS-67 root and compatibility exports keep identical WABA phone-number callable", async () => {
+    const root = await import("../src");
+    expect(wabaEndpoints.listPhoneNumbers).toBe(root.listPhoneNumbers);
+    expect(wabaEndpoints.listPhoneNumbers).toBe(listPhoneNumbers);
+  });
+
   test("GETs /{wabaId}/phone_numbers and parses response", async () => {
     const { client, handle } = clientWith({
       status: 200,
