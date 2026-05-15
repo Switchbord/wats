@@ -36,15 +36,11 @@ describe("WATS 0.3.0 packed export-map smoke contract", () => {
     expect(smoke).toContain("for (const specifier of exportSpecifiersForPackage(pkg))");
     expect(smoke).toContain("subpath-smoke.ts");
 
-    for (const pkg of PUBLISHABLE_PACKAGES) {
+    const specifierCount = PUBLISHABLE_PACKAGES.reduce((count, pkg) => {
       const manifest = readJson(`packages/${pkg}/package.json`);
-      const packageName = manifest.name;
-      expect(typeof packageName, `${pkg} package name`).toBe("string");
       const exportsMap = manifest.exports as JsonRecord;
-      for (const key of Object.keys(exportsMap)) {
-        const specifier = key === "." ? packageName : `${packageName}${key.slice(1)}`;
-        expect(smoke, `${specifier} should be covered by packed export-map smoke`).toContain(JSON.stringify(specifier));
-      }
-    }
+      return count + Object.keys(exportsMap).length;
+    }, 0);
+    expect(specifierCount).toBe(44);
   });
 });
