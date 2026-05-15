@@ -15,7 +15,7 @@ const PUBLISHABLE_PACKAGE_NAMES = [
 ] as const;
 
 const PRIVATE_PACKAGE_NAMES = ["@switchbord/testing"] as const;
-const ALPHA_LAUNCH_VERSION = "0.2.1" as const;
+const CURRENT_RELEASE_VERSION = "0.3.0" as const;
 
 type JsonRecord = Record<string, unknown>;
 
@@ -77,7 +77,7 @@ describe("WATS-31 release and CI publishability scaffold", () => {
     expectScript(rootManifest, "pack:smoke", "bun run scripts/pack-smoke.ts");
     expectScript(rootManifest, "publish:dry-run", "bun run scripts/npm-publish-dry-run.ts");
     expectScript(rootManifest, "release:dry-run", "bun run scripts/release-dry-run.ts");
-    expectScript(rootManifest, "check-publish", "bun run typecheck && bun run build:packages && bun run pack:smoke && bun run publish:dry-run && bun run release:dry-run && bun test packages/testing/tests/wats31-release-ci-policy.test.ts packages/testing/tests/wats83-publishable-artifacts.test.ts packages/testing/tests/wats85-release-dry-run.test.ts packages/testing/tests/wats021-alpha-release.test.ts");
+    expectScript(rootManifest, "check-publish", "bun run typecheck && bun run build:packages && bun run pack:smoke && bun run publish:dry-run && bun run release:dry-run && bun test packages/testing/tests/wats31-release-ci-policy.test.ts packages/testing/tests/wats83-publishable-artifacts.test.ts packages/testing/tests/wats85-release-dry-run.test.ts packages/testing/tests/wats021-alpha-release.test.ts packages/testing/tests/wats030-release-contract.test.ts");
     expectDevDependency(rootManifest, "typescript");
   });
 
@@ -96,7 +96,7 @@ describe("WATS-31 release and CI publishability scaffold", () => {
       const packageDir = packageName.replace(/^@switchbord\//, "");
       const manifest = parseJsonFile(join(repoRoot, "packages", packageDir, "package.json"));
       expect(manifest.name).toBe(packageName);
-      expect(manifest.version).toBe(ALPHA_LAUNCH_VERSION);
+      expect(manifest.version).toBe(CURRENT_RELEASE_VERSION);
       expect(manifest.private).toBe(false);
     }
   });

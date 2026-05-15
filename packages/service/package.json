@@ -1,6 +1,6 @@
 {
   "name": "@switchbord/service",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "private": false,
   "license": "MIT",
   "type": "module",
@@ -37,10 +37,10 @@
     "wats"
   ],
   "dependencies": {
-    "@switchbord/config": "^0.2.1",
-    "@switchbord/core": "^0.2.1",
-    "@switchbord/http": "^0.2.1",
-    "@switchbord/graph": "^0.2.1",
-    "@switchbord/crypto": "^0.2.1"
+    "@switchbord/config": "^0.3.0",
+    "@switchbord/core": "^0.3.0",
+    "@switchbord/http": "^0.3.0",
+    "@switchbord/graph": "^0.3.0",
+    "@switchbord/crypto": "^0.3.0"
   }
 }

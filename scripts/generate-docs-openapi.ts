@@ -1,10 +1,9 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { createWatsServiceOpenApiDocument } from "../packages/service/src/index";
 import type { WatsProfileConfig } from "../packages/config/src/index";
+import { readReleaseVersion, repoRoot } from "./release-metadata";
 
-const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const outputPathForDocsLock = "docs/public/openapi.json";
 const outputPath = join(repoRoot, "docs", "public", "openapi.json");
 void outputPathForDocsLock;
@@ -47,7 +46,7 @@ const profile: WatsProfileConfig = Object.freeze({
 const document = createWatsServiceOpenApiDocument(profile, {
   serverUrl: "https://service.example",
   title: "WATS Service API",
-  version: "0.2.1"
+  version: readReleaseVersion()
 });
 
 const json = `${JSON.stringify(document, null, 2)}\n`;

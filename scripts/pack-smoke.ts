@@ -1,23 +1,11 @@
 import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { spawnSync } from "node:child_process";
+import { PUBLISHABLE_PACKAGES, readReleaseVersion, repoRoot } from "./release-metadata";
 
-const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const packRoot = mkdtempSync(join(tmpdir(), "wats-pack-smoke-"));
-
-const PUBLISHABLE_PACKAGES = [
-  "types",
-  "crypto",
-  "graph",
-  "core",
-  "http",
-  "internal-utils",
-  "config",
-  "service",
-  "cli"
-] as const;
+const VERSION = readReleaseVersion();
 
 const INTERNAL_WORKSPACE_DEPS: Record<string, readonly string[]> = {
   core: ["graph", "types"],
@@ -107,7 +95,7 @@ try {
       types?: string;
     };
     if (packageJson.private !== false) {
-      throw new Error(`${packageJson.name ?? pkg} must be publishable (private false) for the 0.2.1 alpha launch smoke gate`);
+      throw new Error(`${packageJson.name ?? pkg} must be publishable (private false) for the current release smoke gate`);
     }
     if (packageJson.main !== "./dist/index.js" || packageJson.types !== "./dist/index.d.ts") {
       throw new Error(`${packageJson.name ?? pkg} must point main/types at dist artifacts`);
@@ -121,8 +109,8 @@ try {
     for (const dep of INTERNAL_WORKSPACE_DEPS[pkg] ?? []) {
       const packageJsonPath = join(scopedRoot, pkg, "package.json");
       const manifest = JSON.parse(readFileSync(packageJsonPath, "utf8")) as { dependencies?: Record<string, string> };
-      if (manifest.dependencies?.[`@switchbord/${dep}`] === "workspace:*") {
-        manifest.dependencies[`@switchbord/${dep}`] = "0.2.1";
+      if (manifest.dependencies?.[`@switchbord/${dep}`]?.startsWith("workspace:")) {
+        manifest.dependencies[`@switchbord/${dep}`] = VERSION;
         writeFileSync(packageJsonPath, JSON.stringify(manifest, null, 2));
       }
     }

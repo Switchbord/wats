@@ -31,15 +31,16 @@ function readJson(path: string): JsonRecord {
 }
 
 describe("WATS 0.2.1 alpha launch release contract", () => {
-  test("root manifest and publishable package manifests are versioned for 0.2.1 alpha", () => {
+  test("current release manifests remain publishable while 0.2.1 stays a historical changelog entry", () => {
     const root = readJson("package.json");
-    expect(root.version).toBe("0.2.1");
     expect(root.private).toBe(true);
+    expect(typeof root.version).toBe("string");
+    expect(root.version).not.toBe("0.2.1");
 
     for (const pkg of PUBLISHABLE_PACKAGES) {
       const manifest = readJson(`packages/${pkg}/package.json`);
       expect(manifest.name, `${pkg} npm scope`).toBe(`@switchbord/${pkg}`);
-      expect(manifest.version, `${pkg} version`).toBe("0.2.1");
+      expect(manifest.version, `${pkg} version`).toBe(root.version);
       expect(manifest.private, `${pkg} private gate before publish command`).toBe(false);
       expect(manifest.publishConfig, `${pkg} public publishConfig`).toEqual({ access: "public" });
       expect(manifest.repository, `${pkg} repository`).toEqual({
@@ -72,6 +73,7 @@ describe("WATS 0.2.1 alpha launch release contract", () => {
     expect(scripts["publish:dry-run"]).toBe("bun run scripts/npm-publish-dry-run.ts");
     expect(String(scripts["check-publish"])).toContain("bun run publish:dry-run");
     expect(String(scripts["check-publish"])).toContain("packages/testing/tests/wats021-alpha-release.test.ts");
+    expect(String(scripts["check-publish"])).toContain("packages/testing/tests/wats030-release-contract.test.ts");
   });
 
   test("changelog starts 0.2.1 alpha launch with install guidance and boundaries", () => {
