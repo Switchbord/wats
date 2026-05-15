@@ -1,16 +1,18 @@
 # WATS
 
-WATS is a TypeScript toolkit for WhatsApp operations: a small set of composable packages for Graph calls, webhook ingestion, typed routing, listeners, filters, and testable runtime adapters.
+WATS is a TypeScript toolkit for WhatsApp operations: a small set of composable packages for Graph calls, webhook ingestion, typed routing, listeners, filters, service routes, CLI operator checks, and testable runtime adapters.
 
-It is intentionally not a single framework. The repository is a toolkit first; the CLI and standalone service will sit on top of these packages rather than replace them.
+It is intentionally not a single framework. The repository is a toolkit first; the CLI and standalone service sit on top of these packages rather than replace them.
 
 ## Status
 
-Current release: `0.2.1-alpha-launch`.
+Current release: `0.3.0-alpha-tooling`.
 
 WATS is alpha software. The foundations are in place and tested: Graph transport, endpoint definitions, error taxonomy, webhook verification, runtime-neutral webhook adapters, typed update normalization, filters, routers, listeners, and the `WhatsApp` facade.
 
-Endpoint breadth is still early but expanding. Today WATS ships text message send, `WhatsApp.startChat(...)` / `PhoneNumberClient.sendText(...)` for arbitrary-recipient text starts, WABA phone-number listing, pagination, WATS-37 media runtime (single-POST upload, metadata resolution, binary download, delete, encrypted decrypt, and upload sessions), WATS-39 templates, WATS-40 flows, WATS-41 calling, and WATS-42A read-only business-management inventory (`getWabaInfo`, subscribed-app listing, phone-number info/settings, business profile, and commerce settings). Mutating admin APIs and live Meta checks remain roadmap/credential-gated work.
+Endpoint breadth is still expanding. Today WATS ships text message send, `WhatsApp.startChat(...)` / `PhoneNumberClient.sendText(...)` for arbitrary-recipient text starts, WABA phone-number listing, pagination, WATS-37 media runtime (single-POST upload, metadata resolution, binary download, delete, encrypted decrypt, and upload sessions), WATS-39 templates, WATS-40 flows, WATS-41 calling, WATS-42A read-only business-management inventory (`getWabaInfo`, subscribed-app listing, phone-number info/settings, business profile, and commerce settings), and service `POST {apiPrefix}/messages` routes for text, media, location, contacts, reaction, remove-reaction, and interactive message bodies.
+
+The 0.3.0 line is an alpha tooling release. It adds safe local operator tooling around `wats init`, `wats onboarding`, `wats doctor`, and dry-run `wats serve`, plus release metadata/preflight cleanup. live serve mode, env-file secret resolution, Docker image publication, persistence/outbox, and live Meta validation are not included.
 
 ## Shape
 
@@ -22,7 +24,7 @@ packages/
   core            typed updates, filters, router, listeners, WhatsApp facade
   http            webhook verification and Bun/Node/Fetch adapters
   config          YAML/JSON config validation and env-secret refs
-  cli             safe onboarding CLI skeleton
+  cli             safe local operator tooling
   service         runtime-neutral webhook/API service foundation
   internal-utils  published internal support package for shared runtime helpers
   testing         private fixtures and workspace policy tests
@@ -39,7 +41,7 @@ The dependency direction is deliberate: low-level packages stay portable; `@swit
 
 ## Install
 
-After the alpha packages are published to the npm registry, Bun users can install them directly:
+The public packages are standard npm registry packages and Bun can install them directly:
 
 ```bash
 bun add @switchbord/cli
@@ -62,6 +64,7 @@ Useful references:
 
 - `docs/getting-started.md` — end-to-end foundations walkthrough
 - `docs/reference/index.md` — reference map
+- `docs/reference/cli.md` — safe local operator tooling reference
 - `docs/parity/pywa-parity-matrix.md` — implemented vs deferred coverage
 - `docs/architecture/package-map.md` — package boundaries
 - `docs/architecture/release-policy.md` — version and release rules

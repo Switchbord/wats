@@ -1,29 +1,26 @@
 import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { spawnSync } from "node:child_process";
+import { PUBLISHABLE_PACKAGES, readReleaseVersion, repoRoot } from "./release-metadata";
 
-const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const packRoot = mkdtempSync(join(tmpdir(), "wats-pack-smoke-"));
-
-const PUBLISHABLE_PACKAGES = [
-  "types",
-  "crypto",
-  "graph",
-  "core",
-  "http",
-  "internal-utils",
-  "config",
-  "service",
-  "cli"
-] as const;
+const VERSION = readReleaseVersion();
 
 const INTERNAL_WORKSPACE_DEPS: Record<string, readonly string[]> = {
   core: ["graph", "types"],
   http: ["crypto", "core", "types"],
   service: ["config", "core", "http", "graph", "crypto"],
   cli: ["config", "service"]
+};
+
+type PackageManifest = {
+  name?: string;
+  private?: boolean;
+  main?: string;
+  types?: string;
+  exports?: Record<string, unknown>;
+  dependencies?: Record<string, string>;
 };
 
 function run(command: string, args: readonly string[], cwd: string): string {
@@ -52,17 +49,58 @@ function assertExcludes(haystack: string, needle: string, label: string): void {
   }
 }
 
-function writeConsumerSmoke(pkg: string, installRoot: string): void {
-  const packageJson = JSON.parse(readFileSync(join(repoRoot, "packages", pkg, "package.json"), "utf8")) as { name?: string };
-  const packageName = packageJson.name;
+function readPackageManifest(pkg: string): PackageManifest {
+  return JSON.parse(readFileSync(join(repoRoot, "packages", pkg, "package.json"), "utf8")) as PackageManifest;
+}
+
+function packageNameForPackage(pkg: string): string {
+  const packageName = readPackageManifest(pkg).name;
   if (typeof packageName !== "string") throw new Error(`Missing package name for ${pkg}`);
+  return packageName;
+}
+
+function exportSpecifiersForPackage(pkg: string): string[] {
+  const manifest = readPackageManifest(pkg);
+  const packageName = packageNameForPackage(pkg);
+  if (typeof manifest.exports !== "object" || manifest.exports === null || Array.isArray(manifest.exports)) {
+    throw new Error(`${packageName} exports map required for packed export-map smoke`);
+  }
+  return Object.keys(manifest.exports).map((key) => key === "." ? packageName : `${packageName}${key.slice(1)}`);
+}
+
+function writeConsumerSmoke(pkg: string, installRoot: string): void {
+  const packageName = packageNameForPackage(pkg);
+  const specifiers: string[] = [];
+  for (const specifier of exportSpecifiersForPackage(pkg)) {
+    specifiers.push(specifier);
+  }
 
   const consumerDir = join(installRoot, `consumer-${pkg}`);
   mkdirSync(consumerDir, { recursive: true });
   writeFileSync(join(consumerDir, "package.json"), JSON.stringify({ type: "module" }, null, 2));
-  writeFileSync(join(consumerDir, "smoke.ts"), `import * as mod from ${JSON.stringify(packageName)};\nif (Object.keys(mod).length === 0) throw new Error(${JSON.stringify(`${packageName} exported no runtime symbols`)});\nconsole.log(${JSON.stringify(`${packageName}:import-ok`)});\n`);
-  writeFileSync(join(consumerDir, "types.ts"), `import type * as mod from ${JSON.stringify(packageName)};\ntype Keys = keyof typeof mod;\nconst ok: Keys | null = null;\nvoid ok;\n`);
-  run("bun", [join(consumerDir, "smoke.ts")], consumerDir);
+
+  writeFileSync(
+    join(consumerDir, "subpath-smoke.ts"),
+    `const specifiers = ${JSON.stringify(specifiers, null, 2)} as const;\n` +
+      `for (const specifier of specifiers) {\n` +
+      `  const mod = await import(specifier);\n` +
+      `  if (typeof mod !== "object" || mod === null) throw new Error(\`runtime import failed for \${specifier}\`);\n` +
+      `  if (specifier === ${JSON.stringify(packageName)} && Object.keys(mod).length === 0) throw new Error(\`root export for \${specifier} has no runtime symbols\`);\n` +
+      `}\n` +
+      `console.log(${JSON.stringify(`${packageName}:export-map-import-ok`)});\n`
+  );
+
+  writeFileSync(
+    join(consumerDir, "types.ts"),
+    specifiers.map((specifier, index) => {
+      return `import type * as mod${index} from ${JSON.stringify(specifier)};\n` +
+        `type Keys${index} = keyof typeof mod${index};\n` +
+        `const ok${index}: Keys${index} | null = null;\n` +
+        `void ok${index};\n`;
+    }).join("\n")
+  );
+
+  run("bun", [join(consumerDir, "subpath-smoke.ts")], consumerDir);
   run("bunx", ["tsc", "--noEmit", "--module", "NodeNext", "--target", "ES2022", "--moduleResolution", "NodeNext", "--strict", "--skipLibCheck", join(consumerDir, "types.ts")], consumerDir);
 }
 
@@ -100,14 +138,9 @@ try {
     assertExcludes(tarList, "package/src/index.ts", `${label} tarball`);
     assertExcludes(tarList, "package/node_modules", `${label} tarball`);
 
-    const packageJson = JSON.parse(readFileSync(join(packageDir, "package.json"), "utf8")) as {
-      name?: string;
-      private?: boolean;
-      main?: string;
-      types?: string;
-    };
+    const packageJson = readPackageManifest(pkg);
     if (packageJson.private !== false) {
-      throw new Error(`${packageJson.name ?? pkg} must be publishable (private false) for the 0.2.1 alpha launch smoke gate`);
+      throw new Error(`${packageJson.name ?? pkg} must be publishable (private false) for the current release smoke gate`);
     }
     if (packageJson.main !== "./dist/index.js" || packageJson.types !== "./dist/index.d.ts") {
       throw new Error(`${packageJson.name ?? pkg} must point main/types at dist artifacts`);
@@ -121,8 +154,8 @@ try {
     for (const dep of INTERNAL_WORKSPACE_DEPS[pkg] ?? []) {
       const packageJsonPath = join(scopedRoot, pkg, "package.json");
       const manifest = JSON.parse(readFileSync(packageJsonPath, "utf8")) as { dependencies?: Record<string, string> };
-      if (manifest.dependencies?.[`@switchbord/${dep}`] === "workspace:*") {
-        manifest.dependencies[`@switchbord/${dep}`] = "0.2.1";
+      if (manifest.dependencies?.[`@switchbord/${dep}`]?.startsWith("workspace:")) {
+        manifest.dependencies[`@switchbord/${dep}`] = VERSION;
         writeFileSync(packageJsonPath, JSON.stringify(manifest, null, 2));
       }
     }
@@ -137,7 +170,7 @@ try {
     }
   }
 
-  console.log(`pack-smoke: verified ${PUBLISHABLE_PACKAGES.length} package tarballs including packed import/type smokes; no package publication, npm publish, GitHub release, or registry login performed`);
+  console.log(`pack-smoke: verified ${PUBLISHABLE_PACKAGES.length} package tarballs including packed export-map import/type smokes; no package publication, npm publish, GitHub release, or registry login performed`);
   console.log("pack-smoke: root LICENSE, CONTRIBUTING.md, and SECURITY.md remain repository-level policy files; package tarballs include package-local dist artifacts only");
 } finally {
   rmSync(packRoot, { recursive: true, force: true });

@@ -1,6 +1,6 @@
 {
   "name": "wats",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "private": true,
   "license": "MIT",
   "scripts": {
@@ -9,7 +9,7 @@
     "build:packages": "bun run scripts/build-packages.ts",
     "pack:smoke": "bun run scripts/pack-smoke.ts",
     "release:dry-run": "bun run scripts/release-dry-run.ts",
-    "check-publish": "bun run typecheck && bun run build:packages && bun run pack:smoke && bun run publish:dry-run && bun run release:dry-run && bun test packages/testing/tests/wats31-release-ci-policy.test.ts packages/testing/tests/wats83-publishable-artifacts.test.ts packages/testing/tests/wats85-release-dry-run.test.ts packages/testing/tests/wats021-alpha-release.test.ts",
+    "check-publish": "bun run typecheck && bun run build:packages && bun run pack:smoke && bun run publish:dry-run && bun run release:dry-run && bun test packages/testing/tests/wats31-release-ci-policy.test.ts packages/testing/tests/wats83-publishable-artifacts.test.ts packages/testing/tests/wats85-release-dry-run.test.ts packages/testing/tests/wats021-alpha-release.test.ts packages/testing/tests/wats030-release-contract.test.ts",
     "api:check": "bun run scripts/check-public-api-consistency.ts",
     "docs:openapi": "bun run scripts/generate-docs-openapi.ts",
     "docs:api": "bun run scripts/generate-docs-api.ts",

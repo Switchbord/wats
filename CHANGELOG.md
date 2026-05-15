@@ -1,8 +1,75 @@
 # Changelog
 
+## [0.3.0] - 2026-05-15
+
+Alpha tooling release for WATS. This release prepares the next public package line after 0.2.1 and collects the post-0.2.1 CLI, service, Graph-internal, docs, and release-metadata work into a truthful 0.3.0 train.
+
+### Install
+
+```bash
+bun add @switchbord/cli
+bunx --bun wats --help
+
+bun add @switchbord/core @switchbord/graph @switchbord/http
+bun add @switchbord/config @switchbord/service
+```
+
+The packages are standard npm registry packages, so Bun installs them with `bun add ...`. Release checks remain credential-free and verify package build, pack, publish dry-run, release dry-run, docs, and policy tests before any side-effecting publish/tag/release step is allowed.
+
+### CLI diagnostics and dry-run service
+
+- `wats onboarding --public-url <https URL>` prints an operator-facing Meta webhook setup checklist with a safe callback URL, locally generated verify/service tokens, and a clear list of user-side Meta values to store outside git.
+- `wats doctor --config <path>` runs offline diagnostics for runtime/package imports, config/profile checks, service route collisions, OpenAPI generation, and optional env presence counts without printing env names or values.
+- `wats serve --config <path> --dry-run` starts the standalone `@switchbord/service` app through a local Bun process wrapper with synthetic in-memory secrets, a no-network Graph transport, health/readiness/OpenAPI routes, `--print-routes`, and graceful shutdown.
+- The exported `runCli` helper remains embeddable: process signal handling and `process.exit` stay isolated to the executable bin wrapper, with regression coverage in both direct tests and the external `@switchbord/cli` consumer fixture.
+- `wats serve` recognizes the WATS-72 live-intent/acknowledgement guard (`--live` + `--yes-live`, or paired `WATS_LIVE_ENABLE=1` / `WATS_YES_LIVE=1`) but still fails closed before secret resolution, env-file parsing, service bind, or Meta Graph calls.
+
+### Service message routes
+
+- `@switchbord/service` `POST {apiPrefix}/messages` accepts WATS media composer bodies for image, video, audio, document, sticker, location, contacts, reaction, remove-reaction, and interactive button/list/CTA URL/product/product-list/catalog/location-request messages.
+- The service converts supported message bodies through the existing SDK builders, preserves generic text body compatibility, and keeps remaining non-message route expansion as later issues.
+- The service OpenAPI default and generated docs now align with the 0.3.0 release version while continuing to describe WATS service routes only, not the full Meta Graph API.
+
+### Graph endpoint internals
+
+- WATS-65 moves the message-template endpoint family into `packages/graph/src/endpoints/templates/` modules while preserving root `@switchbord/graph`, `@switchbord/graph/endpoints/templates`, and `WABAClient` behavior.
+- WATS-66 moves the Flow endpoint family into `packages/graph/src/endpoints/flows/` modules while preserving root `@switchbord/graph`, `@switchbord/graph/endpoints/flows`, and `WABAClient` behavior.
+- WATS-67 moves WABA phone-number listing into `packages/graph/src/endpoints/waba/` modules while preserving root `@switchbord/graph`, `wabaEndpoints.ts`, and `WABAClient.listPhoneNumbers` behavior.
+- These are internal endpoint-family splits only: no new live Meta behavior, no new WABA/admin mutations, and no package export breakage.
+
+### Docs and release hygiene
+
+- Public docs now separate the implemented dry-run/local operator tooling from live/production operator modes that remain future work.
+- Release metadata is aligned for 0.3.0 across root/package manifests and release dry-run scripts derive the release version from the root manifest instead of stale hard-coded 0.2.1 constants.
+- `bun run check-publish` includes the 0.3.0 release contract test in addition to existing WATS-31/WATS-83/WATS-85/0.2.1 historical release checks.
+- Credential-free dry-runs still perform no package publication and No GitHub release/tag creation.
+
+### Release and safety boundaries
+
+- This is an alpha tooling release, not a 1.0 stability claim.
+- test account credentials are not required for this release, default install, local tests, CI, docs generation, package build, or package-manager smoke checks.
+- No live Meta calls are part of the release checks.
+- No WhatsApp access tokens, app secrets, WABA IDs, phone-number IDs, or webhook payloads are committed.
+- Live Meta validation remains gated behind WATS-80/WATS-81 and explicit credentials.
+- No live Meta validation campaign execution yet.
+- No live-capable `wats serve` startup or `--env-file` secret resolution yet; WATS-72 currently provides guard recognition only.
+- No Docker image publication.
+- No persistence, idempotency, or outbox runtime yet.
+
+### Verification gates
+
+- `bun run typecheck`
+- `bun run build:packages`
+- `bun run pack:smoke`
+- `bun run publish:dry-run` (`npm publish --dry-run` equivalent checks only; no package publication)
+- `bun run release:dry-run`
+- `bun run docs:check`
+- `bun run docs:build`
+- targeted release policy tests including `packages/testing/tests/wats030-release-contract.test.ts`
+
 ## [0.2.1] - 2026-05-04
 
-Alpha launch release for WATS. This is the first release line intended for public repository visibility and package-manager installation from the Bun/npm ecosystem once registry credentials are authorized.
+Alpha launch release for WATS. This was the first release line intended for public repository visibility and package-manager installation from the Bun/npm ecosystem.
 
 ### Install
 
@@ -37,8 +104,8 @@ Design-only/docs-only boundaries preserved in this launch: WATS-46/WATS-47/WATS-
 - No live Meta calls are part of the release checks.
 - No WhatsApp access tokens, app secrets, WABA IDs, phone-number IDs, or webhook payloads are committed.
 - Live Meta validation remains gated behind future WATS-80/WATS-81 work and explicit credentials.
-- GitHub publication still requires a sanitized public import or history rewrite before pushing private history.
-- No package publication occurs during release dry-runs; no GitHub release/tag creation happens until the sanitized public repository is pushed and reviewed. No package publication is performed by these checks.
+- GitHub publication required a sanitized public import or history rewrite before pushing private history.
+- No package publication occurs during release dry-runs. No package publication is performed by these checks.
 
 ### Verification gates
 
@@ -50,28 +117,3 @@ Design-only/docs-only boundaries preserved in this launch: WATS-46/WATS-47/WATS-
 - `bun run docs:check`
 - `bun run docs:build`
 - targeted release policy tests including `packages/testing/tests/wats021-alpha-release.test.ts`
-
-
-### Service message routes
-
-- `@switchbord/service` `POST {apiPrefix}/messages` now accepts WATS media composer bodies for image, video, audio, document, sticker, location, contacts, reaction, remove-reaction, and interactive button/list/CTA URL/product/product-list/catalog/location-request messages, converts them through the existing SDK builders, preserves generic text body compatibility, and keeps remaining non-message service route expansion as later issues.
-
-### Graph endpoint internals
-
-- WATS-65 moves the message-template endpoint family into `packages/graph/src/endpoints/templates/` modules while preserving root `@switchbord/graph`, `@switchbord/graph/endpoints/templates`, and `WABAClient` behavior. This is an internal template endpoint family split only: no WABA phone-number listing split, validation utility consolidation, live Meta calls, or package publication.
-- WATS-66 moves the Flow endpoint family into `packages/graph/src/endpoints/flows/` modules while preserving root `@switchbord/graph`, `@switchbord/graph/endpoints/flows`, and `WABAClient` behavior. This is an internal Flow endpoint family split only: no message composer split, Flow DSL/encrypted runtime expansion, validation utility consolidation, live Meta calls, or package publication.
-- WATS-67 moves WABA phone-number listing into `packages/graph/src/endpoints/waba/` modules while preserving root `@switchbord/graph`, `wabaEndpoints.ts`, and `WABAClient.listPhoneNumbers` behavior. This is an internal WABA phone-number listing split only: no new WABA endpoints, business-management refactor beyond type-import cleanup, message composer split, live Meta calls, or package publication.
-
-### CLI diagnostics and dry-run service
-
-- `wats doctor --config <path>` now runs offline diagnostics for runtime/package imports, config/profile checks, service route collisions, OpenAPI generation, and optional env presence counts without printing env names or values.
-- `wats serve --config <path> --dry-run` now starts the standalone `@switchbord/service` app through a local Bun process wrapper with synthetic in-memory secrets, a no-network Graph transport, health/readiness/OpenAPI routes, `--print-routes`, and graceful shutdown. Live serve mode, env-file secret resolution, Docker packaging, and Meta Graph calls remain outside the dry-run slice.
-- The exported `runCli` helper remains embeddable: process signal handling and `process.exit` stay isolated to the executable bin wrapper, with regression coverage in both direct tests and the external `@switchbord/cli` consumer fixture.
-- `wats serve` now recognizes the WATS-72 live-intent/acknowledgement guard (`--live` + `--yes-live`, or paired `WATS_LIVE_ENABLE=1` / `WATS_YES_LIVE=1`) but still fails closed before secret resolution, env-file parsing, service bind, or Meta Graph calls.
-
-### Not included
-
-- No live-capable `wats serve` startup or `--env-file` secret resolution yet; WATS-72 currently provides guard recognition only.
-- No live Meta validation campaign execution yet.
-- No Docker image publication.
-- No GitHub release/tag creation until the sanitized public repository is pushed and reviewed.

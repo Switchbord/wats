@@ -53,7 +53,7 @@ function assertManifestDistShape(pkg: string): void {
     types?: string;
     exports?: Record<string, { import?: string; types?: string }>;
   };
-  assert(manifest.private === false, `${manifest.name ?? pkg} must be publishable (private false) for the 0.2.1 alpha launch`);
+  assert(manifest.private === false, `${manifest.name ?? pkg} must be publishable (private false) for the current release`);
   assert(manifest.main === "./dist/index.js", `${manifest.name ?? pkg} main must point at dist/index.js`);
   assert(manifest.types === "./dist/index.d.ts", `${manifest.name ?? pkg} types must point at dist/index.d.ts`);
   assert(typeof manifest.exports === "object" && manifest.exports !== null, `${manifest.name ?? pkg} exports map required`);

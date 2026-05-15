@@ -3,22 +3,10 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { PUBLISHABLE_PACKAGES, readReleaseVersion, repoRoot } from "./release-metadata";
 
-const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const packRoot = mkdtempSync(join(tmpdir(), "wats-npm-publish-dry-run-"));
-const VERSION = "0.2.1";
-
-const PUBLISHABLE_PACKAGES = [
-  "types",
-  "crypto",
-  "graph",
-  "core",
-  "http",
-  "internal-utils",
-  "config",
-  "service",
-  "cli"
-] as const;
+const VERSION = readReleaseVersion();
 
 const INTERNAL_WORKSPACE_DEPS: Record<string, readonly string[]> = {
   core: ["graph", "types"],
@@ -90,7 +78,7 @@ function assertManifest(pkg: string): Manifest {
 function rewriteInternalDeps(manifestPath: string): void {
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as Manifest;
   for (const [dep, spec] of Object.entries(manifest.dependencies ?? {})) {
-    if (dep.startsWith("@switchbord/") && spec.startsWith("^0.2.")) {
+    if (dep.startsWith("@switchbord/") && spec.startsWith("^")) {
       manifest.dependencies![dep] = VERSION;
     }
   }
