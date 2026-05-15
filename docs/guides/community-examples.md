@@ -44,7 +44,7 @@ bun test packages/testing/tests/wats52-community-examples.test.ts
 bun run docs:check
 ```
 
-This guide does not document a live serve command. Current service examples call `createWatsServiceApp(...).fetch(request)` directly instead of relying on a process wrapper.
+For no-network process smoke checks, use the current dry-run `wats serve --config <path> --dry-run` flow documented in `docs/reference/cli.md`. The examples below still call `createWatsServiceApp(...).fetch(request)` directly when a test wants a pure Request-to-Response fixture instead of a process wrapper.
 
 ## Offline MockTransport bot example
 
@@ -154,6 +154,6 @@ Community examples should prefer existing public seams:
 
 ## What is not implemented yet
 
-This WATS-52A scaffold predates WATS-69/WATS-70/WATS-71. Current WATS now implements safe local `wats init` config/env placeholder generation, real offline `wats doctor` diagnostics, and dry-run `wats serve` for local service smoke checks. Dockerfiles, Compose files, release automation, image publication, credential-gated live serve mode, live Meta validation, and a full community gallery remain outside the WATS-52A scaffold.
+Current WATS now implements safe local `wats init` config/env placeholder generation, real offline `wats doctor` diagnostics, and dry-run `wats serve` for local service smoke checks. credential-gated live serve mode, live Meta validation, Dockerfiles, Compose files, release automation, image publication, and a full community gallery remain outside this scaffold.
 
 Use Linear issue scope for future backlog. Do not add repo-local deferred ledgers for WATS-52 follow-up work.

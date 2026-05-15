@@ -216,7 +216,7 @@ Do not migrate code assuming WATS already has pywa parity for:
 - pywa's full Flow JSON DSL, encrypted Flow request decrypt/encrypt, Flow hosting, metrics, migration.
 - calling permissions, calling settings/SIP mutations, and real call orchestration.
 - mutating admin APIs, token flows, callback overrides, QR codes, block/unblock users, and phone registration/deregistration.
-- full Meta Graph OpenAPI generation, CLI `serve`, CLI `init`, and deeper `doctor` diagnostics.
+- full Meta Graph OpenAPI generation and live/production operator modes beyond the current credential-free `wats init`, `wats doctor`, and dry-run `wats serve` tooling.
 
 ## Migration checklist
 
