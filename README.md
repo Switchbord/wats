@@ -12,7 +12,7 @@ WATS is alpha software. The foundations are in place and tested: Graph transport
 
 Endpoint breadth is still expanding. Today WATS ships text message send, `WhatsApp.startChat(...)` / `PhoneNumberClient.sendText(...)` for arbitrary-recipient text starts, WABA phone-number listing, pagination, WATS-37 media runtime (single-POST upload, metadata resolution, binary download, delete, encrypted decrypt, and upload sessions), WATS-39 templates, WATS-40 flows, WATS-41 calling, WATS-42A read-only business-management inventory (`getWabaInfo`, subscribed-app listing, phone-number info/settings, business profile, and commerce settings), and service `POST {apiPrefix}/messages` routes for text, media, location, contacts, reaction, remove-reaction, and interactive message bodies.
 
-The 0.3.0 line is an alpha tooling release. It adds safe local operator tooling around `wats init`, `wats onboarding`, `wats doctor`, and dry-run `wats serve`, plus release metadata/preflight cleanup. live serve mode, env-file secret resolution, Docker image publication, persistence/outbox, and live Meta validation are not included.
+The 0.3.0 line is an alpha tooling release. It adds safe local operator tooling around `wats init`, `wats setup`, `wats onboarding`, `wats doctor`, and dry-run `wats serve`, plus release metadata/preflight cleanup. `wats setup` writes a safe `wats.config.yaml` with env-secret references plus an ignored `.env.local` for local secrets without making Meta calls. live serve mode, token validation against Meta, Docker image publication, persistence/outbox, and live Meta validation are not included.
 
 ## Shape
 

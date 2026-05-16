@@ -1,11 +1,11 @@
 # CLI reference
 
 - status: experimental
-- applies-to: WATS-33, WATS-47, and WATS-69
+- applies-to: WATS-33, WATS-47, WATS-69, and WATS-104
 - package: `@switchbord/cli`
-- lastReviewed: 2026-05-04
+- lastReviewed: 2026-05-16
 
-`@switchbord/cli` provides the `wats` command for safe local onboarding and inspection. WATS-33 ships real offline config validation and OpenAPI export. WATS-69 adds safe `wats init` config/env placeholder generation. WATS-70 adds real offline `wats doctor` diagnostics. WATS-71 adds a real dry-run `wats serve` process wrapper around `@switchbord/service`.
+`@switchbord/cli` provides the `wats` command for safe local onboarding and inspection. WATS-33 ships real offline config validation and OpenAPI export. WATS-69 adds safe `wats init` config/env placeholder generation. WATS-104 adds safe single-profile `wats setup` credential-file generation. WATS-70 adds real offline `wats doctor` diagnostics. WATS-71 adds a real dry-run `wats serve` process wrapper around `@switchbord/service`.
 
 ## No-live-credentials default
 
@@ -48,6 +48,39 @@ Failure behavior:
 - existing `wats.config.*` or `.env.example` targets fail with `refusing to overwrite`;
 - diagnostics do not echo attacker-supplied paths or token-like values;
 - no raw secrets are generated.
+
+### `wats setup [dir] [--profile <name>]`
+
+Runs a safe credential setup wizard for one local WATS profile. It writes `wats.config.yaml` with env-secret references and an ignored `.env.local` containing the operator-entered local values. The command validates the generated config through `@switchbord/config`, refuses to overwrite existing `wats.config.yaml` or `.env.local`, and rolls back the config file if the secret-file write fails.
+
+The generated config keeps raw access tokens, app secrets, webhook verify tokens, and service bearer tokens out of YAML. It uses the existing env names `WATS_ACCESS_TOKEN`, `WATS_VERIFY_TOKEN`, `WATS_APP_SECRET`, and `WATS_SERVICE_TOKEN`; `.env.local` also records WABA/phone-number ids plus `WATS_LIVE_ENABLE=0` and `WATS_YES_LIVE=0`.
+
+Prompted input policy:
+
+- profile names are limited to safe 1..32 character identifiers and cannot contain token/secret/password-like words;
+- access token and app secret are required, non-empty strings, max 4096 characters, and cannot contain control characters;
+- verify and service tokens may be left blank, in which case WATS generates local random `wats_wh_...` and `wats_srv_...` values;
+- WABA and phone-number ids must be digit strings;
+- webhook path and service API prefix must be absolute safe paths with no traversal, encoded traversal, query, fragment, or control characters;
+- service host and port use the same safe local validation as dry-run serve.
+
+Success output is count/status-only:
+
+```text
+setup complete
+files: 2
+profile: [REDACTED_PROFILE]
+```
+
+Failure behavior:
+
+- malformed args return `CliUsageError`;
+- invalid prompt plumbing returns `PromptInputError`;
+- unsafe operator answers return `SetupInputError`;
+- generated config-schema failures return `ConfigValidationError`;
+- file write conflicts return `OutputError` with `refusing to overwrite`.
+
+The command does not print target paths, profile names, env-secret names, token values, or raw prompt answers. It does not read existing `.env.local`, resolve env-secret values, validate tokens against Meta, call Meta Graph APIs, manage multiple profiles, or start the service.
 
 ### `wats onboarding --public-url <https URL> [--webhook-path /webhooks/whatsapp]`
 

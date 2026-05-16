@@ -90,7 +90,7 @@ function envValue(envText: string, name: string): string {
   return (line ?? "").slice(name.length + 1);
 }
 
-function validAnswers(overrides: Partial<{
+type AnswerOverrides = Partial<{
   profile: unknown;
   apiVersion: unknown;
   baseUrl: unknown;
@@ -104,27 +104,53 @@ function validAnswers(overrides: Partial<{
   serviceHost: unknown;
   servicePort: unknown;
   apiPrefix: unknown;
-}> = {}): unknown[] {
+}>;
+
+function answerOverride(overrides: AnswerOverrides, key: keyof AnswerOverrides, fallback: unknown): unknown {
+  return Object.prototype.hasOwnProperty.call(overrides, key) ? overrides[key] : fallback;
+}
+
+function validAnswers(overrides: AnswerOverrides = {}): unknown[] {
   return [
-    overrides.profile ?? "test",
-    overrides.apiVersion ?? "",
-    overrides.baseUrl ?? "",
-    overrides.wabaId ?? "123456789012345",
-    overrides.phoneNumberId ?? "987654321098765",
-    overrides.accessToken ?? ACCESS_TOKEN,
-    overrides.appSecret ?? APP_SECRET,
-    overrides.verifyToken ?? "",
-    overrides.serviceToken ?? "",
-    overrides.webhookPath ?? "",
-    overrides.serviceHost ?? "",
-    overrides.servicePort ?? "",
-    overrides.apiPrefix ?? ""
+    answerOverride(overrides, "profile", "test"),
+    answerOverride(overrides, "apiVersion", ""),
+    answerOverride(overrides, "baseUrl", ""),
+    answerOverride(overrides, "wabaId", "123456789012345"),
+    answerOverride(overrides, "phoneNumberId", "987654321098765"),
+    answerOverride(overrides, "accessToken", ACCESS_TOKEN),
+    answerOverride(overrides, "appSecret", APP_SECRET),
+    answerOverride(overrides, "verifyToken", ""),
+    answerOverride(overrides, "serviceToken", ""),
+    answerOverride(overrides, "webhookPath", ""),
+    answerOverride(overrides, "serviceHost", ""),
+    answerOverride(overrides, "servicePort", ""),
+    answerOverride(overrides, "apiPrefix", "")
   ];
 }
 
 async function runSetup(
   args: readonly unknown[],
   answers: readonly unknown[] = validAnswers(),
+  cwd = repoRoot
+): Promise<{ result: CliResult; prompts: PromptRequest[] }> {
+  const prompts: PromptRequest[] = [];
+  let answerIndex = 0;
+  const result = await runCli(args as readonly string[], {
+    cwd,
+    prompt: async (request: PromptRequest): Promise<unknown> => {
+      prompts.push(request);
+      if (answerIndex >= answers.length) return "";
+      const answer = answers[answerIndex];
+      answerIndex += 1;
+      return answer;
+    }
+  });
+  return { result, prompts };
+}
+
+async function runSetupWithAnswers(
+  args: readonly unknown[],
+  answers: readonly unknown[],
   cwd = repoRoot
 ): Promise<{ result: CliResult; prompts: PromptRequest[] }> {
   const prompts: PromptRequest[] = [];
@@ -271,7 +297,7 @@ profiles:
     for (const entry of cases) {
       const dir = makeTempDir();
       try {
-        const { result } = await runSetup(["setup", dir], validAnswers({ accessToken: entry.answer }));
+        const { result } = await runSetupWithAnswers(["setup", dir], validAnswers({ accessToken: entry.answer }));
         expect(result.exitCode, `answer=${String(entry.answer)} stdout=${result.stdout}`).toBe(1);
         expect(result.stdout).toBe("");
         expect(result.stderr).toContain(entry.error);

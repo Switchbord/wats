@@ -74,6 +74,7 @@ describe("wats CLI help skeleton", () => {
     expectSuccessfulHelp(runCli(["--help"]), [
       "WATS CLI",
       "wats init",
+      "wats setup",
       "wats config validate",
       "wats doctor",
       "wats openapi",

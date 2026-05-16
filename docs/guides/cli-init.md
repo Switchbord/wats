@@ -1,18 +1,20 @@
 # CLI Onboarding Guide
 
 - status: experimental
-- applies-to: WATS-33, WATS-47, and WATS-69
-- lastReviewed: 2026-05-04
+- applies-to: WATS-33, WATS-47, WATS-69, and WATS-104
+- lastReviewed: 2026-05-16
 
 ## Purpose
 
-The WATS CLI is the package-manager entry point for safe local onboarding and inspection. WATS-33 ships credential-safe help surfaces, local verify-token generation, offline config validation, and OpenAPI export. WATS-69 implements the safe `wats init` bootstrap for config/env placeholder generation. WATS-70 implements real offline `wats doctor` diagnostics. WATS-71 implements a dry-run `wats serve` process wrapper for local service smoke checks without live credentials.
+The WATS CLI is the package-manager entry point for safe local onboarding and inspection. WATS-33 ships credential-safe help surfaces, local verify-token generation, offline config validation, and OpenAPI export. WATS-69 implements the safe `wats init` bootstrap for config/env placeholder generation. WATS-104 implements the safe single-profile `wats setup` wizard for writing local credential files. WATS-70 implements real offline `wats doctor` diagnostics. WATS-71 implements a dry-run `wats serve` process wrapper for local service smoke checks without live credentials.
 
 ## Current commands
 
 ```bash
 wats --help
 wats init --help
+wats setup --help
+wats setup ./my-bot --profile test
 wats config validate <path>
 wats config validate --config <path>
 wats doctor --config <path>
@@ -33,10 +35,10 @@ wats webhook token --help
 
 The CLI still does not:
 
-- create `.env.local`
-- read or resolve live credentials
+- read or resolve live credentials from existing env files implicitly
 - call Meta Graph APIs
 - validate tokens against Meta
+- manage multiple credential profiles interactively
 - start live/credentialed service mode
 - overwrite output files
 
@@ -90,9 +92,17 @@ wats init ./my-bot --format yaml --profile local
 wats init ./my-bot --format=json --profile prod
 ```
 
-`wats init` writes `wats.config.yaml` or `wats.config.json` plus `.env.example`, refuses to overwrite either file, prints only a redacted count summary, and keeps `.env.example` secret-bearing values blank. Copy `.env.example` to an ignored local file such as `.env.local` before filling real values.
+`wats init` writes `wats.config.yaml` or `wats.config.json` plus `.env.example`, refuses to overwrite either file, prints only a redacted count summary, and keeps `.env.example` secret-bearing values blank. Copy `.env.example` to an ignored local file such as `.env.local` before filling real values, or use `wats setup` for a guided local-only file write.
 
-Generated local verify tokens and service bearer tokens are secrets; if a later `--generate-local-secrets` writes them, it should do so only to an explicitly chosen local env file, with no overwrite by default.
+`wats setup [dir] [--profile <name>]` prompts for one profile's Graph defaults, WABA id, phone-number id, access token, app secret, webhook path, and local service defaults. It writes `wats.config.yaml` with env-secret references and `.env.local` with local values, validates the generated config, refuses to overwrite either target, and rolls back the config if `.env.local` cannot be created. Blank verify/service-token answers generate local random `wats_wh_...` and `wats_srv_...` values. Success output is only:
+
+```text
+setup complete
+files: 2
+profile: [REDACTED_PROFILE]
+```
+
+The setup wizard does not read existing `.env.local`, resolve env-secret values, validate tokens against Meta, call Meta Graph APIs, manage multiple profiles, or start the service. Prompt answers are validated for empty/whitespace/control-character values, numeric bounds, safe path shape, and safe profile identifiers before any file is written.
 
 Do not pass raw secrets as CLI arguments. Do not commit access tokens, app secrets, webhook verify tokens, service bearer tokens, WABA ids from real accounts, or phone-number ids from real accounts.
 

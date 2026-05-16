@@ -8,8 +8,19 @@ export type CliCommandResult = Readonly<{
   shutdown?: () => void;
 }>;
 
+export type CliPromptRequest = Readonly<{
+  label?: string;
+  message?: string;
+  defaultValue?: string;
+  secret?: boolean;
+  required?: boolean;
+}>;
+
+export type CliPromptProvider = (request: CliPromptRequest) => unknown | Promise<unknown>;
+
 export type CliCommandContext = Readonly<{
-  argv: readonly string[];
+  cwd?: string;
+  prompt?: CliPromptProvider;
 }>;
 
 type ParsedOptionValue = Readonly<{
@@ -101,6 +112,32 @@ type InitArgs = Readonly<{
   reason: "help" | "usage";
 }>;
 
+type SetupArgs = Readonly<{
+  ok: true;
+  dir: string;
+  profileName?: string;
+}> | Readonly<{
+  ok: false;
+  reason: "help" | "usage";
+}>;
+
+type SetupAnswerKey =
+  | "profile"
+  | "apiVersion"
+  | "baseUrl"
+  | "wabaId"
+  | "phoneNumberId"
+  | "accessToken"
+  | "appSecret"
+  | "verifyToken"
+  | "serviceToken"
+  | "webhookPath"
+  | "serviceHost"
+  | "servicePort"
+  | "apiPrefix";
+
+type SetupAnswers = Readonly<Record<SetupAnswerKey, string>>;
+
 type OnboardingArgs = Readonly<{
   ok: true;
   publicUrl: string;
@@ -118,6 +155,7 @@ Usage: wats <command> [options]
 
 Implemented commands:
   wats init [dir] [--dry-run]              Generate WATS config/env placeholders safely.
+  wats setup [dir] [--profile <name>]       Run interactive credential setup wizard.
   wats onboarding --public-url <url>        Print webhook address and setup secrets checklist.
   wats config validate <path>              Validate a WATS config file safely.
   wats config validate --config <path>     Validate a WATS config file safely.
@@ -140,6 +178,17 @@ Options:
   --profile <name>       Set the generated default profile name (default: local).
 
 Writes only wats.config.yaml/json and .env.example, refuses to overwrite existing files, uses env-secret references, and does not resolve live credentials, read .env.local, or call Meta Graph APIs.
+${NO_LIVE_CREDENTIALS}
+`;
+
+const SETUP_HELP = `Usage: wats setup [dir] [--profile <name>]
+
+Run an interactive credential setup wizard that writes wats.config.yaml and .env.local for local WATS development.
+
+Options:
+  --profile <name>       Preselect the generated default profile name.
+
+The wizard stores raw values only in .env.local, writes env-secret references in wats.config.yaml, refuses to overwrite existing files, and rolls back the config if secret-file creation fails. Output is count/status only and does not print target paths, env variable names, profile names, or token values.
 ${NO_LIVE_CREDENTIALS}
 `;
 
@@ -230,8 +279,17 @@ ${NO_LIVE_CREDENTIALS}
 
 const INIT_DEFAULT_PROFILE = "local" as const;
 const INIT_DEFAULT_FORMAT: InitFormat = "yaml";
-const INIT_ALLOWED_FLAGS = ["--dry-run", "--format", "--profile"] as const;
 const INIT_VALUE_FLAGS = ["--format", "--profile"] as const;
+const SETUP_VALUE_FLAGS = ["--profile"] as const;
+const SETUP_DEFAULT_PROFILE = "local" as const;
+const SETUP_DEFAULT_API_VERSION = "v25.0" as const;
+const SETUP_DEFAULT_BASE_URL = "https://graph.facebook.com" as const;
+const SETUP_DEFAULT_WEBHOOK_PATH = "/webhooks/whatsapp" as const;
+const SETUP_DEFAULT_SERVICE_HOST = "127.0.0.1" as const;
+const SETUP_DEFAULT_SERVICE_PORT = "8787" as const;
+const SETUP_DEFAULT_API_PREFIX = "/api" as const;
+const SETUP_SECRET_MAX_LENGTH = 4096;
+const SETUP_PROFILE_MAX_LENGTH = 32;
 const ONBOARDING_DEFAULT_WEBHOOK_PATH = "/webhooks/whatsapp" as const;
 const ONBOARDING_VALUE_FLAGS = ["--public-url", "--webhook-path"] as const;
 const DOCTOR_VALUE_FLAGS = ["--config", "--profile", "--format"] as const;
@@ -270,6 +328,22 @@ function ok(stdout: string): CliCommandResult {
 
 function fail(stderr: string): CliCommandResult {
   return Object.freeze({ exitCode: 1, stdout: "", stderr });
+}
+
+function cliUsageError(hint: string): CliCommandResult {
+  return fail(`CliUsageError\nInvalid arguments. Run \`${hint}\` for usage.\n`);
+}
+
+function promptInputError(hint: string): CliCommandResult {
+  return fail(`PromptInputError\nInvalid prompt input. Run \`${hint}\` for usage.\n`);
+}
+
+function setupInputError(hint: string): CliCommandResult {
+  return fail(`SetupInputError\nInvalid setup input. Run \`${hint}\` for usage.\n`);
+}
+
+function outputError(message: string, hint: string): CliCommandResult {
+  return fail(`OutputError\n${message}. Run \`${hint}\` for usage.\n`);
 }
 
 function hasHelpFlag(args: readonly string[]): boolean {
@@ -679,6 +753,209 @@ async function initCommand(args: readonly string[]): Promise<CliCommandResult> {
     return fail("Output target exists; refusing to overwrite. Run `wats init --help` for usage.\n");
   }
   return ok(initSummary("complete", parsed.format));
+}
+
+
+function resolveSetupTargetDir(value: string, cwd: string | undefined): string | null {
+  if (hasUnsafeTargetPath(value)) return null;
+  if (value === ".") return cwd ?? (globalThis as { process?: { cwd(): string } }).process?.cwd?.() ?? ".";
+  if (value.startsWith("/")) return value;
+  const base = cwd ?? (globalThis as { process?: { cwd(): string } }).process?.cwd?.() ?? ".";
+  const relativePath = value.startsWith("./") ? value.slice(2) : value;
+  return `${base.replace(/\/+$/u, "")}/${relativePath}`;
+}
+
+function parseSetupArgs(args: readonly string[], cwd?: string): SetupArgs {
+  let profileName: string | undefined;
+  let profileSeen = false;
+  const positionals: string[] = [];
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index] ?? "";
+    if (arg.trim().length === 0) return { ok: false, reason: "usage" };
+    if (!arg.startsWith("-")) {
+      positionals.push(arg);
+      continue;
+    }
+
+    const equalsIndex = arg.indexOf("=");
+    const flagName = equalsIndex === -1 ? arg : arg.slice(0, equalsIndex);
+    if (ROOT_HELP_FLAGS.has(flagName)) {
+      return args.some((sidecar) => sidecar.startsWith("-") && !ROOT_HELP_FLAGS.has(sidecar.includes("=") ? sidecar.slice(0, sidecar.indexOf("=")) : sidecar))
+        ? { ok: false, reason: "usage" }
+        : { ok: false, reason: "help" };
+    }
+    if (!SETUP_VALUE_FLAGS.includes(flagName as typeof SETUP_VALUE_FLAGS[number])) return { ok: false, reason: "usage" };
+    if (profileSeen) return { ok: false, reason: "usage" };
+    const value = equalsIndex === -1 ? args[index + 1] : arg.slice(equalsIndex + 1);
+    if (equalsIndex === -1) index += 1;
+    if (!isNonEmptyArg(value) || !isSafeProfileName(value)) return { ok: false, reason: "usage" };
+    profileName = value;
+    profileSeen = true;
+  }
+
+  if (positionals.length > 1) return { ok: false, reason: "usage" };
+  const targetDir = resolveSetupTargetDir(positionals[0] ?? ".", cwd);
+  if (targetDir === null) return { ok: false, reason: "usage" };
+  return { ok: true, dir: targetDir, ...(profileName !== undefined ? { profileName } : {}) };
+}
+
+function isSafeNumericIdentifier(value: string): boolean {
+  return /^\d{1,32}$/u.test(value);
+}
+
+function isSafeSetupSecret(value: string): boolean {
+  return value.length > 0 && value.trim().length > 0 && value.length <= SETUP_SECRET_MAX_LENGTH && !/[\u0000-\u001f\u007f]/u.test(value);
+}
+
+function setupAnswerOrDefault(value: string, fallback: string): string {
+  return value.length === 0 ? fallback : value;
+}
+
+function parseSetupPort(value: string): number | null {
+  const raw = setupAnswerOrDefault(value, SETUP_DEFAULT_SERVICE_PORT);
+  if (!/^\d{1,5}$/u.test(raw)) return null;
+  const parsed = Number.parseInt(raw, 10);
+  return parsed >= 1 && parsed <= 65_535 ? parsed : null;
+}
+
+function setupConfigObject(answers: SetupAnswers): WatsConfig {
+  const profile = Object.freeze({
+    graph: Object.freeze({ apiVersion: answers.apiVersion, baseUrl: answers.baseUrl }),
+    whatsapp: Object.freeze({ wabaId: answers.wabaId, phoneNumberId: answers.phoneNumberId }),
+    auth: Object.freeze({ accessToken: Object.freeze({ env: "WATS_ACCESS_TOKEN" }) }),
+    webhook: Object.freeze({
+      path: answers.webhookPath,
+      verifyToken: Object.freeze({ env: "WATS_VERIFY_TOKEN" }),
+      appSecret: Object.freeze({ env: "WATS_APP_SECRET" }),
+      maxBodyBytes: 1_048_576
+    }),
+    service: Object.freeze({
+      host: answers.serviceHost,
+      port: Number.parseInt(answers.servicePort, 10),
+      apiPrefix: answers.apiPrefix,
+      bearerToken: Object.freeze({ env: "WATS_SERVICE_TOKEN" })
+    })
+  }) satisfies WatsProfileConfig;
+  return Object.freeze({ version: 1, defaultProfile: answers.profile, profiles: Object.freeze({ [answers.profile]: profile }) }) as WatsConfig;
+}
+
+function formatSetupEnv(answers: SetupAnswers): string {
+  return [
+    "# WATS local credentials generated by `wats setup`.",
+    "# Do not commit this file.",
+    `WATS_ACCESS_TOKEN=${answers.accessToken}`,
+    `WATS_WABA_ID=${answers.wabaId}`,
+    `WATS_PHONE_NUMBER_ID=${answers.phoneNumberId}`,
+    `WATS_VERIFY_TOKEN=${answers.verifyToken}`,
+    `WATS_APP_SECRET=${answers.appSecret}`,
+    `WATS_SERVICE_TOKEN=${answers.serviceToken}`,
+    "WATS_LIVE_ENABLE=0",
+    "WATS_YES_LIVE=0",
+    ""
+  ].join("\n");
+}
+
+async function readSetupAnswer(prompt: CliPromptProvider | undefined, request: CliPromptRequest): Promise<string | null> {
+  if (prompt === undefined) return null;
+  let raw: unknown;
+  try {
+    raw = await prompt(request);
+  } catch {
+    return null;
+  }
+  return typeof raw === "string" ? raw : null;
+}
+
+async function collectSetupAnswers(parsed: SetupArgs & { ok: true }, prompt: CliPromptProvider | undefined): Promise<SetupAnswers | "prompt_error" | "input_error" | ConfigValidationError> {
+  const profileRaw = parsed.profileName ?? await readSetupAnswer(prompt, { label: "Profile name", defaultValue: SETUP_DEFAULT_PROFILE, required: true });
+  const apiVersionRaw = await readSetupAnswer(prompt, { label: "Graph API version", defaultValue: SETUP_DEFAULT_API_VERSION, required: false });
+  const baseUrlRaw = await readSetupAnswer(prompt, { label: "Graph base URL", defaultValue: SETUP_DEFAULT_BASE_URL, required: false });
+  const wabaIdRaw = await readSetupAnswer(prompt, { label: "WABA ID", required: true });
+  const phoneNumberIdRaw = await readSetupAnswer(prompt, { label: "Phone number ID", required: true });
+  const accessTokenRaw = await readSetupAnswer(prompt, { label: "Meta access token", secret: true, required: true });
+  const appSecretRaw = await readSetupAnswer(prompt, { label: "Meta app secret", secret: true, required: true });
+  const verifyTokenRaw = await readSetupAnswer(prompt, { label: "Webhook verify token", secret: true, required: false });
+  const serviceTokenRaw = await readSetupAnswer(prompt, { label: "WATS service bearer token", secret: true, required: false });
+  const webhookPathRaw = await readSetupAnswer(prompt, { label: "Webhook path", defaultValue: SETUP_DEFAULT_WEBHOOK_PATH, required: false });
+  const serviceHostRaw = await readSetupAnswer(prompt, { label: "Service host", defaultValue: SETUP_DEFAULT_SERVICE_HOST, required: false });
+  const servicePortRaw = await readSetupAnswer(prompt, { label: "Service port", defaultValue: SETUP_DEFAULT_SERVICE_PORT, required: false });
+  const apiPrefixRaw = await readSetupAnswer(prompt, { label: "Service API prefix", defaultValue: SETUP_DEFAULT_API_PREFIX, required: false });
+
+  const rawAnswers = [profileRaw, apiVersionRaw, baseUrlRaw, wabaIdRaw, phoneNumberIdRaw, accessTokenRaw, appSecretRaw, verifyTokenRaw, serviceTokenRaw, webhookPathRaw, serviceHostRaw, servicePortRaw, apiPrefixRaw];
+  if (rawAnswers.some((value) => value === null)) return "prompt_error";
+
+  const profile = setupAnswerOrDefault(profileRaw as string, SETUP_DEFAULT_PROFILE);
+  const apiVersion = setupAnswerOrDefault(apiVersionRaw as string, SETUP_DEFAULT_API_VERSION);
+  const baseUrl = setupAnswerOrDefault(baseUrlRaw as string, SETUP_DEFAULT_BASE_URL);
+  const wabaId = wabaIdRaw as string;
+  const phoneNumberId = phoneNumberIdRaw as string;
+  const accessToken = accessTokenRaw as string;
+  const appSecret = appSecretRaw as string;
+  const webhookPath = setupAnswerOrDefault(webhookPathRaw as string, SETUP_DEFAULT_WEBHOOK_PATH);
+  const serviceHost = setupAnswerOrDefault(serviceHostRaw as string, SETUP_DEFAULT_SERVICE_HOST);
+  const servicePortNumber = parseSetupPort(servicePortRaw as string);
+  const apiPrefix = setupAnswerOrDefault(apiPrefixRaw as string, SETUP_DEFAULT_API_PREFIX);
+
+  if (!isSafeProfileName(profile) || profile.length > SETUP_PROFILE_MAX_LENGTH) return "input_error";
+  if (!isSafeNumericIdentifier(wabaId) || !isSafeNumericIdentifier(phoneNumberId)) return "input_error";
+  if (!isSafeSetupSecret(accessToken) || !isSafeSetupSecret(appSecret)) return "input_error";
+  const verifyToken = (verifyTokenRaw as string).length === 0 ? await createWebhookVerifyToken() : verifyTokenRaw as string;
+  const serviceToken = (serviceTokenRaw as string).length === 0 ? await createServiceBearerToken() : serviceTokenRaw as string;
+  if (!isSafeSetupSecret(verifyToken) || !isSafeSetupSecret(serviceToken)) return "input_error";
+  if (!isSafeWebhookPath(webhookPath) || !isSafeServeHost(serviceHost) || servicePortNumber === null || !isSafeWebhookPath(apiPrefix)) return "input_error";
+
+  const answers: SetupAnswers = Object.freeze({
+    profile,
+    apiVersion,
+    baseUrl,
+    wabaId,
+    phoneNumberId,
+    accessToken,
+    appSecret,
+    verifyToken,
+    serviceToken,
+    webhookPath,
+    serviceHost,
+    servicePort: String(servicePortNumber),
+    apiPrefix
+  });
+  try {
+    parseConfig(formatInitJson(setupConfigObject(answers)), { format: "json" });
+  } catch (error) {
+    return error instanceof ConfigValidationError ? error : "input_error";
+  }
+  return answers;
+}
+
+async function setupCommand(args: readonly string[], context: CliCommandContext = {}): Promise<CliCommandResult> {
+  const parsed = parseSetupArgs(args, context.cwd);
+  if (!parsed.ok) {
+    if (parsed.reason === "help") return ok(SETUP_HELP);
+    return cliUsageError("wats setup --help");
+  }
+
+  const answers = await collectSetupAnswers(parsed, context.prompt);
+  if (answers === "prompt_error") return promptInputError("wats setup --help");
+  if (answers === "input_error") return setupInputError("wats setup --help");
+  if (answers instanceof ConfigValidationError) return fail(formatConfigValidationError(answers, "wats setup --help"));
+
+  const configText = formatInitYaml(parseConfig(formatInitJson(setupConfigObject(answers)), { format: "json" }));
+  const envText = formatSetupEnv(answers);
+  const configPath = `${parsed.dir.replace(/\/+$/u, "")}/wats.config.yaml`;
+  const envPath = `${parsed.dir.replace(/\/+$/u, "")}/.env.local`;
+
+  if (!await ensureDir(parsed.dir)) return outputError("invalid output directory", "wats setup --help");
+  if (await fileExists(configPath) || await fileExists(envPath)) return outputError("refusing to overwrite", "wats setup --help");
+  const configWrite = await writeTextFileExclusive(configPath, configText);
+  if (configWrite !== "written") return outputError("refusing to overwrite", "wats setup --help");
+  const envWrite = await writeTextFileExclusive(envPath, envText);
+  if (envWrite !== "written") {
+    await removeFileBestEffort(configPath);
+    return outputError(envWrite === "exists" ? "refusing to overwrite" : "could not write local secrets", "wats setup --help");
+  }
+
+  return ok(["setup complete", "files: 2", "profile: [REDACTED_PROFILE]", NO_LIVE_CREDENTIALS].join("\n") + "\n");
 }
 
 
@@ -1485,7 +1762,10 @@ async function runWebhookCommand(args: readonly string[]): Promise<CliCommandRes
   return fail("Unknown command. Run `wats --help` for usage.\n");
 }
 
-export async function runCli(argv: readonly string[] = []): Promise<CliCommandResult> {
+export async function runCli(argv: readonly string[] = [], context: CliCommandContext = {}): Promise<CliCommandResult> {
+  if (!Array.isArray(argv) || argv.some((arg) => typeof arg !== "string")) {
+    return cliUsageError("wats --help");
+  }
   const args = argv.filter((arg) => arg.length > 0);
   const [command, ...rest] = args;
 
@@ -1500,6 +1780,9 @@ export async function runCli(argv: readonly string[] = []): Promise<CliCommandRe
   switch (command) {
     case "init":
       return initCommand(rest);
+
+    case "setup":
+      return setupCommand(rest, context);
 
     case "onboarding":
       return onboardingCommand(rest);

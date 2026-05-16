@@ -18,6 +18,7 @@ The packages are standard npm registry packages, so Bun installs them with `bun 
 
 ### CLI diagnostics and dry-run service
 
+- `wats setup [dir] [--profile <name>]` runs a safe credential setup wizard for one local profile, writing `wats.config.yaml` with env-secret references plus an ignored `.env.local` for local values, while refusing overwrites and making no Meta calls.
 - `wats onboarding --public-url <https URL>` prints an operator-facing Meta webhook setup checklist with a safe callback URL, locally generated verify/service tokens, and a clear list of user-side Meta values to store outside git.
 - `wats doctor --config <path>` runs offline diagnostics for runtime/package imports, config/profile checks, service route collisions, OpenAPI generation, and optional env presence counts without printing env names or values.
 - `wats serve --config <path> --dry-run` starts the standalone `@switchbord/service` app through a local Bun process wrapper with synthetic in-memory secrets, a no-network Graph transport, health/readiness/OpenAPI routes, `--print-routes`, and graceful shutdown.
