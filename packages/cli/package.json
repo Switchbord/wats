@@ -1,6 +1,6 @@
 {
   "name": "@switchbord/cli",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": false,
   "license": "MIT",
   "type": "module",
@@ -40,7 +40,7 @@
     "wats"
   ],
   "dependencies": {
-    "@switchbord/config": "^0.3.0",
-    "@switchbord/service": "^0.3.0"
+    "@switchbord/config": "^0.3.1",
+    "@switchbord/service": "^0.3.1"
   }
 }

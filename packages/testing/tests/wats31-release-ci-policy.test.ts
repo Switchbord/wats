@@ -15,7 +15,7 @@ const PUBLISHABLE_PACKAGE_NAMES = [
 ] as const;
 
 const PRIVATE_PACKAGE_NAMES = ["@switchbord/testing"] as const;
-const CURRENT_RELEASE_VERSION = "0.3.0" as const;
+const CURRENT_RELEASE_VERSION = "0.3.1" as const;
 
 type JsonRecord = Record<string, unknown>;
 

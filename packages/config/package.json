@@ -1,6 +1,6 @@
 {
   "name": "@switchbord/config",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": false,
   "license": "MIT",
   "type": "module",
@@ -37,6 +37,6 @@
     "wats"
   ],
   "dependencies": {
-    "@switchbord/internal-utils": "^0.3.0"
+    "@switchbord/internal-utils": "^0.3.1"
   }
 }

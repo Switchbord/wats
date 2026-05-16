@@ -1,6 +1,6 @@
 {
   "name": "@switchbord/http",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": false,
   "license": "MIT",
   "type": "module",
@@ -61,8 +61,8 @@
     "wats"
   ],
   "dependencies": {
-    "@switchbord/crypto": "^0.3.0",
-    "@switchbord/core": "^0.3.0",
-    "@switchbord/types": "^0.3.0"
+    "@switchbord/crypto": "^0.3.1",
+    "@switchbord/core": "^0.3.1",
+    "@switchbord/types": "^0.3.1"
   }
 }

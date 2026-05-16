@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.3.1] - 2026-05-16
+
+Patch alpha tooling release for WATS. This release adds WATS-104's safe single-profile credential setup wizard on top of the 0.3.0 operator tooling line.
+
+### CLI setup wizard
+
+- `wats setup [dir] [--profile <name>]` runs a safe non-live credential setup wizard for one local profile.
+- The wizard writes `wats.config.yaml` with env-secret references and an ignored `.env.local` with local values, validates the generated config, refuses overwrites, rolls config back if the secret-file write fails, and keeps stdout/stderr redacted.
+- Blank verify/service-token answers generate local random `wats_wh_...` and `wats_srv_...` values.
+- The exported `runCli` helper gains a testable prompt seam while process prompting, signal handling, and `process.exit` remain isolated to the executable bin wrapper.
+
+### Docs and release hygiene
+
+- Release metadata is aligned for 0.3.1 across root/package manifests, public internal dependency ranges, service OpenAPI default version, and release-policy tests.
+- Public docs describe `wats setup` as additive local setup behavior while preserving the 0.3.0 tooling boundaries and WATS-47 design-truth contracts.
+
+### Release and safety boundaries
+
+- This is an alpha tooling patch release, not a 1.0 stability claim.
+- No live Meta calls, token validation against Meta, multi-profile credential editor, live-capable `wats serve`, `--env-file` live secret resolution, Docker image publication, persistence/outbox, or live Meta validation campaign execution are included.
+- Credential-free dry-runs still perform no package publication and No GitHub release/tag creation.
+
 ## [0.3.0] - 2026-05-15
 
 Alpha tooling release for WATS. This release prepares the next public package line after 0.2.1 and collects the post-0.2.1 CLI, service, Graph-internal, docs, and release-metadata work into a truthful 0.3.0 train.

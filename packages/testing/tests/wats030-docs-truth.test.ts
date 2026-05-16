@@ -21,25 +21,25 @@ function read(path: string): string {
   return readFileSync(join(repoRoot, path), "utf8");
 }
 
-describe("WATS 0.3.0 public docs truth contract", () => {
-  test("README announces the 0.3.0 alpha tooling release without stale publication wording", () => {
+describe("WATS 0.3.1 public docs truth contract", () => {
+  test("README announces the 0.3.1 alpha tooling release without stale publication wording", () => {
     const readme = read("README.md");
-    expect(readme).toContain("Current release: `0.3.0-alpha-tooling`");
-    expect(readme).toContain("safe local operator tooling");
-    expect(readme).toContain("`wats init`, `wats onboarding`, `wats doctor`, and dry-run `wats serve`");
+    expect(readme).toContain("Current release: `0.3.1-alpha-tooling`");
+    expect(readme).toContain("alpha tooling patch release");
+    expect(readme).toContain("`wats setup` writes a safe `wats.config.yaml`");
     expect(readme).toContain("live serve mode, env-file secret resolution, Docker image publication, persistence/outbox, and live Meta validation are not included");
-    expect(readme).not.toContain("Current release: `0.2.1-alpha-launch`");
+
     expect(readme).not.toContain("After the alpha packages are published");
   });
 
-  test("changelog has a top 0.3.0 section and keeps release side-effect boundaries honest", () => {
+  test("changelog has a top 0.3.1 section and keeps release side-effect boundaries honest", () => {
     const changelog = read("CHANGELOG.md");
-    expect(changelog.startsWith("# Changelog\n\n## [0.3.0]")).toBe(true);
-    expect(changelog).toContain("### CLI diagnostics and dry-run service");
-    expect(changelog).toContain("### Service message routes");
-    expect(changelog).toContain("### Graph endpoint internals");
-    expect(changelog).toContain("No live-capable `wats serve` startup or `--env-file` secret resolution yet");
-    expect(changelog).toContain("No live Meta validation campaign execution yet");
+    expect(changelog.startsWith("# Changelog\n\n## [0.3.1]")).toBe(true);
+    expect(changelog).toContain("### CLI setup wizard");
+    expect(changelog).toContain("`wats setup [dir] [--profile <name>]`");
+    expect(changelog).toContain("Release metadata is aligned for 0.3.1");
+    expect(changelog).toContain("No live Meta calls, token validation against Meta, multi-profile credential editor");
+    expect(changelog).toContain("No live Meta validation campaign execution");
     expect(changelog).not.toContain("No GitHub release/tag creation until the sanitized public repository is pushed and reviewed");
   });
 
