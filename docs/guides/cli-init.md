@@ -1,7 +1,7 @@
 # CLI Onboarding Guide
 
 - status: experimental
-- applies-to: WATS-33, WATS-47, WATS-69, and WATS-104
+- applies-to: WATS-33, WATS-47, and WATS-69; WATS-104 setup wizard
 - lastReviewed: 2026-05-16
 
 ## Purpose
