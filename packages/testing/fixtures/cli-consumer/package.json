@@ -1,0 +1,11 @@
+{
+  "name": "cli-consumer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "verify-imports": "bun ./verify-imports.ts"
+  },
+  "dependencies": {
+    "@wats/cli": "workspace:*"
+  }
+}

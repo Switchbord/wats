@@ -1,0 +1,68 @@
+{
+  "name": "@wats/http",
+  "version": "0.3.2",
+  "private": false,
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./webhookServer": {
+      "types": "./dist/webhookServer.d.ts",
+      "import": "./dist/webhookServer.js"
+    },
+    "./signature": {
+      "types": "./dist/signature.d.ts",
+      "import": "./dist/signature.js"
+    },
+    "./webhookAdapter": {
+      "types": "./dist/adapters/webhookAdapter.d.ts",
+      "import": "./dist/adapters/webhookAdapter.js"
+    },
+    "./adapters/fetch": {
+      "types": "./dist/adapters/fetchAdapter.d.ts",
+      "import": "./dist/adapters/fetchAdapter.js"
+    },
+    "./adapters/bun": {
+      "types": "./dist/adapters/bunAdapter.d.ts",
+      "import": "./dist/adapters/bunAdapter.js"
+    },
+    "./adapters/node": {
+      "types": "./dist/adapters/nodeAdapter.d.ts",
+      "import": "./dist/adapters/nodeAdapter.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Switchbord/wats.git",
+    "directory": "packages/http"
+  },
+  "homepage": "https://github.com/Switchbord/wats#readme",
+  "bugs": {
+    "url": "https://github.com/Switchbord/wats/issues"
+  },
+  "keywords": [
+    "whatsapp",
+    "whatsapp-cloud-api",
+    "bun",
+    "typescript",
+    "wats"
+  ],
+  "dependencies": {
+    "@wats/crypto": "^0.3.2",
+    "@wats/core": "^0.3.2",
+    "@wats/types": "^0.3.2"
+  }
+}

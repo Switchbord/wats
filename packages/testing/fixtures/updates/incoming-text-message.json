@@ -1,0 +1,40 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "WABA123456",
+      "time": 1713697200,
+      "changes": [
+        {
+          "field": "messages",
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": {
+              "display_phone_number": "15550001111",
+              "phone_number_id": "1234567890"
+            },
+            "contacts": [
+              {
+                "profile": {
+                  "name": "Ava Patel"
+                },
+                "wa_id": "15551234567"
+              }
+            ],
+            "messages": [
+              {
+                "from": "15551234567",
+                "id": "wamid.HBgMNTU1NTEyMzQ1NjcVAgASGBQzQjY3QzM5RjQ2Q0YzNEIxNQ==",
+                "timestamp": "1713697198",
+                "type": "text",
+                "text": {
+                  "body": "Hi, I need help with my order"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

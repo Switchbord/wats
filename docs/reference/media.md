@@ -1,0 +1,194 @@
+# Media Reference
+
+- status: experimental
+- decisionStatus: runtime-complete
+- labels: [camelCaseOnly, asyncOnly, aggressiveParity, monorepo]
+- owner: TBD
+- lastReviewed: 2026-04-29
+
+## Status notice
+
+WATS-37 now provides the credential-free media runtime surface that can be exercised through `GraphClient` and injected `Transport` implementations:
+
+- `uploadMedia(...)` performs a single multipart `POST /{phoneNumberId}/media`.
+- `downloadMedia(...)` resolves media metadata through `GET /{mediaId}`.
+- `downloadMediaBytes(...)` fetches bytes from the resolved media URL through the same injected transport, enforces finite download caps, and can verify SHA-256.
+- `deleteMedia(...)` performs `DELETE /{mediaId}`.
+- `decryptEncryptedMedia(...)` verifies and decrypts encrypted media bundles with SHA-256, HMAC-SHA256, AES-CBC, and PKCS#7 padding checks.
+- `createUploadSession(...)`, `uploadFileToSession(...)`, and `getUploadSession(...)` implement resumable upload-session primitives.
+
+No live Meta credentials are required by the test suite. Live credentialed checks remain outside the repository gates and require explicit user authorization.
+
+## Public API
+
+```ts
+import {
+  uploadMedia,
+  downloadMedia,
+  downloadMediaBytes,
+  deleteMedia,
+  decryptEncryptedMedia,
+  createUploadSession,
+  uploadFileToSession,
+  getUploadSession,
+  DEFAULT_MAX_MEDIA_UPLOAD_BYTES,
+  DEFAULT_MAX_MEDIA_DOWNLOAD_BYTES,
+  DEFAULT_MAX_UPLOAD_SESSION_BYTES,
+  MediaValidationError,
+  MediaCryptoError,
+  MediaIntegrityError
+} from "@wats/graph";
+```
+
+### `uploadMedia(client, params, body, options?)`
+
+```ts
+const result = await uploadMedia(
+  client,
+  { phoneNumberId: "555000111" },
+  { file: new Uint8Array([1, 2, 3]), type: "image/jpeg", messagingProduct: "whatsapp" },
+  { maxBytes: DEFAULT_MAX_MEDIA_UPLOAD_BYTES }
+);
+console.log(result.id);
+```
+
+Runtime behavior:
+- Builds one `multipart/form-data` request.
+- Sends `POST /{phoneNumberId}/media` through `GraphClient.request`.
+- Adds a generated safe boundary to the `content-type` header.
+- Preserves the existing Graph error taxonomy for non-2xx responses.
+
+Supported file bodies for single-post upload:
+
+| Body kind | Supported | Notes |
+| --- | ---: | --- |
+| `Blob` | yes | `Blob.size` is checked before `arrayBuffer()` when available. |
+| `ArrayBuffer` | yes | `byteLength` is checked before sending. |
+| `Uint8Array` | yes | `byteLength` is checked before copying/sending. |
+| `DataView` / other `ArrayBufferView` | no | Rejected with `MediaValidationError("invalid_file")`. |
+| `SharedArrayBuffer`-backed `Uint8Array` | no | Rejected to avoid shared-memory/TOCTOU surprises. |
+| string / plain object / null / undefined | no | Rejected before transport. |
+
+### `downloadMedia(client, opts)` and `downloadMediaBytes(client, opts)`
+
+```ts
+const metadata = await downloadMedia(client, { mediaId: "media123" });
+const file = await downloadMediaBytes(client, {
+  url: metadata.url,
+  expectedSha256: metadata.sha256,
+  maxBytes: DEFAULT_MAX_MEDIA_DOWNLOAD_BYTES
+});
+console.log(file.bytes, file.contentType);
+```
+
+`downloadMedia` parses Graph snake_case metadata into camelCase. `downloadMediaBytes` accepts only `http:` / `https:` URLs, fetches through the injected transport with the client's authorization header, enforces `DEFAULT_MAX_MEDIA_DOWNLOAD_BYTES` / `MAX_MEDIA_DOWNLOAD_BYTES`, and verifies `expectedSha256` when provided.
+
+### `deleteMedia(client, params)`
+
+```ts
+const { success } = await deleteMedia(client, { mediaId: "media123" });
+```
+
+Sends `DELETE /{mediaId}` and requires `{ success: boolean }`.
+
+### `decryptEncryptedMedia(bundle, encrypted)`
+
+```ts
+const plaintext = await decryptEncryptedMedia(bundle, encryptedBytes);
+```
+
+The encrypted media payload is `ciphertext || 10-byte-HMAC-tag`. WATS verifies `sha256Enc`, verifies the truncated HMAC-SHA256 tag over `iv || ciphertext` using constant-work byte comparison, AES-CBC decrypts, removes/accepts PKCS#7 padding according to runtime behavior, and verifies plaintext `sha256`.
+
+### Resumable upload sessions
+
+```ts
+const session = await createUploadSession(client, {
+  appId: "1234567890",
+  fileName: "document.pdf",
+  fileLength: 1234,
+  fileType: "application/pdf"
+});
+
+const uploaded = await uploadFileToSession(client, {
+  uploadSessionId: session.id,
+  file: new Uint8Array([1, 2, 3]),
+  fileOffset: 0,
+  contentLength: 3
+});
+
+const status = await getUploadSession(client, { uploadSessionId: session.id });
+```
+
+`uploadFileToSession` supports `Uint8Array`, `ArrayBuffer`, `Blob`, and `ReadableStream<Uint8Array>` bodies. `Uint8Array` inputs and stream chunks are normalized to plain `Uint8Array` copies using intrinsic typed-array metadata before transport, so subclass overrides of `byteLength` / `length` cannot under-report upload size. `ReadableStream` uploads require `contentLength`, and WATS wraps the stream to count actual bytes as they are read by transport. If the streamed byte total exceeds `maxBytes` / `DEFAULT_MAX_UPLOAD_SESSION_BYTES`, the stream fails with `MediaValidationError("upload_too_large")` instead of allowing an unbounded upload.
+
+## Preconditions and validation
+
+Validation failures reject before transport with `MediaValidationError`, `MediaCryptoError`, or `MediaIntegrityError`, not raw `TypeError`.
+
+Path parameters:
+- `phoneNumberId` / `appId` must be non-empty digits-only strings.
+- `mediaId` must be a non-empty string containing only letters, digits, `_`, or `-`.
+- `uploadSessionId` must be a non-empty string containing only letters, digits, `_`, `-`, or `:`; the underlying Graph request percent-encodes `:` as a path-segment character.
+- Path params reject whitespace-only strings, non-strings, control characters, `/`, `\`, `?`, `#`, URL markers like `://`, dot-segments, traversal markers, and encoded/double-encoded traversal markers.
+
+Options and caps:
+- `DEFAULT_MAX_MEDIA_UPLOAD_BYTES = 16 MiB`; `MAX_MEDIA_UPLOAD_BYTES` is the same value.
+- `DEFAULT_MAX_MEDIA_DOWNLOAD_BYTES = 16 MiB`; `MAX_MEDIA_DOWNLOAD_BYTES` is the same value.
+- `DEFAULT_MAX_UPLOAD_SESSION_BYTES = 64 MiB`; `MAX_UPLOAD_SESSION_BYTES` is the same value.
+- Override caps must be positive safe integers no greater than the implementation maximum.
+- `signal`, when present, must be `AbortSignal`-like: boolean `.aborted` plus `.addEventListener()` and `.removeEventListener()` functions.
+
+## Error taxonomy
+
+| Error | When |
+| --- | --- |
+| `MediaValidationError` | Media precondition failure, unsupported body, cap violation, malformed successful media response. |
+| `MediaCryptoError` | Invalid encrypted bundle shape/base64/key length/ciphertext/padding or unsupported crypto. |
+| `MediaIntegrityError` | SHA-256, encrypted-hash, HMAC, or plaintext-hash verification failure. |
+| `GraphApiError` subclasses | Non-2xx Graph API responses, preserved from Graph request/error taxonomy. |
+| `GraphNetworkError` | Transport/network failures, preserved where applicable. |
+| `GraphSerializationError` | Malformed successful Graph JSON, preserved from `GraphClient.request`. |
+
+Important codes include `upload_too_large`, `download_too_large`, `invalid_url`, `invalid_file_offset`, `invalid_content_length`, `invalid_ciphertext`, `invalid_padding`, `encrypted_hash_mismatch`, `hmac_mismatch`, and `plaintext_hash_mismatch`.
+
+## Typed surface
+
+```ts
+export const DEFAULT_MAX_MEDIA_UPLOAD_BYTES: number;
+export const MAX_MEDIA_UPLOAD_BYTES: number;
+export const DEFAULT_MAX_MEDIA_DOWNLOAD_BYTES: number;
+export const MAX_MEDIA_DOWNLOAD_BYTES: number;
+export const DEFAULT_MAX_UPLOAD_SESSION_BYTES: number;
+export const MAX_UPLOAD_SESSION_BYTES: number;
+
+export function uploadMedia(...): Promise<MediaUploadResponse>;
+export function downloadMedia(...): Promise<MediaDownloadResponse>;
+export function downloadMediaBytes(...): Promise<MediaDownloadBytesResponse>;
+export function deleteMedia(...): Promise<MediaDeleteResponse>;
+export function decryptEncryptedMedia(...): Promise<Uint8Array>;
+export function createUploadSession(...): Promise<CreateUploadSessionResponse>;
+export function uploadFileToSession(...): Promise<UploadFileToSessionResponse>;
+export function getUploadSession(...): Promise<GetUploadSessionResponse>;
+```
+
+## Scope ledger
+
+Implemented in WATS-37:
+- Runtime single-post upload.
+- Runtime media metadata resolution.
+- Runtime binary fetch from resolved URLs through injected transport.
+- Runtime media delete.
+- Runtime encrypted media decrypt.
+- Runtime resumable upload-session helpers.
+- Runtime input, response, crypto, integrity, cap, URL/path/header validation.
+- MockTransport-backed tests and external consumer fixture coverage.
+
+Not included:
+- Live credentialed Meta checks in CI; these require explicit user authorization and secrets.
+
+## References
+
+- Linear: WATS-37 (media runtime parity).
+- Related prior sketch: WATS-24 / Arch-J media primitives.
+- Related Graph primitives: `GraphClient.request`, `GraphClient.requestRaw`, `Transport`, `createMockTransport`.
+- Parity tracking: `docs/parity/pywa-parity-matrix.md`.

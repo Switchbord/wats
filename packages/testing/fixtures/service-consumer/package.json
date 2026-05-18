@@ -1,0 +1,13 @@
+{
+  "name": "service-consumer",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "verify-imports": "bun verify-imports.ts"
+  },
+  "dependencies": {
+    "@wats/service": "workspace:*",
+    "@wats/graph": "workspace:*"
+  }
+}

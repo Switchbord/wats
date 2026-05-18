@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": [],
+    "paths": {
+      "@wats/types": ["../types/src/index.ts"],
+      "@wats/types/*": ["../types/src/*"],
+      "@wats/graph": ["../graph/src/index.ts"],
+      "@wats/graph/*": ["../graph/src/*"]
+    }
+  },
+  "include": ["src"]
+}

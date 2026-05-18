@@ -1,0 +1,1092 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "WATS Service API",
+    "version": "0.3.2",
+    "description": "Runtime-neutral OpenAPI description for the standalone WATS service routes currently implemented."
+  },
+  "servers": [
+    {
+      "url": "https://service.example"
+    }
+  ],
+  "paths": {
+    "/healthz": {
+      "get": {
+        "tags": [
+          "status"
+        ],
+        "summary": "Health check",
+        "responses": {
+          "200": {
+            "description": "Service process is alive.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "tags": [
+          "status"
+        ],
+        "summary": "Readiness check",
+        "responses": {
+          "200": {
+            "description": "Service dependencies were constructed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadyResponse"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/webhook": {
+      "get": {
+        "tags": [
+          "webhook"
+        ],
+        "summary": "Verify Meta webhook challenge",
+        "parameters": [
+          {
+            "name": "hub.mode",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hub.verify_token",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hub.challenge",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Verification challenge.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookVerificationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed verification query.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Verification token mismatch.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "webhook"
+        ],
+        "summary": "Receive signed Meta webhook payload",
+        "parameters": [
+          {
+            "name": "x-hub-signature-256",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook accepted and dispatched.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookDispatchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed webhook body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid signature.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Webhook body exceeds configured maxBodyBytes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/messages/text": {
+      "post": {
+        "tags": [
+          "messages"
+        ],
+        "summary": "Send a text message",
+        "security": [
+          {
+            "serviceBearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TextMessageBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Graph response passthrough.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphResponsePassthrough"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed JSON or unsupported body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid service bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Graph request failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/messages": {
+      "post": {
+        "tags": [
+          "messages"
+        ],
+        "summary": "Send a supported text, media, location, reaction, contacts, or interactive message body",
+        "security": [
+          {
+            "serviceBearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupportedMessageBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Graph response passthrough.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphResponsePassthrough"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed JSON or unsupported body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid service bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Graph request failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "tags": [
+          "openapi"
+        ],
+        "summary": "Fetch this OpenAPI document",
+        "responses": {
+          "200": {
+            "description": "OpenAPI 3.1 document for this WATS service profile.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "serviceBearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "opaque"
+      }
+    },
+    "schemas": {
+      "HealthResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ok",
+          "service"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "service": {
+            "type": "string",
+            "const": "wats"
+          }
+        }
+      },
+      "ReadyResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ok",
+          "service"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "service": {
+            "type": "string",
+            "const": "wats"
+          }
+        }
+      },
+      "ErrorEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "code"
+            ],
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "TextMessageBody": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "to",
+          "text"
+        ],
+        "properties": {
+          "to": {
+            "type": "string",
+            "minLength": 1,
+            "description": "WhatsApp recipient phone number or wa_id."
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1
+          },
+          "previewUrl": {
+            "type": "boolean",
+            "description": "Maps to Graph text.preview_url when present."
+          }
+        }
+      },
+      "GenericTextMessageBody": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "messaging_product",
+          "to",
+          "type",
+          "text"
+        ],
+        "properties": {
+          "messaging_product": {
+            "type": "string",
+            "const": "whatsapp"
+          },
+          "to": {
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "type": "string",
+            "const": "text"
+          },
+          "text": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": [
+              "body"
+            ],
+            "properties": {
+              "body": {
+                "type": "string",
+                "minLength": 1
+              },
+              "preview_url": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "MediaMessageBody": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "to"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "image",
+              "video",
+              "audio",
+              "document",
+              "sticker"
+            ]
+          },
+          "to": {
+            "type": "string",
+            "minLength": 1,
+            "description": "WhatsApp recipient phone number or wa_id."
+          },
+          "mediaId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Uploaded Graph media ID. Mutually exclusive with link."
+          },
+          "link": {
+            "type": "string",
+            "minLength": 1,
+            "description": "HTTPS media URL. Mutually exclusive with mediaId."
+          },
+          "caption": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Allowed for image, video, and document bodies."
+          },
+          "filename": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Allowed for document bodies only."
+          },
+          "replyToMessageId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional message ID to send as a reply context."
+          }
+        },
+        "oneOf": [
+          {
+            "required": [
+              "mediaId"
+            ],
+            "not": {
+              "required": [
+                "link"
+              ]
+            }
+          },
+          {
+            "required": [
+              "link"
+            ],
+            "not": {
+              "required": [
+                "mediaId"
+              ]
+            }
+          }
+        ]
+      },
+      "BasicInteractiveMessageBody": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "to",
+              "bodyText",
+              "buttons"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "interactiveButtons"
+              },
+              "to": {
+                "type": "string",
+                "minLength": 1
+              },
+              "bodyText": {
+                "type": "string",
+                "minLength": 1
+              },
+              "buttons": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              "headerText": {
+                "type": "string",
+                "minLength": 1
+              },
+              "footerText": {
+                "type": "string",
+                "minLength": 1
+              },
+              "replyToMessageId": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "to",
+              "bodyText",
+              "buttonText",
+              "sections"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "interactiveList"
+              },
+              "to": {
+                "type": "string",
+                "minLength": 1
+              },
+              "bodyText": {
+                "type": "string",
+                "minLength": 1
+              },
+              "buttonText": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sections": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              "headerText": {
+                "type": "string",
+                "minLength": 1
+              },
+              "footerText": {
+                "type": "string",
+                "minLength": 1
+              },
+              "replyToMessageId": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "to",
+              "bodyText",
+              "displayText",
+              "url"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "interactiveCtaUrl"
+              },
+              "to": {
+                "type": "string",
+                "minLength": 1
+              },
+              "bodyText": {
+                "type": "string",
+                "minLength": 1
+              },
+              "displayText": {
+                "type": "string",
+                "minLength": 1
+              },
+              "url": {
+                "type": "string",
+                "minLength": 1
+              },
+              "footerText": {
+                "type": "string",
+                "minLength": 1
+              },
+              "replyToMessageId": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        ]
+      },
+      "CommerceInteractiveMessageBody": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "to",
+              "catalogId",
+              "productRetailerId"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "interactiveProduct"
+              },
+              "to": {
+                "type": "string",
+                "minLength": 1
+              },
+              "catalogId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "productRetailerId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "bodyText": {
+                "type": "string",
+                "minLength": 1
+              },
+              "footerText": {
+                "type": "string",
+                "minLength": 1
+              },
+              "replyToMessageId": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "to",
+              "catalogId",
+              "headerText",
+              "bodyText",
+              "sections"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "interactiveProducts"
+              },
+              "to": {
+                "type": "string",
+                "minLength": 1
+              },
+              "catalogId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "headerText": {
+                "type": "string",
+                "minLength": 1
+              },
+              "bodyText": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sections": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              "footerText": {
+                "type": "string",
+                "minLength": 1
+              },
+              "replyToMessageId": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "to",
+              "bodyText"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "interactiveCatalog"
+              },
+              "to": {
+                "type": "string",
+                "minLength": 1
+              },
+              "bodyText": {
+                "type": "string",
+                "minLength": 1
+              },
+              "thumbnailProductRetailerId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "headerText": {
+                "type": "string",
+                "minLength": 1
+              },
+              "footerText": {
+                "type": "string",
+                "minLength": 1
+              },
+              "replyToMessageId": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "to",
+              "bodyText"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "interactiveLocationRequest"
+              },
+              "to": {
+                "type": "string",
+                "minLength": 1
+              },
+              "bodyText": {
+                "type": "string",
+                "minLength": 1
+              },
+              "replyToMessageId": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        ]
+      },
+      "ContactsMessageBody": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "to",
+          "contacts"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "contacts"
+          },
+          "to": {
+            "type": "string",
+            "minLength": 1,
+            "description": "WhatsApp recipient phone number or wa_id."
+          },
+          "contacts": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "replyToMessageId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional message ID to send as a reply context."
+          }
+        }
+      },
+      "LocationMessageBody": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "to",
+          "latitude",
+          "longitude"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "location"
+          },
+          "to": {
+            "type": "string",
+            "minLength": 1,
+            "description": "WhatsApp recipient phone number or wa_id."
+          },
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "address": {
+            "type": "string",
+            "minLength": 1
+          },
+          "replyToMessageId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional message ID to send as a reply context."
+          }
+        }
+      },
+      "ReactionMessageBody": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "to",
+              "messageId",
+              "emoji"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "reaction"
+              },
+              "to": {
+                "type": "string",
+                "minLength": 1,
+                "description": "WhatsApp recipient phone number or wa_id."
+              },
+              "messageId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Message ID to react to."
+              },
+              "emoji": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Emoji reaction to apply."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "to",
+              "messageId"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "removeReaction"
+              },
+              "to": {
+                "type": "string",
+                "minLength": 1,
+                "description": "WhatsApp recipient phone number or wa_id."
+              },
+              "messageId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Message ID whose reaction should be removed."
+              }
+            }
+          }
+        ]
+      },
+      "SupportedMessageBody": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/GenericTextMessageBody"
+          },
+          {
+            "$ref": "#/components/schemas/MediaMessageBody"
+          },
+          {
+            "$ref": "#/components/schemas/LocationMessageBody"
+          },
+          {
+            "$ref": "#/components/schemas/ContactsMessageBody"
+          },
+          {
+            "$ref": "#/components/schemas/ReactionMessageBody"
+          },
+          {
+            "$ref": "#/components/schemas/BasicInteractiveMessageBody"
+          },
+          {
+            "$ref": "#/components/schemas/CommerceInteractiveMessageBody"
+          }
+        ],
+        "description": "Supported POST /messages bodies: generic Graph-native text, WATS media composer, location, reaction, remove-reaction, contacts, basic interactive, or commerce interactive bodies."
+      },
+      "GraphResponsePassthrough": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "Unmodified JSON object returned by the configured Graph transport."
+      },
+      "WebhookVerificationResponse": {
+        "type": "string",
+        "description": "Meta webhook challenge string when verification succeeds."
+      },
+      "WebhookDispatchResponse": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "Webhook adapter response envelope for accepted signed webhook payloads."
+      }
+    }
+  }
+}
