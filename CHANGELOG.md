@@ -11,6 +11,9 @@ Patch alpha package release for WATS. This release keeps the 0.3.1 setup-wizard/
 - Corrects the `@wats/cli` bin metadata to `dist/bin.js`, preserving the executable `wats` command for package-manager installs.
 - `0.3.1` should be treated as superseded on npm; use `0.3.2` or `latest`.
 
+### CI maintenance
+
+- Updates GitHub Actions checkout steps to `actions/checkout@v5` so the credential-free CI and release dry-run workflows are ready for GitHub's Node 24 action runtime.
 
 ### CLI setup wizard
 
