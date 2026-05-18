@@ -6,6 +6,7 @@ import {
   buildRemoveReactionPayload,
   buildSendImagePayload,
   buildSendButtonsPayload,
+  buildSendCallPermissionRequestPayload,
   buildSendContactsPayload,
   buildSendCtaUrlPayload,
   buildSendListPayload,
@@ -431,7 +432,8 @@ function createOpenApiSchemas(): Record<string, Record<string, unknown>> {
         link: { type: "string", minLength: 1, description: "HTTPS media URL. Mutually exclusive with mediaId." },
         caption: { type: "string", minLength: 1, description: "Allowed for image, video, and document bodies." },
         filename: { type: "string", minLength: 1, description: "Allowed for document bodies only." },
-        replyToMessageId: { type: "string", minLength: 1, description: "Optional message ID to send as a reply context." }
+        replyToMessageId: { type: "string", minLength: 1, description: "Optional message ID to send as a reply context." },
+        voice: { type: "boolean", description: "Audio-only Graph v24+ voice-message designation." }
       },
       oneOf: [
         { required: ["mediaId"], not: { required: ["link"] } },
@@ -440,6 +442,18 @@ function createOpenApiSchemas(): Record<string, Record<string, unknown>> {
     },
     BasicInteractiveMessageBody: {
       oneOf: [
+        {
+          type: "object",
+          additionalProperties: false,
+          required: ["type", "to", "bodyText"],
+          properties: {
+            type: { type: "string", const: "callPermissionRequest" },
+            to: { type: "string", minLength: 1 },
+            bodyText: { type: "string", minLength: 1 },
+            footerText: { type: "string", minLength: 1 },
+            replyToMessageId: { type: "string", minLength: 1 }
+          }
+        },
         {
           type: "object",
           additionalProperties: false,
@@ -699,7 +713,7 @@ function validateTextBody(body: unknown): { to: string; text: string; previewUrl
 type ServiceMediaMessageKind = "image" | "video" | "audio" | "document" | "sticker";
 type ServiceLocationReactionMessageKind = "location" | "reaction" | "removeReaction";
 type ServiceContactsMessageKind = "contacts";
-type ServiceBasicInteractiveMessageKind = "interactiveButtons" | "interactiveList" | "interactiveCtaUrl";
+type ServiceBasicInteractiveMessageKind = "interactiveButtons" | "interactiveList" | "interactiveCtaUrl" | "callPermissionRequest";
 type ServiceCommerceInteractiveMessageKind = "interactiveProduct" | "interactiveProducts" | "interactiveCatalog" | "interactiveLocationRequest";
 
 interface ServiceMediaMessageInput {
@@ -710,6 +724,7 @@ interface ServiceMediaMessageInput {
   readonly caption?: string;
   readonly filename?: string;
   readonly replyToMessageId?: string;
+  readonly voice?: boolean;
 }
 
 interface ServiceLocationReactionMessageInput {
@@ -761,6 +776,8 @@ function validateServiceMediaMessageBody(body: unknown): ServiceMediaMessageInpu
   if (body.caption !== undefined && !isNonEmptyString(body.caption)) return null;
   if (body.filename !== undefined && !isNonEmptyString(body.filename)) return null;
   if (body.replyToMessageId !== undefined && !isNonEmptyString(body.replyToMessageId)) return null;
+  if (body.voice !== undefined && typeof body.voice !== "boolean") return null;
+  if (body.type !== "audio" && body.voice !== undefined) return null;
   if ((body.type === "audio" || body.type === "sticker") && body.caption !== undefined) return null;
   if (body.type !== "document" && body.filename !== undefined) return null;
   const out: {
@@ -771,12 +788,14 @@ function validateServiceMediaMessageBody(body: unknown): ServiceMediaMessageInpu
     caption?: string;
     filename?: string;
     replyToMessageId?: string;
+    voice?: boolean;
   } = { type: body.type, to: body.to };
   if (body.mediaId !== undefined) out.mediaId = body.mediaId;
   if (body.link !== undefined) out.link = body.link;
   if (body.caption !== undefined) out.caption = body.caption;
   if (body.filename !== undefined) out.filename = body.filename;
   if (body.replyToMessageId !== undefined) out.replyToMessageId = body.replyToMessageId;
+  if (body.voice !== undefined) out.voice = body.voice;
   return out;
 }
 
@@ -852,8 +871,15 @@ function validateServiceCommerceInteractiveMessageBody(body: unknown): ServiceCo
 
 function validateServiceBasicInteractiveMessageBody(body: unknown): ServiceBasicInteractiveMessageInput | null {
   if (!isRecord(body)) return null;
-  if (body.type !== "interactiveButtons" && body.type !== "interactiveList" && body.type !== "interactiveCtaUrl") return null;
+  if (body.type !== "interactiveButtons" && body.type !== "interactiveList" && body.type !== "interactiveCtaUrl" && body.type !== "callPermissionRequest") return null;
   if (!isNonEmptyString(body.to)) return null;
+  if (body.type === "callPermissionRequest") {
+    if (!hasOnlyKeys(body, ["type", "to", "bodyText", "footerText", "replyToMessageId"])) return null;
+    if (!isNonEmptyString(body.bodyText)) return null;
+    if (body.footerText !== undefined && !isNonEmptyString(body.footerText)) return null;
+    if (body.replyToMessageId !== undefined && !isNonEmptyString(body.replyToMessageId)) return null;
+    return body as ServiceBasicInteractiveMessageInput;
+  }
   if (body.type === "interactiveButtons") {
     if (!hasOnlyKeys(body, ["type", "to", "bodyText", "buttons", "headerText", "footerText", "replyToMessageId"])) return null;
     if (!isNonEmptyString(body.bodyText) || !Array.isArray(body.buttons) || body.buttons.length === 0) return null;
@@ -931,6 +957,13 @@ function buildServiceBasicInteractivePayload(input: ServiceBasicInteractiveMessa
       return buildSendListPayload(input as unknown as Parameters<typeof buildSendListPayload>[0]) as GraphMessagesSendBody;
     case "interactiveCtaUrl":
       return buildSendCtaUrlPayload(input as unknown as Parameters<typeof buildSendCtaUrlPayload>[0]) as GraphMessagesSendBody;
+    case "callPermissionRequest":
+      return buildSendCallPermissionRequestPayload({
+        to: input.to,
+        bodyText: input.bodyText as string,
+        ...(typeof input.footerText === "string" ? { footerText: input.footerText } : {}),
+        ...(typeof input.replyToMessageId === "string" ? { replyToMessageId: input.replyToMessageId } : {})
+      }) as GraphMessagesSendBody;
   }
 }
 

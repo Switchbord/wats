@@ -115,6 +115,7 @@ type _InteractiveReplyKinds = Expect<
     | "product_reply"
     | "product_list_reply"
     | "cta_url_reply"
+    | "call_permission_reply"
   >
 >;
 
@@ -277,6 +278,12 @@ describe("F-1 discriminated union contracts", () => {
   });
 
   test("InteractiveMessage reply union discriminates each interactive subtype", () => {
+    const callPermissionReply: InteractiveReply = {
+      type: "call_permission_reply",
+      callPermissionReply: { response: "accepted", expirationTimestamp: "1718000099" }
+    };
+    expect(callPermissionReply.callPermissionReply.response).toBe("accepted");
+
     const reply: InteractiveReply = {
       type: "button_reply",
       buttonReply: { id: "btn-1", title: "Yes" }

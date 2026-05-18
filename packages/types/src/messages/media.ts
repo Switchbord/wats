@@ -10,6 +10,8 @@ export interface MediaReference {
   sha256?: string;
   caption?: string;
   filename?: string;
+  /** WATS-90 / Graph v24+ audio voice-message designation when present on audio media. */
+  voice?: boolean;
 }
 
 export interface DocumentReference extends MediaReference {

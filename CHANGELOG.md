@@ -2,6 +2,12 @@
 
 ## [0.3.2] - 2026-05-18
 
+### WATS-90 — v24 message builders
+
+- Adds `buildSendCallPermissionRequestPayload(...)` and `PhoneNumberClient.sendCallPermissionRequest(...)` for Graph `interactive.type = "call_permission_request"` / `action.name = "call_permission_request"` bodies.
+- Adds audio voice-message designation via `buildSendAudioPayload({ to, mediaId, voice: true })` and `PhoneNumberClient.sendAudio({ ..., voice: true })`.
+- Updates service `/messages` composer docs for `type: "callPermissionRequest"` and audio `voice: true`; all coverage is credential-free MockTransport only.
+
 Patch alpha package release for WATS. This release keeps the 0.3.1 setup-wizard/tooling behavior and publishes corrected `@wats/*` npm packages with package-manager-safe ESM imports and CLI bin metadata.
 
 ### Package release correction

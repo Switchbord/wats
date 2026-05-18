@@ -49,6 +49,7 @@ import {
   buildRequestLocationPayload,
   buildSendAudioPayload,
   buildSendButtonsPayload,
+  buildSendCallPermissionRequestPayload,
   buildSendCatalogPayload,
   buildSendContactsPayload,
   buildSendCtaUrlPayload,
@@ -71,6 +72,7 @@ import {
   type GraphMessagesSendAudioInput,
   type GraphMessagesSendBody,
   type GraphMessagesSendButtonsInput,
+  type GraphMessagesSendCallPermissionRequestInput,
   type GraphMessagesSendCatalogInput,
   type GraphMessagesSendContactsInput,
   type GraphMessagesSendCtaUrlInput,
@@ -297,6 +299,10 @@ export class PhoneNumberClient {
 
   async sendAudio(input: GraphMessagesSendAudioInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse> {
     return this.sendMessage(buildSendAudioPayload(input), opts);
+  }
+
+  async sendCallPermissionRequest(input: GraphMessagesSendCallPermissionRequestInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse> {
+    return this.sendMessage(buildSendCallPermissionRequestPayload(input), opts);
   }
 
   async sendDocument(input: GraphMessagesSendDocumentInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse> {

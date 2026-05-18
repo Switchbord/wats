@@ -275,6 +275,16 @@ describe("WATS-34 service bearer auth and message APIs", () => {
         }
       },
       {
+        label: "voice audio media id",
+        input: { type: "audio", to: "15550001111", mediaId: "media-voice", voice: true },
+        expected: {
+          messaging_product: "whatsapp",
+          to: "15550001111",
+          type: "audio",
+          audio: { id: "media-voice", voice: true }
+        }
+      },
+      {
         label: "document link",
         input: { type: "document", to: "15550001111", link: "https://cdn.example/doc.pdf", caption: "read", filename: "doc.pdf" },
         expected: {
@@ -335,6 +345,8 @@ describe("WATS-34 service bearer auth and message APIs", () => {
       { type: "image", to: "15550001111" },
       { type: "image", to: "15550001111", mediaId: "media-image", link: "https://cdn.example/image.jpg" },
       { type: "audio", to: "15550001111", mediaId: "media-audio", caption: "not allowed" },
+      { type: "audio", to: "15550001111", mediaId: "media-audio", voice: "true" },
+      { type: "image", to: "15550001111", mediaId: "media-image", voice: true },
       { type: "sticker", to: "15550001111", mediaId: "media-sticker", filename: "nope.webp" },
       { type: "document", to: "15550001111", link: "file:///tmp/secret.pdf" },
       { type: "interactive", to: "15550001111" }
@@ -538,6 +550,15 @@ describe("WATS-34 service bearer auth and message APIs", () => {
           body: { text: "Visit" },
           action: { name: "cta_url", parameters: { display_text: "Open", url: "https://example.test/offer" } }
         }
+      },
+      {
+        label: "call permission request",
+        input: { type: "callPermissionRequest", to: "15550001111", bodyText: "May we call you?", replyToMessageId: "wamid.PARENT" },
+        expectedInteractive: {
+          type: "call_permission_request",
+          body: { text: "May we call you?" },
+          action: { name: "call_permission_request" }
+        }
       }
     ];
 
@@ -567,7 +588,9 @@ describe("WATS-34 service bearer auth and message APIs", () => {
       { type: "interactiveList", to: "15550001111", bodyText: "Pick", buttonText: "Open", sections: [] },
       { type: "interactiveList", to: "15550001111", bodyText: "Pick", buttonText: "Open", sections: [{ rows: [] }] },
       { type: "interactiveCtaUrl", to: "15550001111", bodyText: "Visit", displayText: "Open", url: "file:///tmp/a" },
-      { type: "interactiveCtaUrl", to: "15550001111", bodyText: "Visit", displayText: "Open", url: "https://example.test", extra: "not allowed" }
+      { type: "interactiveCtaUrl", to: "15550001111", bodyText: "Visit", displayText: "Open", url: "https://example.test", extra: "not allowed" },
+      { type: "callPermissionRequest", to: "15550001111", bodyText: "" },
+      { type: "callPermissionRequest", to: "15550001111", bodyText: "May we call you?", extra: "not allowed" }
     ];
 
     for (const body of invalidBodies) {
@@ -618,6 +641,9 @@ describe("WATS-34 service bearer auth and message APIs", () => {
       expect(body.to, testCase.label).toBe("15550001111");
       expect(body.type, testCase.label).toBe("interactive");
       expect(body.interactive, testCase.label).toEqual(testCase.expectedInteractive);
+      if (testCase.input.replyToMessageId !== undefined) {
+        expect(body.context, testCase.label).toEqual({ message_id: testCase.input.replyToMessageId });
+      }
       expect(mock.requests[0]!.headers.get("authorization"), testCase.label).toBe("Bearer graph-access-token");
       expect(mock.requests[0]!.headers.get("authorization"), testCase.label).not.toBe("Bearer service-bearer");
     }

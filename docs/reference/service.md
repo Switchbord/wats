@@ -123,6 +123,14 @@ or WATS-73 media composer bodies that are converted through the SDK media builde
 
 ```json
 {
+  "type": "callPermissionRequest",
+  "to": "15551230000",
+  "bodyText": "May we call you?"
+}
+```
+
+```json
+{
   "type": "image",
   "to": "15551230000",
   "mediaId": "1234567890",
@@ -131,9 +139,9 @@ or WATS-73 media composer bodies that are converted through the SDK media builde
 }
 ```
 
-Supported media `type` values are `image`, `video`, `audio`, `document`, and `sticker`. Each media body must provide exactly one of `mediaId` or `link`. `caption` is accepted for image, video, and document bodies. `filename` is accepted for document bodies only. `replyToMessageId` maps to Graph `context.message_id`.
+Supported media `type` values are `image`, `video`, `audio`, `document`, and `sticker`. Each media body must provide exactly one of `mediaId` or `link`. `caption` is accepted for image, video, and document bodies. `filename` is accepted for document bodies only. `replyToMessageId` maps to Graph `context.message_id`. WATS-90 adds audio `voice: true`, which maps to Graph `audio.voice = true`; omitting it preserves the standard audio payload.
 
-Location bodies use `type: "location"`, finite `latitude`/`longitude` values in Graph-supported ranges, and optional `name`, `address`, and `replyToMessageId`. Reaction bodies use `type: "reaction"` with `messageId` and non-empty `emoji`. Remove-reaction bodies use `type: "removeReaction"` with `messageId` and map to Graph reaction payloads with an empty emoji. Contacts bodies use `type: "contacts"`, a non-empty `contacts` array, and the same camelCase contact input objects as the SDK composer helper. Interactive bodies support `interactiveButtons`, `interactiveList`, `interactiveCtaUrl`, `interactiveProduct`, `interactiveProducts`, `interactiveCatalog`, and `interactiveLocationRequest`, and map through the corresponding SDK builders.
+Location bodies use `type: "location"`, finite `latitude`/`longitude` values in Graph-supported ranges, and optional `name`, `address`, and `replyToMessageId`. Reaction bodies use `type: "reaction"` with `messageId` and non-empty `emoji`. Remove-reaction bodies use `type: "removeReaction"` with `messageId` and map to Graph reaction payloads with an empty emoji. Contacts bodies use `type: "contacts"`, a non-empty `contacts` array, and the same camelCase contact input objects as the SDK composer helper. Interactive bodies support `interactiveButtons`, `interactiveList`, `interactiveCtaUrl`, `callPermissionRequest`, `interactiveProduct`, `interactiveProducts`, `interactiveCatalog`, and `interactiveLocationRequest`, and map through the corresponding SDK builders. WATS-90 `type: "callPermissionRequest"` emits Graph `interactive.type = "call_permission_request"` and `interactive.action.name = "call_permission_request"`.
 
 The route preserves the service bearer boundary: the service bearer token authorizes the local service route, is never forwarded to Graph, and builder/validation failures return `400` without echoing tokens or request secrets.
 

@@ -36,13 +36,19 @@ export interface InteractiveCtaUrlReply {
   ctaUrlReply: { displayText: string; url: string };
 }
 
+export interface InteractiveCallPermissionReply {
+  type: "call_permission_reply";
+  callPermissionReply: { response: "accepted" | "rejected"; expirationTimestamp?: string };
+}
+
 export type InteractiveReply =
   | InteractiveButtonReply
   | InteractiveListReply
   | InteractiveNfmReply
   | InteractiveProductReply
   | InteractiveProductListReply
-  | InteractiveCtaUrlReply;
+  | InteractiveCtaUrlReply
+  | InteractiveCallPermissionReply;
 
 export interface InteractiveMessage {
   type: "interactive";

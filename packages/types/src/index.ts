@@ -38,6 +38,7 @@ export type {
   InteractiveProductReply,
   InteractiveProductListReply,
   InteractiveCtaUrlReply,
+  InteractiveCallPermissionReply,
   ButtonMessage,
   ButtonPayload,
   WhatsAppMessageKind,
