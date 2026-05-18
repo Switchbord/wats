@@ -127,13 +127,13 @@ endpoint callable.
 | `sendText`         | implemented (WATS-30) | `POST /{phoneNumberId}/messages` text payload |
 | `sendImage`        | implemented (WATS-38) | `POST /{phoneNumberId}/messages` image payload |
 | `sendVideo`        | implemented (WATS-38) | `POST /{phoneNumberId}/messages` video payload |
-| `sendAudio`        | implemented (WATS-38) | `POST /{phoneNumberId}/messages` audio payload |
+| `sendAudio`        | implemented (WATS-38/WATS-90) | `POST /{phoneNumberId}/messages` audio payload; WATS-90 adds `voice?: boolean` |
 | `sendDocument`     | implemented (WATS-38) | `POST /{phoneNumberId}/messages` document payload |
 | `sendSticker`      | implemented (WATS-38) | `POST /{phoneNumberId}/messages` sticker payload |
 | `sendLocation`    | implemented (WATS-38) | `POST /{phoneNumberId}/messages` location payload |
 | `sendContacts`    | implemented (WATS-38) | `POST /{phoneNumberId}/messages` contacts payload |
 | `sendReaction` / `removeReaction` | implemented (WATS-38) | `POST /{phoneNumberId}/messages` reaction payload |
-| `sendButtons` / `sendList` / `sendCtaUrl` | implemented (WATS-38) | interactive button/list/CTA payloads |
+| `sendButtons` / `sendList` / `sendCtaUrl` / `sendCallPermissionRequest` | implemented (WATS-38/WATS-90) | interactive button/list/CTA/call-permission payloads |
 | `sendProduct` / `sendProducts` / `sendCatalog` | implemented (WATS-38) | commerce interactive payloads |
 | `requestLocation` | implemented (WATS-38) | interactive location request payload |
 | `sendTemplate`    | implemented (WATS-38) | approved template send payload |
@@ -167,6 +167,29 @@ await phone.sendText({
   replyToMessageId: "wamid.OPTIONAL"
 });
 ```
+
+
+WATS-90 adds two v24 send-message deltas:
+
+```ts
+await phone.sendAudio({
+  to: "+155****0000",
+  mediaId: "AUDIO_ID",
+  voice: true
+});
+
+await phone.sendCallPermissionRequest({
+  to: "+155****0000",
+  bodyText: "May we call you?",
+  replyToMessageId: "wamid.OPTIONAL"
+});
+```
+
+`sendAudio(..., { voice: true })` emits Graph `audio.voice = true`; omitting
+`voice` preserves the pre-WATS-90 audio body. `sendCallPermissionRequest(...)`
+emits `interactive.type = "call_permission_request"` with
+`interactive.action.name = "call_permission_request"` and validates unknown or
+malformed fields before transport.
 
 Validation is runtime-enforced for JavaScript callers and rejects with
 `GraphRequestValidationError` before any transport call:

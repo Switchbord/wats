@@ -29,7 +29,8 @@ export type {
   InteractiveNfmReply,
   InteractiveProductReply,
   InteractiveProductListReply,
-  InteractiveCtaUrlReply
+  InteractiveCtaUrlReply,
+  InteractiveCallPermissionReply
 } from "./interactive.js";
 export type { ButtonMessage, ButtonPayload } from "./button.js";
 export type { WhatsAppMessage, WhatsAppMessageKind } from "./union.js";

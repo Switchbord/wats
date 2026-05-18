@@ -58,7 +58,10 @@ export interface GraphMessagesSendDocumentInput extends GraphMessagesSendCaption
 
 export type GraphMessagesSendImageInput = GraphMessagesSendCaptionedMediaInput;
 export type GraphMessagesSendVideoInput = GraphMessagesSendCaptionedMediaInput;
-export type GraphMessagesSendAudioInput = GraphMessagesSendMediaInput;
+export interface GraphMessagesSendAudioInput extends GraphMessagesSendMediaInput {
+  /** Graph v24+ voice-message designation for audio sends. Defaults to omitted/false. */
+  readonly voice?: boolean;
+}
 export type GraphMessagesSendStickerInput = GraphMessagesSendMediaInput;
 
 export interface GraphMessagesSendLocationInput {
@@ -169,6 +172,13 @@ export interface GraphMessagesSendCtaUrlInput {
   readonly replyToMessageId?: string;
 }
 
+export interface GraphMessagesSendCallPermissionRequestInput {
+  readonly to: string;
+  readonly bodyText: string;
+  readonly footerText?: string;
+  readonly replyToMessageId?: string;
+}
+
 export interface GraphMessagesSendProductInput {
   readonly to: string;
   readonly catalogId: string;
@@ -259,6 +269,10 @@ interface GraphMessagesMediaReferencePayload {
   filename?: string;
 }
 
+interface GraphMessagesAudioReferencePayload extends GraphMessagesMediaReferencePayload {
+  voice?: boolean;
+}
+
 export type GraphMessagesImagePayload = {
   messaging_product: "whatsapp";
   to: string;
@@ -279,7 +293,7 @@ export type GraphMessagesAudioPayload = {
   messaging_product: "whatsapp";
   to: string;
   type: "audio";
-  audio: GraphMessagesMediaReferencePayload;
+  audio: GraphMessagesAudioReferencePayload;
   context?: { message_id: string };
 };
 
@@ -679,10 +693,18 @@ export function buildSendVideoPayload(
 export function buildSendAudioPayload(
   input: GraphMessagesSendAudioInput
 ): GraphMessagesAudioPayload {
-  return buildSendMediaPayload(input, "audio", "sendAudio", {
+  const payload = buildSendMediaPayload(input, "audio", "sendAudio", {
     caption: false,
     filename: false
   }) as GraphMessagesAudioPayload;
+  const record = input as unknown as Record<string, unknown>;
+  if (record.voice !== undefined) {
+    if (typeof record.voice !== "boolean") {
+      throw new GraphRequestValidationError("Invalid sendAudio input: voice must be a boolean when provided.");
+    }
+    if (record.voice) payload.audio.voice = true;
+  }
+  return payload;
 }
 
 export function buildSendDocumentPayload(
@@ -799,6 +821,19 @@ function mapValidatedArray<T>(
     out.push(mapper(values[i], i));
   }
   return out;
+}
+
+function assertOnlyKnownKeys(
+  record: Record<string, unknown>,
+  allowed: readonly string[],
+  helperName: string
+): void {
+  const allowedSet = new Set(allowed);
+  for (const key of Object.keys(record)) {
+    if (!allowedSet.has(key)) {
+      throw new GraphRequestValidationError(`Invalid ${helperName} input: unknown field ${key}.`);
+    }
+  }
 }
 
 export function buildSendLocationPayload(input: GraphMessagesSendLocationInput): GraphMessagesLocationPayload {
@@ -991,6 +1026,19 @@ export function buildSendCtaUrlPayload(input: GraphMessagesSendCtaUrlInput): Gra
   const interactive: Record<string, unknown> = { type: "cta_url", body: { text: assertNonEmptyControlFreeString(record.bodyText, "bodyText", GRAPH_MESSAGES_GENERAL_TEXT_MAX_LENGTH, "sendCtaUrl") }, action: { name: "cta_url", parameters: { display_text: assertNonEmptyControlFreeString(record.displayText, "displayText", GRAPH_MESSAGES_BUTTON_TITLE_MAX_LENGTH, "sendCtaUrl"), url: assertValidMediaLink(record.url, "sendCtaUrl") } } };
   addHeaderFooter(interactive, record, "sendCtaUrl");
   return interactiveBase(input, "sendCtaUrl", interactive);
+}
+
+export function buildSendCallPermissionRequestPayload(input: GraphMessagesSendCallPermissionRequestInput): GraphMessagesInteractivePayload {
+  const record = asRecordInput(input, "sendCallPermissionRequest");
+  assertOnlyKnownKeys(record, ["to", "bodyText", "footerText", "replyToMessageId"], "sendCallPermissionRequest");
+  const interactive: Record<string, unknown> = {
+    type: "call_permission_request",
+    body: { text: assertNonEmptyControlFreeString(record.bodyText, "bodyText", GRAPH_MESSAGES_GENERAL_TEXT_MAX_LENGTH, "sendCallPermissionRequest") },
+    action: { name: "call_permission_request" }
+  };
+  const footerText = maybeText(record.footerText, "footerText", GRAPH_MESSAGES_SHORT_LABEL_MAX_LENGTH, "sendCallPermissionRequest");
+  if (footerText !== undefined) interactive.footer = { text: footerText };
+  return interactiveBase(input, "sendCallPermissionRequest", interactive);
 }
 
 export function buildSendProductPayload(input: GraphMessagesSendProductInput): GraphMessagesInteractivePayload {

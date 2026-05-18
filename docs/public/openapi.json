@@ -587,6 +587,10 @@
             "type": "string",
             "minLength": 1,
             "description": "Optional message ID to send as a reply context."
+          },
+          "voice": {
+            "type": "boolean",
+            "description": "Audio-only Graph v24+ voice-message designation."
           }
         },
         "oneOf": [
@@ -614,6 +618,37 @@
       },
       "BasicInteractiveMessageBody": {
         "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "to",
+              "bodyText"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "callPermissionRequest"
+              },
+              "to": {
+                "type": "string",
+                "minLength": 1
+              },
+              "bodyText": {
+                "type": "string",
+                "minLength": 1
+              },
+              "footerText": {
+                "type": "string",
+                "minLength": 1
+              },
+              "replyToMessageId": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
           {
             "type": "object",
             "additionalProperties": false,

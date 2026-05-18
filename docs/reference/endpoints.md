@@ -289,6 +289,37 @@ All the usual invariants hold automatically:
 - `since` is URL-encoded and omitted when absent;
 - network/registry errors surface as `GraphApiError` subclasses per F-5.
 
+
+## WATS-90 v24 message composers
+
+WATS-90 adds credential-free builders for the v24 message send deltas:
+`buildSendCallPermissionRequestPayload(input)` and the `voice?: boolean`
+field on `buildSendAudioPayload(input)` / `PhoneNumberClient.sendAudio(...)`.
+Both builders still delegate to `POST /{phoneNumberId}/messages` and keep
+validation before transport via `GraphRequestValidationError`.
+
+```ts
+import {
+  buildSendCallPermissionRequestPayload,
+  buildSendAudioPayload
+} from "@wats/graph";
+
+buildSendCallPermissionRequestPayload({
+  to: "15551230000",
+  bodyText: "May we call you?"
+});
+// => interactive.type = "call_permission_request"
+// => interactive.action.name = "call_permission_request"
+
+buildSendAudioPayload({ to: "15551230000", mediaId: "AUDIO_ID", voice: true });
+// => { type: "audio", audio: { id: "AUDIO_ID", voice: true } }
+```
+
+`buildSendAudioPayload({ to, mediaId, voice: true })` marks an audio send as a
+voice message. Omitting `voice` preserves the pre-WATS-90 audio payload. The
+call-permission request helper accepts `to`, `bodyText`, optional `footerText`,
+and optional `replyToMessageId`; unknown fields reject before transport.
+
 ## Public API summary
 
 - `defineEndpoint(spec): EndpointCallable`
