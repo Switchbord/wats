@@ -1,8 +1,8 @@
 # Webhook primitives reference
 
 - status: active
-- applies-to: `@wats/http`, `@wats/core` (`0.2.0-foundations-complete`)
-- lastReviewed: 2026-04-28
+- applies-to: `@wats/http`, `@wats/core` (`0.2.0-foundations-complete`), WATS-96
+- lastReviewed: 2026-05-19
 
 ## Purpose
 
@@ -17,6 +17,14 @@ This page documents the low-level webhook primitives. Most applications should s
 5. Dispatch each `TypedUpdate` through `WhatsApp.dispatch(...)` or a compatible router/facade.
 
 `createWebhookAdapter` performs these steps for Bun, Node, Fetch/Workers, and Deno-style runtimes.
+
+## WATS-96 mTLS CA transition boundary
+
+Meta's webhook delivery may be deployed behind an optional infrastructure-level mTLS client certificate check as Meta transitions outbound client certificate validation to the Meta-owned root `meta-outbound-api-ca-2025-12.pem`. That check is separate from WATS application behavior.
+
+WATS always treats `X-Hub-Signature-256` as the app-level HMAC verification boundary: `validateWebhookSignature(...)` computes HMAC-SHA256 over the exact raw body bytes using your app secret after the request reaches WATS. Infrastructure-level mTLS client certificate validation, when you choose to use it, belongs at the TLS terminator, load balancer, reverse proxy, CDN/edge product, or platform ingress before the WATS handler is invoked.
+
+WATS does not vendor `meta-outbound-api-ca-2025-12.pem`, does not embed certificate PEM material, and does not configure user infrastructure automatically. Operators who enable mTLS must obtain the CA from Meta's authoritative documentation/distribution channel, keep it updated, and configure their own ingress. App-level HMAC (`X-Hub-Signature-256`) remains required even when infrastructure-level client certificate validation is enabled.
 
 ## `verifyWebhookChallenge(input)`
 

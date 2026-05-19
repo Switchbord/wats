@@ -1,7 +1,7 @@
 # Deploying a WATS webhook on Bun
 
 > Status: guide (F-12). Shipped with WATS-22 (Arch-K) and WATS-25
-> (edge-runtime) resolution.
+> (edge-runtime) resolution. WATS-96 adds the v25 webhook mTLS boundary note.
 
 This guide covers deploying a WATS webhook server under the **Bun
 runtime** using `createBunWebhookServer`. For Node, see
@@ -68,6 +68,12 @@ bun run server.ts
 adapter is a thin wrapper over `createFetchWebhookHandler`. Every
 request goes through the same runtime-neutral core as the fetch and
 Node adapters, which means the status-code taxonomy is identical.
+
+## WATS-96 webhook mTLS and HMAC boundary
+
+`createBunWebhookServer` verifies Meta webhook POST bodies at the WATS app layer with HMAC-SHA256 from `X-Hub-Signature-256`. Keep that app-level HMAC verification enabled; it is independent of TLS termination.
+
+If your production ingress opts into Meta outbound webhook mTLS, configure infrastructure-level client certificate validation at the TLS terminator, reverse proxy, load balancer, CDN, or platform in front of Bun. Meta's transition names the Meta-owned root `meta-outbound-api-ca-2025-12.pem`; WATS does not vendor that CA, does not include PEM contents, and does not configure user infrastructure automatically. Obtain and rotate the CA through Meta's authoritative channel, then pass only already-accepted HTTP requests to the Bun WATS handler.
 
 ## Graceful shutdown
 

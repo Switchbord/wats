@@ -2,7 +2,7 @@
 
 > Status: guide (F-12). Sketch only — WATS-25 closes the edge-runtime
 > shape invariant; the full Miniflare integration test is tracked
-> for a later step.
+> for a later step. WATS-96 adds the v25 webhook mTLS boundary note.
 
 This guide covers deploying a WATS webhook on **Cloudflare Workers**
 using `createFetchWebhookHandler`. The same pattern works on Deno
@@ -115,6 +115,12 @@ limits (100 MiB on paid plans as of 2024). WATS's default
 `maxBodyBytes` is 1 MiB — well within any realistic WhatsApp webhook
 payload. Raise it via `createWebhookAdapter({ ..., maxBodyBytes })`
 if your deployment genuinely needs larger envelopes.
+
+## WATS-96 webhook mTLS and HMAC boundary
+
+The Worker handler still verifies Meta webhook POST bodies at the WATS app layer with HMAC-SHA256 from `X-Hub-Signature-256`. That app-level HMAC verification happens in `@wats/http` after the request reaches the Worker and remains required.
+
+Optional Meta webhook mTLS belongs to infrastructure-level client certificate validation before the Worker handler runs. During Meta's CA transition, any Cloudflare/edge ingress mTLS configuration you choose must trust Meta's owned root `meta-outbound-api-ca-2025-12.pem` through the platform controls that support client certificates. WATS does not vendor the CA, does not embed PEM contents, does not expose a Worker-side certificate validator, and does not configure user infrastructure automatically; obtain and rotate the CA from Meta's authoritative channel.
 
 ## Observability on Workers
 
