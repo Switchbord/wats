@@ -161,6 +161,12 @@ recent WhatsApp Cloud API changes:
 
 Live Meta webhook fixtures remain credential-gated; repository tests use synthetic envelopes only.
 
+## WATS-97 webhook media ID retention
+
+Current behavior: webhook media IDs received via webhook are downloadable for 7 days after 2025-10-09. Linear WATS-97 source evidence is the WhatsApp changelog dated 2025-09-24, which records the reduction from 30 days to 7 days.
+
+If a handler needs media beyond the current retention window, promptly download the media through the WATS media helpers and persist it in application-owned durable storage. WATS normalizes inbound media IDs and optional `media.url` values, but it does not automatically persist webhook media.
+
 ## When to use the adapter instead
 
 Prefer `createWebhookAdapter` unless you need custom HTTP behavior that the adapter cannot express. The adapter already provides:

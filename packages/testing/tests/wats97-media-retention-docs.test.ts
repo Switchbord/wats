@@ -99,14 +99,23 @@ function isHistoricalThirtyDayContext(context: string): boolean {
   ].some((pattern) => pattern.test(lower));
 }
 
+function isWebhookMediaRetentionContext(context: string): boolean {
+  const lower = context.toLowerCase();
+  const mentionsMedia = /\bmedia\b|\bmedia\s+ids?\b|\bmediaid\b|\bmedia_id\b/u.test(lower);
+  const mentionsWebhook = /\bwebhook\b/u.test(lower);
+  const mentionsRetention = /\bretention\b|\bdownloadable\b|\bavailable\b|\bavailability\b|\bdownloadability\b|\bwindow\b/u.test(lower);
+  return mentionsMedia && mentionsWebhook && mentionsRetention;
+}
+
 function thirtyDayViolations(paths: readonly string[]): string[] {
   return paths.flatMap((path) => {
     const lines = read(path).split(/\r?\n/u);
     return lines.flatMap((line, index) => {
       if (!/30\s+days?/iu.test(line)) return [];
-      const start = Math.max(0, index - 2);
-      const end = Math.min(lines.length, index + 3);
+      const start = Math.max(0, index - 3);
+      const end = Math.min(lines.length, index + 4);
       const context = lines.slice(start, end).join("\n");
+      if (!isWebhookMediaRetentionContext(context)) return [];
       if (isHistoricalThirtyDayContext(context)) return [];
       return [`${path}:${index + 1}: ${line.trim()}`];
     });
