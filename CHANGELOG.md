@@ -3,6 +3,13 @@
 ## [0.3.2] - 2026-05-18
 
 
+### WATS-97 — webhook media ID retention docs
+
+- Documents current behavior: webhook media IDs received via webhook are downloadable for 7 days after 2025-10-09.
+- Cites the Linear WATS-97 source evidence from the WhatsApp changelog dated 2025-09-24, where Meta reduced the webhook media ID downloadability window from 30 days to 7 days.
+- Recommends that applications promptly download webhook media and persist it in durable application-owned storage if they need media beyond the current retention window; no automatic media persistence, byte-limit changes, or live Meta calls are included.
+
+
 ### WATS-96 — Graph v25 metadata and webhook mTLS docs
 
 - Documents that Meta Graph v25 deprecates `metadata=1` metadata/introspection usage and that WATS does not send `metadata=1`, append it to runtime Graph requests, or use it during docs/OpenAPI generation.

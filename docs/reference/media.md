@@ -4,7 +4,7 @@
 - decisionStatus: runtime-complete
 - labels: [camelCaseOnly, asyncOnly, aggressiveParity, monorepo]
 - owner: TBD
-- lastReviewed: 2026-04-29
+- lastReviewed: 2026-05-19
 
 ## Status notice
 
@@ -18,6 +18,12 @@ WATS-37 now provides the credential-free media runtime surface that can be exerc
 - `createUploadSession(...)`, `uploadFileToSession(...)`, and `getUploadSession(...)` implement resumable upload-session primitives.
 
 No live Meta credentials are required by the test suite. Live credentialed checks remain outside the repository gates and require explicit user authorization.
+
+## Webhook media ID retention (WATS-97)
+
+Current behavior: webhook media IDs received via webhook are downloadable for 7 days after 2025-10-09. Linear WATS-97 cites the WhatsApp changelog dated 2025-09-24: Meta reduced this downloadability window from 30 days to 7 days.
+
+Applications that need media beyond the current retention window should promptly download the media bytes and persist them in their own durable storage. WATS exposes the media ID/URL and the `downloadMedia` / `downloadMediaBytes` helpers; it does not automatically persist webhook media for the application.
 
 ## Public API
 
