@@ -3,6 +3,13 @@
 ## [0.3.2] - 2026-05-18
 
 
+### WATS-92 — WhatsApp and Marketing Messages error registry refresh
+
+- Adds v21-v25 diagnostic code mappings for `131050`, `132018`, `131059`, `131064`, and Marketing Messages Lite `134100`, `134101`, `134102`, and `134103`.
+- Adds `InvalidTemplateParameterError`, `TemplateClassificationRateLimitError`, and Marketing Messages Lite subclasses such as `MarketingMessagesLiteUnsupportedMessageTypeError`, `MarketingMessagesLiteUnsupportedTemplateCategoryError`, `MarketingMessagesLiteInvalidFlowError`, and `MarketingMessagesLiteUnsupportedTemplateStructureError`.
+- Documents remediation guidance without suppressing Graph errors or adding broad automatic retry policy.
+
+
 ### WATS-91 — business messaging limits and template cursors
 
 - Adds typed WABA/phone-number response fields for `whatsapp_business_manager_messaging_limit` and v24+ `messaging_limit_tier` portfolio semantics.

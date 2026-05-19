@@ -209,6 +209,7 @@ rate-limit classification: `{4, 80007, 130429, 131048, 131056}`.
 | 131056 | `TooManyMessagesError` | `GraphRateLimitError` | rate-limit | `TooManyMessages` |
 | 131057 | `AccountInMaintenanceModeError` | `GraphApiError` | send-message | `AccountInMaintenanceMode` |
 | 131059 | `InvalidTemplateCursorError` | `GraphApiError` | template | WATS-91 `message_templates` invalid before/after cursor |
+| 131064 | `TemplateClassificationRateLimitError` | `GraphApiError` | template | WATS-92 template classification rate limit |
 | 132000 | `TemplateParamCountMismatchError` | `GraphApiError` | template | `TemplateParamCountMismatch` |
 | 132001 | `TemplateNotExistsError` | `GraphApiError` | template | `TemplateNotExists` |
 | 132005 | `TemplateTextTooLongError` | `GraphApiError` | template | `TemplateTextTooLong` |
@@ -217,6 +218,7 @@ rate-limit classification: `{4, 80007, 130429, 131048, 131056}`.
 | 132012 | `TemplateParamFormatMismatchError` | `GraphApiError` | template | `TemplateParamFormatMismatch` |
 | 132015 | `TemplatePausedError` | `GraphApiError` | template | `TemplatePaused` |
 | 132016 | `TemplateDisabledError` | `GraphApiError` | template | `TemplateDisabled` |
+| 132018 | `InvalidTemplateParameterError` | `GraphApiError` | template | WATS-92 template message invalid parameters |
 | 132068 | `FlowBlockedError` | `GraphApiError` | flow | `FlowBlocked` |
 | 132069 | `FlowThrottledError` | `GraphApiError` | flow | `FlowThrottled` |
 | 135000 | `GenericError` | `GraphApiError` | send-message | `GenericError` |
@@ -241,6 +243,10 @@ rate-limit classification: `{4, 80007, 130429, 131048, 131056}`.
 | 139100 | `BulkBlockingFailedError` | `GraphApiError` | block-user | `BulkBlockingFailed` |
 | 139101 | `BlockListLimitReachedError` | `GraphApiError` | block-user | `BlockListLimitReached` |
 | 139102 | `BlockListConcurrentUpdateError` | `GraphApiError` | block-user | `BlockListConcurrentUpdate` |
+| 134100 | `MarketingMessagesLiteUnsupportedMessageTypeError` | `GraphApiError` | marketing-messages-lite | WATS-92 Marketing Messages Lite unsupported message type |
+| 134101 | `MarketingMessagesLiteUnsupportedTemplateCategoryError` | `GraphApiError` | marketing-messages-lite | WATS-92 Marketing Messages Lite unsupported template category |
+| 134102 | `MarketingMessagesLiteInvalidFlowError` | `GraphApiError` | marketing-messages-lite | WATS-92 Marketing Messages Lite invalid Flow |
+| 134103 | `MarketingMessagesLiteUnsupportedTemplateStructureError` | `GraphApiError` | marketing-messages-lite | WATS-92 Marketing Messages Lite unsupported template structure |
 | 139103 | `BlockUserInternalError` | `GraphApiError` | block-user | `BlockUserInternalError` |
 
 Naming convention: pywa class name verbatim with an `Error` suffix
@@ -299,6 +305,26 @@ and deferred to a later feature. Consumers that need `Retry-After`
 parsing today must read it themselves from
 `error.payload ? ... : response.headers`.
 
+
+
+### WATS-92 WhatsApp and Marketing Messages diagnostic refresh
+
+WATS-92 adds the current v21-v25 WhatsApp / Marketing Messages diagnostic
+codes to the built-in registry. `131050` remains
+`UserStoppedMarketingMessagesError`; `132018` maps to
+`InvalidTemplateParameterError`; `131059` is `InvalidTemplateCursorError` from
+WATS-91; `131064` maps to `TemplateClassificationRateLimitError`; and
+`134100`-`134103` map to Marketing Messages Lite diagnostics:
+`MarketingMessagesLiteUnsupportedMessageTypeError`,
+`MarketingMessagesLiteUnsupportedTemplateCategoryError`,
+`MarketingMessagesLiteInvalidFlowError`, and
+`MarketingMessagesLiteUnsupportedTemplateStructureError`.
+
+These subclasses preserve the original Graph payload and keep the normal HTTP
+classification on `GraphApiError`. They are not broad retry suppressors: callers
+should remediate the message/template/Flow shape or user marketing preference
+state, and only apply explicit retry policies documented for a specific code
+such as the WATS-91 template cursor case.
 
 ### WATS-91 message template cursor error
 

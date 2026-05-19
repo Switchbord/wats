@@ -331,6 +331,54 @@ export class TemplateDisabledError extends GraphApiError {
   }
 }
 
+export class InvalidTemplateParameterError extends GraphApiError {
+  static readonly errorCode = 132018 as const;
+  constructor(ctx: GraphErrorFactoryContext) {
+    super(coreParams(ctx, "Template message has invalid parameters."));
+    this.name = "InvalidTemplateParameterError";
+  }
+}
+
+export class TemplateClassificationRateLimitError extends GraphApiError {
+  static readonly errorCode = 131064 as const;
+  constructor(ctx: GraphErrorFactoryContext) {
+    super(coreParams(ctx, "Template classification rate limit reached."));
+    this.name = "TemplateClassificationRateLimitError";
+  }
+}
+
+export class MarketingMessagesLiteUnsupportedMessageTypeError extends GraphApiError {
+  static readonly errorCode = 134100 as const;
+  constructor(ctx: GraphErrorFactoryContext) {
+    super(coreParams(ctx, "Marketing Messages Lite does not support this message type."));
+    this.name = "MarketingMessagesLiteUnsupportedMessageTypeError";
+  }
+}
+
+export class MarketingMessagesLiteUnsupportedTemplateCategoryError extends GraphApiError {
+  static readonly errorCode = 134101 as const;
+  constructor(ctx: GraphErrorFactoryContext) {
+    super(coreParams(ctx, "Marketing Messages Lite does not support this template category."));
+    this.name = "MarketingMessagesLiteUnsupportedTemplateCategoryError";
+  }
+}
+
+export class MarketingMessagesLiteInvalidFlowError extends GraphApiError {
+  static readonly errorCode = 134102 as const;
+  constructor(ctx: GraphErrorFactoryContext) {
+    super(coreParams(ctx, "Marketing Messages Lite Flow is invalid."));
+    this.name = "MarketingMessagesLiteInvalidFlowError";
+  }
+}
+
+export class MarketingMessagesLiteUnsupportedTemplateStructureError extends GraphApiError {
+  static readonly errorCode = 134103 as const;
+  constructor(ctx: GraphErrorFactoryContext) {
+    super(coreParams(ctx, "Marketing Messages Lite does not support this template structure."));
+    this.name = "MarketingMessagesLiteUnsupportedTemplateStructureError";
+  }
+}
+
 export class InvalidTemplateCursorError extends GraphApiError {
   static readonly errorCode = 131059 as const;
   constructor(ctx: GraphErrorFactoryContext) {
@@ -669,6 +717,7 @@ const BUILT_IN_SEEDS: readonly Seed[] = [
   { code: 132012, errorName: "TemplateParamFormatMismatchError", factory: (ctx) => new TemplateParamFormatMismatchError(ctx) },
   { code: 132015, errorName: "TemplatePausedError", factory: (ctx) => new TemplatePausedError(ctx) },
   { code: 132016, errorName: "TemplateDisabledError", factory: (ctx) => new TemplateDisabledError(ctx) },
+  { code: 132018, errorName: "InvalidTemplateParameterError", factory: (ctx) => new InvalidTemplateParameterError(ctx) },
   { code: 132068, errorName: "FlowBlockedError", factory: (ctx) => new FlowBlockedError(ctx) },
   { code: 132069, errorName: "FlowThrottledError", factory: (ctx) => new FlowThrottledError(ctx) },
   { code: 135000, errorName: "GenericError", factory: (ctx) => new GenericError(ctx) },
@@ -681,6 +730,7 @@ const BUILT_IN_SEEDS: readonly Seed[] = [
   { code: 131045, errorName: "IncorrectCertificateError", factory: (ctx) => new IncorrectCertificateError(ctx) },
   { code: 131057, errorName: "AccountInMaintenanceModeError", factory: (ctx) => new AccountInMaintenanceModeError(ctx) },
   { code: 131059, errorName: "InvalidTemplateCursorError", factory: (ctx) => new InvalidTemplateCursorError(ctx) },
+  { code: 131064, errorName: "TemplateClassificationRateLimitError", factory: (ctx) => new TemplateClassificationRateLimitError(ctx) },
   { code: 131050, errorName: "UserStoppedMarketingMessagesError", factory: (ctx) => new UserStoppedMarketingMessagesError(ctx) },
   { code: 137000, errorName: "RecipientIdentityKeyMismatchError", factory: (ctx) => new RecipientIdentityKeyMismatchError(ctx) },
   // --- Flow axis ---
@@ -694,6 +744,11 @@ const BUILT_IN_SEEDS: readonly Seed[] = [
   { code: 139101, errorName: "BlockListLimitReachedError", factory: (ctx) => new BlockListLimitReachedError(ctx) },
   { code: 139102, errorName: "BlockListConcurrentUpdateError", factory: (ctx) => new BlockListConcurrentUpdateError(ctx) },
   { code: 139103, errorName: "BlockUserInternalError", factory: (ctx) => new BlockUserInternalError(ctx) },
+  // --- Marketing Messages Lite diagnostics (Meta changelog, WATS-92) ---
+  { code: 134100, errorName: "MarketingMessagesLiteUnsupportedMessageTypeError", factory: (ctx) => new MarketingMessagesLiteUnsupportedMessageTypeError(ctx) },
+  { code: 134101, errorName: "MarketingMessagesLiteUnsupportedTemplateCategoryError", factory: (ctx) => new MarketingMessagesLiteUnsupportedTemplateCategoryError(ctx) },
+  { code: 134102, errorName: "MarketingMessagesLiteInvalidFlowError", factory: (ctx) => new MarketingMessagesLiteInvalidFlowError(ctx) },
+  { code: 134103, errorName: "MarketingMessagesLiteUnsupportedTemplateStructureError", factory: (ctx) => new MarketingMessagesLiteUnsupportedTemplateStructureError(ctx) },
   // --- Calling axis ---
   { code: 138000, errorName: "CallingNotEnabledError", factory: (ctx) => new CallingNotEnabledError(ctx) },
   { code: 138018, errorName: "CallingCannotBeEnabledError", factory: (ctx) => new CallingCannotBeEnabledError(ctx) },
