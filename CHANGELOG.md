@@ -2,6 +2,14 @@
 
 ## [0.3.2] - 2026-05-18
 
+
+### WATS-89 — v24/v25 webhook schema refresh
+
+- Adds `played` to `WhatsAppMessageStatusKind` and `filtersTyped.status.played()` for voice playback receipts.
+- Normalizes inbound webhook media `url` to public `media.url` and documents that status `conversation` is optional / absent by default in v24+.
+- Preserves unsupported details for removed/unsupported message shapes such as `request_welcome` while keeping raw fallback.
+- Promotes Coexistence account events including `PARTNER_REMOVED`, `account_offboarded`, `account_reconnected`, and `disconnectionInfo` in credential-free synthetic webhook coverage.
+
 ### WATS-90 — v24 message builders
 
 - Adds `buildSendCallPermissionRequestPayload(...)` and `PhoneNumberClient.sendCallPermissionRequest(...)` for Graph `interactive.type = "call_permission_request"` / `action.name = "call_permission_request"` bodies.

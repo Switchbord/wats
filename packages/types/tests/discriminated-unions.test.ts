@@ -92,7 +92,7 @@ type _MessageKindUnion = Expect<
 type _StatusKindUnion = Expect<
   Equal<
     WhatsAppMessageStatusKind,
-    "sent" | "delivered" | "read" | "failed" | "deleted" | "warning"
+    "sent" | "delivered" | "read" | "played" | "failed" | "deleted" | "warning"
   >
 >;
 
@@ -172,6 +172,7 @@ function assertAllStatusesHandled(status: WhatsAppMessageStatus): string {
     case "sent":
     case "delivered":
     case "read":
+    case "played":
     case "failed":
     case "deleted":
     case "warning":
@@ -200,6 +201,7 @@ describe("F-1 discriminated union contracts", () => {
       "sent",
       "delivered",
       "read",
+      "played",
       "failed",
       "deleted",
       "warning"
@@ -236,6 +238,8 @@ describe("F-1 discriminated union contracts", () => {
     const media: MediaReference = message.image;
     expect(media.id).toBe("media-1");
     expect(media.mimeType).toBe("image/jpeg");
+    const mediaWithUrl: MediaReference = { id: "media-url", mimeType: "image/jpeg", url: "https://lookaside.fbsbx.com/media" };
+    expect(mediaWithUrl.url).toContain("lookaside");
   });
 
   test("DocumentMessage carries DocumentReference with filename", () => {
@@ -310,9 +314,11 @@ describe("F-1 discriminated union contracts", () => {
       from: "15551234567",
       timestamp: "1718000005",
       errors: [err],
+      unsupported: { type: "request_welcome", title: "Removed", description: "Deprecated by Meta" },
       raw: { original: "payload" }
     };
     expect(message.errors?.[0]?.code).toBe(131051);
+    expect(message.unsupported?.type).toBe("request_welcome");
     expect(message.raw).toEqual({ original: "payload" });
   });
 

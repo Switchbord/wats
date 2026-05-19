@@ -67,7 +67,8 @@ const EXPECTED_CONTRACT_VALUES = {
     "WhatsAppWebhookEnvelope",
     "WhatsAppWebhookEntry",
     "WhatsAppWebhookChange",
-    "WhatsAppWebhookValue"
+    "WhatsAppWebhookValue",
+    "WhatsAppAccountUpdateValue"
   ],
   WATS_TYPES_ENTITIES_EXPORTS: [
     "WhatsAppMessage",

@@ -57,9 +57,7 @@ Contract at a glance:
   message plus `phoneNumberId` / `wabaId` / `updateId` (= message
   id) / `receivedAt` (ms; derived from `message.timestamp` when
   present, else `clockNow()`).
-- `TypedStatusUpdate` — `kind: "status"`. Same scope fields; the
-  inner `status` object is the wire status payload verbatim for now;
-  WATS-43A's deep normalization is intentionally scoped to message bodies.
+- `TypedStatusUpdate` — `kind: "status"`. Same scope fields; WATS-89 normalizes `recipient_id` to `recipientId`, accepts `played`, and documents that `conversation is optional` because v24+ omits `status.conversation` by default outside special conversation windows.
 - `TypedAccountUpdate` — `kind: "account"`. Produced by
   account-scoped webhook fields: `account_update`,
   `account_review_update`, `account_alerts`,
@@ -68,11 +66,14 @@ Contract at a glance:
   `message_template_components_update`,
   `phone_number_quality_update`, `phone_number_name_update`,
   `business_status_update`, `business_capability_update`,
-  `security`, `template_category_update`. `wabaId` only; no
+  `security`, `template_category_update`, `account_offboarded`,
+  `account_reconnected`. `wabaId` only; no
   `phoneNumberId` (most account updates are WABA-scoped). WATS-39 adds
   an optional `template` helper object on template status/quality/category/components
   account updates when the payload includes safe `message_template_id`,
-  `message_template_name`, and `message_template_language` strings.
+  `message_template_name`, and `message_template_language` strings. WATS-89 also adds
+  `account.event` and Coexistence `account.disconnectionInfo` for `PARTNER_REMOVED`,
+  plus typed `account_offboarded` and `account_reconnected` account updates.
 - `TypedUnknownUpdate` — `kind: "unknown"`. Catch-all for webhook
   field names Meta has not yet published a typed shape for.
   Preserves `field` + `rawChange` so the consumer can inspect.
@@ -105,6 +106,19 @@ for (const u of updates) {
   }
 }
 ```
+
+
+## WATS-89 v24/v25 webhook deltas
+
+WATS-89 updates the normalizer for recent WhatsApp Cloud API webhook changes:
+
+- `WhatsAppMessageStatusKind` includes `played`, used for voice-message playback receipts.
+- `status.conversation` remains optional; in v24+ `conversation is optional` and is absent by default except when Meta includes a conversation object for special windows.
+- Media references include `media.url` when incoming media webhook payloads carry a Meta lookaside download URL.
+- Unsupported messages carry `unsupported.type`, `unsupported.title`, `unsupported.description`, and `unsupported.raw`, so removed/unsupported shapes such as `request_welcome` are preserved without pretending WATS supports them.
+- Account/coexistence updates include `account.event`, `account.disconnectionInfo` for `PARTNER_REMOVED`, and typed `account_offboarded` / `account_reconnected` account update classification.
+
+All of these remain credential-free synthetic-envelope checks in CI; live Meta validation stays in the credential-gated campaign.
 
 ## Input contract
 

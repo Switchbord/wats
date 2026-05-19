@@ -360,13 +360,14 @@ All WATS-43A helpers use normalized camelCase message fields and do not inspect
 
 ## Status built-ins (`status.*`)
 
-All four status built-ins target `TypedStatusUpdate` and match
+The status built-ins target `TypedStatusUpdate` and match
 against the closed `WhatsAppMessageStatusKind` discriminator. Each
 returns `false` (never throws) for off-kind updates.
 
 - `status.sent()` — matches `status.status === "sent"`.
 - `status.delivered()` — matches `"delivered"`.
 - `status.read()` — matches `"read"`.
+- `status.played()` — matches WATS-89 `"played"` voice playback receipts.
 - `status.failed()` — matches `"failed"`.
 
 ### Forward-declared
