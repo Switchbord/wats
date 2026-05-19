@@ -367,6 +367,7 @@ Violations throw `GraphRequestValidationError` at construction.
 | `getMessageTemplate` | implemented (WATS-39) | `GET /{templateId}` |
 | `updateMessageTemplate` | implemented (WATS-39) | `POST /{templateId}` |
 | `deleteMessageTemplate` | implemented (WATS-39) | `DELETE /{wabaId}/message_templates?name=...&hsm_id=...` |
+| `listTemplateGroups` / `createTemplateGroup` / `getTemplateGroup` / `updateTemplateGroup` / `deleteTemplateGroup` / `getTemplateGroupAnalytics` | implemented (WATS-94) | `/{wabaId}/template_groups`, `/{templateGroupId}`, and `/{wabaId}/template_group_analytics` |
 | `listFlows` | implemented (WATS-40) | `GET /{wabaId}/flows` |
 | `createFlow` | implemented (WATS-40) | `POST /{wabaId}/flows` |
 | `getFlow` | implemented (WATS-40) | `GET /{flowId}` |
@@ -401,6 +402,32 @@ await createMessageTemplate(graphClient, { wabaId: "999" }, {
   components: [buildTemplateBodyComponent({ text: "Hi {{1}}" })]
 });
 ```
+
+
+### Template groups and analytics (WATS-94)
+
+`WABAClient` exposes Template Group helpers over the bound WABA id:
+`listTemplateGroups`, `createTemplateGroup`, `getTemplateGroup`,
+`updateTemplateGroup`, `deleteTemplateGroup`, and
+`getTemplateGroupAnalytics`. Direct callables with the same names are exported
+from root `@wats/graph` and `@wats/graph/endpoints/templates`.
+
+```ts
+await waba.listTemplateGroups({ limit: "25" });
+await waba.createTemplateGroup({
+  name: "launch_group",
+  category: "MARKETING",
+  templateIds: ["template-id-1"]
+});
+await waba.getTemplateGroupAnalytics({
+  templateGroupId: "template-group-id",
+  metricTypes: ["sent", "delivered"]
+});
+```
+
+The wire endpoints are Graph `template_groups` and
+`template_group_analytics`. WATS does not claim a dashboard or undocumented
+metric schema; unknown analytics fields are preserved structurally.
 
 WATS-39 template helpers and WATS-40 Flow helpers are credential-free SDK surfaces. They build
 and validate Graph request shapes and are covered through MockTransport;

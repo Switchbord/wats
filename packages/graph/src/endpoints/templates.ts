@@ -10,19 +10,29 @@ export {
   buildTemplateFooterComponent,
   buildTemplateHeaderComponent,
   createMessageTemplate,
+  createTemplateGroup,
   deleteMessageTemplate,
+  deleteTemplateGroup,
   getMessageTemplate,
+  getTemplateGroup,
+  getTemplateGroupAnalytics,
   listMessageTemplates,
+  listTemplateGroups,
   updateMessageTemplate,
+  updateTemplateGroup,
   validateTemplateParameterCounts
 } from "./templates/index.js";
 
 export type {
   CreateMessageTemplateBody,
+  CreateTemplateGroupBody,
   DeleteMessageTemplateInput,
+  DeleteTemplateGroupInput,
   GetMessageTemplateInput,
+  GetTemplateGroupInput,
   GraphPaging,
   ListMessageTemplatesInput,
+  ListTemplateGroupsInput,
   SendTemplateComponentForValidation,
   TemplateBodyComponentInput,
   TemplateButtonInput,
@@ -32,6 +42,13 @@ export type {
   TemplateComponent,
   TemplateDefinitionForValidation,
   TemplateDetails,
+  TemplateGroupAnalyticsInput,
+  TemplateGroupAnalyticsPoint,
+  TemplateGroupAnalyticsResponse,
+  TemplateGroupBody,
+  TemplateGroupDetails,
+  TemplateGroupListResponse,
+  TemplateGroupMutationResponse,
   TemplateFooterComponentInput,
   TemplateHeaderComponentInput,
   TemplateHeaderFormat,
@@ -41,5 +58,6 @@ export type {
   TemplateParameterFormat,
   TemplateQualityScore,
   TemplateStatus,
-  UpdateMessageTemplateBody
+  UpdateMessageTemplateBody,
+  UpdateTemplateGroupBody
 } from "./templates/index.js";
