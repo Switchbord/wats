@@ -111,6 +111,7 @@ function describeStatus(status: WhatsAppMessageStatus): string {
     case "sent":
     case "delivered":
     case "read":
+    case "played":
     case "failed":
     case "deleted":
     case "warning":
@@ -161,7 +162,7 @@ for (const [specifier, requiredSymbols] of Object.entries(REQUIRED_EXPORT_SYMBOL
 // Construct one representative value per discriminator kind and run
 // every exhaustive switch above. Any unhandled kind throws; any
 // widened discriminator fails compilation at the never branch.
-const sampleMedia: MediaReference = { id: "media-x", mimeType: "image/jpeg" };
+const sampleMedia: MediaReference = { id: "media-x", mimeType: "image/jpeg", url: "https://lookaside.fbsbx.com/media" };
 const sampleDoc: DocumentReference = {
   id: "doc-x",
   mimeType: "application/pdf",
@@ -256,6 +257,7 @@ const statusKinds: WhatsAppMessageStatusKind[] = [
   "sent",
   "delivered",
   "read",
+  "played",
   "failed",
   "deleted",
   "warning"
@@ -268,8 +270,8 @@ const statuses: WhatsAppMessageStatus[] = statusKinds.map((kind) => ({
 }));
 
 const describedStatuses = statuses.map(describeStatus);
-if (describedStatuses.length !== 6) {
-  throw new Error(`expected 6 status kinds, got ${describedStatuses.length}`);
+if (describedStatuses.length !== 7) {
+  throw new Error(`expected 7 status kinds, got ${describedStatuses.length}`);
 }
 
 const interactiveReplies: InteractiveReply[] = [

@@ -115,8 +115,19 @@ export interface TypedAccountUpdate {
   readonly receivedAt: number;
   readonly eventName: string;
   readonly template?: TypedTemplateAccountUpdate;
+  readonly account?: TypedGenericAccountUpdate;
   readonly payload: unknown;
   readonly rawChange: WhatsAppWebhookChange;
+}
+
+export interface TypedGenericAccountUpdate {
+  readonly event?: string;
+  readonly disconnectionInfo?: {
+    readonly reason?: string;
+    readonly partnerId?: string;
+    readonly partnerName?: string;
+    readonly raw?: unknown;
+  };
 }
 
 export interface TypedTemplateAccountUpdate {
@@ -224,7 +235,9 @@ const ACCOUNT_FIELDS: ReadonlySet<string> = new Set([
   "business_status_update",
   "business_capability_update",
   "security",
-  "template_category_update"
+  "template_category_update",
+  "account_offboarded",
+  "account_reconnected"
 ]);
 
 export class WebhookNormalizationError extends Error {
@@ -516,6 +529,8 @@ function normalizeMediaReference(value: unknown): Record<string, unknown> | unde
   if (caption !== undefined) out.caption = caption;
   const filename = readStringField(value, "filename");
   if (filename !== undefined) out.filename = filename;
+  const url = readStringField(value, "url");
+  if (url !== undefined) out.url = url;
   const voice = readBooleanField(value, "voice");
   if (voice !== undefined) out.voice = voice;
   const animated = readBooleanField(value, "animated");
@@ -621,6 +636,16 @@ function normalizeInteractivePayload(value: unknown): Record<string, unknown> | 
     if (displayText === undefined || url === undefined) return undefined;
     return { type, ctaUrlReply: { displayText, url } };
   }
+  if (type === "call_permission_reply") {
+    const reply = readOwnDataField(value, "call_permission_reply");
+    if (!isRecord(reply)) return undefined;
+    const response = readStringField(reply, "response");
+    const expirationTimestamp = readStringField(reply, "expiration_timestamp");
+    const out: Record<string, unknown> = {};
+    if (response === "accepted" || response === "rejected") out.response = response;
+    if (expirationTimestamp !== undefined) out.expirationTimestamp = expirationTimestamp;
+    return { type, callPermissionReply: out };
+  }
   return safeCloneMessageJsonValue(value) as Record<string, unknown> | undefined;
 }
 
@@ -658,6 +683,23 @@ function normalizeMessagePayload(raw: Record<string, unknown>): WhatsAppMessage 
   if (type === "button") {
     const button = normalizeButtonPayload(readOwnDataField(raw, "button"));
     if (button !== undefined) base.button = button;
+    return base as unknown as WhatsAppMessage;
+  }
+  if (type === "unsupported") {
+    const unsupported = readOwnDataField(raw, "unsupported");
+    if (isRecord(unsupported)) {
+      const out: Record<string, unknown> = {};
+      const unsupportedType = readStringField(unsupported, "type");
+      const title = readStringField(unsupported, "title");
+      const description = readStringField(unsupported, "description");
+      if (unsupportedType !== undefined) out.type = unsupportedType;
+      if (title !== undefined) out.title = title;
+      if (description !== undefined) out.description = description;
+      out.raw = unsupported;
+      base.unsupported = out;
+    }
+    const errors = safeCloneMessageJsonValue(readOwnDataField(raw, "errors"));
+    if (Array.isArray(errors)) base.errors = errors;
     return base as unknown as WhatsAppMessage;
   }
   const cloned = safeCloneMessageJsonValue(raw);
@@ -734,6 +776,28 @@ function safeCloneTemplateJsonValue(value: unknown, depth: number, seen: WeakSet
   }
   seen.delete(value);
   return out;
+}
+
+
+function normalizeGenericAccountPayload(payload: Record<string, unknown>): TypedGenericAccountUpdate | undefined {
+  const event = readStringField(payload, "event");
+  const out: {
+    event?: string;
+    disconnectionInfo?: { reason?: string; partnerId?: string; partnerName?: string; raw?: unknown };
+  } = {};
+  if (event !== undefined) out.event = event;
+  const disconnection = readOwnDataField(payload, "disconnection_info");
+  if (isRecord(disconnection)) {
+    const info: { reason?: string; partnerId?: string; partnerName?: string; raw?: unknown } = { raw: disconnection };
+    const reason = readStringField(disconnection, "reason");
+    const partnerId = readStringField(disconnection, "partner_id");
+    const partnerName = readStringField(disconnection, "partner_name");
+    if (reason !== undefined) info.reason = reason;
+    if (partnerId !== undefined) info.partnerId = partnerId;
+    if (partnerName !== undefined) info.partnerName = partnerName;
+    out.disconnectionInfo = info;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 function normalizeTemplateAccountPayload(
@@ -981,6 +1045,7 @@ function normalizeChange(
   if (ACCOUNT_FIELDS.has(field)) {
     const payload = readOwnDataField(change, "value");
     const template = isRecord(payload) ? normalizeTemplateAccountPayload(field, payload) : undefined;
+    const account = isRecord(payload) ? normalizeGenericAccountPayload(payload) : undefined;
     const update: TypedAccountUpdate = {
       kind: "account",
       updateId: deriveSyntheticId("account", wabaId, field, path),
@@ -988,6 +1053,7 @@ function normalizeChange(
       receivedAt: entryTimeMs,
       eventName: field,
       ...(template !== undefined ? { template } : {}),
+      ...(account !== undefined ? { account } : {}),
       payload,
       rawChange
     };
@@ -1098,13 +1164,46 @@ function normalizeMessagesChange(
         continue;
       }
       const receivedAt = parseTimestampMs(readOwnDataField(st, "timestamp"), acc.clockNow);
+      const statusValue = readStringField(st, "status");
+      const recipientId = readSafeIdField(st, "recipient_id");
+      const normalizedStatus: Record<string, unknown> = {
+        id: statusId,
+        ...(recipientId !== undefined ? { recipientId } : {}),
+        ...(statusValue !== undefined ? { status: statusValue } : {}),
+        ...(typeof readOwnDataField(st, "timestamp") === "string" ? { timestamp: readOwnDataField(st, "timestamp") } : {}),
+        raw: st
+      };
+      const conversation = readOwnDataField(st, "conversation");
+      if (isRecord(conversation)) {
+        const id = readStringField(conversation, "id");
+        const origin = readOwnDataField(conversation, "origin");
+        const expirationTimestamp = readStringField(conversation, "expiration_timestamp");
+        const out: Record<string, unknown> = {};
+        if (id !== undefined) out.id = id;
+        if (isRecord(origin)) out.origin = safeCloneMessageJsonValue(origin);
+        if (expirationTimestamp !== undefined) out.expirationTimestamp = expirationTimestamp;
+        if (Object.keys(out).length > 0) normalizedStatus.conversation = out;
+      }
+      const pricing = readOwnDataField(st, "pricing");
+      if (isRecord(pricing)) {
+        const category = readStringField(pricing, "category");
+        const pricingModel = readStringField(pricing, "pricing_model");
+        const billable = readBooleanField(pricing, "billable");
+        const out: Record<string, unknown> = {};
+        if (category !== undefined) out.category = category;
+        if (pricingModel !== undefined) out.pricingModel = pricingModel;
+        if (billable !== undefined) out.billable = billable;
+        if (Object.keys(out).length > 0) normalizedStatus.pricing = out;
+      }
+      const errors = safeCloneMessageJsonValue(readOwnDataField(st, "errors"));
+      if (Array.isArray(errors)) normalizedStatus.errors = errors;
       const update: TypedStatusUpdate = {
         kind: "status",
         updateId: statusId,
         phoneNumberId,
         wabaId,
         receivedAt,
-        status: st as unknown as WhatsAppMessageStatus,
+        status: normalizedStatus as unknown as WhatsAppMessageStatus,
         rawChange
       };
       pushUpdate(acc, update, stPath);

@@ -73,6 +73,17 @@ export interface WhatsAppAccountReviewUpdateValue {
   raw?: unknown;
 }
 
+export interface WhatsAppAccountUpdateValue {
+  event?: string;
+  disconnectionInfo?: {
+    reason?: string;
+    partnerId?: string;
+    partnerName?: string;
+    raw?: unknown;
+  };
+  raw?: unknown;
+}
+
 export interface WhatsAppUserMarketingPreferencesValue {
   waId: string;
   category: string;
@@ -115,6 +126,7 @@ export interface WhatsAppRawWebhookValue {
  */
 export type WhatsAppWebhookValue =
   | WhatsAppMessagesFieldValue
+  | WhatsAppAccountUpdateValue
   | WhatsAppTemplateStatusUpdateValue
   | WhatsAppAccountReviewUpdateValue
   | WhatsAppUserMarketingPreferencesValue
@@ -126,5 +138,6 @@ export const WATS_TYPES_WEBHOOK_EXPORTS = [
   "WhatsAppWebhookEnvelope",
   "WhatsAppWebhookEntry",
   "WhatsAppWebhookChange",
-  "WhatsAppWebhookValue"
+  "WhatsAppWebhookValue",
+  "WhatsAppAccountUpdateValue"
 ] as const;

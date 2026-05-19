@@ -1,10 +1,10 @@
 // @wats/core — filtersTyped/status.ts (F-9 GREEN)
 //
 // The `status` export is BOTH a kind-filter (narrow TypedUpdate to
-// TypedStatusUpdate) AND a namespace carrying the four message-status
-// built-ins: `sent`, `delivered`, `read`, `failed`. `deleted` and
-// per-error-code matchers are forward-declared — consumers compose
-// via `custom(predicate)` in the interim.
+// TypedStatusUpdate) AND a namespace carrying message-status
+// built-ins: `sent`, `delivered`, `read`, `played`, `failed`. `deleted`,
+// `warning`, and per-error-code matchers are forward-declared — consumers
+// compose via `custom(predicate)` in the interim.
 
 import type { TypedStatusUpdate, TypedUpdate } from "../webhookNormalizer.js";
 import type { WhatsAppMessageStatusKind } from "@wats/types";
@@ -35,6 +35,7 @@ export interface StatusFilterNamespace extends TypedFilter<TypedStatusUpdate> {
   sent(): TypedFilter<TypedStatusUpdate>;
   delivered(): TypedFilter<TypedStatusUpdate>;
   read(): TypedFilter<TypedStatusUpdate>;
+  played(): TypedFilter<TypedStatusUpdate>;
   failed(): TypedFilter<TypedStatusUpdate>;
 }
 
@@ -55,6 +56,8 @@ export const status: StatusFilterNamespace = Object.freeze(
         buildStatusFilter("delivered", "status.delivered()"),
       read: (): TypedFilter<TypedStatusUpdate> =>
         buildStatusFilter("read", "status.read()"),
+      played: (): TypedFilter<TypedStatusUpdate> =>
+        buildStatusFilter("played", "status.played()"),
       failed: (): TypedFilter<TypedStatusUpdate> =>
         buildStatusFilter("failed", "status.failed()")
     }

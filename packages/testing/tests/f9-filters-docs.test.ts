@@ -103,10 +103,11 @@ describe("F-9 filters.md reference guide", () => {
     expect(doc).toContain("message.from");
   });
 
-  test("documents the status built-ins (sent / delivered / read / failed)", () => {
+  test("documents the status built-ins (sent / delivered / read / played / failed)", () => {
     expect(doc).toContain("status.sent");
     expect(doc).toContain("status.delivered");
     expect(doc).toContain("status.read");
+    expect(doc).toContain("status.played");
     expect(doc).toContain("status.failed");
   });
 

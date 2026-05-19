@@ -30,6 +30,7 @@ export type {
   SystemMessage,
   SystemNotification,
   UnsupportedMessage,
+  UnsupportedMessageDetail,
   InteractiveMessage,
   InteractiveReply,
   InteractiveButtonReply,
@@ -56,6 +57,7 @@ export { WATS_TYPES_ERRORS_EXPORTS } from "./errors.js";
 // narrow without reaching into ./webhook directly.
 export type {
   WhatsAppMessagesFieldValue,
+  WhatsAppAccountUpdateValue,
   WhatsAppTemplateStatusUpdateValue,
   WhatsAppAccountReviewUpdateValue,
   WhatsAppUserMarketingPreferencesValue,

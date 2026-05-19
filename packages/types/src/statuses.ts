@@ -1,7 +1,7 @@
 // @wats/types — statuses.ts
 //
 // Closed WhatsAppMessageStatus per architecture notes F-1. The `status` field is
-// the discriminator and narrows to one of six literals. Additional
+// the discriminator and narrows to the current Meta status literals. Additional
 // context (conversation, pricing, errors) is flat and optional; any
 // extra fields Meta may add ride through `raw`.
 
@@ -11,6 +11,7 @@ export type WhatsAppMessageStatusKind =
   | "sent"
   | "delivered"
   | "read"
+  | "played"
   | "failed"
   | "deleted"
   | "warning";

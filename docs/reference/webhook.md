@@ -139,6 +139,20 @@ and accessor-backed nested fields are recorded in `skipped[]` with
 `reason: "malformed_field"`; they do not throw host errors. Live webhook
 fixtures remain credential-gated.
 
+
+### WATS-89 v24/v25 webhook refresh
+
+WATS-89 refreshes the credential-free webhook typing/normalizer contract for
+recent WhatsApp Cloud API changes:
+
+- message statuses now include `played` for voice playback receipts;
+- `status.conversation` remains optional, and in v24+ status conversation is absent by default outside special conversation windows;
+- inbound media webhooks may include `media.url`, surfaced as public `media.url` on image/video/audio/document/sticker references;
+- unsupported messages preserve details such as `unsupported.type` (including removed `request_welcome` / welcome-message shapes), `title`, and `description` while preserving `raw`;
+- Coexistence/account events `PARTNER_REMOVED`, `account_offboarded`, and `account_reconnected` are promoted to account updates, with `disconnectionInfo` mapped from `disconnection_info` when present.
+
+Live Meta webhook fixtures remain credential-gated; repository tests use synthetic envelopes only.
+
 ## When to use the adapter instead
 
 Prefer `createWebhookAdapter` unless you need custom HTTP behavior that the adapter cannot express. The adapter already provides:

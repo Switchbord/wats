@@ -20,7 +20,7 @@ export type {
   OrderProductItem
 } from "./order.js";
 export type { SystemMessage, SystemNotification } from "./system.js";
-export type { UnsupportedMessage } from "./unsupported.js";
+export type { UnsupportedMessage, UnsupportedMessageDetail } from "./unsupported.js";
 export type {
   InteractiveMessage,
   InteractiveReply,

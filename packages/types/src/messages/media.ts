@@ -8,6 +8,8 @@ export interface MediaReference {
   id: string;
   mimeType: string;
   sha256?: string;
+  /** WATS-89 / v24+ incoming media download URL when Meta includes it on webhook media objects. */
+  url?: string;
   caption?: string;
   filename?: string;
   /** WATS-90 / Graph v24+ audio voice-message designation when present on audio media. */

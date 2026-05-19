@@ -181,6 +181,7 @@ describe("B1 external consumer importability", () => {
         "sent",
         "delivered",
         "read",
+        "played",
         "failed",
         "deleted",
         "warning"
