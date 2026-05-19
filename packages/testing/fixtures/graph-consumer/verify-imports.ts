@@ -80,18 +80,24 @@ import {
   buildFlowScreenResponse,
   createFlow,
   createMessageTemplate,
+  createTemplateGroup,
   deleteFlow,
   deleteMessageTemplate,
+  deleteTemplateGroup,
   deprecateFlow,
   getFlow,
   getFlowAssets,
   getMessageTemplate,
+  getTemplateGroup,
+  getTemplateGroupAnalytics,
   listFlows,
   listMessageTemplates,
+  listTemplateGroups,
   publishFlow,
   updateFlowJson,
   updateFlowMetadata,
   updateMessageTemplate,
+  updateTemplateGroup,
   validateFlowJson,
   validateTemplateParameterCounts,
   uploadMedia,
@@ -447,6 +453,20 @@ async function verify(): Promise<VerifyReportOk> {
     templatesSubpath.deleteMessageTemplate === deleteMessageTemplate &&
     templatesSubpath.buildTemplateHeaderComponent === buildTemplateHeaderComponent &&
     templatesSubpath.validateTemplateParameterCounts === validateTemplateParameterCounts;
+  checks["WATS-94 template group callables exist"] =
+    typeof listTemplateGroups === "function" &&
+    typeof createTemplateGroup === "function" &&
+    typeof getTemplateGroup === "function" &&
+    typeof updateTemplateGroup === "function" &&
+    typeof deleteTemplateGroup === "function" &&
+    typeof getTemplateGroupAnalytics === "function";
+  checks["WATS-94 template group subpath exports runtime surface"] =
+    templatesSubpath.listTemplateGroups === listTemplateGroups &&
+    templatesSubpath.createTemplateGroup === createTemplateGroup &&
+    templatesSubpath.getTemplateGroup === getTemplateGroup &&
+    templatesSubpath.updateTemplateGroup === updateTemplateGroup &&
+    templatesSubpath.deleteTemplateGroup === deleteTemplateGroup &&
+    templatesSubpath.getTemplateGroupAnalytics === getTemplateGroupAnalytics;
 
   const templateBody = buildTemplateBodyComponent({ text: "Hi {{1}}" });
   checks["buildTemplateBodyComponent emits Graph BODY component"] =

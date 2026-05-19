@@ -33,6 +33,12 @@ import {
   getMessageTemplate as getMessageTemplateEndpoint,
   listMessageTemplates as listMessageTemplatesEndpoint,
   updateMessageTemplate as updateMessageTemplateEndpoint,
+  listTemplateGroups as listTemplateGroupsEndpoint,
+  createTemplateGroup as createTemplateGroupEndpoint,
+  getTemplateGroup as getTemplateGroupEndpoint,
+  updateTemplateGroup as updateTemplateGroupEndpoint,
+  deleteTemplateGroup as deleteTemplateGroupEndpoint,
+  getTemplateGroupAnalytics as getTemplateGroupAnalyticsEndpoint,
   listFlows as listFlowsEndpoint,
   getFlow as getFlowEndpoint,
   createFlow as createFlowEndpoint,
@@ -54,9 +60,19 @@ import {
   type GetMessageTemplateInput,
   type ListFlowsInput,
   type ListMessageTemplatesInput,
+  type ListTemplateGroupsInput,
   type TemplateDetails,
+  type TemplateGroupAnalyticsInput,
+  type TemplateGroupAnalyticsResponse,
+  type TemplateGroupDetails,
+  type TemplateGroupListResponse,
+  type TemplateGroupMutationResponse,
   type TemplateListResponse,
   type TemplateMutationResponse,
+  type CreateTemplateGroupBody,
+  type DeleteTemplateGroupInput,
+  type GetTemplateGroupInput,
+  type UpdateTemplateGroupBody,
   type UpdateFlowJsonBody,
   type UpdateFlowMetadataBody,
   type UpdateMessageTemplateBody
@@ -309,6 +325,93 @@ export class WABAClient {
     return deleteMessageTemplateEndpoint(
       this.#graphClient,
       scopedParams as DeleteMessageTemplateInput & Record<string, string>,
+      undefined,
+      opts
+    );
+  }
+
+
+  /** Graph `GET /{wabaId}/template_groups`. */
+  async listTemplateGroups(
+    params?: Omit<ListTemplateGroupsInput, "wabaId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<TemplateGroupListResponse> {
+    const scopedParams: Record<string, unknown> = {
+      ...copyOptionalParamsObject(params, "WABAClient.listTemplateGroups"),
+      wabaId: this.#wabaId
+    };
+    return listTemplateGroupsEndpoint(
+      this.#graphClient,
+      scopedParams as unknown as ListTemplateGroupsInput,
+      undefined,
+      opts
+    );
+  }
+
+  /** Graph `POST /{wabaId}/template_groups`. */
+  async createTemplateGroup(
+    body: CreateTemplateGroupBody,
+    opts?: EndpointInvokeOptions
+  ): Promise<TemplateGroupMutationResponse> {
+    return createTemplateGroupEndpoint(
+      this.#graphClient,
+      { wabaId: this.#wabaId },
+      body,
+      opts
+    );
+  }
+
+  /** Graph `GET /{templateGroupId}`. */
+  async getTemplateGroup(
+    params: GetTemplateGroupInput,
+    opts?: EndpointInvokeOptions
+  ): Promise<TemplateGroupDetails> {
+    return getTemplateGroupEndpoint(
+      this.#graphClient,
+      params,
+      undefined,
+      opts
+    );
+  }
+
+  /** Graph `POST /{templateGroupId}`. */
+  async updateTemplateGroup(
+    params: { readonly templateGroupId: string } & UpdateTemplateGroupBody,
+    opts?: EndpointInvokeOptions
+  ): Promise<TemplateGroupMutationResponse> {
+    const { value: templateGroupId, rest } = splitRequiredStringDataProp(
+      params,
+      "templateGroupId",
+      "WABAClient.updateTemplateGroup"
+    );
+    return updateTemplateGroupEndpoint(
+      this.#graphClient,
+      { templateGroupId },
+      rest as UpdateTemplateGroupBody,
+      opts
+    );
+  }
+
+  /** Graph `DELETE /{templateGroupId}`. */
+  async deleteTemplateGroup(
+    params: DeleteTemplateGroupInput,
+    opts?: EndpointInvokeOptions
+  ): Promise<TemplateGroupMutationResponse> {
+    return deleteTemplateGroupEndpoint(this.#graphClient, params, undefined, opts);
+  }
+
+  /** Graph `GET /{wabaId}/template_group_analytics`. */
+  async getTemplateGroupAnalytics(
+    params?: Omit<TemplateGroupAnalyticsInput, "wabaId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<TemplateGroupAnalyticsResponse> {
+    const scopedParams: Record<string, unknown> = {
+      ...copyOptionalParamsObject(params, "WABAClient.getTemplateGroupAnalytics"),
+      wabaId: this.#wabaId
+    };
+    return getTemplateGroupAnalyticsEndpoint(
+      this.#graphClient,
+      scopedParams as unknown as TemplateGroupAnalyticsInput,
       undefined,
       opts
     );

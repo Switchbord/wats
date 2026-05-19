@@ -3,6 +3,13 @@
 ## [0.3.2] - 2026-05-18
 
 
+### WATS-94 — template groups and analytics
+
+- Adds Template Group endpoint callables and WABAClient helpers: `listTemplateGroups`, `createTemplateGroup`, `getTemplateGroup`, `updateTemplateGroup`, `deleteTemplateGroup`, and `getTemplateGroupAnalytics`.
+- Maps Graph `template_groups` and `template_group_analytics` request shapes through MockTransport-tested direct callables and scoped WABA methods.
+- Documents analytics as structural/pass-through only; WATS does not claim an analytics dashboard or undocumented metric schema.
+
+
 ### WATS-93 — auth-template nesting and local-storage settings
 
 - Adds authentication-template OTP button support for nested `supported_apps` records from `supportedApps: [{ packageName, signatureHash }]`, emitting Graph `package_name` / `signature_hash`.

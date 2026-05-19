@@ -100,7 +100,7 @@ Migration notes:
 
 | pywa usage | WATS usage | Status | Notes |
 | --- | --- | --- | --- |
-| pywa `create_template` / `get_templates` / `delete_template` | WATS `WABAClient.createMessageTemplate`, `.listMessageTemplates`, `.getMessageTemplate`, `.updateMessageTemplate`, `.deleteMessageTemplate` | Implemented, live pending | Live template mutations require explicit opt-in. WATS-93 auth OTP buttons use `supportedApps` -> Graph `supported_apps` with nested `package_name` / `signature_hash`. |
+| pywa `create_template` / `get_templates` / `delete_template` | WATS `WABAClient.createMessageTemplate`, `.listMessageTemplates`, `.getMessageTemplate`, `.updateMessageTemplate`, `.deleteMessageTemplate` | Implemented, live pending | Live template mutations require explicit opt-in. WATS-93 auth OTP buttons use `supportedApps` -> Graph `supported_apps` with nested `package_name` / `signature_hash`. WATS-94 adds Template Group helpers: `listTemplateGroups`, `createTemplateGroup`, and `getTemplateGroupAnalytics` for Graph `template_groups` / `template_group_analytics`. |
 | pywa `send_template` | `PhoneNumberClient.sendTemplate` or `WhatsApp.sendTemplate` | Implemented, live pending | Parameter-count validation exists locally. |
 | pywa template component DSL | WATS component builders such as `buildTemplateHeaderComponent` | Partial | Core HEADER/BODY/FOOTER/BUTTONS helpers exist; pywa's larger DSL is broader. |
 | template status/category/quality/components handlers | `normalizeWebhookEnvelope` account helpers plus `filtersTyped.template` | Implemented, credential-free | Synthetic webhook coverage; live webhook validation pending. |

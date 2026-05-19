@@ -9,6 +9,15 @@ export {
 } from "./callables.js";
 
 export {
+  createTemplateGroup,
+  deleteTemplateGroup,
+  getTemplateGroup,
+  getTemplateGroupAnalytics,
+  listTemplateGroups,
+  updateTemplateGroup
+} from "./groups.js";
+
+export {
   buildCreateMessageTemplateBody,
   buildUpdateMessageTemplateBody,
   buildTemplateBodyComponent,
@@ -48,3 +57,18 @@ export type {
   TemplateSupportedAppInput,
   UpdateMessageTemplateBody
 } from "./types.js";
+
+export type {
+  CreateTemplateGroupBody,
+  DeleteTemplateGroupInput,
+  GetTemplateGroupInput,
+  ListTemplateGroupsInput,
+  TemplateGroupAnalyticsInput,
+  TemplateGroupAnalyticsPoint,
+  TemplateGroupAnalyticsResponse,
+  TemplateGroupBody,
+  TemplateGroupDetails,
+  TemplateGroupListResponse,
+  TemplateGroupMutationResponse,
+  UpdateTemplateGroupBody
+} from "./groups.js";

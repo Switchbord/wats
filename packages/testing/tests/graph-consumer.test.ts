@@ -160,6 +160,8 @@ describe("F-4 @wats/graph consumer fixture", () => {
         "createMessageTemplate",
         "updateMessageTemplate",
         "deleteMessageTemplate",
+        "listTemplateGroups",
+        "getTemplateGroupAnalytics",
         "buildTemplateHeaderComponent",
         "validateTemplateParameterCounts"
       ],

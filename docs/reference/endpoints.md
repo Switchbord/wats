@@ -321,6 +321,38 @@ call-permission request helper accepts `to`, `bodyText`, optional `footerText`,
 and optional `replyToMessageId`; unknown fields reject before transport.
 
 
+
+## WATS-94 template groups and analytics
+
+WATS-94 adds credential-free endpoint callables for Meta's Template Group
+surfaces. These helpers are MockTransport-tested only; live WABA analytics and
+mutations remain credential-gated.
+
+- `listTemplateGroups(client, { wabaId, fields?, limit?, after?, before? })`
+  maps to `GET /{wabaId}/template_groups`.
+- `createTemplateGroup(client, { wabaId }, body)` maps to
+  `POST /{wabaId}/template_groups` and converts camelCase `templateIds` to
+  Graph `template_ids`.
+- `getTemplateGroup`, `updateTemplateGroup`, and `deleteTemplateGroup` map to
+  `GET` / `POST` / `DELETE /{templateGroupId}` respectively.
+- `getTemplateGroupAnalytics(client, { wabaId, templateGroupId?, ... })` maps
+  to `GET /{wabaId}/template_group_analytics` and serializes `metricTypes` as
+  Graph `metric_types`.
+
+```ts
+await listTemplateGroups(client, { wabaId, limit: "25" });
+await createTemplateGroup(client, { wabaId }, {
+  name: "launch_group",
+  category: "MARKETING",
+  templateIds: ["template-id-1"]
+});
+await getTemplateGroupAnalytics(client, {
+  wabaId,
+  templateGroupId: "template-group-id",
+  metricTypes: ["sent", "delivered"]
+});
+```
+
 ## WATS-93 authentication templates and local-storage settings
 
 WATS-93 models two v21+ compatibility deltas without making live Meta calls:

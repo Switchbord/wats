@@ -69,6 +69,7 @@ Current runtime endpoints and helpers:
 - `POST /{phoneNumberId}/messages`
 - `PhoneNumberClient.sendText(...)` convenience helper for arbitrary-recipient text starts (WATS-30)
 - WATS-38 `PhoneNumberClient` composer helpers for media, location, contacts, reaction, interactive variants, template send, mark-as-read, and typing indicators
+- WATS-94 Template Group helpers for Graph `template_groups` and `template_group_analytics` (`listTemplateGroups`, `getTemplateGroupAnalytics`)
 - `GET /{wabaId}/phone_numbers`
 
 Current endpoint subpaths:
