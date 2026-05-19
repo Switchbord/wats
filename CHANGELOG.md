@@ -3,6 +3,13 @@
 ## [0.3.2] - 2026-05-18
 
 
+### WATS-93 — auth-template nesting and local-storage settings
+
+- Adds authentication-template OTP button support for nested `supported_apps` records from `supportedApps: [{ packageName, signatureHash }]`, emitting Graph `package_name` / `signature_hash`.
+- Adds `updatePhoneNumberSettings(...)` and `PhoneNumberClient.updateSettings({ storageConfiguration })` for `POST /{phoneNumberId}/settings` with `storage_configuration`.
+- Documents that WATS does not emit `data_localization_region` on registration helpers; local-storage configuration uses the settings endpoint instead.
+
+
 ### WATS-92 — WhatsApp and Marketing Messages error registry refresh
 
 - Adds v21-v25 diagnostic code mappings for `131050`, `132018`, `131059`, `131064`, and Marketing Messages Lite `134100`, `134101`, `134102`, and `134103`.

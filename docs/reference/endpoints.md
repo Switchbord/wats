@@ -320,6 +320,40 @@ voice message. Omitting `voice` preserves the pre-WATS-90 audio payload. The
 call-permission request helper accepts `to`, `bodyText`, optional `footerText`,
 and optional `replyToMessageId`; unknown fields reject before transport.
 
+
+## WATS-93 authentication templates and local-storage settings
+
+WATS-93 models two v21+ compatibility deltas without making live Meta calls:
+
+- Authentication template OTP buttons for one-tap / zero-tap app autofill use
+  nested `supported_apps` records. In the WATS builder API, pass
+  `supportedApps: [{ packageName, signatureHash }]`; the Graph body emits
+  `supported_apps: [{ package_name, signature_hash }]`. Legacy flat
+  `packageName` / `signatureHash` on the OTP button are rejected.
+- Local-storage enablement is expressed through
+  `updatePhoneNumberSettings(..., { storageConfiguration })`, which POSTs
+  `storage_configuration` to `/{phoneNumberId}/settings`.
+- WATS does not expose a phone registration helper that emits the removed
+  `data_localization_region` field; local-storage configuration belongs in
+  `storage_configuration` settings updates instead.
+
+```ts
+buildTemplateButtonComponent({
+  buttons: [{
+    type: "OTP",
+    otpType: "ZERO_TAP",
+    supportedApps: [{ packageName: "com.example.app", signatureHash: "abc123" }]
+  }]
+});
+// => supported_apps: [{ package_name: "com.example.app", signature_hash: "abc123" }]
+
+await updatePhoneNumberSettings(client, {
+  phoneNumberId,
+  storageConfiguration: { status: "ENABLED" }
+});
+// => POST /{phoneNumberId}/settings { storage_configuration: { status: "ENABLED" } }
+```
+
 ## Public API summary
 
 - `defineEndpoint(spec): EndpointCallable`

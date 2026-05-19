@@ -141,6 +141,7 @@ endpoint callable.
 | `indicateTyping` | implemented (WATS-38) | read status + typing indicator payload |
 | `getInfo({ fields? })` | implemented (WATS-42A) | `GET /{phoneNumberId}` |
 | `getSettings({ fields?, includeSipCredentials? })` | implemented (WATS-42A) | `GET /{phoneNumberId}/settings`; `includeSipCredentials` maps to `include_sip_credentials` and responses may be sensitive |
+| `updateSettings({ storageConfiguration })` | implemented (WATS-93) | `POST /{phoneNumberId}/settings`; emits `storage_configuration` and never `data_localization_region` |
 | `getBusinessProfile({ fields? })` | implemented (WATS-42A) | `GET /{phoneNumberId}/whatsapp_business_profile` |
 | `getCommerceSettings({ fields? })` | implemented (WATS-42A) | `GET /{phoneNumberId}/whatsapp_commerce_settings` |
 | `initiateCall` | implemented (WATS-41) | `POST /{phoneNumberId}/calls` action `connect` |
@@ -154,6 +155,23 @@ Live template/Flow/calling validation, production Flow hosting, encrypted data-e
 request handling, live call sessions, and broad admin APIs remain separate credential-gated
 or roadmap issues. Consumer code may type-check this list via the exported method/input
 types.
+
+
+### `updateSettings({ storageConfiguration })` (WATS-93)
+
+`PhoneNumberClient.updateSettings(...)` binds the configured phone-number id and
+POSTs local-storage settings to `/{phoneNumberId}/settings`. Pass camelCase
+`storageConfiguration`; WATS emits Graph `storage_configuration` (the same
+local-storage settings surface used alongside authentication templates whose
+OTP buttons use `supported_apps` records with `package_name` and
+`signature_hash`). The removed registration field `data_localization_region` is
+rejected/documented as not emitted by WATS.
+
+```ts
+await phone.updateSettings({
+  storageConfiguration: { status: "ENABLED" }
+});
+```
 
 ### `sendText(input, opts?)` (WATS-30)
 
