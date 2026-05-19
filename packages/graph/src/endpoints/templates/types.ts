@@ -66,6 +66,7 @@ export interface ListMessageTemplatesInput {
   readonly qualityScore?: string;
   readonly limit?: string;
   readonly after?: string;
+  readonly before?: string;
 }
 
 export interface GetMessageTemplateInput {

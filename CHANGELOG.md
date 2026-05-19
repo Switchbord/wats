@@ -3,6 +3,13 @@
 ## [0.3.2] - 2026-05-18
 
 
+### WATS-91 — business messaging limits and template cursors
+
+- Adds typed WABA/phone-number response fields for `whatsapp_business_manager_messaging_limit` and v24+ `messaging_limit_tier` portfolio semantics.
+- Adds `before` cursor support to `listMessageTemplates(...)` and `WABAClient.listMessageTemplates(...)`, preserving existing `after` support.
+- Adds `InvalidTemplateCursorError` for Graph code `131059` and documents the opt-in retry without before/after cursor pattern for `message_templates`.
+
+
 ### WATS-89 — v24/v25 webhook schema refresh
 
 - Adds `played` to `WhatsAppMessageStatusKind` and `filtersTyped.status.played()` for voice playback receipts.

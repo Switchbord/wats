@@ -182,7 +182,33 @@ Set `maxPages: 1` for "first page only" semantics; set a larger cap
 for long-running exports; the default is a safety net rather than a
 tight bound.
 
-## Scope ledger (non-goals)
+## WATS-91 message template cursor handling
+
+`listMessageTemplates(...)` accepts both `after` and `before` cursor parameters
+and forwards them to Graph `/{wabaId}/message_templates`. Graph code `131059`
+now maps to `InvalidTemplateCursorError` when Meta rejects a template cursor.
+
+WATS does not perform a hidden retry automatically. If an application can safely
+restart the list from the first page, it can catch `InvalidTemplateCursorError`
+and retry without before/after as an explicit opt-in policy:
+
+```ts
+try {
+  await waba.listMessageTemplates({ after: savedCursor });
+} catch (error) {
+  if (error instanceof InvalidTemplateCursorError) {
+    // opt-in: discard stale cursor and retry without before/after
+    await waba.listMessageTemplates({ limit: "25" });
+  }
+}
+```
+
+WATS-91 also documents `whatsapp_business_manager_messaging_limit` and
+`messaging_limit_tier` on WABA/phone-number inventory responses; these are not
+pagination inputs but they often influence how operators schedule template and
+campaign work.
+
+## Non-goals
 
 F-13 pagination does NOT:
 

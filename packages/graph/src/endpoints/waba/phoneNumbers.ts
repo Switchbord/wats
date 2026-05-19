@@ -15,6 +15,8 @@ export interface PhoneNumberListEntry {
   readonly display_phone_number?: string;
   readonly verified_name?: string;
   readonly quality_rating?: string;
+  readonly messaging_limit_tier?: string;
+  readonly whatsapp_business_manager_messaging_limit?: string;
 }
 
 export interface PhoneNumberListResponse {

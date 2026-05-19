@@ -29,7 +29,8 @@ function normalizeListParams(input: ListMessageTemplatesInput): Record<string, s
     ["nameOrContent", "name_or_content"],
     ["qualityScore", "quality_score"],
     ["limit", "limit"],
-    ["after", "after"]
+    ["after", "after"],
+    ["before", "before"]
   ] as const) {
     if (record[publicKey] !== undefined) out[graphKey] = assertString(record[publicKey], publicKey, "listMessageTemplates");
   }
@@ -66,6 +67,7 @@ const listMessageTemplatesRaw = defineEndpoint<
     quality_score?: string;
     limit?: string;
     after?: string;
+    before?: string;
   },
   never,
   TemplateListResponse
@@ -83,7 +85,8 @@ const listMessageTemplatesRaw = defineEndpoint<
     name_or_content: { in: "query" },
     quality_score: { in: "query" },
     limit: { in: "query" },
-    after: { in: "query" }
+    after: { in: "query" },
+    before: { in: "query" }
   }
 });
 
