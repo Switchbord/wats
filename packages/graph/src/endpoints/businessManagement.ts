@@ -145,6 +145,21 @@ export interface GetPhoneNumberSettingsInput {
   readonly includeSipCredentials?: boolean;
 }
 
+export interface StorageConfigurationInput {
+  readonly status: "ENABLED" | "DISABLED" | string;
+  readonly [key: string]: unknown;
+}
+
+export interface UpdatePhoneNumberSettingsInput {
+  readonly phoneNumberId: string;
+  readonly storageConfiguration?: StorageConfigurationInput;
+}
+
+export interface PhoneNumberSettingsUpdateResponse {
+  readonly success?: boolean;
+  readonly [key: string]: unknown;
+}
+
 export interface GetBusinessProfileInput {
   readonly phoneNumberId: string;
   readonly fields?: BusinessManagementFields;
@@ -260,6 +275,41 @@ function optionalIncludeSipCredentials(record: Record<string, unknown>, helperNa
     throw validationError(`Invalid ${helperName} input: includeSipCredentials must be boolean when provided.`);
   }
   return value ? "true" : "false";
+}
+
+function sanitizeStorageConfiguration(value: unknown, helperName: string): Record<string, unknown> {
+  const record = assertPlainRecord(value, helperName, "storageConfiguration");
+  const status = ownDataValue(record, "status", helperName, true);
+  const out: Record<string, unknown> = {
+    status: assertQueryString(status, "storageConfiguration.status", helperName, 32).toUpperCase()
+  };
+  for (const [key, nested] of Object.entries(record)) {
+    if (key === "status") continue;
+    if (key === "dataLocalizationRegion" || key === "data_localization_region") {
+      throw validationError(`Invalid ${helperName} input: dataLocalizationRegion is not supported; use storageConfiguration.`);
+    }
+    if (nested !== undefined) out[key] = nested;
+  }
+  return out;
+}
+
+export function buildUpdatePhoneNumberSettingsBody(input: UpdatePhoneNumberSettingsInput): Record<string, unknown> {
+  const helperName = "updatePhoneNumberSettings";
+  const record = assertPlainRecord(input, helperName);
+  if (ownDataValue(record, "dataLocalizationRegion", helperName, false) !== undefined || ownDataValue(record, "data_localization_region", helperName, false) !== undefined) {
+    throw validationError(`Invalid ${helperName} input: dataLocalizationRegion is not supported; use storageConfiguration.`);
+  }
+  const storageConfiguration = ownDataValue(record, "storageConfiguration", helperName, false);
+  if (storageConfiguration === undefined) {
+    throw validationError(`Invalid ${helperName} input: storageConfiguration is required.`);
+  }
+  return { storage_configuration: sanitizeStorageConfiguration(storageConfiguration, helperName) };
+}
+
+export function normalizeUpdatePhoneNumberSettingsParams(input: UpdatePhoneNumberSettingsInput): WireParams {
+  const helperName = "updatePhoneNumberSettings";
+  const record = assertPlainRecord(input, helperName);
+  return { phoneNumberId: assertPathId(ownDataValue(record, "phoneNumberId", helperName, true), "phoneNumberId", helperName) };
 }
 
 export function normalizeWabaInfoParams(input: GetWabaInfoInput): WireParams {
@@ -396,6 +446,19 @@ const getPhoneNumberSettingsRaw = defineEndpoint<
   }
 });
 
+
+const updatePhoneNumberSettingsRaw = defineEndpoint<
+  { phoneNumberId: string },
+  UpdatePhoneNumberSettingsInput,
+  PhoneNumberSettingsUpdateResponse
+>({
+  method: "POST",
+  pathTemplate: "/{phoneNumberId}/settings",
+  params: { phoneNumberId: { in: "path", required: true } },
+  bodyContentType: "application/json",
+  buildBody: buildUpdatePhoneNumberSettingsBody
+});
+
 const getBusinessProfileRaw = defineEndpoint<{ phoneNumberId: string; fields?: string }, never, BusinessProfileResponse>({
   method: "GET",
   pathTemplate: "/{phoneNumberId}/whatsapp_business_profile",
@@ -438,6 +501,14 @@ export const getPhoneNumberSettings = Object.assign(
     return getPhoneNumberSettingsRaw(client, normalizePhoneNumberSettingsParams(params) as Parameters<typeof getPhoneNumberSettingsRaw>[1], undefined, sanitizeBusinessManagementOptions(opts, "getPhoneNumberSettings"));
   },
   { definition: getPhoneNumberSettingsRaw.definition }
+);
+
+export const updatePhoneNumberSettings = Object.assign(
+  async function updatePhoneNumberSettings(client: GraphClient, params: UpdatePhoneNumberSettingsInput, body?: never, opts?: EndpointInvokeOptions): Promise<PhoneNumberSettingsUpdateResponse> {
+    assertNoBody(body, "updatePhoneNumberSettings");
+    return updatePhoneNumberSettingsRaw(client, normalizeUpdatePhoneNumberSettingsParams(params) as Parameters<typeof updatePhoneNumberSettingsRaw>[1], params, sanitizeBusinessManagementOptions(opts, "updatePhoneNumberSettings"));
+  },
+  { definition: updatePhoneNumberSettingsRaw.definition }
 );
 
 export const getBusinessProfile = Object.assign(

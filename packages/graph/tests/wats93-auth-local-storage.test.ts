@@ -132,7 +132,8 @@ describe("WATS-93 local-storage phone-number settings", () => {
       enumerable: true,
       get() { throw new Error("storageConfiguration getter should not run"); }
     });
-    await expect(updatePhoneNumberSettings(client, { phoneNumberId: "PN-1", ...accessor } as never)).rejects.toThrow(GraphRequestValidationError);
+    Object.defineProperty(accessor, "phoneNumberId", { value: "PN-1", enumerable: true });
+    await expect(updatePhoneNumberSettings(client, accessor as never)).rejects.toThrow(GraphRequestValidationError);
 
     expect(handle.requests.length).toBe(0);
   });

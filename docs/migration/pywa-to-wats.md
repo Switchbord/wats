@@ -100,7 +100,7 @@ Migration notes:
 
 | pywa usage | WATS usage | Status | Notes |
 | --- | --- | --- | --- |
-| pywa `create_template` / `get_templates` / `delete_template` | WATS `WABAClient.createMessageTemplate`, `.listMessageTemplates`, `.getMessageTemplate`, `.updateMessageTemplate`, `.deleteMessageTemplate` | Implemented, live pending | Live template mutations require explicit opt-in. |
+| pywa `create_template` / `get_templates` / `delete_template` | WATS `WABAClient.createMessageTemplate`, `.listMessageTemplates`, `.getMessageTemplate`, `.updateMessageTemplate`, `.deleteMessageTemplate` | Implemented, live pending | Live template mutations require explicit opt-in. WATS-93 auth OTP buttons use `supportedApps` -> Graph `supported_apps` with nested `package_name` / `signature_hash`. |
 | pywa `send_template` | `PhoneNumberClient.sendTemplate` or `WhatsApp.sendTemplate` | Implemented, live pending | Parameter-count validation exists locally. |
 | pywa template component DSL | WATS component builders such as `buildTemplateHeaderComponent` | Partial | Core HEADER/BODY/FOOTER/BUTTONS helpers exist; pywa's larger DSL is broader. |
 | template status/category/quality/components handlers | `normalizeWebhookEnvelope` account helpers plus `filtersTyped.template` | Implemented, credential-free | Synthetic webhook coverage; live webhook validation pending. |
@@ -133,7 +133,8 @@ Migration notes:
 | --- | --- | --- | --- |
 | pywa `get_business_account` | `WABAClient.getInfo` / `getWabaInfo` | Read-only only | WATS-42A. |
 | pywa `get_business_phone_numbers` | `WABAClient.listPhoneNumbers` | Read-only only | Supports `fields`, `limit`, `after`, `before`. |
-| pywa `get_business_phone_number_settings` | `PhoneNumberClient.getSettings` | Read-only only | `includeSipCredentials` is sensitive. |
+| pywa `get_business_phone_number_settings` | `PhoneNumberClient.getSettings` | Implemented, read-only | `includeSipCredentials` is sensitive. |
+| pywa phone local-storage settings update | `PhoneNumberClient.updateSettings({ storageConfiguration })` / `updatePhoneNumberSettings` | Implemented, live pending | WATS-93 emits `storage_configuration`; WATS does not emit removed register field `data_localization_region`. |
 | pywa `get_business_profile` / `get_commerce_settings` | WATS `PhoneNumberClient.getBusinessProfile` / `.getCommerceSettings` | Read-only only | Mutations are deferred. |
 | register/deregister phone, callback overrides, public key, profile/settings/commerce updates | No first-class WATS helper yet | Deferred / credential-gated | Separate issue and explicit user authorization required. |
 | QR code CRUD, block/unblock users, token exchange | No first-class WATS helper yet | Deferred | Capture as Linear follow-ups if needed. |

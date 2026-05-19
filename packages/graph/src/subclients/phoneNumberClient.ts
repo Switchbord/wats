@@ -21,6 +21,7 @@ import {
   getCommerceSettings as getCommerceSettingsEndpoint,
   getPhoneNumberInfo as getPhoneNumberInfoEndpoint,
   getPhoneNumberSettings as getPhoneNumberSettingsEndpoint,
+  updatePhoneNumberSettings as updatePhoneNumberSettingsEndpoint,
   type BusinessProfileResponse,
   type CommerceSettingsResponse,
   type GetBusinessProfileInput,
@@ -28,7 +29,9 @@ import {
   type GetPhoneNumberInfoInput,
   type GetPhoneNumberSettingsInput,
   type PhoneNumberInfo,
-  type PhoneNumberSettingsResponse
+  type PhoneNumberSettingsResponse,
+  type PhoneNumberSettingsUpdateResponse,
+  type UpdatePhoneNumberSettingsInput
 } from "../endpoints/businessManagement.js";
 import {
   acceptCall as acceptCallEndpoint,
@@ -219,6 +222,25 @@ export class PhoneNumberClient {
     return getPhoneNumberSettingsEndpoint(
       this.#graphClient,
       scopedParams as unknown as GetPhoneNumberSettingsInput,
+      undefined,
+      opts
+    );
+  }
+
+
+  /** Graph `POST /{phoneNumberId}/settings`; WATS-93 local-storage settings update. */
+  async updateSettings(
+    params: Omit<UpdatePhoneNumberSettingsInput, "phoneNumberId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<PhoneNumberSettingsUpdateResponse> {
+    const scopedParams: Record<string, unknown> = copyOptionalParamsObject(
+      params,
+      "PhoneNumberClient.updateSettings"
+    );
+    scopedParams.phoneNumberId = this.#phoneNumberId;
+    return updatePhoneNumberSettingsEndpoint(
+      this.#graphClient,
+      scopedParams as unknown as UpdatePhoneNumberSettingsInput,
       undefined,
       opts
     );

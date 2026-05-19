@@ -41,8 +41,10 @@ export type {
   TemplateLanguageCode,
   TemplateListResponse,
   TemplateMutationResponse,
+  TemplateOtpType,
   TemplateParameterFormat,
   TemplateQualityScore,
   TemplateStatus,
+  TemplateSupportedAppInput,
   UpdateMessageTemplateBody
 } from "./types.js";

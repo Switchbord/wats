@@ -16,6 +16,7 @@ export type TemplateStatus =
 export type TemplateLanguageCode = string;
 export type TemplateParameterFormat = "POSITIONAL" | "NAMED";
 export type TemplateQualityScore = "GREEN" | "YELLOW" | "RED" | "UNKNOWN" | string;
+export type TemplateOtpType = "COPY_CODE" | "ONE_TAP" | "ZERO_TAP" | string;
 export type TemplateHeaderFormat = "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT" | "LOCATION";
 export type TemplateButtonType =
   | "QUICK_REPLY"
@@ -23,7 +24,8 @@ export type TemplateButtonType =
   | "PHONE_NUMBER"
   | "COPY_CODE"
   | "CATALOG"
-  | "FLOW";
+  | "FLOW"
+  | "OTP";
 
 export interface TemplateComponent {
   readonly type: string;
@@ -117,13 +119,20 @@ export interface TemplateFooterComponentInput {
   readonly [key: string]: unknown;
 }
 
+export interface TemplateSupportedAppInput {
+  readonly packageName: string;
+  readonly signatureHash: string;
+  readonly [key: string]: unknown;
+}
+
 export type TemplateButtonInput =
   | { readonly type: "QUICK_REPLY"; readonly text: string; readonly [key: string]: unknown }
   | { readonly type: "URL"; readonly text: string; readonly url: string; readonly [key: string]: unknown }
   | { readonly type: "PHONE_NUMBER"; readonly text: string; readonly phoneNumber: string; readonly [key: string]: unknown }
   | { readonly type: "COPY_CODE"; readonly example: string; readonly [key: string]: unknown }
   | { readonly type: "CATALOG"; readonly text?: string; readonly [key: string]: unknown }
-  | { readonly type: "FLOW"; readonly text: string; readonly flowId?: string; readonly flowName?: string; readonly flowAction?: string; readonly navigateScreen?: string; readonly [key: string]: unknown };
+  | { readonly type: "FLOW"; readonly text: string; readonly flowId?: string; readonly flowName?: string; readonly flowAction?: string; readonly navigateScreen?: string; readonly [key: string]: unknown }
+  | { readonly type: "OTP"; readonly otpType: TemplateOtpType; readonly text?: string; readonly supportedApps?: readonly TemplateSupportedAppInput[]; readonly [key: string]: unknown };
 
 export interface TemplateButtonsComponentInput {
   readonly buttons: readonly TemplateButtonInput[];
