@@ -35,6 +35,8 @@ export interface WabaInfo {
   readonly is_enabled_for_insights?: boolean;
   readonly marketing_messages_lite_api_status?: string;
   readonly marketing_messages_onboarding_status?: string;
+  /** WATS-91 / Graph v24+ portfolio-level messaging limit. */
+  readonly whatsapp_business_manager_messaging_limit?: string;
   readonly ownership_type?: string;
   readonly health_status?: unknown;
   readonly currency?: string;
@@ -67,6 +69,10 @@ export interface PhoneNumberInfo {
   readonly platform_type?: string;
   readonly throughput?: unknown;
   readonly webhook_configuration?: unknown;
+  /** Graph phone-number field; v24+ semantics return the business-portfolio messaging limit. */
+  readonly messaging_limit_tier?: string;
+  /** WATS-91 / Graph v24+ explicit portfolio-level messaging limit field. */
+  readonly whatsapp_business_manager_messaging_limit?: string;
   readonly [key: string]: unknown;
 }
 

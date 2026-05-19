@@ -331,6 +331,14 @@ export class TemplateDisabledError extends GraphApiError {
   }
 }
 
+export class InvalidTemplateCursorError extends GraphApiError {
+  static readonly errorCode = 131059 as const;
+  constructor(ctx: GraphErrorFactoryContext) {
+    super(coreParams(ctx, "Invalid message_templates cursor."));
+    this.name = "InvalidTemplateCursorError";
+  }
+}
+
 export class FlowBlockedError extends GraphApiError {
   static readonly errorCode = 132068 as const;
   constructor(ctx: GraphErrorFactoryContext) {
@@ -672,6 +680,7 @@ const BUILT_IN_SEEDS: readonly Seed[] = [
   { code: 131044, errorName: "BusinessPaymentIssueError", factory: (ctx) => new BusinessPaymentIssueError(ctx) },
   { code: 131045, errorName: "IncorrectCertificateError", factory: (ctx) => new IncorrectCertificateError(ctx) },
   { code: 131057, errorName: "AccountInMaintenanceModeError", factory: (ctx) => new AccountInMaintenanceModeError(ctx) },
+  { code: 131059, errorName: "InvalidTemplateCursorError", factory: (ctx) => new InvalidTemplateCursorError(ctx) },
   { code: 131050, errorName: "UserStoppedMarketingMessagesError", factory: (ctx) => new UserStoppedMarketingMessagesError(ctx) },
   { code: 137000, errorName: "RecipientIdentityKeyMismatchError", factory: (ctx) => new RecipientIdentityKeyMismatchError(ctx) },
   // --- Flow axis ---

@@ -208,6 +208,7 @@ rate-limit classification: `{4, 80007, 130429, 131048, 131056}`.
 | 131053 | `MediaUploadError` | `GraphApiError` | send-message | `MediaUploadError` |
 | 131056 | `TooManyMessagesError` | `GraphRateLimitError` | rate-limit | `TooManyMessages` |
 | 131057 | `AccountInMaintenanceModeError` | `GraphApiError` | send-message | `AccountInMaintenanceMode` |
+| 131059 | `InvalidTemplateCursorError` | `GraphApiError` | template | WATS-91 `message_templates` invalid before/after cursor |
 | 132000 | `TemplateParamCountMismatchError` | `GraphApiError` | template | `TemplateParamCountMismatch` |
 | 132001 | `TemplateNotExistsError` | `GraphApiError` | template | `TemplateNotExists` |
 | 132005 | `TemplateTextTooLongError` | `GraphApiError` | template | `TemplateTextTooLong` |
@@ -297,6 +298,20 @@ millisecond delay on `GraphRateLimitError`) is out of scope for F-5
 and deferred to a later feature. Consumers that need `Retry-After`
 parsing today must read it themselves from
 `error.payload ? ... : response.headers`.
+
+
+### WATS-91 message template cursor error
+
+WATS-91 adds `InvalidTemplateCursorError` for Graph code `131059`, emitted
+when `message_templates` pagination receives an invalid `before` or `after`
+cursor. This is intentionally not a hidden global retry: callers may opt into
+retry without before/after only for template-list operations where dropping the
+cursor is safe for their workflow.
+
+The related business-management response fields
+`whatsapp_business_manager_messaging_limit` and `messaging_limit_tier` are typed
+on WABA/phone-number read responses; `messaging_limit_tier` now reflects the
+business portfolio messaging limit in v24+ semantics.
 
 ### `GraphRequestValidationError` (F-4)
 
