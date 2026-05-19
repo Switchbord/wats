@@ -1,8 +1,8 @@
 # Docker Deployment Guide
 
 - status: design/scaffold
-- applies-to: WATS-49
-- lastReviewed: 2026-05-01
+- applies-to: WATS-49/WATS-96
+- lastReviewed: 2026-05-19
 
 ## Current implementation status
 
@@ -20,6 +20,12 @@ This guide is the WATS-49 deployment contract scaffold. It documents the shape f
 - env-secret references only
 - do not commit `.env`
 - do not pass raw secrets as CLI arguments
+
+## WATS-96 webhook mTLS and HMAC boundary
+
+Container packaging does not change the webhook security split. WATS verifies incoming Meta webhook POSTs at the app layer with HMAC-SHA256 from `X-Hub-Signature-256`; preserve the raw body so that app-level HMAC validation still succeeds.
+
+Optional Meta webhook mTLS is an infrastructure-level client certificate validation concern for the ingress in front of the container: reverse proxy, load balancer, service mesh, CDN, Kubernetes ingress, or other TLS terminator. During Meta's CA transition, operators who enable that control must configure trust for Meta's owned root `meta-outbound-api-ca-2025-12.pem` outside WATS. WATS does not vendor the CA, does not bake PEM contents into images, and does not configure user infrastructure automatically. Obtain and rotate the CA from Meta's authoritative channel rather than committing certificate material to this repo.
 
 ## Future Dockerfile shape
 

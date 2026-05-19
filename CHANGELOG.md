@@ -3,6 +3,13 @@
 ## [0.3.2] - 2026-05-18
 
 
+### WATS-96 — Graph v25 metadata and webhook mTLS docs
+
+- Documents that Meta Graph v25 deprecates `metadata=1` metadata/introspection usage and that WATS does not send `metadata=1`, append it to runtime Graph requests, or use it during docs/OpenAPI generation.
+- Documents Meta webhook mTLS CA transition guidance for the Meta-owned root `meta-outbound-api-ca-2025-12.pem` while preserving the required app-level HMAC `X-Hub-Signature-256` verification boundary.
+- Clarifies that infrastructure-level client certificate validation is operator-managed and optional: WATS does not vendor the Meta CA certificate, does not include PEM contents, and does not configure user infrastructure automatically.
+
+
 ### WATS-94 — template groups and analytics
 
 - Adds Template Group endpoint callables and WABAClient helpers: `listTemplateGroups`, `createTemplateGroup`, `getTemplateGroup`, `updateTemplateGroup`, `deleteTemplateGroup`, and `getTemplateGroupAnalytics`.

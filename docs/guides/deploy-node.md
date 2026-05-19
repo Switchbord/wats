@@ -1,6 +1,6 @@
 # Deploying a WATS webhook on Node
 
-> Status: guide (F-12). Shipped with WATS-22 (Arch-K).
+> Status: guide (F-12). Shipped with WATS-22 (Arch-K). WATS-96 adds the v25 webhook mTLS boundary note.
 
 This guide covers deploying a WATS webhook server under **Node.js**
 using `createNodeWebhookHandler` and the standard `node:http`
@@ -82,6 +82,12 @@ When running behind Nginx / Caddy / a cloud load balancer, make sure
 the proxy forwards the raw request body unchanged. Any transform
 applied before the body reaches WATS will invalidate the HMAC
 signature and cause 401 responses.
+
+## WATS-96 webhook mTLS and HMAC boundary
+
+`createNodeWebhookHandler` verifies Meta webhook POST bodies at the WATS app layer with HMAC-SHA256 from `X-Hub-Signature-256`. Keep that app-level HMAC verification enabled even if your Node deployment also sits behind TLS or mTLS infrastructure.
+
+Optional Meta webhook mTLS is an infrastructure-level client certificate validation control. During Meta's CA transition, configure your TLS terminator, reverse proxy, load balancer, CDN, platform ingress, or your own HTTPS server to trust Meta's owned root `meta-outbound-api-ca-2025-12.pem` only if you choose that deployment pattern. WATS does not vendor the CA file, does not include PEM contents, and does not configure user infrastructure automatically; obtain and rotate the CA from Meta's authoritative channel.
 
 ## Graceful shutdown
 

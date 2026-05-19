@@ -1,14 +1,20 @@
 # OpenAPI Reference (`@wats/service`)
 
 - status: experimental
-- applies-to: WATS-35/WATS-73
-- lastReviewed: 2026-05-06
+- applies-to: WATS-35/WATS-73/WATS-96
+- lastReviewed: 2026-05-19
 
 ## Purpose
 
 `@wats/service` can generate and serve an OpenAPI 3.1 document for the standalone WATS service API that exists today.
 
 This is not a Meta Graph API OpenAPI document. It describes only WATS service routes: status checks, configured webhook ingress, the current text, media, location, reaction, contacts, and interactive service APIs, and `/openapi.json`.
+
+## WATS-96 Graph v25 metadata compatibility
+
+Meta Graph v25 deprecates using the Graph query flag `metadata=1` for API metadata/introspection. WATS-96 keeps the service OpenAPI contract explicitly separate from that deprecated Graph metadata path: WATS does not send `metadata=1`, does not append it to Graph runtime requests, and does not use it during docs generation.
+
+The generated `/openapi.json` remains a local WATS service document, not a live Meta Graph v25 schema scrape. Consumers should treat any Meta-owned Graph OpenAPI/source-of-truth material as external documentation and should not expect WATS runtime or generation code to request `metadata=1`.
 
 ## Public API
 
