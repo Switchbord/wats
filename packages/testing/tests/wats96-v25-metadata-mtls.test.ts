@@ -14,8 +14,33 @@ function findRepoRoot(startDir: string): string {
 }
 
 const repoRoot = findRepoRoot(dirname(fileURLToPath(import.meta.url)));
-const metadataFlag = ["metadata", "=1"].join("");
+const metadataField = "metadata";
+const metadataOne = "1";
+const metadataFlag = [metadataField, "=", metadataOne].join("");
 const metaMtlsCa = "meta-outbound-api-ca-2025-12.pem";
+
+function stripComments(source: string): string {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//gu, "")
+    .replace(/(^|[^:])\/\/.*$/gmu, "$1");
+}
+
+function metadataQueryUses(source: string): readonly string[] {
+  const code = stripComments(source);
+  const patterns: readonly RegExp[] = [
+    /metadata\s*=\s*1/u,
+    /metadata%3D1/iu,
+    /[?&]metadata=1/u,
+    /["']metadata["']\s*,\s*["']1["']/u,
+    /(?:["']metadata["']|\bmetadata)\s*:\s*["']?1["']?/u,
+    /["']metadata["']\s*=>\s*["']?1["']?/u,
+    /searchParams\.(?:set|append)\(\s*["']metadata["']\s*,\s*["']1["']/u,
+    /URLSearchParams\(\s*\{[^}]*["']?metadata["']?\s*:\s*["']?1["']?/u
+  ];
+  return patterns
+    .filter((pattern) => pattern.test(code))
+    .map((pattern) => pattern.source);
+}
 
 function read(path: string): string {
   return readFileSync(join(repoRoot, path), "utf8");
@@ -107,8 +132,11 @@ describe("WATS-96 v25 Graph metadata and webhook mTLS docs", () => {
     const offenders = roots
       .flatMap(walkTsFiles)
       .filter((path) => !isTestAllowlist(path))
-      .filter((path) => readFileSync(path, "utf8").includes(metadataFlag))
-      .map((path) => relative(repoRoot, path).replace(/\\/gu, "/"));
+      .flatMap((path) => {
+        const source = readFileSync(path, "utf8");
+        const matches = metadataQueryUses(source);
+        return matches.map((pattern) => `${relative(repoRoot, path).replace(/\\/gu, "/")} :: ${pattern}`);
+      });
 
     expect(offenders).toEqual([]);
   });
