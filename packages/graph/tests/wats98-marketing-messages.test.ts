@@ -180,6 +180,24 @@ describe("WATS-98 Marketing Messages API request-shape helpers", () => {
     } as never)).toThrow(GraphRequestValidationError);
     expect(() => buildSendMarketingTemplatePayload({
       ...base,
+      components: new Proxy([templateComponent], {
+        getPrototypeOf() { throw new TypeError("components array proto trap should be wrapped"); }
+      })
+    } as never)).toThrow(GraphRequestValidationError);
+    expect(() => buildSendMarketingTemplatePayload({
+      ...base,
+      components: new Proxy([templateComponent], {
+        ownKeys() { throw new TypeError("components array ownKeys trap should be wrapped"); }
+      })
+    } as never)).toThrow(GraphRequestValidationError);
+    expect(() => buildSendMarketingTemplatePayload({
+      ...base,
+      components: [{ type: "body", parameters: new Proxy([{ type: "text", text: "Ada" }], {
+        getPrototypeOf() { throw new TypeError("parameters array proto trap should be wrapped"); }
+      }) }]
+    } as never)).toThrow(GraphRequestValidationError);
+    expect(() => buildSendMarketingTemplatePayload({
+      ...base,
       components: [{ type: "body", parameters: [new Proxy({ type: "text", text: "Ada" }, {
         ownKeys() { throw new TypeError("parameter ownKeys trap should be wrapped"); }
       })] }]

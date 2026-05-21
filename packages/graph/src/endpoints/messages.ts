@@ -812,10 +812,11 @@ function asRecordInput(input: unknown, helperName: string): Record<string, unkno
 }
 
 function assertArray(value: unknown, fieldName: string, helperName: string): readonly unknown[] {
-  if (!Array.isArray(value)) {
+  const isArray = inspectTemplateValue(helperName, fieldName, () => Array.isArray(value));
+  if (!isArray) {
     throw new GraphRequestValidationError(`Invalid ${helperName} input: ${fieldName} must be an array.`);
   }
-  return value;
+  return value as readonly unknown[];
 }
 
 function assertBoundedArray(
@@ -826,28 +827,31 @@ function assertBoundedArray(
   helperName: string
 ): readonly unknown[] {
   const arr = assertArray(value, fieldName, helperName);
-  if (arr.length < min || arr.length > max) {
+  const length = inspectTemplateValue(helperName, fieldName, () => arr.length);
+  if (length < min || length > max) {
     throw new GraphRequestValidationError(`Invalid ${helperName} input: ${fieldName} length must be between ${min} and ${max}.`);
   }
-  for (let i = 0; i < arr.length; i += 1) {
-    if (!(i in arr)) {
+  for (let i = 0; i < length; i += 1) {
+    const hasIndex = inspectTemplateValue(helperName, fieldName, () => i in arr);
+    if (!hasIndex) {
       throw new GraphRequestValidationError(`Invalid ${helperName} input: ${fieldName} must not contain sparse array holes.`);
     }
   }
-  if (Object.getPrototypeOf(arr) !== Array.prototype) {
+  const proto = inspectTemplateValue(helperName, fieldName, () => Object.getPrototypeOf(arr));
+  if (proto !== Array.prototype) {
     throw new GraphRequestValidationError(`Invalid ${helperName} input: ${fieldName} must use Array.prototype.`);
   }
-  if (Object.prototype.hasOwnProperty.call(arr, "map") || Object.prototype.hasOwnProperty.call(arr, Symbol.iterator)) {
+  const descriptors = inspectTemplateValue(helperName, fieldName, () => Object.getOwnPropertyDescriptors(arr));
+  if (descriptors.map !== undefined || Object.prototype.hasOwnProperty.call(descriptors, Symbol.iterator)) {
     throw new GraphRequestValidationError(`Invalid ${helperName} input: ${fieldName} must not override Array.prototype methods.`);
   }
-  const descriptors = Object.getOwnPropertyDescriptors(arr);
   const copy: unknown[] = [];
-  for (let i = 0; i < arr.length; i += 1) {
-    if (!Object.prototype.hasOwnProperty.call(arr, i)) {
+  for (let i = 0; i < length; i += 1) {
+    const descriptor = descriptors[String(i)];
+    if (descriptor === undefined) {
       throw new GraphRequestValidationError(`Invalid ${helperName} input: ${fieldName} must not contain inherited elements.`);
     }
-    const descriptor = descriptors[String(i)];
-    if (descriptor === undefined || typeof descriptor.get === "function" || typeof descriptor.set === "function") {
+    if (typeof descriptor.get === "function" || typeof descriptor.set === "function") {
       throw new GraphRequestValidationError(`Invalid ${helperName} input: ${fieldName} must not use accessors.`);
     }
     copy.push(descriptor.value);
