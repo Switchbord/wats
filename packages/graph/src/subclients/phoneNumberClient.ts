@@ -517,17 +517,19 @@ export class PhoneNumberClient {
   }
 
   async sendMarketingTemplate(input: GraphMessagesSendMarketingTemplateInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesMarketingTemplateResponse> {
-    const body: Record<string, unknown> = copyOptionalParamsObject(
-      input,
-      "PhoneNumberClient.sendMarketingTemplate"
-    );
-    delete body.phoneNumberId;
-    return sendMarketingTemplateEndpoint(
-      this.#graphClient,
-      { phoneNumberId: this.#phoneNumberId },
-      body as unknown as GraphMessagesSendMarketingTemplateInput,
-      opts
-    );
+    try {
+      const body = { ...(input as unknown as Record<string, unknown>) };
+      delete body.phoneNumberId;
+      return sendMarketingTemplateEndpoint(
+        this.#graphClient,
+        { phoneNumberId: this.#phoneNumberId },
+        body as unknown as GraphMessagesSendMarketingTemplateInput,
+        opts
+      );
+    } catch (error) {
+      if (error instanceof GraphRequestValidationError) throw error;
+      throw new GraphRequestValidationError("Invalid PhoneNumberClient.sendMarketingTemplate input: body could not be inspected.");
+    }
   }
 
   async initiateCall(input: InitiateCallRequest, opts?: EndpointInvokeOptions): Promise<CallLifecycleResponse> {

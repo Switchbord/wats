@@ -136,6 +136,13 @@ describe("WATS-98 Marketing Messages API request-shape helpers", () => {
       name: "promo_offer",
       languageCode: "en_US"
     } as never);
+    const { proxy: revokedScopedInput, revoke: revokeScopedInput } = Proxy.revocable({
+      recipient: "bsuid-parent-2",
+      name: "promo_offer",
+      languageCode: "en_US"
+    }, {});
+    revokeScopedInput();
+    await expect(scoped.sendMarketingTemplate(revokedScopedInput as never)).rejects.toThrow(GraphRequestValidationError);
 
     expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v25.0/BOUND/marketing_messages");
     expect(parseBody(handle.requests[0]?.body)).toEqual({
@@ -197,6 +204,15 @@ describe("WATS-98 Marketing Messages API request-shape helpers", () => {
       ...base,
       components: new Proxy([templateComponent], {
         ownKeys() { throw new TypeError("components array ownKeys trap should be wrapped"); }
+      })
+    } as never)).toThrow(GraphRequestValidationError);
+    expect(() => buildSendMarketingTemplatePayload({
+      ...base,
+      components: new Proxy([templateComponent], {
+        get(target, prop, receiver) {
+          if (prop === "length") return Symbol("bad-length");
+          return Reflect.get(target, prop, receiver);
+        }
       })
     } as never)).toThrow(GraphRequestValidationError);
     expect(() => buildSendMarketingTemplatePayload({

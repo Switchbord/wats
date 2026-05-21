@@ -827,7 +827,7 @@ function assertBoundedArray(
 ): readonly unknown[] {
   const arr = assertArray(value, fieldName, helperName);
   const length = inspectTemplateValue(helperName, fieldName, () => arr.length);
-  if (length < min || length > max) {
+  if (!Number.isInteger(length) || length < min || length > max) {
     throw new GraphRequestValidationError(`Invalid ${helperName} input: ${fieldName} length must be between ${min} and ${max}.`);
   }
   for (let i = 0; i < length; i += 1) {
