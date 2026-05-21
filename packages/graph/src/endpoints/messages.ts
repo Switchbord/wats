@@ -18,9 +18,12 @@
 // builders for media, location, contacts, reaction, interactive variants,
 // template send, mark-as-read, and typing indicators. Template
 // CRUD/management landed in WATS-39; Flow management helpers landed in WATS-40.
+// WATS-98 adds credential-free Marketing Messages API request-shape helpers
+// for `POST /{phoneNumberId}/marketing_messages` only; no live Meta calls,
+// credential validation, Ads Manager dashboards, or ACO automation claims.
 
 import type { GraphClient, GraphRequestOptions } from "../client.js";
-import { defineEndpoint } from "../endpoint.js";
+import { defineEndpoint, type EndpointInvokeOptions } from "../endpoint.js";
 import { GraphRequestValidationError } from "../errors.js";
 
 interface GraphRequestExecutor {
@@ -236,6 +239,19 @@ export interface GraphMessagesSendTemplateInput {
   readonly replyToMessageId?: string;
 }
 
+export type GraphMessagesMarketingProductPolicy = "CLOUD_API_FALLBACK" | "STRICT";
+export type GraphMessagesMarketingMessageStatus = "accepted" | "held_for_quality_assessment" | "paused" | string;
+
+export interface GraphMessagesSendMarketingTemplateInput {
+  readonly to?: string;
+  readonly recipient?: string;
+  readonly name: string;
+  readonly languageCode: string;
+  readonly components?: readonly GraphMessagesTemplateComponentInput[];
+  readonly productPolicy?: GraphMessagesMarketingProductPolicy;
+  readonly messageActivitySharing?: boolean;
+}
+
 export interface GraphMessagesSendResponse {
   messaging_product?: string;
   contacts?: Array<{
@@ -245,6 +261,32 @@ export interface GraphMessagesSendResponse {
   messages?: Array<{
     id: string;
   }>;
+}
+
+export interface GraphMessagesMarketingTemplateResponse {
+  messaging_product?: string;
+  contacts?: Array<{
+    input?: string;
+    wa_id?: string;
+    /** WATS-98 BSUID response field returned for Business-Scoped User ID sends. */
+    user_id?: string;
+  }>;
+  messages?: Array<{
+    id: string;
+    /** WATS-98 /marketing_messages status: accepted, held_for_quality_assessment, or paused. */
+    message_status?: GraphMessagesMarketingMessageStatus;
+  }>;
+}
+
+export interface GraphMessagesMarketingTemplatePayload {
+  messaging_product: "whatsapp";
+  recipient_type: "individual";
+  to?: string;
+  recipient?: string;
+  type: "template";
+  template: Record<string, unknown>;
+  product_policy?: GraphMessagesMarketingProductPolicy;
+  message_activity_sharing?: boolean;
 }
 
 export interface GraphMessagesTextPayload {
@@ -769,10 +811,11 @@ function asRecordInput(input: unknown, helperName: string): Record<string, unkno
 }
 
 function assertArray(value: unknown, fieldName: string, helperName: string): readonly unknown[] {
-  if (!Array.isArray(value)) {
+  const isArray = inspectTemplateValue(helperName, fieldName, () => Array.isArray(value));
+  if (!isArray) {
     throw new GraphRequestValidationError(`Invalid ${helperName} input: ${fieldName} must be an array.`);
   }
-  return value;
+  return value as readonly unknown[];
 }
 
 function assertBoundedArray(
@@ -783,28 +826,31 @@ function assertBoundedArray(
   helperName: string
 ): readonly unknown[] {
   const arr = assertArray(value, fieldName, helperName);
-  if (arr.length < min || arr.length > max) {
+  const length = inspectTemplateValue(helperName, fieldName, () => arr.length);
+  if (!Number.isInteger(length) || length < min || length > max) {
     throw new GraphRequestValidationError(`Invalid ${helperName} input: ${fieldName} length must be between ${min} and ${max}.`);
   }
-  for (let i = 0; i < arr.length; i += 1) {
-    if (!(i in arr)) {
+  for (let i = 0; i < length; i += 1) {
+    const hasIndex = inspectTemplateValue(helperName, fieldName, () => i in arr);
+    if (!hasIndex) {
       throw new GraphRequestValidationError(`Invalid ${helperName} input: ${fieldName} must not contain sparse array holes.`);
     }
   }
-  if (Object.getPrototypeOf(arr) !== Array.prototype) {
+  const proto = inspectTemplateValue(helperName, fieldName, () => Object.getPrototypeOf(arr));
+  if (proto !== Array.prototype) {
     throw new GraphRequestValidationError(`Invalid ${helperName} input: ${fieldName} must use Array.prototype.`);
   }
-  if (Object.prototype.hasOwnProperty.call(arr, "map") || Object.prototype.hasOwnProperty.call(arr, Symbol.iterator)) {
+  const descriptors = inspectTemplateValue(helperName, fieldName, () => Object.getOwnPropertyDescriptors(arr));
+  if (descriptors.map !== undefined || Object.prototype.hasOwnProperty.call(descriptors, Symbol.iterator)) {
     throw new GraphRequestValidationError(`Invalid ${helperName} input: ${fieldName} must not override Array.prototype methods.`);
   }
-  const descriptors = Object.getOwnPropertyDescriptors(arr);
   const copy: unknown[] = [];
-  for (let i = 0; i < arr.length; i += 1) {
-    if (!Object.prototype.hasOwnProperty.call(arr, i)) {
+  for (let i = 0; i < length; i += 1) {
+    const descriptor = descriptors[String(i)];
+    if (descriptor === undefined) {
       throw new GraphRequestValidationError(`Invalid ${helperName} input: ${fieldName} must not contain inherited elements.`);
     }
-    const descriptor = descriptors[String(i)];
-    if (descriptor === undefined || typeof descriptor.get === "function" || typeof descriptor.set === "function") {
+    if (typeof descriptor.get === "function" || typeof descriptor.set === "function") {
       throw new GraphRequestValidationError(`Invalid ${helperName} input: ${fieldName} must not use accessors.`);
     }
     copy.push(descriptor.value);
@@ -1097,6 +1143,15 @@ export function buildTypingIndicatorPayload(input: GraphMessagesTypingIndicatorI
   return { ...payload, typing_indicator: { type: "text" } };
 }
 
+function inspectTemplateValue<T>(helperName: string, path: string, inspector: () => T): T {
+  try {
+    return inspector();
+  } catch (error) {
+    if (error instanceof GraphRequestValidationError) throw error;
+    throw new GraphRequestValidationError(`Invalid ${helperName} input: ${path} could not be inspected.`);
+  }
+}
+
 function sanitizeTemplateParameter(
   value: unknown,
   helperName: string,
@@ -1121,9 +1176,11 @@ function sanitizeTemplateParameter(
   }
   if (value === null || typeof value === "boolean") return value;
   if (value === undefined) return undefined;
-  if (Array.isArray(value)) {
-    const own = Object.getOwnPropertyDescriptors(value);
-    if (Object.prototype.hasOwnProperty.call(own, "toJSON") || "toJSON" in value) {
+  const maybeObject = value as object;
+  const isArrayValue = inspectTemplateValue(helperName, path, () => Array.isArray(maybeObject));
+  if (isArrayValue) {
+    const own = inspectTemplateValue(helperName, path, () => Object.getOwnPropertyDescriptors(maybeObject));
+    if (Object.prototype.hasOwnProperty.call(own, "toJSON") || inspectTemplateValue(helperName, path, () => "toJSON" in maybeObject)) {
       throw new GraphRequestValidationError(`Invalid ${helperName} input: ${path} must not define toJSON.`);
     }
     for (const [key, descriptor] of Object.entries(own)) {
@@ -1139,12 +1196,12 @@ function sanitizeTemplateParameter(
     throw new GraphRequestValidationError(`Invalid ${helperName} input: ${path} must be JSON-serializable.`);
   }
   const record = value as Record<string, unknown>;
-  const proto = Object.getPrototypeOf(record);
+  const proto = inspectTemplateValue(helperName, path, () => Object.getPrototypeOf(record));
   if (proto !== Object.prototype && proto !== null) {
     throw new GraphRequestValidationError(`Invalid ${helperName} input: ${path} must be a plain object.`);
   }
-  const descriptors = Object.getOwnPropertyDescriptors(record);
-  if (Object.prototype.hasOwnProperty.call(descriptors, "toJSON") || "toJSON" in record) {
+  const descriptors = inspectTemplateValue(helperName, path, () => Object.getOwnPropertyDescriptors(record));
+  if (Object.prototype.hasOwnProperty.call(descriptors, "toJSON") || inspectTemplateValue(helperName, path, () => "toJSON" in record)) {
     throw new GraphRequestValidationError(`Invalid ${helperName} input: ${path} must not define toJSON.`);
   }
   for (const [key, descriptor] of Object.entries(descriptors)) {
@@ -1160,20 +1217,24 @@ function sanitizeTemplateParameter(
   }
   seen.add(record);
   const out: Record<string, unknown> = {};
-  for (const [key, nested] of Object.entries(record)) {
-    if (key.length === 0 || key.length > GRAPH_MESSAGES_SHORT_LABEL_MAX_LENGTH || hasControlChar(key)) {
-      throw new GraphRequestValidationError(`Invalid ${helperName} input: ${path} contains an invalid key.`);
+  try {
+    for (const [key, descriptor] of Object.entries(descriptors)) {
+      if (key.length === 0 || key.length > GRAPH_MESSAGES_SHORT_LABEL_MAX_LENGTH || hasControlChar(key)) {
+        throw new GraphRequestValidationError(`Invalid ${helperName} input: ${path} contains an invalid key.`);
+      }
+      const sanitized = sanitizeTemplateParameter(descriptor.value, helperName, `${path}.${key}`, seen, depth + 1);
+      if (sanitized !== undefined) out[key] = sanitized;
     }
-    const sanitized = sanitizeTemplateParameter(nested, helperName, `${path}.${key}`, seen, depth + 1);
-    if (sanitized !== undefined) out[key] = sanitized;
+  } finally {
+    seen.delete(record);
   }
-  seen.delete(record);
   return out;
 }
 
 function normalizeTemplateComponent(value: unknown, helperName: string): Record<string, unknown> {
-  if (!isPlainOptionsObject(value)) throw new GraphRequestValidationError(`Invalid ${helperName} input: component entries must be objects.`);
-  const component = value as Record<string, unknown>;
+  const cloned = sanitizeTemplateParameter(value, helperName, "component", new WeakSet<object>());
+  if (!isPlainOptionsObject(cloned)) throw new GraphRequestValidationError(`Invalid ${helperName} input: component entries must be objects.`);
+  const component = cloned as Record<string, unknown>;
   const out: Record<string, unknown> = { type: assertNonEmptyControlFreeString(component.type, "component.type", GRAPH_MESSAGES_SHORT_LABEL_MAX_LENGTH, helperName) };
   if (component.subType !== undefined) out.sub_type = assertNonEmptyControlFreeString(component.subType, "component.subType", GRAPH_MESSAGES_SHORT_LABEL_MAX_LENGTH, helperName);
   if (component.index !== undefined) out.index = assertNonEmptyControlFreeString(component.index, "component.index", 8, helperName);
@@ -1193,6 +1254,111 @@ export function buildSendTemplatePayload(input: GraphMessagesSendTemplateInput):
   if (record.components !== undefined) template.components = mapValidatedArray(assertBoundedArray(record.components, "components", 0, 100, "sendTemplate"), (c) => normalizeTemplateComponent(c, "sendTemplate"));
   return withReplyContext({ messaging_product: "whatsapp", to: assertValidRecipient(record.to, "sendTemplate"), type: "template", template }, record);
 }
+
+function assertMarketingRecipient(value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  return assertNonEmptyControlFreeString(value, "recipient", GRAPH_MESSAGES_MEDIA_ID_MAX_LENGTH, "sendMarketingTemplate");
+}
+
+function buildMarketingTemplateObject(record: Record<string, unknown>): Record<string, unknown> {
+  const name = record.name;
+  const languageCode = record.languageCode;
+  const components = record.components;
+  const template: Record<string, unknown> = {
+    name: assertNonEmptyControlFreeString(name, "name", GRAPH_MESSAGES_MEDIA_ID_MAX_LENGTH, "sendMarketingTemplate"),
+    language: { code: assertNonEmptyControlFreeString(languageCode, "languageCode", GRAPH_MESSAGES_SHORT_LABEL_MAX_LENGTH, "sendMarketingTemplate") }
+  };
+  if (components !== undefined) {
+    template.components = mapValidatedArray(assertBoundedArray(components, "components", 0, 100, "sendMarketingTemplate"), (c) => normalizeTemplateComponent(c, "sendMarketingTemplate"));
+  }
+  return template;
+}
+
+function copySendMarketingTemplateInput(input: GraphMessagesSendMarketingTemplateInput): Record<string, unknown> {
+  if (typeof input !== "object" || input === null) {
+    throw new GraphRequestValidationError("Invalid sendMarketingTemplate input: expected an options object.");
+  }
+  const record = input as unknown as Record<string, unknown>;
+  const isArrayInput = inspectTemplateValue("sendMarketingTemplate", "input", () => Array.isArray(record));
+  if (isArrayInput) {
+    throw new GraphRequestValidationError("Invalid sendMarketingTemplate input: expected an options object.");
+  }
+  const proto = inspectTemplateValue("sendMarketingTemplate", "input", () => Object.getPrototypeOf(record));
+  if (proto !== Object.prototype && proto !== null) {
+    throw new GraphRequestValidationError("Invalid sendMarketingTemplate input: expected a plain options object.");
+  }
+  const descriptors = inspectTemplateValue("sendMarketingTemplate", "input", () => Object.getOwnPropertyDescriptors(record));
+  if (Object.prototype.hasOwnProperty.call(descriptors, "toJSON") || inspectTemplateValue("sendMarketingTemplate", "input", () => "toJSON" in record)) {
+    throw new GraphRequestValidationError("Invalid sendMarketingTemplate input: input must not define toJSON.");
+  }
+  const out: Record<string, unknown> = {};
+  for (const [key, descriptor] of Object.entries(descriptors)) {
+    if (typeof descriptor.get === "function" || typeof descriptor.set === "function") {
+      throw new GraphRequestValidationError(`Invalid sendMarketingTemplate input: ${key} must not use accessors.`);
+    }
+    if (descriptor.value !== undefined) out[key] = descriptor.value;
+  }
+  assertOnlyKnownKeys(out, ["to", "recipient", "name", "languageCode", "components", "productPolicy", "messageActivitySharing"], "sendMarketingTemplate");
+  return out;
+}
+
+export function buildSendMarketingTemplatePayload(input: GraphMessagesSendMarketingTemplateInput): GraphMessagesMarketingTemplatePayload {
+  const record = copySendMarketingTemplateInput(input);
+  const to = record.to === undefined ? undefined : assertValidRecipient(record.to, "sendMarketingTemplate");
+  const recipient = assertMarketingRecipient(record.recipient);
+  if (to === undefined && recipient === undefined) {
+    throw new GraphRequestValidationError("Invalid sendMarketingTemplate input: at least one of to or recipient is required.");
+  }
+  const payload: GraphMessagesMarketingTemplatePayload = {
+    messaging_product: "whatsapp",
+    recipient_type: "individual",
+    type: "template",
+    template: buildMarketingTemplateObject(record)
+  };
+  if (to !== undefined) payload.to = to;
+  if (recipient !== undefined) payload.recipient = recipient;
+  const productPolicy = record.productPolicy;
+  if (productPolicy !== undefined) {
+    if (productPolicy !== "CLOUD_API_FALLBACK" && productPolicy !== "STRICT") {
+      throw new GraphRequestValidationError("Invalid sendMarketingTemplate input: productPolicy must be CLOUD_API_FALLBACK or STRICT.");
+    }
+    payload.product_policy = productPolicy;
+  }
+  const messageActivitySharing = record.messageActivitySharing;
+  if (messageActivitySharing !== undefined) {
+    if (typeof messageActivitySharing !== "boolean") {
+      throw new GraphRequestValidationError("Invalid sendMarketingTemplate input: messageActivitySharing must be a boolean when provided.");
+    }
+    payload.message_activity_sharing = messageActivitySharing;
+  }
+  return payload;
+}
+
+const sendMarketingTemplateEndpoint = defineEndpoint<
+  { phoneNumberId: string },
+  GraphMessagesSendMarketingTemplateInput,
+  GraphMessagesMarketingTemplateResponse
+>({
+  method: "POST",
+  pathTemplate: "/{phoneNumberId}/marketing_messages",
+  params: { phoneNumberId: { in: "path", required: true } },
+  bodyContentType: "application/json",
+  buildBody: buildSendMarketingTemplatePayload
+});
+
+export async function sendMarketingTemplate(
+  client: GraphClient,
+  params: { phoneNumberId: string },
+  body: GraphMessagesSendMarketingTemplateInput,
+  opts?: EndpointInvokeOptions
+): Promise<GraphMessagesMarketingTemplateResponse> {
+  if (body === undefined) {
+    throw new GraphRequestValidationError("Invalid sendMarketingTemplate input: body is required.");
+  }
+  return sendMarketingTemplateEndpoint(client, params, body, opts);
+}
+
+sendMarketingTemplate.definition = sendMarketingTemplateEndpoint.definition;
 
 export function buildSendMessagePayload(
   input: GraphMessagesSendMessageInput

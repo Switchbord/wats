@@ -83,6 +83,7 @@ import {
   buildSendReactionPayload,
   buildSendStickerPayload,
   buildSendTemplatePayload,
+  sendMarketingTemplate as sendMarketingTemplateEndpoint,
   buildSendTextPayload,
   buildSendVideoPayload,
   buildTypingIndicatorPayload,
@@ -101,6 +102,8 @@ import {
   type GraphMessagesSendImageInput,
   type GraphMessagesSendListInput,
   type GraphMessagesSendLocationInput,
+  type GraphMessagesSendMarketingTemplateInput,
+  type GraphMessagesMarketingTemplateResponse,
   type GraphMessagesSendProductInput,
   type GraphMessagesSendProductsInput,
   type GraphMessagesSendReactionInput,
@@ -511,6 +514,35 @@ export class PhoneNumberClient {
 
   async sendTemplate(input: GraphMessagesSendTemplateInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse> {
     return this.sendMessage(buildSendTemplatePayload(input), opts);
+  }
+
+  async sendMarketingTemplate(input: GraphMessagesSendMarketingTemplateInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesMarketingTemplateResponse> {
+    try {
+      if (typeof input !== "object" || input === null) {
+        throw new GraphRequestValidationError("Invalid PhoneNumberClient.sendMarketingTemplate input: expected an options object.");
+      }
+      if (Array.isArray(input)) {
+        throw new GraphRequestValidationError("Invalid PhoneNumberClient.sendMarketingTemplate input: expected an options object.");
+      }
+      const record = input as unknown as Record<string, unknown>;
+      const descriptors = Object.getOwnPropertyDescriptors(record);
+      const body: Record<string, unknown> = {};
+      for (const [key, descriptor] of Object.entries(descriptors)) {
+        if (typeof descriptor.get === "function" || typeof descriptor.set === "function") {
+          throw new GraphRequestValidationError(`Invalid PhoneNumberClient.sendMarketingTemplate input: ${key} must not use accessors.`);
+        }
+        if (key !== "phoneNumberId" && descriptor.value !== undefined) body[key] = descriptor.value;
+      }
+      return sendMarketingTemplateEndpoint(
+        this.#graphClient,
+        { phoneNumberId: this.#phoneNumberId },
+        body as unknown as GraphMessagesSendMarketingTemplateInput,
+        opts
+      );
+    } catch (error) {
+      if (error instanceof GraphRequestValidationError) throw error;
+      throw new GraphRequestValidationError("Invalid PhoneNumberClient.sendMarketingTemplate input: body could not be inspected.");
+    }
   }
 
   async initiateCall(input: InitiateCallRequest, opts?: EndpointInvokeOptions): Promise<CallLifecycleResponse> {

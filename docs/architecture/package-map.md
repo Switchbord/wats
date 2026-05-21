@@ -67,6 +67,7 @@ Canonical dependency map for the WATS workspace. Arrows point from dependent pac
 Current runtime endpoints and helpers:
 
 - `POST /{phoneNumberId}/messages`
+- WATS-98 `POST /{phoneNumberId}/marketing_messages` via `sendMarketingTemplate` and `PhoneNumberClient.sendMarketingTemplate(...)`
 - `PhoneNumberClient.sendText(...)` convenience helper for arbitrary-recipient text starts (WATS-30)
 - WATS-38 `PhoneNumberClient` composer helpers for media, location, contacts, reaction, interactive variants, template send, mark-as-read, and typing indicators
 - WATS-94 Template Group helpers for Graph `template_groups` and `template_group_analytics` (`listTemplateGroups`, `getTemplateGroupAnalytics`)

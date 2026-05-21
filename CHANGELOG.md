@@ -3,6 +3,12 @@
 ## [0.3.2] - 2026-05-18
 
 
+### WATS-98 — Marketing Messages API compatibility surfaces
+
+- Adds credential-free `sendMarketingTemplate` / `buildSendMarketingTemplatePayload` helpers for `POST /{phoneNumberId}/marketing_messages`, including `product_policy`, `message_activity_sharing`, BSUID `recipient`, and `messages[].message_status` response typing (`accepted`, `held_for_quality_assessment`, `paused`).
+- Normalizes current Marketing Messages status/onboarding values: `pricing.category = "marketing_lite"`, `conversation.origin.type = "marketing_lite"`, and `account.marketingMessages` for `MM_LITE_TERMS_SIGNED` / `marketing_messages_onboarding_status` / deprecated `marketing_messages_lite_api_status` fields.
+- No live Meta calls, credential validation, Ads Manager dashboards, ACO claims, marketing automation, npm publish, tag, or GitHub release are included.
+
 ### WATS-95 — business-management Block API and alert deltas
 
 - Adds credential-free MockTransport helpers for Meta `block_users`: `listBlockedUsers`, `blockUsers`, `unblockUsers`, and matching `PhoneNumberClient` methods.

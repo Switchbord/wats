@@ -13,6 +13,16 @@ export * from "./entities.js";
 
 // F-1 discriminated unions.
 export type {
+  WhatsAppMessageStatus,
+  WhatsAppMessageStatusKind,
+  PricingRef,
+  ConversationRef,
+  WhatsAppPricingCategory,
+  WhatsAppPricingModel,
+  WhatsAppMarketingMessageStatus
+} from "./statuses.js";
+
+export type {
   TextMessage,
   ImageMessage,
   VideoMessage,
