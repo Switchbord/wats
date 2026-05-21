@@ -1215,8 +1215,9 @@ function sanitizeTemplateParameter(
 }
 
 function normalizeTemplateComponent(value: unknown, helperName: string): Record<string, unknown> {
-  if (!isPlainOptionsObject(value)) throw new GraphRequestValidationError(`Invalid ${helperName} input: component entries must be objects.`);
-  const component = value as Record<string, unknown>;
+  const cloned = sanitizeTemplateParameter(value, helperName, "component", new WeakSet<object>());
+  if (!isPlainOptionsObject(cloned)) throw new GraphRequestValidationError(`Invalid ${helperName} input: component entries must be objects.`);
+  const component = cloned as Record<string, unknown>;
   const out: Record<string, unknown> = { type: assertNonEmptyControlFreeString(component.type, "component.type", GRAPH_MESSAGES_SHORT_LABEL_MAX_LENGTH, helperName) };
   if (component.subType !== undefined) out.sub_type = assertNonEmptyControlFreeString(component.subType, "component.subType", GRAPH_MESSAGES_SHORT_LABEL_MAX_LENGTH, helperName);
   if (component.index !== undefined) out.index = assertNonEmptyControlFreeString(component.index, "component.index", 8, helperName);

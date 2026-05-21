@@ -165,6 +165,13 @@ describe("WATS-98 Marketing Messages API request-shape helpers", () => {
       enumerable: true,
       get() { throw new TypeError("name getter should not run"); }
     }) as never)).toThrow(GraphRequestValidationError);
+    expect(() => buildSendMarketingTemplatePayload({
+      ...base,
+      components: [Object.defineProperty({}, "type", {
+        enumerable: true,
+        get() { throw new TypeError("component.type getter should not run"); }
+      })]
+    } as never)).toThrow(GraphRequestValidationError);
 
     await expect(sendMarketingTemplate(client, { phoneNumberId: "555" }, undefined as never)).rejects.toThrow(GraphRequestValidationError);
     await expect(sendMarketingTemplate(client, { phoneNumberId: "../555" }, base)).rejects.toThrow(GraphRequestValidationError);
