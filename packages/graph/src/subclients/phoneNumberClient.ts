@@ -518,8 +518,21 @@ export class PhoneNumberClient {
 
   async sendMarketingTemplate(input: GraphMessagesSendMarketingTemplateInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesMarketingTemplateResponse> {
     try {
-      const body = { ...(input as unknown as Record<string, unknown>) };
-      delete body.phoneNumberId;
+      if (typeof input !== "object" || input === null) {
+        throw new GraphRequestValidationError("Invalid PhoneNumberClient.sendMarketingTemplate input: expected an options object.");
+      }
+      if (Array.isArray(input)) {
+        throw new GraphRequestValidationError("Invalid PhoneNumberClient.sendMarketingTemplate input: expected an options object.");
+      }
+      const record = input as unknown as Record<string, unknown>;
+      const descriptors = Object.getOwnPropertyDescriptors(record);
+      const body: Record<string, unknown> = {};
+      for (const [key, descriptor] of Object.entries(descriptors)) {
+        if (typeof descriptor.get === "function" || typeof descriptor.set === "function") {
+          throw new GraphRequestValidationError(`Invalid PhoneNumberClient.sendMarketingTemplate input: ${key} must not use accessors.`);
+        }
+        if (key !== "phoneNumberId" && descriptor.value !== undefined) body[key] = descriptor.value;
+      }
       return sendMarketingTemplateEndpoint(
         this.#graphClient,
         { phoneNumberId: this.#phoneNumberId },

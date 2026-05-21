@@ -136,6 +136,14 @@ describe("WATS-98 Marketing Messages API request-shape helpers", () => {
       name: "promo_offer",
       languageCode: "en_US"
     } as never);
+    const accessorScopedInput = Object.defineProperty({
+      recipient: "bsuid-parent-2",
+      languageCode: "en_US"
+    }, "name", {
+      enumerable: true,
+      get() { throw new TypeError("scoped name getter should not run"); }
+    });
+    await expect(scoped.sendMarketingTemplate(accessorScopedInput as never)).rejects.toThrow(GraphRequestValidationError);
     const { proxy: revokedScopedInput, revoke: revokeScopedInput } = Proxy.revocable({
       recipient: "bsuid-parent-2",
       name: "promo_offer",
