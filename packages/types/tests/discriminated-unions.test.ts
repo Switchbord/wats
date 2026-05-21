@@ -22,6 +22,7 @@ import type {
   InteractiveReply,
   WhatsAppError,
   WhatsAppMessageStatusKind,
+  PricingRef,
   MediaReference,
   DocumentReference,
   MessageContext
@@ -364,5 +365,34 @@ describe("F-1 discriminated union contracts", () => {
     };
     expect(value.phoneNumberQuality?.currentLimit).toBe("TIER_UNLIMITED");
     expect(value.alert?.type).toBe("PROFILE_PICTURE_LOST");
+  });
+
+  test("WATS-98 Marketing Messages status and account helper types are exposed", () => {
+    const pricing: PricingRef = {
+      category: "marketing_lite",
+      pricingModel: "PMP",
+      billable: true
+    };
+    const status: WhatsAppMessageStatus = {
+      id: "wamid.marketing-status",
+      recipientId: "15551234567",
+      status: "sent",
+      timestamp: "1718000006",
+      conversation: { id: "conv-1", origin: { type: "marketing_lite" } },
+      pricing,
+      messageStatus: "held_for_quality_assessment"
+    };
+    const value: WhatsAppAccountUpdateValue = {
+      event: "MM_LITE_TERMS_SIGNED",
+      marketingMessages: {
+        wabaId: "123456789",
+        ownerBusinessId: "987654321",
+        onboardingStatus: "ONBOARDED",
+        liteApiStatus: "ELIGIBLE"
+      }
+    };
+    expect(status.pricing?.category).toBe("marketing_lite");
+    expect(status.messageStatus).toBe("held_for_quality_assessment");
+    expect(value.marketingMessages?.wabaId).toBe("123456789");
   });
 });
