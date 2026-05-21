@@ -165,6 +165,9 @@ describe("WATS-98 Marketing Messages API request-shape helpers", () => {
       enumerable: true,
       get() { throw new TypeError("name getter should not run"); }
     }) as never)).toThrow(GraphRequestValidationError);
+    const { proxy: revokedInput, revoke: revokeInput } = Proxy.revocable({ ...base }, {});
+    revokeInput();
+    expect(() => buildSendMarketingTemplatePayload(revokedInput as never)).toThrow(GraphRequestValidationError);
     expect(() => buildSendMarketingTemplatePayload({
       ...base,
       components: [Object.defineProperty({}, "type", {
@@ -177,6 +180,12 @@ describe("WATS-98 Marketing Messages API request-shape helpers", () => {
       components: [new Proxy({ type: "body" }, {
         getPrototypeOf() { throw new TypeError("component proto trap should be wrapped"); }
       })]
+    } as never)).toThrow(GraphRequestValidationError);
+    const { proxy: revokedComponent, revoke: revokeComponent } = Proxy.revocable({ type: "body" }, {});
+    revokeComponent();
+    expect(() => buildSendMarketingTemplatePayload({
+      ...base,
+      components: [revokedComponent]
     } as never)).toThrow(GraphRequestValidationError);
     expect(() => buildSendMarketingTemplatePayload({
       ...base,
@@ -196,11 +205,23 @@ describe("WATS-98 Marketing Messages API request-shape helpers", () => {
         getPrototypeOf() { throw new TypeError("parameters array proto trap should be wrapped"); }
       }) }]
     } as never)).toThrow(GraphRequestValidationError);
+    const { proxy: revokedParameters, revoke: revokeParameters } = Proxy.revocable([{ type: "text", text: "Ada" }], {});
+    revokeParameters();
+    expect(() => buildSendMarketingTemplatePayload({
+      ...base,
+      components: [{ type: "body", parameters: revokedParameters }]
+    } as never)).toThrow(GraphRequestValidationError);
     expect(() => buildSendMarketingTemplatePayload({
       ...base,
       components: [{ type: "body", parameters: [new Proxy({ type: "text", text: "Ada" }, {
         ownKeys() { throw new TypeError("parameter ownKeys trap should be wrapped"); }
       })] }]
+    } as never)).toThrow(GraphRequestValidationError);
+    const { proxy: revokedParameter, revoke: revokeParameter } = Proxy.revocable({ type: "text", text: "Ada" }, {});
+    revokeParameter();
+    expect(() => buildSendMarketingTemplatePayload({
+      ...base,
+      components: [{ type: "body", parameters: [revokedParameter] }]
     } as never)).toThrow(GraphRequestValidationError);
 
     await expect(sendMarketingTemplate(client, { phoneNumberId: "555" }, undefined as never)).rejects.toThrow(GraphRequestValidationError);

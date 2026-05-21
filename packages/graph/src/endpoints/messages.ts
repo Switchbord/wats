@@ -25,7 +25,6 @@
 import type { GraphClient, GraphRequestOptions } from "../client.js";
 import { defineEndpoint, type EndpointInvokeOptions } from "../endpoint.js";
 import { GraphRequestValidationError } from "../errors.js";
-import { copyOptionalParamsObject } from "../internal/validation/options.js";
 
 interface GraphRequestExecutor {
   request<TResponse>(options: GraphRequestOptions): Promise<TResponse>;
@@ -1177,9 +1176,11 @@ function sanitizeTemplateParameter(
   }
   if (value === null || typeof value === "boolean") return value;
   if (value === undefined) return undefined;
-  if (Array.isArray(value)) {
-    const own = inspectTemplateValue(helperName, path, () => Object.getOwnPropertyDescriptors(value));
-    if (Object.prototype.hasOwnProperty.call(own, "toJSON") || inspectTemplateValue(helperName, path, () => "toJSON" in value)) {
+  const maybeObject = value as object;
+  const isArrayValue = inspectTemplateValue(helperName, path, () => Array.isArray(maybeObject));
+  if (isArrayValue) {
+    const own = inspectTemplateValue(helperName, path, () => Object.getOwnPropertyDescriptors(maybeObject));
+    if (Object.prototype.hasOwnProperty.call(own, "toJSON") || inspectTemplateValue(helperName, path, () => "toJSON" in maybeObject)) {
       throw new GraphRequestValidationError(`Invalid ${helperName} input: ${path} must not define toJSON.`);
     }
     for (const [key, descriptor] of Object.entries(own)) {
@@ -1274,9 +1275,31 @@ function buildMarketingTemplateObject(record: Record<string, unknown>): Record<s
 }
 
 function copySendMarketingTemplateInput(input: GraphMessagesSendMarketingTemplateInput): Record<string, unknown> {
-  const record = copyOptionalParamsObject(input, "sendMarketingTemplate");
-  assertOnlyKnownKeys(record, ["to", "recipient", "name", "languageCode", "components", "productPolicy", "messageActivitySharing"], "sendMarketingTemplate");
-  return record;
+  if (typeof input !== "object" || input === null) {
+    throw new GraphRequestValidationError("Invalid sendMarketingTemplate input: expected an options object.");
+  }
+  const record = input as unknown as Record<string, unknown>;
+  const isArrayInput = inspectTemplateValue("sendMarketingTemplate", "input", () => Array.isArray(record));
+  if (isArrayInput) {
+    throw new GraphRequestValidationError("Invalid sendMarketingTemplate input: expected an options object.");
+  }
+  const proto = inspectTemplateValue("sendMarketingTemplate", "input", () => Object.getPrototypeOf(record));
+  if (proto !== Object.prototype && proto !== null) {
+    throw new GraphRequestValidationError("Invalid sendMarketingTemplate input: expected a plain options object.");
+  }
+  const descriptors = inspectTemplateValue("sendMarketingTemplate", "input", () => Object.getOwnPropertyDescriptors(record));
+  if (Object.prototype.hasOwnProperty.call(descriptors, "toJSON") || inspectTemplateValue("sendMarketingTemplate", "input", () => "toJSON" in record)) {
+    throw new GraphRequestValidationError("Invalid sendMarketingTemplate input: input must not define toJSON.");
+  }
+  const out: Record<string, unknown> = {};
+  for (const [key, descriptor] of Object.entries(descriptors)) {
+    if (typeof descriptor.get === "function" || typeof descriptor.set === "function") {
+      throw new GraphRequestValidationError(`Invalid sendMarketingTemplate input: ${key} must not use accessors.`);
+    }
+    if (descriptor.value !== undefined) out[key] = descriptor.value;
+  }
+  assertOnlyKnownKeys(out, ["to", "recipient", "name", "languageCode", "components", "productPolicy", "messageActivitySharing"], "sendMarketingTemplate");
+  return out;
 }
 
 export function buildSendMarketingTemplatePayload(input: GraphMessagesSendMarketingTemplateInput): GraphMessagesMarketingTemplatePayload {
