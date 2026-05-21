@@ -1140,6 +1140,15 @@ export function buildTypingIndicatorPayload(input: GraphMessagesTypingIndicatorI
   return { ...payload, typing_indicator: { type: "text" } };
 }
 
+function inspectTemplateValue<T>(helperName: string, path: string, inspector: () => T): T {
+  try {
+    return inspector();
+  } catch (error) {
+    if (error instanceof GraphRequestValidationError) throw error;
+    throw new GraphRequestValidationError(`Invalid ${helperName} input: ${path} could not be inspected.`);
+  }
+}
+
 function sanitizeTemplateParameter(
   value: unknown,
   helperName: string,
@@ -1165,8 +1174,8 @@ function sanitizeTemplateParameter(
   if (value === null || typeof value === "boolean") return value;
   if (value === undefined) return undefined;
   if (Array.isArray(value)) {
-    const own = Object.getOwnPropertyDescriptors(value);
-    if (Object.prototype.hasOwnProperty.call(own, "toJSON") || "toJSON" in value) {
+    const own = inspectTemplateValue(helperName, path, () => Object.getOwnPropertyDescriptors(value));
+    if (Object.prototype.hasOwnProperty.call(own, "toJSON") || inspectTemplateValue(helperName, path, () => "toJSON" in value)) {
       throw new GraphRequestValidationError(`Invalid ${helperName} input: ${path} must not define toJSON.`);
     }
     for (const [key, descriptor] of Object.entries(own)) {
@@ -1182,12 +1191,12 @@ function sanitizeTemplateParameter(
     throw new GraphRequestValidationError(`Invalid ${helperName} input: ${path} must be JSON-serializable.`);
   }
   const record = value as Record<string, unknown>;
-  const proto = Object.getPrototypeOf(record);
+  const proto = inspectTemplateValue(helperName, path, () => Object.getPrototypeOf(record));
   if (proto !== Object.prototype && proto !== null) {
     throw new GraphRequestValidationError(`Invalid ${helperName} input: ${path} must be a plain object.`);
   }
-  const descriptors = Object.getOwnPropertyDescriptors(record);
-  if (Object.prototype.hasOwnProperty.call(descriptors, "toJSON") || "toJSON" in record) {
+  const descriptors = inspectTemplateValue(helperName, path, () => Object.getOwnPropertyDescriptors(record));
+  if (Object.prototype.hasOwnProperty.call(descriptors, "toJSON") || inspectTemplateValue(helperName, path, () => "toJSON" in record)) {
     throw new GraphRequestValidationError(`Invalid ${helperName} input: ${path} must not define toJSON.`);
   }
   for (const [key, descriptor] of Object.entries(descriptors)) {
@@ -1203,14 +1212,17 @@ function sanitizeTemplateParameter(
   }
   seen.add(record);
   const out: Record<string, unknown> = {};
-  for (const [key, nested] of Object.entries(record)) {
-    if (key.length === 0 || key.length > GRAPH_MESSAGES_SHORT_LABEL_MAX_LENGTH || hasControlChar(key)) {
-      throw new GraphRequestValidationError(`Invalid ${helperName} input: ${path} contains an invalid key.`);
+  try {
+    for (const [key, descriptor] of Object.entries(descriptors)) {
+      if (key.length === 0 || key.length > GRAPH_MESSAGES_SHORT_LABEL_MAX_LENGTH || hasControlChar(key)) {
+        throw new GraphRequestValidationError(`Invalid ${helperName} input: ${path} contains an invalid key.`);
+      }
+      const sanitized = sanitizeTemplateParameter(descriptor.value, helperName, `${path}.${key}`, seen, depth + 1);
+      if (sanitized !== undefined) out[key] = sanitized;
     }
-    const sanitized = sanitizeTemplateParameter(nested, helperName, `${path}.${key}`, seen, depth + 1);
-    if (sanitized !== undefined) out[key] = sanitized;
+  } finally {
+    seen.delete(record);
   }
-  seen.delete(record);
   return out;
 }
 
