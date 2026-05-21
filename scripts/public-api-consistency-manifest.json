@@ -111,6 +111,7 @@
       "fixtureChecks": [
         "from \"@wats/graph/endpoints/business-management\"",
         "wats42-business-management subpath exports are functions",
+        "wats95-business-management subpath exports are functions",
         "\"@wats/graph/endpoints/business-management\""
       ],
       "docs": [

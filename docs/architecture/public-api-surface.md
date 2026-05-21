@@ -55,15 +55,15 @@ Primary exports:
 - `sendMessage` for `POST /{phoneNumberId}/messages`
 - Calling API lifecycle callables: `initiateCall`, `preAcceptCall`, `acceptCall`, `rejectCall`, `terminateCall`
 - outbound message payload builders for text plus WATS-38 media/location/contacts/reaction/interactive/template/read/typing sends
-- `PhoneNumberClient` with `.sendMessage(...)`, `.sendText(...)`, WATS-38 composer helpers, WATS-41 calling lifecycle helpers, and WATS-42A read-only phone inventory/profile helpers (`getInfo`, `getSettings`, `getBusinessProfile`, `getCommerceSettings`)
+- `PhoneNumberClient` with `.sendMessage(...)`, `.sendText(...)`, WATS-38 composer helpers, WATS-41 calling lifecycle helpers, WATS-42A read-only phone inventory/profile helpers (`getInfo`, `getSettings`, `getBusinessProfile`, `getCommerceSettings`), and WATS-95 Block API/OBA/display-name helpers (`listBlockedUsers`, `blockUsers`, `unblockUsers`, `getOfficialBusinessAccountStatus`, `requestOfficialBusinessAccountReview`, `submitDisplayNameForReview`)
 - `WABAClient` with `.getInfo(...)`, `.listSubscribedApps(...)`, and enhanced `.listPhoneNumbers({ fields?, limit?, after?, before? })`
-- read-only business/admin inventory callables and types: `getWabaInfo`, `listSubscribedApps`, enhanced `listPhoneNumbers`, `getPhoneNumberInfo`, `getPhoneNumberSettings`, `getBusinessProfile`, `getCommerceSettings`, exported at root and at `./endpoints/business-management`
+- business/admin inventory and compatibility callables/types: `getWabaInfo`, `listSubscribedApps`, enhanced `listPhoneNumbers`, `getPhoneNumberInfo`, `getPhoneNumberSettings`, `getBusinessProfile`, `getCommerceSettings`, WATS-95 `listBlockedUsers`, `blockUsers`, `unblockUsers`, `getOfficialBusinessAccountStatus`, `requestOfficialBusinessAccountReview`, and `submitDisplayNameForReview`, exported at root and at `./endpoints/business-management`
 - public endpoint subpaths for already-shipped Graph families: WATS-53 added `@wats/graph/endpoints/media`, `@wats/graph/endpoints/templates`, and `@wats/graph/endpoints/flows`; the full checked set is `@wats/graph/endpoints/messages`, `@wats/graph/endpoints/media`, `@wats/graph/endpoints/templates`, `@wats/graph/endpoints/flows`, `@wats/graph/endpoints/calling`, and `@wats/graph/endpoints/business-management`; WATS-54 keeps package exports, fixture imports, docs, and changelog mentions aligned with `bun run api:check`
 - `paginate` / `paginateAll`
 - Graph error classes and pywa-seeded error registry helpers
 - media runtime: `uploadMedia`, `downloadMedia`, `downloadMediaBytes`, `deleteMedia`, `decryptEncryptedMedia`, upload-session helpers, `MediaValidationError`, `MediaCryptoError`, `MediaIntegrityError`, and finite media cap constants
 
-Status: foundations-complete for Graph plumbing; endpoint breadth is expanding. WATS-37 media runtime, WATS-38 outbound composers, WATS-39 template management, WATS-40 Flow helpers, WATS-41 Calling API lifecycle requests, and WATS-42A read-only business/admin inventory are complete for credential-free MockTransport-backed behavior. Live Meta checks and mutating admin APIs remain credential-gated.
+Status: foundations-complete for Graph plumbing; endpoint breadth is expanding. WATS-37 media runtime, WATS-38 outbound composers, WATS-39 template management, WATS-40 Flow helpers, WATS-41 Calling API lifecycle requests, WATS-42A read-only business/admin inventory, and WATS-95 Block API/OBA/display-name request-shape helpers plus business-alert webhook values are complete for credential-free MockTransport-backed behavior. Live Meta checks, automatic user-block decisions, policy/appeal automation, and broader mutating admin APIs remain credential-gated.
 
 ### `@wats/core`
 
@@ -188,7 +188,7 @@ These are not implemented as runtime APIs yet:
 - live credentialed template mutations/validation and high-level template library/bulk-authentication helpers
 - live Flow mutations/hosting/encrypted data-exchange APIs beyond WATS-40 credential-free helpers
 - live calling sessions and WebRTC/media signaling beyond WATS-41 credential-free Calling API request/webhook helpers
-- mutating WABA/phone-number/business-management/admin APIs beyond WATS-42A read-only inventory
+- mutating WABA/phone-number/business-management/admin APIs beyond WATS-42A read-only inventory and the bounded WATS-95 request-shape helpers; no automatic user-block decisions or policy/appeal automation are implemented
 - catalog/product management APIs beyond WATS-42A read-only getCommerceSettings
 - full Meta Graph API OpenAPI generation
 - live-capable credentialed `wats serve` startup and env-file secret resolution; the guard-only `--live`/`--yes-live` contract is recognized but fails closed

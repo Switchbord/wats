@@ -20,7 +20,7 @@ This document summarizes the roadmap shape. Linear is the source of truth for is
 - typed filters, router, listeners, and `WhatsApp` facade
 - consumer fixtures and docs lockstep checks
 
-Endpoint breadth remains early but now includes text send, arbitrary-recipient text starts, WABA phone-number listing, WATS-37 media runtime (single-POST upload, metadata resolution, binary download, delete, encrypted decrypt, and upload sessions), WATS-39 templates, WATS-40 flows, WATS-41 calling request shapes, and WATS-42A read-only business/admin inventory. Mutating admin APIs and live checks remain credential-gated.
+Endpoint breadth remains early but now includes text send, arbitrary-recipient text starts, WABA phone-number listing, WATS-37 media runtime (single-POST upload, metadata resolution, binary download, delete, encrypted decrypt, and upload sessions), WATS-39 templates, WATS-40 flows, WATS-41 calling request shapes, WATS-42A read-only business/admin inventory, and WATS-95 Block API/OBA/display-name request-shape helpers plus business-alert webhook values. Broader mutating admin APIs and live checks remain credential-gated.
 
 ## Milestone structure
 
@@ -135,9 +135,15 @@ WATS-42A — Complete for the bounded read-only, credential-free first slice:
 - matching `WABAClient` / `PhoneNumberClient` methods and public `@wats/graph/endpoints/business-management` subpath
 - MockTransport-only validation; `getPhoneNumberSettings({ includeSipCredentials: true })` may return sensitive SIP credential material
 
+WATS-95 — Complete for bounded credential-free compatibility deltas:
+- Block API helpers `listBlockedUsers`, `blockUsers`, `unblockUsers` over Graph `block_users`
+- OBA/display-name helpers `getOfficialBusinessAccountStatus`, `requestOfficialBusinessAccountReview`, `submitDisplayNameForReview`
+- typed business webhook values for `phone_number_quality_update` (`THROUGHPUT_UPGRADE`, `TIER_UNLIMITED`) and `account_alerts` (`PROFILE_PICTURE_LOST`)
+- no live Meta calls, no automatic user-block decisions, and no policy/appeal automation
+
 Remaining:
-- Mutating admin endpoints remain credential-gated/deferred: WABA CRUD, phone-number registration/configuration, profile/settings/commerce updates, subscribed-app mutations, webhook callback override, public-key mutation, and display-name updates
-- analytics/quality/rate-limit surfaces
+- Mutating admin endpoints remain credential-gated/deferred: WABA CRUD, phone-number registration/configuration beyond the bounded WATS-95 request-shape helpers, profile/settings/commerce updates, subscribed-app mutations, webhook callback override, and public-key mutation
+- analytics/quality/rate-limit surfaces beyond WATS-95 typed alert payloads
 - catalog/product inventory CRUD beyond read-only commerce settings
 
 ### M8 — pywa migration and parity hardening
