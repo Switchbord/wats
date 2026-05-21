@@ -144,6 +144,13 @@ export interface TypedGenericAccountUpdate {
     readonly description?: string;
     readonly raw?: unknown;
   };
+  readonly marketingMessages?: {
+    readonly wabaId?: string;
+    readonly ownerBusinessId?: string;
+    readonly onboardingStatus?: string;
+    readonly liteApiStatus?: string;
+    readonly raw?: unknown;
+  };
 }
 
 export interface TypedTemplateAccountUpdate {
@@ -802,6 +809,7 @@ function normalizeGenericAccountPayload(payload: Record<string, unknown>): Typed
     disconnectionInfo?: { reason?: string; partnerId?: string; partnerName?: string; raw?: unknown };
     phoneNumberQuality?: { displayPhoneNumber?: string; oldLimit?: string; currentLimit?: string; maxDailyConversationsPerBusiness?: string; raw?: unknown };
     alert?: { entityType?: string; entityId?: string; severity?: string; status?: string; type?: string; description?: string; raw?: unknown };
+    marketingMessages?: { wabaId?: string; ownerBusinessId?: string; onboardingStatus?: string; liteApiStatus?: string; raw?: unknown };
   } = {};
   if (event !== undefined) out.event = event;
   const disconnection = readOwnDataField(payload, "disconnection_info");
@@ -826,6 +834,20 @@ function normalizeGenericAccountPayload(payload: Record<string, unknown>): Typed
   if (currentLimit !== undefined) phoneNumberQuality.currentLimit = currentLimit;
   if (maxDaily !== undefined) phoneNumberQuality.maxDailyConversationsPerBusiness = maxDaily;
   if (Object.keys(phoneNumberQuality).length > 1) out.phoneNumberQuality = phoneNumberQuality;
+
+  const marketingMessages: { wabaId?: string; ownerBusinessId?: string; onboardingStatus?: string; liteApiStatus?: string; raw?: unknown } = { raw: payload };
+  const wabaInfo = readOwnDataField(payload, "waba_info");
+  if (isRecord(wabaInfo)) {
+    const wabaId = readStringField(wabaInfo, "waba_id");
+    const ownerBusinessId = readStringField(wabaInfo, "owner_business_id");
+    if (wabaId !== undefined) marketingMessages.wabaId = wabaId;
+    if (ownerBusinessId !== undefined) marketingMessages.ownerBusinessId = ownerBusinessId;
+  }
+  const onboardingStatus = readStringField(payload, "marketing_messages_onboarding_status");
+  const liteApiStatus = readStringField(payload, "marketing_messages_lite_api_status");
+  if (onboardingStatus !== undefined) marketingMessages.onboardingStatus = onboardingStatus;
+  if (liteApiStatus !== undefined) marketingMessages.liteApiStatus = liteApiStatus;
+  if (Object.keys(marketingMessages).length > 1) out.marketingMessages = marketingMessages;
 
   const entityType = readStringField(payload, "entity_type");
   const entityId = readStringField(payload, "entity_id");

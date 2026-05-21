@@ -83,6 +83,7 @@ import {
   buildSendReactionPayload,
   buildSendStickerPayload,
   buildSendTemplatePayload,
+  sendMarketingTemplate as sendMarketingTemplateEndpoint,
   buildSendTextPayload,
   buildSendVideoPayload,
   buildTypingIndicatorPayload,
@@ -101,6 +102,8 @@ import {
   type GraphMessagesSendImageInput,
   type GraphMessagesSendListInput,
   type GraphMessagesSendLocationInput,
+  type GraphMessagesSendMarketingTemplateInput,
+  type GraphMessagesMarketingTemplateResponse,
   type GraphMessagesSendProductInput,
   type GraphMessagesSendProductsInput,
   type GraphMessagesSendReactionInput,
@@ -511,6 +514,20 @@ export class PhoneNumberClient {
 
   async sendTemplate(input: GraphMessagesSendTemplateInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse> {
     return this.sendMessage(buildSendTemplatePayload(input), opts);
+  }
+
+  async sendMarketingTemplate(input: GraphMessagesSendMarketingTemplateInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesMarketingTemplateResponse> {
+    const body: Record<string, unknown> = copyOptionalParamsObject(
+      input,
+      "PhoneNumberClient.sendMarketingTemplate"
+    );
+    delete body.phoneNumberId;
+    return sendMarketingTemplateEndpoint(
+      this.#graphClient,
+      { phoneNumberId: this.#phoneNumberId },
+      body as unknown as GraphMessagesSendMarketingTemplateInput,
+      opts
+    );
   }
 
   async initiateCall(input: InitiateCallRequest, opts?: EndpointInvokeOptions): Promise<CallLifecycleResponse> {

@@ -59,6 +59,8 @@ import {
   type GraphMessagesSendResponse,
   type GraphMessagesSendStickerInput,
   type GraphMessagesSendTemplateInput,
+  type GraphMessagesSendMarketingTemplateInput,
+  type GraphMessagesMarketingTemplateResponse,
   type GraphMessagesSendTextInput,
   type GraphMessagesSendVideoInput,
   type GraphMessagesTypingIndicatorInput
@@ -150,6 +152,8 @@ export type WhatsAppRequestLocationInput = GraphMessagesRequestLocationInput;
 export type WhatsAppMarkMessageAsReadInput = GraphMessagesMarkMessageAsReadInput;
 export type WhatsAppTypingIndicatorInput = GraphMessagesTypingIndicatorInput;
 export type WhatsAppSendTemplateInput = GraphMessagesSendTemplateInput;
+export type WhatsAppSendMarketingTemplateInput = GraphMessagesSendMarketingTemplateInput;
+export type WhatsAppMarketingTemplateResponse = GraphMessagesMarketingTemplateResponse;
 
 export type WhatsAppListenErrorCode =
   | "invalid_listen_options"
@@ -606,6 +610,15 @@ export class WhatsApp {
       throw new GraphRequestValidationError("WhatsApp.sendTemplate requires a phoneNumberId-bound facade.");
     }
     return this.#phoneNumberClient.sendTemplate(input);
+  }
+
+  async sendMarketingTemplate(
+    input: WhatsAppSendMarketingTemplateInput
+  ): Promise<GraphMessagesMarketingTemplateResponse> {
+    if (this.#phoneNumberClient === undefined) {
+      throw new GraphRequestValidationError("WhatsApp.sendMarketingTemplate requires a phoneNumberId-bound facade.");
+    }
+    return this.#phoneNumberClient.sendMarketingTemplate(input);
   }
 
   // F-11: facade-owned dispatch wrapper. Listeners evaluate BEFORE

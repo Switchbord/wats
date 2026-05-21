@@ -99,6 +99,20 @@ export interface WhatsAppAccountUpdateValue {
     description?: string;
     raw?: unknown;
   };
+  /**
+   * WATS-98 Marketing Messages onboarding/account-update details. Current Meta
+   * docs prefer `marketing_messages_onboarding_status`; the older
+   * `marketing_messages_lite_api_status` remains readable but deprecated in docs.
+   * Synthetic `account_update` payloads may include events such as
+   * `MM_LITE_TERMS_SIGNED`.
+   */
+  marketingMessages?: {
+    wabaId?: string;
+    ownerBusinessId?: string;
+    onboardingStatus?: string;
+    liteApiStatus?: string;
+    raw?: unknown;
+  };
   raw?: unknown;
 }
 

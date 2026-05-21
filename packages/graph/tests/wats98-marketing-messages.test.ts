@@ -163,7 +163,7 @@ describe("WATS-98 Marketing Messages API request-shape helpers", () => {
     expect(() => buildSendMarketingTemplatePayload({ ...base, type: "text" } as never)).toThrow(GraphRequestValidationError);
 
     await expect(sendMarketingTemplate(client, { phoneNumberId: "../555" }, base)).rejects.toThrow(GraphRequestValidationError);
-    await expect(sendMarketingTemplate(client, { phoneNumberId: "555" }, base, { unexpected: true } as never)).rejects.toThrow(GraphRequestValidationError);
+    await expect(sendMarketingTemplate(client, { phoneNumberId: "555", unexpected: "x" } as never, base)).rejects.toThrow(GraphRequestValidationError);
     expect(handle.requests.length).toBe(0);
   });
 

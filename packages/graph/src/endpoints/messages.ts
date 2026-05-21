@@ -18,6 +18,9 @@
 // builders for media, location, contacts, reaction, interactive variants,
 // template send, mark-as-read, and typing indicators. Template
 // CRUD/management landed in WATS-39; Flow management helpers landed in WATS-40.
+// WATS-98 adds credential-free Marketing Messages API request-shape helpers
+// for `POST /{phoneNumberId}/marketing_messages` only; no live Meta calls,
+// credential validation, Ads Manager dashboards, or ACO automation claims.
 
 import type { GraphClient, GraphRequestOptions } from "../client.js";
 import { defineEndpoint } from "../endpoint.js";
@@ -236,6 +239,19 @@ export interface GraphMessagesSendTemplateInput {
   readonly replyToMessageId?: string;
 }
 
+export type GraphMessagesMarketingProductPolicy = "CLOUD_API_FALLBACK" | "STRICT";
+export type GraphMessagesMarketingMessageStatus = "accepted" | "held_for_quality_assessment" | "paused" | string;
+
+export interface GraphMessagesSendMarketingTemplateInput {
+  readonly to?: string;
+  readonly recipient?: string;
+  readonly name: string;
+  readonly languageCode: string;
+  readonly components?: readonly GraphMessagesTemplateComponentInput[];
+  readonly productPolicy?: GraphMessagesMarketingProductPolicy;
+  readonly messageActivitySharing?: boolean;
+}
+
 export interface GraphMessagesSendResponse {
   messaging_product?: string;
   contacts?: Array<{
@@ -245,6 +261,32 @@ export interface GraphMessagesSendResponse {
   messages?: Array<{
     id: string;
   }>;
+}
+
+export interface GraphMessagesMarketingTemplateResponse {
+  messaging_product?: string;
+  contacts?: Array<{
+    input?: string;
+    wa_id?: string;
+    /** WATS-98 BSUID response field returned for Business-Scoped User ID sends. */
+    user_id?: string;
+  }>;
+  messages?: Array<{
+    id: string;
+    /** WATS-98 /marketing_messages status: accepted, held_for_quality_assessment, or paused. */
+    message_status?: GraphMessagesMarketingMessageStatus;
+  }>;
+}
+
+export interface GraphMessagesMarketingTemplatePayload {
+  messaging_product: "whatsapp";
+  recipient_type: "individual";
+  to?: string;
+  recipient?: string;
+  type: "template";
+  template: Record<string, unknown>;
+  product_policy?: GraphMessagesMarketingProductPolicy;
+  message_activity_sharing?: boolean;
 }
 
 export interface GraphMessagesTextPayload {
@@ -1193,6 +1235,65 @@ export function buildSendTemplatePayload(input: GraphMessagesSendTemplateInput):
   if (record.components !== undefined) template.components = mapValidatedArray(assertBoundedArray(record.components, "components", 0, 100, "sendTemplate"), (c) => normalizeTemplateComponent(c, "sendTemplate"));
   return withReplyContext({ messaging_product: "whatsapp", to: assertValidRecipient(record.to, "sendTemplate"), type: "template", template }, record);
 }
+
+function assertMarketingRecipient(value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  return assertNonEmptyControlFreeString(value, "recipient", GRAPH_MESSAGES_MEDIA_ID_MAX_LENGTH, "sendMarketingTemplate");
+}
+
+function buildMarketingTemplateObject(record: Record<string, unknown>): Record<string, unknown> {
+  const template: Record<string, unknown> = {
+    name: assertNonEmptyControlFreeString(record.name, "name", GRAPH_MESSAGES_MEDIA_ID_MAX_LENGTH, "sendMarketingTemplate"),
+    language: { code: assertNonEmptyControlFreeString(record.languageCode, "languageCode", GRAPH_MESSAGES_SHORT_LABEL_MAX_LENGTH, "sendMarketingTemplate") }
+  };
+  if (record.components !== undefined) {
+    template.components = mapValidatedArray(assertBoundedArray(record.components, "components", 0, 100, "sendMarketingTemplate"), (c) => normalizeTemplateComponent(c, "sendMarketingTemplate"));
+  }
+  return template;
+}
+
+export function buildSendMarketingTemplatePayload(input: GraphMessagesSendMarketingTemplateInput): GraphMessagesMarketingTemplatePayload {
+  const record = asRecordInput(input, "sendMarketingTemplate");
+  assertOnlyKnownKeys(record, ["to", "recipient", "name", "languageCode", "components", "productPolicy", "messageActivitySharing"], "sendMarketingTemplate");
+  const to = record.to === undefined ? undefined : assertValidRecipient(record.to, "sendMarketingTemplate");
+  const recipient = assertMarketingRecipient(record.recipient);
+  if (to === undefined && recipient === undefined) {
+    throw new GraphRequestValidationError("Invalid sendMarketingTemplate input: at least one of to or recipient is required.");
+  }
+  const payload: GraphMessagesMarketingTemplatePayload = {
+    messaging_product: "whatsapp",
+    recipient_type: "individual",
+    type: "template",
+    template: buildMarketingTemplateObject(record)
+  };
+  if (to !== undefined) payload.to = to;
+  if (recipient !== undefined) payload.recipient = recipient;
+  if (record.productPolicy !== undefined) {
+    if (record.productPolicy !== "CLOUD_API_FALLBACK" && record.productPolicy !== "STRICT") {
+      throw new GraphRequestValidationError("Invalid sendMarketingTemplate input: productPolicy must be CLOUD_API_FALLBACK or STRICT.");
+    }
+    payload.product_policy = record.productPolicy;
+  }
+  if (record.messageActivitySharing !== undefined) {
+    if (typeof record.messageActivitySharing !== "boolean") {
+      throw new GraphRequestValidationError("Invalid sendMarketingTemplate input: messageActivitySharing must be a boolean when provided.");
+    }
+    payload.message_activity_sharing = record.messageActivitySharing;
+  }
+  return payload;
+}
+
+export const sendMarketingTemplate = defineEndpoint<
+  { phoneNumberId: string },
+  GraphMessagesSendMarketingTemplateInput,
+  GraphMessagesMarketingTemplateResponse
+>({
+  method: "POST",
+  pathTemplate: "/{phoneNumberId}/marketing_messages",
+  params: { phoneNumberId: { in: "path", required: true } },
+  bodyContentType: "application/json",
+  buildBody: buildSendMarketingTemplatePayload
+});
 
 export function buildSendMessagePayload(
   input: GraphMessagesSendMessageInput

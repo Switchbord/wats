@@ -66,7 +66,9 @@ import {
   resolveRegisteredError,
   scrubErrorCause,
   sendMessage,
+  sendMarketingTemplate,
   buildSendImagePayload,
+  buildSendMarketingTemplatePayload,
   buildSendVideoPayload,
   buildSendAudioPayload,
   buildSendDocumentPayload,
@@ -125,7 +127,9 @@ import {
   type UnblockUsersResponse,
   type OfficialBusinessAccountStatusResponse,
   type OfficialBusinessAccountReviewResponse,
-  type SubmitDisplayNameForReviewResponse
+  type SubmitDisplayNameForReviewResponse,
+  type GraphMessagesSendMarketingTemplateInput,
+  type GraphMessagesMarketingTemplateResponse
 } from "@wats/graph";
 import { createMockTransport } from "@wats/graph/testing";
 
@@ -389,7 +393,7 @@ async function verify(): Promise<VerifyReportOk> {
     typeof (sendMessage as { definition?: unknown }).definition === "object" &&
     (sendMessage as { definition: { pathTemplate: string } }).definition
       .pathTemplate === "/{phoneNumberId}/messages";
-  checks["WATS-38 message payload builders are functions"] =
+  checks["WATS-38/WATS-98 message payload builders are functions"] =
     typeof buildSendImagePayload === "function" &&
     typeof buildSendVideoPayload === "function" &&
     typeof buildSendAudioPayload === "function" &&
@@ -399,7 +403,9 @@ async function verify(): Promise<VerifyReportOk> {
     typeof buildSendContactsPayload === "function" &&
     typeof buildSendReactionPayload === "function" &&
     typeof buildSendButtonsPayload === "function" &&
-    typeof buildSendTemplatePayload === "function";
+    typeof buildSendTemplatePayload === "function" &&
+    typeof buildSendMarketingTemplatePayload === "function" &&
+    typeof sendMarketingTemplate === "function";
   checks["buildSendImagePayload emits exact image Graph body"] =
     JSON.stringify(
       buildSendImagePayload({
@@ -444,6 +450,24 @@ async function verify(): Promise<VerifyReportOk> {
       to: "15551230000",
       type: "template",
       template: { name: "hello_world", language: { code: "en_US" } }
+    });
+  const marketingInput: GraphMessagesSendMarketingTemplateInput = {
+    to: "15551230000",
+    name: "promo_offer",
+    languageCode: "en_US",
+    productPolicy: "STRICT",
+    messageActivitySharing: false
+  };
+  checks["buildSendMarketingTemplatePayload emits Marketing Messages body"] =
+    JSON.stringify(buildSendMarketingTemplatePayload(marketingInput)) ===
+    JSON.stringify({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      type: "template",
+      template: { name: "promo_offer", language: { code: "en_US" } },
+      to: "15551230000",
+      product_policy: "STRICT",
+      message_activity_sharing: false
     });
 
   checks["WATS-39 template management exports are functions"] =
@@ -540,10 +564,12 @@ async function verify(): Promise<VerifyReportOk> {
     typeof acceptCall === "function" &&
     typeof rejectCall === "function" &&
     typeof terminateCall === "function";
-  checks["WATS-54 messages subpath exports runtime surface"] =
+  checks["WATS-54/WATS-98 messages subpath exports runtime surface"] =
     messagesSubpath.sendMessage === sendMessage &&
+    messagesSubpath.sendMarketingTemplate === sendMarketingTemplate &&
     messagesSubpath.GraphMessagesEndpoint === GraphMessagesEndpoint &&
-    typeof messagesSubpath.buildSendTemplatePayload === "function";
+    typeof messagesSubpath.buildSendTemplatePayload === "function" &&
+    typeof messagesSubpath.buildSendMarketingTemplatePayload === "function";
   checks["WATS-54 calling subpath exports runtime surface"] =
     callingSubpath.initiateCall === initiateCall &&
     callingSubpath.preAcceptCall === preAcceptCall &&
@@ -1210,6 +1236,33 @@ async function verify(): Promise<VerifyReportOk> {
     displayNameReview.success === true &&
     wats95Handle.requests.map((request) => `${request.method} ${request.url}`).join("|") ===
       "GET https://graph.facebook.com/v25.0/pn-1/block_users|POST https://graph.facebook.com/v25.0/pn-1/block_users|DELETE https://graph.facebook.com/v25.0/pn-1/block_users|GET https://graph.facebook.com/v25.0/pn-1/official_business_account?fields=oba_status|POST https://graph.facebook.com/v25.0/pn-1/official_business_account|POST https://graph.facebook.com/v25.0/pn-1";
+
+  const wats98Handle = createMockTransport({
+    defaultResponse: {
+      status: 200,
+      headers: { "content-type": "application/json" },
+      body: {
+        messaging_product: "whatsapp",
+        contacts: [{ input: "15551230000", wa_id: "15551230000", user_id: "bsuid-fixture" }],
+        messages: [{ id: "wamid.marketing", message_status: "accepted" }]
+      }
+    }
+  });
+  const wats98Client = new GraphClient({
+    accessToken: "t",
+    apiVersion: "v25.0",
+    baseUrl: "https://graph.facebook.com",
+    transport: wats98Handle.transport as Transport
+  });
+  const wats98Phone = new PhoneNumberClient({ graphClient: wats98Client, phoneNumberId: "pn-1" });
+  const wats98Response: GraphMessagesMarketingTemplateResponse = await wats98Phone.sendMarketingTemplate(marketingInput);
+  checks["wats98-marketing-messages root exports are functions"] =
+    typeof sendMarketingTemplate === "function" &&
+    typeof buildSendMarketingTemplatePayload === "function";
+  checks["wats98-marketing-messages round trips through scoped clients"] =
+    wats98Response.messages?.[0]?.message_status === "accepted" &&
+    wats98Response.contacts?.[0]?.user_id === "bsuid-fixture" &&
+    wats98Handle.requests[0]?.url === "https://graph.facebook.com/v25.0/pn-1/marketing_messages";
 
   for (const [label, ok] of Object.entries(checks)) {
     if (!ok) {

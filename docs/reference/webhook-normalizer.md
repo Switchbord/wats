@@ -76,7 +76,11 @@ Contract at a glance:
   plus typed `account_offboarded` and `account_reconnected` account updates. WATS-95
   adds `account.phoneNumberQuality` for `phone_number_quality_update` events such as
   `THROUGHPUT_UPGRADE` and `TIER_UNLIMITED`, and `account.alert` for `account_alerts`
-  values such as `PROFILE_PICTURE_LOST`.
+  values such as `PROFILE_PICTURE_LOST`. WATS-98 keeps current Marketing Messages
+  status webhooks visible through `pricing.category = "marketing_lite"` and
+  `conversation.origin.type = "marketing_lite"`, and promotes `account_update`
+  onboarding fields into `account.marketingMessages` for events such as
+  `MM_LITE_TERMS_SIGNED`.
 - `TypedUnknownUpdate` — `kind: "unknown"`. Catch-all for webhook
   field names Meta has not yet published a typed shape for.
   Preserves `field` + `rawChange` so the consumer can inspect.

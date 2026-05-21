@@ -292,6 +292,39 @@ All the usual invariants hold automatically:
 - network/registry errors surface as `GraphApiError` subclasses per F-5.
 
 
+## WATS-98 Marketing Messages API
+
+WATS-98 adds credential-free request-shape helpers for Meta's Marketing Messages API for WhatsApp. The helper maps only the current confirmed request surface; tests use MockTransport and make no live Meta calls.
+
+```ts
+await sendMarketingTemplate(client, { phoneNumberId }, {
+  to: "15551230000",
+  name: "promo_offer",
+  languageCode: "en_US",
+  productPolicy: "STRICT",
+  messageActivitySharing: false
+});
+
+// PhoneNumberClient also exposes the bound-id variant.
+await phone.sendMarketingTemplate({
+  recipient: "bsuid-parent-1",
+  name: "promo_offer",
+  languageCode: "en_US"
+});
+```
+
+Wire mapping:
+
+- `sendMarketingTemplate` posts `POST /{phoneNumberId}/marketing_messages`.
+- The Graph body always includes `messaging_product: "whatsapp"`, `recipient_type: "individual"`, `type: "template"`, and a `template` object.
+- Public `languageCode` maps to `template.language.code`.
+- Optional `productPolicy` maps to Graph `product_policy` and is limited to `CLOUD_API_FALLBACK` or `STRICT`.
+- Optional `messageActivitySharing` maps to Graph `message_activity_sharing`.
+- Optional `recipient` supports BSUID routing when `to` is omitted; if both `to` and `recipient` are present, `to` remains in the request as Meta's precedence field.
+- Responses may include `contacts.user_id` for BSUID sends and `messages[].message_status` values such as `accepted`, `held_for_quality_assessment`, and `paused`.
+
+Non-goals: WATS-98 does not perform live Meta calls, validate credentials, operate Ads Manager dashboards, claim ACO automation, or decide campaign delivery strategy.
+
 ## WATS-90 v24 message composers
 
 WATS-90 adds credential-free builders for the v24 message send deltas:
