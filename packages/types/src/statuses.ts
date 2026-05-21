@@ -50,8 +50,5 @@ export interface WhatsAppMessageStatus {
 
 export const WATS_TYPES_STATUSES_EXPORTS = [
   "WhatsAppMessageStatus",
-  "WhatsAppMessageStatusKind",
-  "WhatsAppPricingCategory",
-  "WhatsAppPricingModel",
-  "WhatsAppMarketingMessageStatus"
+  "WhatsAppMessageStatusKind"
 ] as const;
