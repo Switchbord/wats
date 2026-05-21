@@ -85,7 +85,8 @@ describe("WATS-95 business webhook alert deltas", () => {
     const alertUpdate = result.updates[0] as TypedAccountUpdate;
     const qualityUpdate = result.updates[1] as TypedAccountUpdate;
     expect(alertUpdate.kind).toBe("account");
-    expect(alertUpdate.account?.alert).toBeUndefined();
+    expect(alertUpdate.account?.alert?.type).toBeUndefined();
+    expect(alertUpdate.account?.alert?.entityType).toBe("PHONE_NUMBER");
     expect(qualityUpdate.account?.phoneNumberQuality?.currentLimit).toBeUndefined();
     expect(qualityUpdate.account?.event).toBe("THROUGHPUT_UPGRADE");
   });

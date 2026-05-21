@@ -128,6 +128,22 @@ export interface TypedGenericAccountUpdate {
     readonly partnerName?: string;
     readonly raw?: unknown;
   };
+  readonly phoneNumberQuality?: {
+    readonly displayPhoneNumber?: string;
+    readonly oldLimit?: string;
+    readonly currentLimit?: string;
+    readonly maxDailyConversationsPerBusiness?: string;
+    readonly raw?: unknown;
+  };
+  readonly alert?: {
+    readonly entityType?: string;
+    readonly entityId?: string;
+    readonly severity?: string;
+    readonly status?: string;
+    readonly type?: string;
+    readonly description?: string;
+    readonly raw?: unknown;
+  };
 }
 
 export interface TypedTemplateAccountUpdate {
@@ -784,6 +800,8 @@ function normalizeGenericAccountPayload(payload: Record<string, unknown>): Typed
   const out: {
     event?: string;
     disconnectionInfo?: { reason?: string; partnerId?: string; partnerName?: string; raw?: unknown };
+    phoneNumberQuality?: { displayPhoneNumber?: string; oldLimit?: string; currentLimit?: string; maxDailyConversationsPerBusiness?: string; raw?: unknown };
+    alert?: { entityType?: string; entityId?: string; severity?: string; status?: string; type?: string; description?: string; raw?: unknown };
   } = {};
   if (event !== undefined) out.event = event;
   const disconnection = readOwnDataField(payload, "disconnection_info");
@@ -797,6 +815,36 @@ function normalizeGenericAccountPayload(payload: Record<string, unknown>): Typed
     if (partnerName !== undefined) info.partnerName = partnerName;
     out.disconnectionInfo = info;
   }
+
+  const phoneNumberQuality: { displayPhoneNumber?: string; oldLimit?: string; currentLimit?: string; maxDailyConversationsPerBusiness?: string; raw?: unknown } = { raw: payload };
+  const displayPhoneNumber = readStringField(payload, "display_phone_number");
+  const oldLimit = readStringField(payload, "old_limit");
+  const currentLimit = readStringField(payload, "current_limit");
+  const maxDaily = readStringField(payload, "max_daily_conversations_per_business");
+  if (displayPhoneNumber !== undefined) phoneNumberQuality.displayPhoneNumber = displayPhoneNumber;
+  if (oldLimit !== undefined) phoneNumberQuality.oldLimit = oldLimit;
+  if (currentLimit !== undefined) phoneNumberQuality.currentLimit = currentLimit;
+  if (maxDaily !== undefined) phoneNumberQuality.maxDailyConversationsPerBusiness = maxDaily;
+  if (Object.keys(phoneNumberQuality).length > 1) out.phoneNumberQuality = phoneNumberQuality;
+
+  const entityType = readStringField(payload, "entity_type");
+  const entityId = readStringField(payload, "entity_id");
+  const alertInfo = readOwnDataField(payload, "alert_info");
+  if (isRecord(alertInfo)) {
+    const alert: { entityType?: string; entityId?: string; severity?: string; status?: string; type?: string; description?: string; raw?: unknown } = { raw: alertInfo };
+    const severity = readStringField(alertInfo, "alert_severity");
+    const status = readStringField(alertInfo, "alert_status");
+    const type = readStringField(alertInfo, "alert_type");
+    const description = readStringField(alertInfo, "alert_description");
+    if (entityType !== undefined) alert.entityType = entityType;
+    if (entityId !== undefined) alert.entityId = entityId;
+    if (severity !== undefined) alert.severity = severity;
+    if (status !== undefined) alert.status = status;
+    if (type !== undefined) alert.type = type;
+    if (description !== undefined) alert.description = description;
+    if (Object.keys(alert).length > 1) out.alert = alert;
+  }
+
   return Object.keys(out).length > 0 ? out : undefined;
 }
 

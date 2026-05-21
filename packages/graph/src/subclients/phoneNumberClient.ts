@@ -22,15 +22,33 @@ import {
   getPhoneNumberInfo as getPhoneNumberInfoEndpoint,
   getPhoneNumberSettings as getPhoneNumberSettingsEndpoint,
   updatePhoneNumberSettings as updatePhoneNumberSettingsEndpoint,
+  listBlockedUsers as listBlockedUsersEndpoint,
+  blockUsers as blockUsersEndpoint,
+  unblockUsers as unblockUsersEndpoint,
+  getOfficialBusinessAccountStatus as getOfficialBusinessAccountStatusEndpoint,
+  requestOfficialBusinessAccountReview as requestOfficialBusinessAccountReviewEndpoint,
+  submitDisplayNameForReview as submitDisplayNameForReviewEndpoint,
+  type BlockUsersInput,
+  type BlockUsersResponse,
+  type BlockedUsersResponse,
   type BusinessProfileResponse,
   type CommerceSettingsResponse,
   type GetBusinessProfileInput,
   type GetCommerceSettingsInput,
+  type GetOfficialBusinessAccountStatusInput,
   type GetPhoneNumberInfoInput,
   type GetPhoneNumberSettingsInput,
+  type ListBlockedUsersInput,
+  type OfficialBusinessAccountReviewResponse,
+  type OfficialBusinessAccountStatusResponse,
   type PhoneNumberInfo,
   type PhoneNumberSettingsResponse,
   type PhoneNumberSettingsUpdateResponse,
+  type RequestOfficialBusinessAccountReviewInput,
+  type SubmitDisplayNameForReviewInput,
+  type SubmitDisplayNameForReviewResponse,
+  type UnblockUsersInput,
+  type UnblockUsersResponse,
   type UpdatePhoneNumberSettingsInput
 } from "../endpoints/businessManagement.js";
 import {
@@ -277,6 +295,110 @@ export class PhoneNumberClient {
     return getCommerceSettingsEndpoint(
       this.#graphClient,
       scopedParams as unknown as GetCommerceSettingsInput,
+      undefined,
+      opts
+    );
+  }
+
+  /** Graph `GET /{phoneNumberId}/block_users`. */
+  async listBlockedUsers(
+    params?: Omit<ListBlockedUsersInput, "phoneNumberId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<BlockedUsersResponse> {
+    copyOptionalParamsObject(params, "PhoneNumberClient.listBlockedUsers");
+    return listBlockedUsersEndpoint(
+      this.#graphClient,
+      { phoneNumberId: this.#phoneNumberId },
+      undefined,
+      opts
+    );
+  }
+
+  /** Graph `POST /{phoneNumberId}/block_users`. */
+  async blockUsers(
+    params: Omit<BlockUsersInput, "phoneNumberId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<BlockUsersResponse> {
+    const scopedParams: Record<string, unknown> = copyOptionalParamsObject(
+      params,
+      "PhoneNumberClient.blockUsers"
+    );
+    scopedParams.phoneNumberId = this.#phoneNumberId;
+    return blockUsersEndpoint(
+      this.#graphClient,
+      scopedParams as unknown as BlockUsersInput,
+      undefined,
+      opts
+    );
+  }
+
+  /** Graph `DELETE /{phoneNumberId}/block_users`. */
+  async unblockUsers(
+    params: Omit<UnblockUsersInput, "phoneNumberId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<UnblockUsersResponse> {
+    const scopedParams: Record<string, unknown> = copyOptionalParamsObject(
+      params,
+      "PhoneNumberClient.unblockUsers"
+    );
+    scopedParams.phoneNumberId = this.#phoneNumberId;
+    return unblockUsersEndpoint(
+      this.#graphClient,
+      scopedParams as unknown as UnblockUsersInput,
+      undefined,
+      opts
+    );
+  }
+
+  /** Graph `GET /{phoneNumberId}/official_business_account`. */
+  async getOfficialBusinessAccountStatus(
+    params?: Omit<GetOfficialBusinessAccountStatusInput, "phoneNumberId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<OfficialBusinessAccountStatusResponse> {
+    const scopedParams: Record<string, unknown> = copyOptionalParamsObject(
+      params,
+      "PhoneNumberClient.getOfficialBusinessAccountStatus"
+    );
+    scopedParams.phoneNumberId = this.#phoneNumberId;
+    return getOfficialBusinessAccountStatusEndpoint(
+      this.#graphClient,
+      scopedParams as unknown as GetOfficialBusinessAccountStatusInput,
+      undefined,
+      opts
+    );
+  }
+
+  /** Graph `POST /{phoneNumberId}/official_business_account`. */
+  async requestOfficialBusinessAccountReview(
+    params: Omit<RequestOfficialBusinessAccountReviewInput, "phoneNumberId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<OfficialBusinessAccountReviewResponse> {
+    const scopedParams: Record<string, unknown> = copyOptionalParamsObject(
+      params,
+      "PhoneNumberClient.requestOfficialBusinessAccountReview"
+    );
+    scopedParams.phoneNumberId = this.#phoneNumberId;
+    return requestOfficialBusinessAccountReviewEndpoint(
+      this.#graphClient,
+      scopedParams as unknown as RequestOfficialBusinessAccountReviewInput,
+      undefined,
+      opts
+    );
+  }
+
+  /** Graph `POST /{phoneNumberId}` with Graph `new_display_name`. */
+  async submitDisplayNameForReview(
+    params: Omit<SubmitDisplayNameForReviewInput, "phoneNumberId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<SubmitDisplayNameForReviewResponse> {
+    const scopedParams: Record<string, unknown> = copyOptionalParamsObject(
+      params,
+      "PhoneNumberClient.submitDisplayNameForReview"
+    );
+    scopedParams.phoneNumberId = this.#phoneNumberId;
+    return submitDisplayNameForReviewEndpoint(
+      this.#graphClient,
+      scopedParams as unknown as SubmitDisplayNameForReviewInput,
       undefined,
       opts
     );

@@ -3,6 +3,13 @@
 ## [0.3.2] - 2026-05-18
 
 
+### WATS-95 — business-management Block API and alert deltas
+
+- Adds credential-free MockTransport helpers for Meta `block_users`: `listBlockedUsers`, `blockUsers`, `unblockUsers`, and matching `PhoneNumberClient` methods.
+- Adds OBA/display-name helpers: `getOfficialBusinessAccountStatus`, `requestOfficialBusinessAccountReview`, and `submitDisplayNameForReview`, mapping `official_business_account`, `new_display_name`, `business_website_url`, and `primary_country_of_operation` wire fields.
+- Normalizes WATS-95 webhook deltas: `phone_number_quality_update` values including `THROUGHPUT_UPGRADE` / `TIER_UNLIMITED`, plus `account_alerts` `PROFILE_PICTURE_LOST`; no live Meta calls, credential validation, policy/appeal automation, or automatic user-block decisions are included.
+
+
 ### WATS-97 — webhook media ID retention docs
 
 - Documents current behavior: webhook media IDs received via webhook are downloadable for 7 days after 2025-10-09.
