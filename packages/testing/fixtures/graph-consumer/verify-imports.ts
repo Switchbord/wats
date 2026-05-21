@@ -33,6 +33,12 @@ import {
   getPhoneNumberSettings,
   getBusinessProfile,
   getCommerceSettings,
+  listBlockedUsers,
+  blockUsers,
+  unblockUsers,
+  getOfficialBusinessAccountStatus,
+  requestOfficialBusinessAccountReview,
+  submitDisplayNameForReview,
   MediaCryptoError,
   MediaIntegrityError,
   MediaValidationError,
@@ -113,7 +119,13 @@ import {
   type PhoneNumberInfo,
   type PhoneNumberSettingsResponse,
   type BusinessProfileResponse,
-  type CommerceSettingsResponse
+  type CommerceSettingsResponse,
+  type BlockedUsersResponse,
+  type BlockUsersResponse,
+  type UnblockUsersResponse,
+  type OfficialBusinessAccountStatusResponse,
+  type OfficialBusinessAccountReviewResponse,
+  type SubmitDisplayNameForReviewResponse
 } from "@wats/graph";
 import { createMockTransport } from "@wats/graph/testing";
 
@@ -1150,6 +1162,54 @@ async function verify(): Promise<VerifyReportOk> {
     commerceSettings.data?.[0]?.is_cart_enabled === true &&
     businessHandle.requests.map((request) => request.url).join("|") ===
       "https://graph.facebook.com/v25.0/waba-1?fields=id%2Cname|https://graph.facebook.com/v25.0/waba-1/subscribed_apps|https://graph.facebook.com/v25.0/waba-1/phone_numbers?fields=id&limit=5|https://graph.facebook.com/v25.0/pn-1?fields=id%2Cdisplay_phone_number|https://graph.facebook.com/v25.0/pn-1/settings?include_sip_credentials=false|https://graph.facebook.com/v25.0/pn-1/whatsapp_business_profile?fields=about|https://graph.facebook.com/v25.0/pn-1/whatsapp_commerce_settings?fields=is_cart_enabled";
+
+  checks["wats95-business-management root exports are functions"] =
+    typeof listBlockedUsers === "function" &&
+    typeof blockUsers === "function" &&
+    typeof unblockUsers === "function" &&
+    typeof getOfficialBusinessAccountStatus === "function" &&
+    typeof requestOfficialBusinessAccountReview === "function" &&
+    typeof submitDisplayNameForReview === "function";
+  checks["wats95-business-management subpath exports are functions"] =
+    typeof businessManagementSubpath.listBlockedUsers === "function" &&
+    typeof businessManagementSubpath.blockUsers === "function" &&
+    typeof businessManagementSubpath.unblockUsers === "function" &&
+    typeof businessManagementSubpath.getOfficialBusinessAccountStatus === "function" &&
+    typeof businessManagementSubpath.requestOfficialBusinessAccountReview === "function" &&
+    typeof businessManagementSubpath.submitDisplayNameForReview === "function";
+
+  const wats95Handle = createMockTransport({
+    responses: [
+      { status: 200, headers: { "content-type": "application/json" }, body: { data: [{ wa_id: "15551234567" }] } },
+      { status: 200, headers: { "content-type": "application/json" }, body: { block_users: { added_users: [{ input: "15551234567", wa_id: "15551234567" }] }, messaging_product: "whatsapp" } },
+      { status: 200, headers: { "content-type": "application/json" }, body: { block_users: { removed_users: [{ input: "15551234567", wa_id: "15551234567" }] }, messaging_product: "whatsapp" } },
+      { status: 200, headers: { "content-type": "application/json" }, body: { id: "pn-1", oba_status: "PENDING", status_message: "Under review" } },
+      { status: 200, headers: { "content-type": "application/json" }, body: { success: true, message: "submitted" } },
+      { status: 200, headers: { "content-type": "application/json" }, body: { success: true } }
+    ]
+  });
+  const wats95Client = new GraphClient({
+    accessToken: "t",
+    apiVersion: "v25.0",
+    baseUrl: "https://graph.facebook.com",
+    transport: wats95Handle.transport as Transport
+  });
+  const wats95Phone = new PhoneNumberClient({ graphClient: wats95Client, phoneNumberId: "pn-1" });
+  const blockedUsers: BlockedUsersResponse = await wats95Phone.listBlockedUsers();
+  const blockResponse: BlockUsersResponse = await wats95Phone.blockUsers({ users: ["15551234567"] });
+  const unblockResponse: UnblockUsersResponse = await wats95Phone.unblockUsers({ users: ["15551234567"] });
+  const obaStatus: OfficialBusinessAccountStatusResponse = await wats95Phone.getOfficialBusinessAccountStatus({ fields: ["oba_status"] });
+  const obaReview: OfficialBusinessAccountReviewResponse = await wats95Phone.requestOfficialBusinessAccountReview({ businessWebsiteUrl: "https://example.com", primaryCountryOfOperation: "US" });
+  const displayNameReview: SubmitDisplayNameForReviewResponse = await wats95Phone.submitDisplayNameForReview({ newDisplayName: "Acme Support" });
+  checks["wats95-business-management round trips through scoped clients"] =
+    blockedUsers.data?.[0]?.wa_id === "15551234567" &&
+    blockResponse.block_users?.added_users?.[0]?.wa_id === "15551234567" &&
+    unblockResponse.block_users?.removed_users?.[0]?.wa_id === "15551234567" &&
+    obaStatus.oba_status === "PENDING" &&
+    obaReview.success === true &&
+    displayNameReview.success === true &&
+    wats95Handle.requests.map((request) => `${request.method} ${request.url}`).join("|") ===
+      "GET https://graph.facebook.com/v25.0/pn-1/block_users|POST https://graph.facebook.com/v25.0/pn-1/block_users|DELETE https://graph.facebook.com/v25.0/pn-1/block_users|GET https://graph.facebook.com/v25.0/pn-1/official_business_account?fields=oba_status|POST https://graph.facebook.com/v25.0/pn-1/official_business_account|POST https://graph.facebook.com/v25.0/pn-1";
 
   for (const [label, ok] of Object.entries(checks)) {
     if (!ok) {

@@ -195,7 +195,7 @@ Migration notes:
 | Message-template helpers | `@wats/graph/endpoints/templates` |
 | Flow management helpers | `@wats/graph/endpoints/flows` |
 | Calling endpoint helpers | `@wats/graph/endpoints/calling` |
-| Business-management read helpers | `@wats/graph/endpoints/business-management` |
+| Business-management read/admin helpers (`getPhoneNumberInfo`, `blockUsers`, `submitDisplayNameForReview`) | `@wats/graph/endpoints/business-management` |
 | Facade/router/filters/listeners | `@wats/core` |
 | Typed filter subpath | `@wats/core/filtersTyped` |
 | Webhook adapters | `@wats/http` or `@wats/http/adapters/fetch` / `bun` / `node` |

@@ -81,6 +81,24 @@ export interface WhatsAppAccountUpdateValue {
     partnerName?: string;
     raw?: unknown;
   };
+  /** WATS-95 normalized `phone_number_quality_update` details. */
+  phoneNumberQuality?: {
+    displayPhoneNumber?: string;
+    oldLimit?: string;
+    currentLimit?: string;
+    maxDailyConversationsPerBusiness?: string;
+    raw?: unknown;
+  };
+  /** WATS-95 normalized `account_alerts.alert_info` details. */
+  alert?: {
+    entityType?: string;
+    entityId?: string;
+    severity?: string;
+    status?: string;
+    type?: string;
+    description?: string;
+    raw?: unknown;
+  };
   raw?: unknown;
 }
 

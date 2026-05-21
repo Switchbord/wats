@@ -73,7 +73,10 @@ Contract at a glance:
   account updates when the payload includes safe `message_template_id`,
   `message_template_name`, and `message_template_language` strings. WATS-89 also adds
   `account.event` and Coexistence `account.disconnectionInfo` for `PARTNER_REMOVED`,
-  plus typed `account_offboarded` and `account_reconnected` account updates.
+  plus typed `account_offboarded` and `account_reconnected` account updates. WATS-95
+  adds `account.phoneNumberQuality` for `phone_number_quality_update` events such as
+  `THROUGHPUT_UPGRADE` and `TIER_UNLIMITED`, and `account.alert` for `account_alerts`
+  values such as `PROFILE_PICTURE_LOST`.
 - `TypedUnknownUpdate` — `kind: "unknown"`. Catch-all for webhook
   field names Meta has not yet published a typed shape for.
   Preserves `field` + `rawChange` so the consumer can inspect.

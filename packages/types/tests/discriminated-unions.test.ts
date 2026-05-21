@@ -4,6 +4,7 @@ import type {
   WhatsAppMessageStatus,
   WhatsAppContact,
   WhatsAppWebhookValue,
+  WhatsAppAccountUpdateValue,
   TextMessage,
   ImageMessage,
   VideoMessage,
@@ -345,5 +346,23 @@ describe("F-1 discriminated union contracts", () => {
       const first = value.messages[0];
       expect(first?.type).toBe("text");
     }
+  });
+
+  test("WhatsAppAccountUpdateValue exposes WATS-95 quality and alert helpers", () => {
+    const value: WhatsAppAccountUpdateValue = {
+      event: "THROUGHPUT_UPGRADE",
+      phoneNumberQuality: {
+        displayPhoneNumber: "15550783881",
+        currentLimit: "TIER_UNLIMITED",
+        maxDailyConversationsPerBusiness: "TIER_UNLIMITED"
+      },
+      alert: {
+        entityType: "PHONE_NUMBER",
+        entityId: "506914307656634",
+        type: "PROFILE_PICTURE_LOST"
+      }
+    };
+    expect(value.phoneNumberQuality?.currentLimit).toBe("TIER_UNLIMITED");
+    expect(value.alert?.type).toBe("PROFILE_PICTURE_LOST");
   });
 });

@@ -13,7 +13,7 @@ import {
 import {
   assertQueryString as assertInternalQueryString
 } from "../internal/validation/strings.js";
-import { assertJoinedStringQueryArray } from "../internal/validation/arrays.js";
+import { assertDenseDataArray, assertJoinedStringQueryArray } from "../internal/validation/arrays.js";
 import { sanitizeHeaderInit } from "../internal/validation/headers.js";
 import {
   assertPlainDataRecord,
@@ -66,6 +66,8 @@ export interface PhoneNumberInfo {
   readonly verified_name?: string;
   readonly quality_rating?: string;
   readonly code_verification_status?: string;
+  /** WATS-95 display-name certification status when requested via `fields=name_status`. */
+  readonly name_status?: string;
   readonly platform_type?: string;
   readonly throughput?: unknown;
   readonly webhook_configuration?: unknown;
@@ -160,6 +162,96 @@ export interface PhoneNumberSettingsUpdateResponse {
   readonly [key: string]: unknown;
 }
 
+export interface BlockedUser {
+  readonly messaging_product?: string;
+  readonly wa_id?: string;
+  readonly [key: string]: unknown;
+}
+
+export interface BlockedUsersResponse {
+  readonly data?: readonly BlockedUser[];
+  readonly paging?: GraphPaging;
+  readonly [key: string]: unknown;
+}
+
+export interface BlockedUserOperation {
+  readonly input?: string;
+  readonly wa_id?: string;
+  readonly [key: string]: unknown;
+}
+
+export interface BlockUsersResponse {
+  readonly block_users?: {
+    readonly added_users?: readonly BlockedUserOperation[];
+    readonly [key: string]: unknown;
+  };
+  readonly messaging_product?: string;
+  readonly [key: string]: unknown;
+}
+
+export interface UnblockUsersResponse {
+  readonly block_users?: {
+    readonly removed_users?: readonly BlockedUserOperation[];
+    readonly [key: string]: unknown;
+  };
+  readonly messaging_product?: string;
+  readonly [key: string]: unknown;
+}
+
+export interface ListBlockedUsersInput {
+  readonly phoneNumberId: string;
+}
+
+export interface BlockUsersInput {
+  readonly phoneNumberId: string;
+  readonly users: readonly string[];
+}
+
+export interface UnblockUsersInput {
+  readonly phoneNumberId: string;
+  readonly users: readonly string[];
+}
+
+export interface OfficialBusinessAccountStatusResponse {
+  readonly id?: string;
+  readonly oba_status?: string;
+  readonly status_message?: string;
+  readonly [key: string]: unknown;
+}
+
+export interface GetOfficialBusinessAccountStatusInput {
+  readonly phoneNumberId: string;
+  readonly fields?: BusinessManagementFields;
+}
+
+export interface RequestOfficialBusinessAccountReviewInput {
+  readonly phoneNumberId: string;
+  readonly businessWebsiteUrl: string;
+  readonly primaryCountryOfOperation: string;
+  readonly primaryLanguage?: string;
+  readonly parentBusinessOrBrand?: string;
+  readonly supportingLinks?: readonly string[];
+  readonly additionalSupportingInformation?: string;
+}
+
+export interface OfficialBusinessAccountReviewResponse {
+  readonly success?: boolean;
+  readonly message?: string;
+  readonly updated_status?: OfficialBusinessAccountStatusResponse;
+  readonly tracking_id?: string;
+  readonly [key: string]: unknown;
+}
+
+export interface SubmitDisplayNameForReviewInput {
+  readonly phoneNumberId: string;
+  readonly newDisplayName: string;
+}
+
+export interface SubmitDisplayNameForReviewResponse {
+  readonly success?: boolean;
+  readonly [key: string]: unknown;
+}
+
 export interface GetBusinessProfileInput {
   readonly phoneNumberId: string;
   readonly fields?: BusinessManagementFields;
@@ -178,6 +270,13 @@ const MAX_FIELD_ARRAY_LENGTH = 50;
 const MAX_FIELD_ITEM_LENGTH = 128;
 const MAX_CURSOR_LENGTH = 512;
 const MAX_PERCENT_DECODE_ROUNDS = 8;
+const MAX_BLOCK_USERS = 50;
+const MAX_RECIPIENT_DIGITS = 15;
+const MAX_DISPLAY_NAME_LENGTH = 128;
+const MAX_OBA_TEXT_LENGTH = 2048;
+const MAX_OBA_URL_LENGTH = 2048;
+const MAX_OBA_SUPPORTING_LINKS = 10;
+const MIN_OBA_SUPPORTING_LINKS = 5;
 
 function validationError(message: string, cause?: unknown): GraphRequestValidationError {
   return new GraphRequestValidationError(message, cause);
@@ -277,6 +376,89 @@ function optionalIncludeSipCredentials(record: Record<string, unknown>, helperNa
   return value ? "true" : "false";
 }
 
+function assertRecipient(value: unknown, fieldName: string, helperName: string): string {
+  if (typeof value !== "string") {
+    throw validationError(`Invalid ${helperName} input: ${fieldName} must be a phone-number string.`);
+  }
+  if (value.length === 0 || value.trim().length === 0) {
+    throw validationError(`Invalid ${helperName} input: ${fieldName} must be a non-empty phone-number string.`);
+  }
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code < 0x20 || code === 0x7f) {
+      throw validationError(`Invalid ${helperName} input: ${fieldName} must not contain control characters.`);
+    }
+  }
+  if (value.includes("/") || value.includes("\\") || value.includes("?") || value.includes("#") || value.includes(":") || value.includes("@")) {
+    throw validationError(`Invalid ${helperName} input: ${fieldName} must be a phone-number string, not a path, URL, or address.`);
+  }
+  if (!/^\+?\d{1,15}$/u.test(value)) {
+    throw validationError(`Invalid ${helperName} input: ${fieldName} must be E.164-ish digits with optional leading + and at most ${MAX_RECIPIENT_DIGITS} digits.`);
+  }
+  return value;
+}
+
+function normalizeBlockUserList(value: unknown, helperName: string): readonly { readonly user: string }[] {
+  const items = assertDenseDataArray(value, {
+    helperName,
+    path: "users",
+    minLength: 1,
+    maxLength: MAX_BLOCK_USERS,
+    invalidTypeMessage: `Invalid ${helperName} input: users must be an array of phone-number strings.`,
+    invalidLengthMessage: `Invalid ${helperName} input: users length must be between 1 and ${MAX_BLOCK_USERS}.`,
+    sparseArrayMessage: `Invalid ${helperName} input: users must not contain sparse array holes.`,
+    unsafePrototypeKeyMessage: `Invalid ${helperName} input: users contains an unsafe prototype key.`,
+    unsupportedPropertyMessage: `Invalid ${helperName} input: users contains unsupported properties.`
+  });
+  return items.map((item, index) => ({ user: assertRecipient(item, `users[${index}]`, helperName) }));
+}
+
+function assertBoundedPlainString(value: unknown, fieldName: string, helperName: string, maxLength: number): string {
+  const out = assertQueryString(value, fieldName, helperName, maxLength);
+  return out;
+}
+
+function assertHttpUrl(value: unknown, fieldName: string, helperName: string): string {
+  const raw = assertBoundedPlainString(value, fieldName, helperName, MAX_OBA_URL_LENGTH);
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch (error) {
+    throw validationError(`Invalid ${helperName} input: ${fieldName} must be an http(s) URL.`, error);
+  }
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    throw validationError(`Invalid ${helperName} input: ${fieldName} must be an http(s) URL.`);
+  }
+  return raw;
+}
+
+function optionalBoundedString(record: Record<string, unknown>, key: keyof RequestOfficialBusinessAccountReviewInput, helperName: string): string | undefined {
+  const value = ownDataValue(record, key as string, helperName, false);
+  if (value === undefined) return undefined;
+  return assertBoundedPlainString(value, key as string, helperName, MAX_OBA_TEXT_LENGTH);
+}
+
+function optionalSupportingLinks(record: Record<string, unknown>, helperName: string): readonly string[] | undefined {
+  const value = ownDataValue(record, "supportingLinks", helperName, false);
+  if (value === undefined) return undefined;
+  const items = assertDenseDataArray(value, {
+    helperName,
+    path: "supportingLinks",
+    minLength: MIN_OBA_SUPPORTING_LINKS,
+    maxLength: MAX_OBA_SUPPORTING_LINKS,
+    invalidTypeMessage: `Invalid ${helperName} input: supportingLinks must be an array of http(s) URLs.`,
+    invalidLengthMessage: `Invalid ${helperName} input: supportingLinks length must be between ${MIN_OBA_SUPPORTING_LINKS} and ${MAX_OBA_SUPPORTING_LINKS}.`,
+    sparseArrayMessage: `Invalid ${helperName} input: supportingLinks must not contain sparse array holes.`,
+    unsafePrototypeKeyMessage: `Invalid ${helperName} input: supportingLinks contains an unsafe prototype key.`,
+    unsupportedPropertyMessage: `Invalid ${helperName} input: supportingLinks contains unsupported properties.`
+  });
+  const out = items.map((item, index) => assertHttpUrl(item, `supportingLinks[${index}]`, helperName));
+  if (new Set(out).size !== out.length) {
+    throw validationError(`Invalid ${helperName} input: supportingLinks must not contain duplicates.`);
+  }
+  return out;
+}
+
 function sanitizeStorageConfiguration(value: unknown, helperName: string): Record<string, unknown> {
   const record = assertPlainRecord(value, helperName, "storageConfiguration");
   const status = ownDataValue(record, "status", helperName, true);
@@ -360,6 +542,90 @@ export function normalizePhoneNumberSettingsParams(input: GetPhoneNumberSettings
   if (fields !== undefined) out.fields = fields;
   if (includeSipCredentials !== undefined) out.include_sip_credentials = includeSipCredentials;
   return out;
+}
+
+export function normalizeListBlockedUsersParams(input: ListBlockedUsersInput): WireParams {
+  const helperName = "listBlockedUsers";
+  const record = assertPlainRecord(input, helperName);
+  return { phoneNumberId: assertPathId(ownDataValue(record, "phoneNumberId", helperName, true), "phoneNumberId", helperName) };
+}
+
+export function buildBlockUsersBody(input: BlockUsersInput | UnblockUsersInput): Record<string, unknown> {
+  const helperName = "blockUsers";
+  const record = assertPlainRecord(input, helperName);
+  return {
+    messaging_product: "whatsapp",
+    block_users: normalizeBlockUserList(ownDataValue(record, "users", helperName, true), helperName)
+  };
+}
+
+export function normalizeBlockUsersParams(input: BlockUsersInput): WireParams {
+  const helperName = "blockUsers";
+  const record = assertPlainRecord(input, helperName);
+  return { phoneNumberId: assertPathId(ownDataValue(record, "phoneNumberId", helperName, true), "phoneNumberId", helperName) };
+}
+
+export function buildUnblockUsersBody(input: UnblockUsersInput): Record<string, unknown> {
+  const helperName = "unblockUsers";
+  const record = assertPlainRecord(input, helperName);
+  return {
+    messaging_product: "whatsapp",
+    block_users: normalizeBlockUserList(ownDataValue(record, "users", helperName, true), helperName)
+  };
+}
+
+export function normalizeUnblockUsersParams(input: UnblockUsersInput): WireParams {
+  const helperName = "unblockUsers";
+  const record = assertPlainRecord(input, helperName);
+  return { phoneNumberId: assertPathId(ownDataValue(record, "phoneNumberId", helperName, true), "phoneNumberId", helperName) };
+}
+
+export function normalizeOfficialBusinessAccountStatusParams(input: GetOfficialBusinessAccountStatusInput): WireParams {
+  const helperName = "getOfficialBusinessAccountStatus";
+  const record = assertPlainRecord(input, helperName);
+  const out: WireParams = { phoneNumberId: assertPathId(ownDataValue(record, "phoneNumberId", helperName, true), "phoneNumberId", helperName) };
+  const fields = optionalFields(record, helperName);
+  if (fields !== undefined) out.fields = fields;
+  return out;
+}
+
+export function buildOfficialBusinessAccountReviewBody(input: RequestOfficialBusinessAccountReviewInput): Record<string, unknown> {
+  const helperName = "requestOfficialBusinessAccountReview";
+  const record = assertPlainRecord(input, helperName);
+  const out: Record<string, unknown> = {
+    business_website_url: assertHttpUrl(ownDataValue(record, "businessWebsiteUrl", helperName, true), "businessWebsiteUrl", helperName),
+    primary_country_of_operation: assertBoundedPlainString(ownDataValue(record, "primaryCountryOfOperation", helperName, true), "primaryCountryOfOperation", helperName, 2).toUpperCase()
+  };
+  if (!/^[A-Z]{2}$/u.test(out.primary_country_of_operation as string)) {
+    throw validationError(`Invalid ${helperName} input: primaryCountryOfOperation must be an ISO 3166-1 alpha-2 country code.`);
+  }
+  const primaryLanguage = optionalBoundedString(record, "primaryLanguage", helperName);
+  const parentBusinessOrBrand = optionalBoundedString(record, "parentBusinessOrBrand", helperName);
+  const supportingLinks = optionalSupportingLinks(record, helperName);
+  const additional = optionalBoundedString(record, "additionalSupportingInformation", helperName);
+  if (primaryLanguage !== undefined) out.primary_language = primaryLanguage;
+  if (parentBusinessOrBrand !== undefined) out.parent_business_or_brand = parentBusinessOrBrand;
+  if (supportingLinks !== undefined) out.supporting_links = supportingLinks;
+  if (additional !== undefined) out.additional_supporting_information = additional;
+  return out;
+}
+
+export function normalizeOfficialBusinessAccountReviewParams(input: RequestOfficialBusinessAccountReviewInput): WireParams {
+  const helperName = "requestOfficialBusinessAccountReview";
+  const record = assertPlainRecord(input, helperName);
+  return { phoneNumberId: assertPathId(ownDataValue(record, "phoneNumberId", helperName, true), "phoneNumberId", helperName) };
+}
+
+export function buildDisplayNameReviewBody(input: SubmitDisplayNameForReviewInput): Record<string, unknown> {
+  const helperName = "submitDisplayNameForReview";
+  const record = assertPlainRecord(input, helperName);
+  return { new_display_name: assertBoundedPlainString(ownDataValue(record, "newDisplayName", helperName, true), "newDisplayName", helperName, MAX_DISPLAY_NAME_LENGTH) };
+}
+
+export function normalizeDisplayNameReviewParams(input: SubmitDisplayNameForReviewInput): WireParams {
+  const helperName = "submitDisplayNameForReview";
+  const record = assertPlainRecord(input, helperName);
+  return { phoneNumberId: assertPathId(ownDataValue(record, "phoneNumberId", helperName, true), "phoneNumberId", helperName) };
 }
 
 export function normalizeBusinessProfileParams(input: GetBusinessProfileInput): WireParams {
@@ -446,6 +712,61 @@ const getPhoneNumberSettingsRaw = defineEndpoint<
   }
 });
 
+const listBlockedUsersRaw = defineEndpoint<{ phoneNumberId: string }, never, BlockedUsersResponse>({
+  method: "GET",
+  pathTemplate: "/{phoneNumberId}/block_users",
+  params: { phoneNumberId: { in: "path", required: true } }
+});
+
+const blockUsersRaw = defineEndpoint<{ phoneNumberId: string }, BlockUsersInput, BlockUsersResponse>({
+  method: "POST",
+  pathTemplate: "/{phoneNumberId}/block_users",
+  params: { phoneNumberId: { in: "path", required: true } },
+  bodyContentType: "application/json",
+  buildBody: buildBlockUsersBody
+});
+
+const unblockUsersRaw = defineEndpoint<{ phoneNumberId: string }, UnblockUsersInput, UnblockUsersResponse>({
+  method: "DELETE",
+  pathTemplate: "/{phoneNumberId}/block_users",
+  params: { phoneNumberId: { in: "path", required: true } },
+  bodyContentType: "application/json",
+  buildBody: buildUnblockUsersBody
+});
+
+const getOfficialBusinessAccountStatusRaw = defineEndpoint<
+  { phoneNumberId: string; fields?: string },
+  never,
+  OfficialBusinessAccountStatusResponse
+>({
+  method: "GET",
+  pathTemplate: "/{phoneNumberId}/official_business_account",
+  params: { phoneNumberId: { in: "path", required: true }, fields: { in: "query" } }
+});
+
+const requestOfficialBusinessAccountReviewRaw = defineEndpoint<
+  { phoneNumberId: string },
+  RequestOfficialBusinessAccountReviewInput,
+  OfficialBusinessAccountReviewResponse
+>({
+  method: "POST",
+  pathTemplate: "/{phoneNumberId}/official_business_account",
+  params: { phoneNumberId: { in: "path", required: true } },
+  bodyContentType: "application/json",
+  buildBody: buildOfficialBusinessAccountReviewBody
+});
+
+const submitDisplayNameForReviewRaw = defineEndpoint<
+  { phoneNumberId: string },
+  SubmitDisplayNameForReviewInput,
+  SubmitDisplayNameForReviewResponse
+>({
+  method: "POST",
+  pathTemplate: "/{phoneNumberId}",
+  params: { phoneNumberId: { in: "path", required: true } },
+  bodyContentType: "application/json",
+  buildBody: buildDisplayNameReviewBody
+});
 
 const updatePhoneNumberSettingsRaw = defineEndpoint<
   { phoneNumberId: string },
@@ -509,6 +830,54 @@ export const updatePhoneNumberSettings = Object.assign(
     return updatePhoneNumberSettingsRaw(client, normalizeUpdatePhoneNumberSettingsParams(params) as Parameters<typeof updatePhoneNumberSettingsRaw>[1], params, sanitizeBusinessManagementOptions(opts, "updatePhoneNumberSettings"));
   },
   { definition: updatePhoneNumberSettingsRaw.definition }
+);
+
+export const listBlockedUsers = Object.assign(
+  async function listBlockedUsers(client: GraphClient, params: ListBlockedUsersInput, body?: never, opts?: EndpointInvokeOptions): Promise<BlockedUsersResponse> {
+    assertNoBody(body, "listBlockedUsers");
+    return listBlockedUsersRaw(client, normalizeListBlockedUsersParams(params) as Parameters<typeof listBlockedUsersRaw>[1], undefined, sanitizeBusinessManagementOptions(opts, "listBlockedUsers"));
+  },
+  { definition: listBlockedUsersRaw.definition }
+);
+
+export const blockUsers = Object.assign(
+  async function blockUsers(client: GraphClient, params: BlockUsersInput, body?: never, opts?: EndpointInvokeOptions): Promise<BlockUsersResponse> {
+    assertNoBody(body, "blockUsers");
+    return blockUsersRaw(client, normalizeBlockUsersParams(params) as Parameters<typeof blockUsersRaw>[1], params, sanitizeBusinessManagementOptions(opts, "blockUsers"));
+  },
+  { definition: blockUsersRaw.definition }
+);
+
+export const unblockUsers = Object.assign(
+  async function unblockUsers(client: GraphClient, params: UnblockUsersInput, body?: never, opts?: EndpointInvokeOptions): Promise<UnblockUsersResponse> {
+    assertNoBody(body, "unblockUsers");
+    return unblockUsersRaw(client, normalizeUnblockUsersParams(params) as Parameters<typeof unblockUsersRaw>[1], params, sanitizeBusinessManagementOptions(opts, "unblockUsers"));
+  },
+  { definition: unblockUsersRaw.definition }
+);
+
+export const getOfficialBusinessAccountStatus = Object.assign(
+  async function getOfficialBusinessAccountStatus(client: GraphClient, params: GetOfficialBusinessAccountStatusInput, body?: never, opts?: EndpointInvokeOptions): Promise<OfficialBusinessAccountStatusResponse> {
+    assertNoBody(body, "getOfficialBusinessAccountStatus");
+    return getOfficialBusinessAccountStatusRaw(client, normalizeOfficialBusinessAccountStatusParams(params) as Parameters<typeof getOfficialBusinessAccountStatusRaw>[1], undefined, sanitizeBusinessManagementOptions(opts, "getOfficialBusinessAccountStatus"));
+  },
+  { definition: getOfficialBusinessAccountStatusRaw.definition }
+);
+
+export const requestOfficialBusinessAccountReview = Object.assign(
+  async function requestOfficialBusinessAccountReview(client: GraphClient, params: RequestOfficialBusinessAccountReviewInput, body?: never, opts?: EndpointInvokeOptions): Promise<OfficialBusinessAccountReviewResponse> {
+    assertNoBody(body, "requestOfficialBusinessAccountReview");
+    return requestOfficialBusinessAccountReviewRaw(client, normalizeOfficialBusinessAccountReviewParams(params) as Parameters<typeof requestOfficialBusinessAccountReviewRaw>[1], params, sanitizeBusinessManagementOptions(opts, "requestOfficialBusinessAccountReview"));
+  },
+  { definition: requestOfficialBusinessAccountReviewRaw.definition }
+);
+
+export const submitDisplayNameForReview = Object.assign(
+  async function submitDisplayNameForReview(client: GraphClient, params: SubmitDisplayNameForReviewInput, body?: never, opts?: EndpointInvokeOptions): Promise<SubmitDisplayNameForReviewResponse> {
+    assertNoBody(body, "submitDisplayNameForReview");
+    return submitDisplayNameForReviewRaw(client, normalizeDisplayNameReviewParams(params) as Parameters<typeof submitDisplayNameForReviewRaw>[1], params, sanitizeBusinessManagementOptions(opts, "submitDisplayNameForReview"));
+  },
+  { definition: submitDisplayNameForReviewRaw.definition }
 );
 
 export const getBusinessProfile = Object.assign(

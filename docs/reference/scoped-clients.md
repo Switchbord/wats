@@ -481,6 +481,27 @@ Direct callables mirror those methods: `getWabaInfo`, `listSubscribedApps`, enha
 
 Validation is fail-closed before transport: path ids reject raw/encoded/double-encoded traversal and control characters; `fields` accepts a string or dense readonly string array and is joined with commas through URLSearchParams; `includeSipCredentials` must be boolean when provided and maps to Graph `include_sip_credentials=true|false`. `getPhoneNumberSettings({ includeSipCredentials: true })` may return SIP credentials, so treat that response as sensitive and avoid logging it. Mutating admin endpoints and live Meta verification remain credential-gated.
 
+### Block API, OBA, and display-name review helpers (WATS-95)
+
+WATS-95 adds credential-free, MockTransport-tested request-shape helpers for current Meta business phone-number deltas. They make no live Meta calls in CI, perform no credential validation, and make no automatic user-block decisions. Policy/appeal automation remains out of scope.
+
+```ts
+await phone.listBlockedUsers();
+await phone.blockUsers({ users: ["15551234567"] });
+await phone.unblockUsers({ users: ["15551234567"] });
+
+await phone.getOfficialBusinessAccountStatus({ fields: ["oba_status", "status_message"] });
+await phone.requestOfficialBusinessAccountReview({
+  businessWebsiteUrl: "https://example.com",
+  primaryCountryOfOperation: "US"
+});
+await phone.submitDisplayNameForReview({ newDisplayName: "Acme Support" });
+```
+
+Direct callables mirror the scoped methods and are exported from root `@wats/graph` and `@wats/graph/endpoints/business-management`: `listBlockedUsers`, `blockUsers`, `unblockUsers`, `getOfficialBusinessAccountStatus`, `requestOfficialBusinessAccountReview`, and `submitDisplayNameForReview`. The wire paths and fields are Meta's `GET|POST|DELETE /{phoneNumberId}/block_users`, `GET|POST /{phoneNumberId}/official_business_account`, and `POST /{phoneNumberId}` with Graph `new_display_name`. OBA review bodies use `business_website_url` and `primary_country_of_operation` plus optional `primary_language`, `parent_business_or_brand`, `supporting_links`, and `additional_supporting_information`.
+
+Validation rejects bad path ids, empty/non-array/sparse/accessor-backed `users`, non-phone-number user strings, invalid display names, non-http(s) OBA URLs, invalid country codes, duplicate or invalid supporting links, GET bodies, and unsafe headers before transport with `GraphRequestValidationError`. Existing Graph error taxonomy is preserved after a request reaches transport.
+
 ## Interplay with the F-5 error registry
 
 Both sub-clients route ALL errors through `GraphClient.request`, which
