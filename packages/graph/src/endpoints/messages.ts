@@ -23,8 +23,9 @@
 // credential validation, Ads Manager dashboards, or ACO automation claims.
 
 import type { GraphClient, GraphRequestOptions } from "../client.js";
-import { defineEndpoint } from "../endpoint.js";
+import { defineEndpoint, type EndpointInvokeOptions } from "../endpoint.js";
 import { GraphRequestValidationError } from "../errors.js";
+import { copyOptionalParamsObject } from "../internal/validation/options.js";
 
 interface GraphRequestExecutor {
   request<TResponse>(options: GraphRequestOptions): Promise<TResponse>;
@@ -1242,19 +1243,27 @@ function assertMarketingRecipient(value: unknown): string | undefined {
 }
 
 function buildMarketingTemplateObject(record: Record<string, unknown>): Record<string, unknown> {
+  const name = record.name;
+  const languageCode = record.languageCode;
+  const components = record.components;
   const template: Record<string, unknown> = {
-    name: assertNonEmptyControlFreeString(record.name, "name", GRAPH_MESSAGES_MEDIA_ID_MAX_LENGTH, "sendMarketingTemplate"),
-    language: { code: assertNonEmptyControlFreeString(record.languageCode, "languageCode", GRAPH_MESSAGES_SHORT_LABEL_MAX_LENGTH, "sendMarketingTemplate") }
+    name: assertNonEmptyControlFreeString(name, "name", GRAPH_MESSAGES_MEDIA_ID_MAX_LENGTH, "sendMarketingTemplate"),
+    language: { code: assertNonEmptyControlFreeString(languageCode, "languageCode", GRAPH_MESSAGES_SHORT_LABEL_MAX_LENGTH, "sendMarketingTemplate") }
   };
-  if (record.components !== undefined) {
-    template.components = mapValidatedArray(assertBoundedArray(record.components, "components", 0, 100, "sendMarketingTemplate"), (c) => normalizeTemplateComponent(c, "sendMarketingTemplate"));
+  if (components !== undefined) {
+    template.components = mapValidatedArray(assertBoundedArray(components, "components", 0, 100, "sendMarketingTemplate"), (c) => normalizeTemplateComponent(c, "sendMarketingTemplate"));
   }
   return template;
 }
 
-export function buildSendMarketingTemplatePayload(input: GraphMessagesSendMarketingTemplateInput): GraphMessagesMarketingTemplatePayload {
-  const record = asRecordInput(input, "sendMarketingTemplate");
+function copySendMarketingTemplateInput(input: GraphMessagesSendMarketingTemplateInput): Record<string, unknown> {
+  const record = copyOptionalParamsObject(input, "sendMarketingTemplate");
   assertOnlyKnownKeys(record, ["to", "recipient", "name", "languageCode", "components", "productPolicy", "messageActivitySharing"], "sendMarketingTemplate");
+  return record;
+}
+
+export function buildSendMarketingTemplatePayload(input: GraphMessagesSendMarketingTemplateInput): GraphMessagesMarketingTemplatePayload {
+  const record = copySendMarketingTemplateInput(input);
   const to = record.to === undefined ? undefined : assertValidRecipient(record.to, "sendMarketingTemplate");
   const recipient = assertMarketingRecipient(record.recipient);
   if (to === undefined && recipient === undefined) {
@@ -1268,22 +1277,24 @@ export function buildSendMarketingTemplatePayload(input: GraphMessagesSendMarket
   };
   if (to !== undefined) payload.to = to;
   if (recipient !== undefined) payload.recipient = recipient;
-  if (record.productPolicy !== undefined) {
-    if (record.productPolicy !== "CLOUD_API_FALLBACK" && record.productPolicy !== "STRICT") {
+  const productPolicy = record.productPolicy;
+  if (productPolicy !== undefined) {
+    if (productPolicy !== "CLOUD_API_FALLBACK" && productPolicy !== "STRICT") {
       throw new GraphRequestValidationError("Invalid sendMarketingTemplate input: productPolicy must be CLOUD_API_FALLBACK or STRICT.");
     }
-    payload.product_policy = record.productPolicy;
+    payload.product_policy = productPolicy;
   }
-  if (record.messageActivitySharing !== undefined) {
-    if (typeof record.messageActivitySharing !== "boolean") {
+  const messageActivitySharing = record.messageActivitySharing;
+  if (messageActivitySharing !== undefined) {
+    if (typeof messageActivitySharing !== "boolean") {
       throw new GraphRequestValidationError("Invalid sendMarketingTemplate input: messageActivitySharing must be a boolean when provided.");
     }
-    payload.message_activity_sharing = record.messageActivitySharing;
+    payload.message_activity_sharing = messageActivitySharing;
   }
   return payload;
 }
 
-export const sendMarketingTemplate = defineEndpoint<
+const sendMarketingTemplateEndpoint = defineEndpoint<
   { phoneNumberId: string },
   GraphMessagesSendMarketingTemplateInput,
   GraphMessagesMarketingTemplateResponse
@@ -1294,6 +1305,20 @@ export const sendMarketingTemplate = defineEndpoint<
   bodyContentType: "application/json",
   buildBody: buildSendMarketingTemplatePayload
 });
+
+export async function sendMarketingTemplate(
+  client: GraphClient,
+  params: { phoneNumberId: string },
+  body: GraphMessagesSendMarketingTemplateInput,
+  opts?: EndpointInvokeOptions
+): Promise<GraphMessagesMarketingTemplateResponse> {
+  if (body === undefined) {
+    throw new GraphRequestValidationError("Invalid sendMarketingTemplate input: body is required.");
+  }
+  return sendMarketingTemplateEndpoint(client, params, body, opts);
+}
+
+sendMarketingTemplate.definition = sendMarketingTemplateEndpoint.definition;
 
 export function buildSendMessagePayload(
   input: GraphMessagesSendMessageInput

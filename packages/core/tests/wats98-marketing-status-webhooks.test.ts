@@ -40,6 +40,7 @@ describe("WATS-98 Marketing Messages webhook/status deltas", () => {
         id: "wamid.marketing-status",
         recipient_id: "15551234567",
         status: "sent",
+        message_status: "held_for_quality_assessment",
         timestamp: "1713697201",
         conversation: {
           id: "conv-marketing-lite",
@@ -61,6 +62,7 @@ describe("WATS-98 Marketing Messages webhook/status deltas", () => {
     expect(update.status.pricing?.pricingModel).toBe("PMP");
     expect(update.status.pricing?.billable).toBe(true);
     expect(update.status.conversation?.origin?.type).toBe("marketing_lite");
+    expect(update.status.messageStatus).toBe("held_for_quality_assessment");
   });
 
   test("normalizes Marketing Messages API onboarding account_update fields", () => {

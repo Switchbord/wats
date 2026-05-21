@@ -1265,6 +1265,8 @@ function normalizeMessagesChange(
         if (billable !== undefined) out.billable = billable;
         if (Object.keys(out).length > 0) normalizedStatus.pricing = out;
       }
+      const messageStatus = readStringField(st, "message_status");
+      if (messageStatus !== undefined) normalizedStatus.messageStatus = messageStatus;
       const errors = safeCloneMessageJsonValue(readOwnDataField(st, "errors"));
       if (Array.isArray(errors)) normalizedStatus.errors = errors;
       const update: TypedStatusUpdate = {
