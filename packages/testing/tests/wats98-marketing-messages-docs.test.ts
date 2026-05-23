@@ -21,7 +21,13 @@ function read(path: string): string {
 
 describe("WATS-98 Marketing Messages docs and package surface lockstep", () => {
   test("Graph package root/subpath and consumer fixture expose WATS-98 Marketing Messages symbols", () => {
-    const graphSource = read("packages/graph/src/endpoints/messages.ts");
+    const graphSource = [
+      read("packages/graph/src/endpoints/messages.ts"),
+      read("packages/graph/src/endpoints/messages/index.ts"),
+      read("packages/graph/src/endpoints/messages/types.ts"),
+      read("packages/graph/src/endpoints/messages/builders-template.ts"),
+      read("packages/graph/src/endpoints/messages/callables.ts")
+    ].join("\n");
     for (const term of [
       "sendMarketingTemplate",
       "buildSendMarketingTemplatePayload",
