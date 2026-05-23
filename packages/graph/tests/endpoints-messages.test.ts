@@ -8,10 +8,13 @@
 
 import { describe, expect, test } from "bun:test";
 import * as graph from "../src";
+import * as rootMessages from "../src/endpoints/messages";
+import * as splitMessages from "../src/endpoints/messages/index";
 import {
   GraphApiError,
   GraphAuthError,
   GraphClient,
+  GraphMessagesEndpoint,
   GraphRateLimitError,
   GraphRequestValidationError,
   sendMessage
@@ -41,6 +44,17 @@ function clientWith(
   });
   return { client, handle };
 }
+
+describe("WATS-68 messages module split compatibility", () => {
+  test("root, compatibility barrel, and focused module exports preserve identity", () => {
+    expect(rootMessages.sendMessage).toBe(sendMessage);
+    expect(splitMessages.sendMessage).toBe(sendMessage);
+    expect(rootMessages.GraphMessagesEndpoint).toBe(GraphMessagesEndpoint);
+    expect(splitMessages.GraphMessagesEndpoint).toBe(GraphMessagesEndpoint);
+    expect(rootMessages.buildSendTextPayload).toBe((graph as typeof graph & { buildSendTextPayload: unknown }).buildSendTextPayload);
+    expect(splitMessages.buildSendMarketingTemplatePayload).toBe((graph as typeof graph & { buildSendMarketingTemplatePayload: unknown }).buildSendMarketingTemplatePayload);
+  });
+});
 
 describe("F-6 sendMessage (endpoint-registry form)", () => {
   test("POSTs to /{phoneNumberId}/messages with JSON body", async () => {
