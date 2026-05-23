@@ -4,7 +4,7 @@
 - decisionStatus: locked
 - labels: [camelCaseOnly, asyncOnly, aggressiveParity, monorepo]
 - lastReviewed: 2026-04-22
-- applies-to: `[0.2.0-foundations-complete]`
+- applies-to: `0.3.x-alpha-tooling`
 
 This is the single end-to-end walkthrough for WATS consumers. Read it
 top-to-bottom. Every code block is runnable against the in-memory

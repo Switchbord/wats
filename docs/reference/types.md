@@ -11,7 +11,7 @@
 Define foundational shared TypeScript contracts used across WATS packages.
 
 `@wats/types` ships discriminated-union shapes for every inbound WhatsApp
-domain object the library exposes. Callers narrow via `switch` on the
+domain object the toolkit exposes. Callers narrow via `switch` on the
 `type` discriminator; exhaustive switches with a `never` default branch
 catch any future variant that is added to the union.
 

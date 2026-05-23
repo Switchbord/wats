@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### WATS-105/106/107/118 — pre-public-alpha docs coherence
+
+- Picks `toolkit` as the canonical noun and sweeps README, docs/index.md, docs/migration/pywa-to-wats.md, docs/architecture/{overview,package-map,release-policy,roadmap-to-whatsapp-pywa-parity}.md, docs/parity/pywa-parity-matrix.md, and docs/reference/types.md so a new reader sees a single voice (WATS-105).
+- Adds a "Positioning" block to README and docs/index.md that names what WATS IS, who it is FOR, and what it provides vs pywa, plus a "When NOT to use WATS" honest section in README (WATS-105).
+- Refreshes stale `applies-to: 0.2.0-foundations-complete` frontmatter on every public doc to `0.3.x-alpha-tooling` (WATS-106).
+- Unifies the parity matrix and migration guide on a 5-label status enum: `Implemented (credential-free)`, `Implemented (live pending)`, `Read-only`, `Partial`, `Deferred`; reconciles block-users surfaces as Implemented (credential-free) in both files (WATS-107).
+- docs/guides/cli-init.md keeps `wats onboarding` in the current-commands list and explicitly labels future-only `--yes` flag examples (WATS-118).
+- Adds packages/testing/tests/wats105-voice-coherence-lock.test.ts to lock the above behaviorally; no public API behavior changes, no live Meta calls, no package publication.
+
 ## [0.3.2] - 2026-05-18
 
 ### WATS-68 — messages endpoint module split

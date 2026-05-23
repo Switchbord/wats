@@ -87,6 +87,7 @@ const VOICE_ALLOWLIST: readonly string[] = [
   "not a single framework",
   // pywa template DSL / library-template helpers — pywa-side description
   "library-template",
+  "template-library",
   "library/authentication helper",
   "bulk auth/library helpers",
   // generic phrasing inside historical / non-voice contexts the tester accepts
@@ -197,9 +198,10 @@ describe("WATS-107 parity-matrix vs migration-guide reconciliation", () => {
     const blockLines = lines.filter((line) => /block.{0,5}unblock|blockUsers|unblockUsers|listBlockedUsers/u.test(line));
     expect(blockLines.length).toBeGreaterThan(0);
     for (const line of blockLines) {
-      // The row(s) that mention block-users surfaces in a status table must show an Implemented label.
-      // We allow lines that don't look like status-table rows (no pipe-delimited Status column) to pass.
-      if (line.includes("|")) {
+      // The row(s) that mention block-users surfaces in a STATUS table (4+ pipe-delimited columns)
+      // must show an Implemented label. Two-column import-cheatsheet rows are skipped.
+      const pipeCount = (line.match(/\|/gu) || []).length;
+      if (pipeCount >= 4) {
         expect(line).toMatch(/Implemented \(credential-free\)|Implemented \(live pending\)|Read-only|Partial/u);
         expect(line).not.toMatch(/\|\s*Deferred\s*\|/u);
       }

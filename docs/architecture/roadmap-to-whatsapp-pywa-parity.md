@@ -10,7 +10,7 @@ This document summarizes the roadmap shape. Linear is the source of truth for is
 
 ## Current state
 
-`0.2.0-foundations-complete` ships the substrate:
+The `0.3.x-alpha-tooling` line ships the substrate (foundations were locked in the historical `0.2.x` baseline):
 
 - Graph client, transport seam, endpoint registry, pagination, scoped clients
 - pywa-seeded Graph error registry
@@ -37,7 +37,7 @@ Goal: make the repository ready for public release engineering.
 
 ### M1 — config, CLI, and standalone service
 
-Goal: make WATS adoptable without writing framework glue.
+Goal: make WATS adoptable without writing toolkit glue.
 
 - `@wats/config` with YAML/JSON config loading and env-secret references
 - `@wats/cli` with `init`, `config validate`, `doctor`, `serve`, and `openapi`
