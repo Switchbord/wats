@@ -4,7 +4,13 @@
 - applies-to: WATS-36A
 - lastReviewed: 2026-05-01
 
-WATS is a Bun-first TypeScript implementation of pywa-style WhatsApp Cloud API primitives. The docs site is generated locally and is credential-free: it does not call Meta Graph APIs, resolve environment secrets, or publish packages.
+WATS is a runtime-neutral TypeScript toolkit for the WhatsApp Cloud API. The docs site is generated locally and is credential-free: it does not call Meta Graph APIs, resolve environment secrets, or publish packages.
+
+WATS-105 positioning lock:
+
+- What WATS is: a runtime-neutral TypeScript toolkit for the WhatsApp Cloud API, with strict typed updates, an injectable Graph transport, and MockTransport-first tests.
+- Who it is for: Bun, Node, and edge teams that want strict types, credential-free defaults, and async-only ergonomics.
+- vs pywa: a runtime-neutral webhook adapter with Transport+Crypto seams, typed discriminated-union updates, MockTransport-first testing, and async-only public APIs. WATS is not a drop-in pywa port, and live Meta validation is still credential-gated.
 
 ## Start here
 

@@ -1,7 +1,7 @@
 # WATS Package Map
 
 - status: active
-- applies-to: `0.2.0-foundations-complete` + WATS-31/32/33/34/35/WATS-37/38/39/40/41/42A/53/54/56 consistency line
+- applies-to: `0.3.x-alpha-tooling` + WATS-31/32/33/34/35/WATS-37/38/39/40/41/42A/53/54/56 consistency line
 - lastReviewed: 2026-05-04
 
 ## Purpose
@@ -179,7 +179,7 @@ Intended dependency direction:
 
 1. `@wats/types` has no runtime dependencies.
 2. `@wats/graph`, `@wats/http`, and `@wats/crypto` expose portable seams and keep runtime-specific behavior behind adapters.
-3. `@wats/core` is the SDK composition root; app-layer packages compose it rather than duplicating router/webhook semantics.
+3. `@wats/core` is the toolkit composition root; app-layer packages compose it rather than duplicating router/webhook semantics.
 4. `@wats/internal-utils` may be published only as an internal support package required by public runtime packages; `@wats/testing` remains private and must not be published.
 5. Consumer fixtures import through package specifiers, never relative source paths.
 6. Roadmap/deferred work is tracked in Linear.

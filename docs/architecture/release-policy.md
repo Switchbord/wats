@@ -14,7 +14,7 @@ WATS uses semantic versioning across published workspace packages.
 
 ### `0.x` development line
 
-Use the `0.x` line while the public SDK is still expanding toward full WhatsApp/pywa parity.
+Use the `0.x` line while the public toolkit is still expanding toward full WhatsApp/pywa parity.
 
 - Patch bump: documentation fixes, test-only changes, non-behavioral repo hygiene, or bug fixes that do not change public contracts.
 - Minor bump: any new public feature, endpoint family, package, CLI command, config schema field, standalone service route, persistence contract, or deployment artifact that defines supported behavior.

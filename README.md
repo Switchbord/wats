@@ -4,6 +4,18 @@ WATS is a TypeScript toolkit for WhatsApp operations: a small set of composable 
 
 It is intentionally not a single framework. The repository is a toolkit first; the CLI and standalone service sit on top of these packages rather than replace them.
 
+## Positioning
+
+- What WATS is: a runtime-neutral TypeScript toolkit for the WhatsApp Cloud API, with strict typed updates, an injectable Graph transport, and MockTransport-first tests.
+- Who it is for: Bun, Node, and edge teams that want strict types, credential-free defaults, and async-only ergonomics without picking up a heavyweight HTTP stack.
+- vs pywa: WATS is a runtime-neutral webhook adapter with Transport+Crypto seams, typed discriminated-union updates, MockTransport-first testing, and async-only public APIs. It is not a drop-in pywa port, and live Meta validation against a real WABA is still credential-gated and out of scope of the default repo checks.
+
+## When NOT to use WATS
+
+- You are a happy pywa user on Python — keep using pywa; WATS is not a Python port and does not aim to be one.
+- You require Meta-validated production behavior today — WATS has no live Meta validation campaign result yet; live-credentialed checks remain explicitly credential-gated.
+- You need long-term API stability — WATS is alpha; the public API surface may still move before the first non-alpha minor.
+
 ## Status
 
 Current release: `0.3.2-alpha-tooling`.

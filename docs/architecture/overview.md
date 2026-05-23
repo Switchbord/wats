@@ -1,10 +1,10 @@
 # Architecture Overview
 
 - status: active
-- applies-to: `0.2.0-foundations-complete`
+- applies-to: `0.3.x-alpha-tooling`
 - lastReviewed: 2026-05-01
 
-WATS is a Bun-first TypeScript monorepo for WhatsApp operations. The repo is organized around small packages with explicit dependency direction rather than one large framework package.
+WATS is a Bun-first TypeScript monorepo for WhatsApp operations. The repo is organized around small packages with explicit dependency direction rather than one large toolkit package.
 
 ## Package layers
 
