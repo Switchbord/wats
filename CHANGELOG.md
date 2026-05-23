@@ -2,6 +2,10 @@
 
 ## [0.3.2] - 2026-05-18
 
+### WATS-68 — messages endpoint module split
+
+- Moves the broad messages endpoint composer internals into focused `packages/graph/src/endpoints/messages/` modules while preserving root `@wats/graph`, `@wats/graph/endpoints/messages`, `GraphMessagesEndpoint`, `sendMessage`, and Marketing Messages helper exports.
+- This messages endpoint module split is an internal maintainability change with no payload behavior changes, no new live Meta calls, no package publication, no tag, and no release side effects.
 
 ### WATS-98 — Marketing Messages API compatibility surfaces
 

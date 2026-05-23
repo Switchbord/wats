@@ -151,6 +151,8 @@ Current commands:
 
 Status: experimental CLI foundation. It generates WATS config/env placeholder files with `wats init`, validates config files safely, exports WATS service OpenAPI, runs offline diagnostics, starts a dry-run local service process with `wats serve --dry-run`, recognizes the WATS-72 live-intent/acknowledgement guard while still failing closed, and generates local webhook verify tokens without resolving env-secret values or calling Meta Graph.
 
+WATS-68 messages endpoint module split note: the public `@wats/graph/endpoints/messages` subpath and root exports are preserved while the broad message composer internals move into focused `packages/graph/src/endpoints/messages/` files; this is an internal split with no payload behavior changes.
+
 ### `@wats/service`
 
 Runtime-neutral standalone webhook/API service foundation.
