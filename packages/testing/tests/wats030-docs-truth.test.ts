@@ -103,6 +103,7 @@ describe("WATS 0.3.3 public docs truth contract", () => {
     const manifest = read("docs/public-docs-manifest.json");
     const graphCalling = read("packages/graph/src/endpoints/calling.ts");
     const graphFlows = read("packages/graph/src/endpoints/flows.ts");
+    const graphWabaEndpoints = read("packages/graph/src/endpoints/wabaEndpoints.ts");
     expect(stability).toContain("Stable-for-0.x surfaces");
     expect(stability).toContain("Experimental surfaces");
     expect(stability).toContain("Internal and unsupported surfaces");
@@ -111,7 +112,8 @@ describe("WATS 0.3.3 public docs truth contract", () => {
     expect(stability).toContain("Calling endpoint helpers");
     expect(stability).toContain("`@wats/internal-utils` is published internal support");
     expect(manifest).toContain("api-stability.md");
-    expect(graphCalling).toContain("@experimental");
-    expect(graphFlows).toContain("@experimental");
+    expect(graphCalling).toContain("@experimental Calling endpoint helpers");
+    expect(graphFlows).toContain("@experimental Flow DSL and data-channel helpers");
+    expect(graphWabaEndpoints).toContain("@experimental Flow DSL and data-channel helpers");
   });
 });

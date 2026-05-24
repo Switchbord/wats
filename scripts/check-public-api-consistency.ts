@@ -35,11 +35,18 @@ const DOC_PACKET = [
 const EXPERIMENTAL_SOURCE_TAGS = [
   {
     path: "packages/graph/src/endpoints/flows.ts",
-    label: "Flow DSL and data-channel helpers"
+    label: "Flow DSL and data-channel helpers",
+    marker: "@experimental Flow DSL and data-channel helpers"
+  },
+  {
+    path: "packages/graph/src/endpoints/wabaEndpoints.ts",
+    label: "Flow DSL and data-channel helpers",
+    marker: "@experimental Flow DSL and data-channel helpers"
   },
   {
     path: "packages/graph/src/endpoints/calling.ts",
-    label: "Calling endpoint helpers"
+    label: "Calling endpoint helpers",
+    marker: "@experimental Calling endpoint helpers"
   }
 ] as const;
 
@@ -192,8 +199,8 @@ function checkExperimentalTags(root: string): string[] {
   const stabilityDoc = readFileSync(safeRepoPath(root, "docs/api-stability.md", "API stability policy"), "utf8");
   for (const entry of EXPERIMENTAL_SOURCE_TAGS) {
     const source = readFileSync(safeRepoPath(root, entry.path, `${entry.label} source`), "utf8");
-    if (!source.includes("@experimental")) {
-      failures.push(`${entry.label}: ${entry.path} must include an @experimental JSDoc marker`);
+    if (!source.includes(entry.marker)) {
+      failures.push(`${entry.label}: ${entry.path} must include marker ${entry.marker}`);
     }
     if (!stabilityDoc.includes(entry.label)) {
       failures.push(`${entry.label}: docs/api-stability.md must classify this experimental surface`);

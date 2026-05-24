@@ -12,17 +12,24 @@ npm i @wats/core
 ## Usage
 
 ```ts
-import { TypedRouter, filtersTyped } from "@wats/core";
+import { TypedRouter, filtersTyped, type TypedMessageUpdate } from "@wats/core";
 
 const router = new TypedRouter();
 router.on(filtersTyped.message.text(), async (update) => {
   console.log(update.message.text.body);
 });
 
-await router.dispatch({
-  type: "message",
-  message: { type: "text", text: { body: "hello" } }
-});
+const update: TypedMessageUpdate = {
+  kind: "message",
+  updateId: "wamid.example",
+  phoneNumberId: "1234567890",
+  wabaId: "WABA_EXAMPLE",
+  receivedAt: Date.now(),
+  message: { id: "wamid.example", timestamp: "1713697100", type: "text", text: { body: "hello" } },
+  rawChange: { field: "messages", value: { messaging_product: "whatsapp", metadata: {}, messages: [] } }
+};
+
+await router.dispatch(update);
 ```
 
 Pair this package with `@wats/http` for webhook ingestion and `@wats/graph` for outbound Graph calls.

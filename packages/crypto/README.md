@@ -14,7 +14,7 @@ npm i @wats/crypto
 ```ts
 import { createCryptoProvider } from "@wats/crypto";
 
-const cryptoProvider = createCryptoProvider();
+const cryptoProvider = await createCryptoProvider();
 const digest = await cryptoProvider.hmacSha256(
   "app-secret",
   new TextEncoder().encode("payload")

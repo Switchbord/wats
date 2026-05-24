@@ -12,7 +12,7 @@ npm i @wats/http
 ## Usage
 
 ```ts
-import { createWebhookAdapter } from "@wats/http";
+import { createFetchWebhookHandler, createWebhookAdapter } from "@wats/http";
 
 const adapter = createWebhookAdapter({
   verifyToken: process.env.WATS_VERIFY_TOKEN ?? "",
@@ -20,7 +20,8 @@ const adapter = createWebhookAdapter({
   whatsapp: { dispatch: async () => undefined }
 });
 
-const response = await adapter.handle(new Request("https://example.test/webhook"));
+const handle = createFetchWebhookHandler(adapter);
+const response = await handle(new Request("https://example.test/webhook"));
 console.log(response.status);
 ```
 

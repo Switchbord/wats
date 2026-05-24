@@ -16,6 +16,7 @@ import { GraphClient, createFetchTransport, sendMessage } from "@wats/graph";
 
 const graph = new GraphClient({
   accessToken: process.env.WATS_ACCESS_TOKEN ?? "",
+  apiVersion: "v25.0",
   transport: createFetchTransport()
 });
 
