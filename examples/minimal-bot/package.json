@@ -1,0 +1,14 @@
+{
+  "name": "@wats/example-minimal-bot",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "demo": "bun run src/index.ts"
+  },
+  "dependencies": {
+    "@wats/service": "workspace:*",
+    "@wats/graph": "workspace:*",
+    "@wats/core": "workspace:*"
+  },
+  "devDependencies": {}
+}

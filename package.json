@@ -16,7 +16,8 @@
     "docs:check": "bun run scripts/check-public-docs.ts",
     "docs:build": "bun run scripts/docs-build.ts",
     "docs:dev": "bun run docs:openapi && bun run docs:api && bunx vitepress dev docs",
-    "publish:dry-run": "bun run scripts/npm-publish-dry-run.ts"
+    "publish:dry-run": "bun run scripts/npm-publish-dry-run.ts",
+    "examples:minimal-bot": "bun run --cwd examples/minimal-bot demo"
   },
   "devDependencies": {
     "@scalar/api-reference": "^1.55.1",
@@ -27,6 +28,7 @@
   },
   "workspaces": [
     "packages/*",
-    "packages/testing/fixtures/*"
+    "packages/testing/fixtures/*",
+    "examples/minimal-bot"
   ]
 }

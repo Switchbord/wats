@@ -21,6 +21,7 @@ This directory contains credential-free community examples for WATS. The WATS-52
 - `examples/config/wats.config.example.json` — WATS-51 placeholder JSON config template.
 - `.env.example` — placeholder env-name index for local ignored copies.
 - `examples/offline-bot/README.md` — offline MockTransport bot walkthrough with synthetic webhook payloads/envelopes.
+- `examples/minimal-bot/` — WATS-113 runnable 60-second offline minimal bot using `@wats/service`, MockTransport, and `bun run demo`.
 
 ## How to run local checks
 
@@ -28,6 +29,7 @@ Docs/examples checks are credential-free:
 
 ```sh
 bun test packages/testing/tests/wats52-community-examples.test.ts
+bun run examples:minimal-bot
 bun run docs:check
 ```
 

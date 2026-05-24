@@ -76,6 +76,16 @@ The fallback string above is a short offline fixture value used only with MockTr
 
 For webhook examples, use synthetic webhook payloads/envelopes and `normalizeWebhookEnvelope` or a `WebhookAdapter` in a local test. Keep fixture sender ids and message ids clearly synthetic.
 
+### WATS-113 runnable minimal bot
+
+The runnable `examples/minimal-bot` package is the 60-second offline onramp for this scaffold:
+
+```bash
+bun run --cwd examples/minimal-bot demo
+```
+
+It creates a `createWatsServiceApp` app, injects MockTransport, sends one text message through the local service API, records a template intent without a live template send, and calls `normalizeWebhookEnvelope(...)` on one synthetic webhook envelope. No live Meta credentials are required.
+
 ## Service app fetch and OpenAPI example
 
 `@wats/service` exposes a runtime-neutral Request-to-Response app. Use it directly for local examples; do not require a server process.
