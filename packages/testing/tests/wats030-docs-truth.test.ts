@@ -26,6 +26,10 @@ describe("WATS 0.3.3 public docs truth contract", () => {
     const readme = read("README.md");
     expect(readme).toContain("Current release: `0.3.3-alpha-compatibility`");
     expect(readme).toContain("alpha compatibility and community-governance patch release");
+    expect(readme).toContain("bunx --bun @wats/cli setup");
+    expect(readme).toContain("bunx --bun @wats/cli --help");
+    expect(readme).not.toContain("bunx --bun wats setup");
+    expect(readme).not.toContain("bunx --bun wats --help");
     expect(readme).toContain("`wats setup` writes a safe `wats.config.yaml`");
     expect(readme).toContain("live serve mode, env-file secret resolution, Docker image publication, persistence/outbox, and live Meta validation are not included");
 

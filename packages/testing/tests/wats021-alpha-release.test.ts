@@ -80,7 +80,7 @@ describe("WATS 0.2.1 alpha launch release contract", () => {
     const changelog = read("CHANGELOG.md");
     expect(changelog.startsWith("# Changelog\n\n## [0.2.1] - 2026-05-04\n\nAlpha launch release"));
     expect(changelog).toContain("bun add @wats/cli");
-    expect(changelog).toContain("bunx --bun wats --help");
+    expect(changelog).toContain("bunx --bun @wats/cli --help");
     expect(changelog).toContain("npm publish --dry-run");
     expect(changelog).toContain("No live Meta calls");
     expect(changelog).toContain("test account credentials are not required for this release");

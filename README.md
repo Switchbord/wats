@@ -45,7 +45,7 @@ The public packages are standard npm registry packages and Bun can install them 
 
 ```bash
 bun add @wats/cli
-bunx --bun wats --help
+bunx --bun @wats/cli --help
 
 bun add @wats/core @wats/graph @wats/http
 bun add @wats/config @wats/service
@@ -55,29 +55,35 @@ test account credentials are not needed for default install or CI. Live Meta val
 
 ## Quickstart with CLI
 
-Install the CLI and run the setup wizard:
+For one-off commands in a fresh project, use the package specifier so Bun resolves the scoped CLI package instead of the unrelated unscoped `wats` package:
+
+```bash
+bunx --bun @wats/cli setup
+```
+
+Or add the CLI dependency first, then keep using the scoped package specifier for one-off commands:
 
 ```bash
 bun add @wats/cli
-bunx --bun wats setup
+bunx --bun @wats/cli setup
 ```
 
 `wats setup` prompts for your Meta access token, app secret, WABA ID, and phone number ID, then writes `wats.config.yaml` (env-secret references, safe to commit) and `.env.local` (your actual secrets, gitignored). Verify token and service token are generated for you if left blank — or generate one explicitly first:
 
 ```bash
-bunx --bun wats webhook token
+bunx --bun @wats/cli webhook token
 ```
 
 Verify local readiness after setup:
 
 ```bash
-bunx --bun wats doctor --config wats.config.yaml --check-env
+bunx --bun @wats/cli doctor --config wats.config.yaml --check-env
 ```
 
 Get the webhook callback URL to paste into Meta App Dashboard → WhatsApp → Configuration:
 
 ```bash
-bunx --bun wats onboarding --public-url https://your-public-url.example
+bunx --bun @wats/cli onboarding --public-url https://your-public-url.example
 ```
 
 See `docs/reference/cli.md` for all commands and `docs/parity/live-testing-campaign.md` for the full credentialed live-testing runbook.

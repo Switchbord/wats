@@ -127,7 +127,7 @@ Alpha tooling release for WATS. This release prepares the next public package li
 
 ```bash
 bun add @wats/cli
-bunx --bun wats --help
+bunx --bun @wats/cli --help
 
 bun add @wats/core @wats/graph @wats/http
 bun add @wats/config @wats/service
@@ -195,7 +195,7 @@ Alpha launch release for WATS. This was the first release line intended for publ
 
 ```bash
 bun add @wats/cli
-bunx --bun wats --help
+bunx --bun @wats/cli --help
 
 bun add @wats/core @wats/graph @wats/http
 bun add @wats/config @wats/service
