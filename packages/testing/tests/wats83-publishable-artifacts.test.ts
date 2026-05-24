@@ -68,6 +68,14 @@ describe("WATS-83 publishable artifact smoke contract", () => {
       expect(manifest.types, `${pkg} types`).toBe("./dist/index.d.ts");
       expect(manifest.files, `${pkg} files`).toEqual(["dist", "README.md", "LICENSE"]);
 
+      const readme = read(`packages/${pkg}/README.md`);
+      expect(readme, `${pkg} package README names package`).toContain(`@wats/${pkg}`);
+      expect(readme, `${pkg} package README has Bun install command`).toContain(`bun add @wats/${pkg}`);
+      expect(readme, `${pkg} package README has npm install command`).toContain(`npm i @wats/${pkg}`);
+      expect(readme, `${pkg} package README links docs`).toContain("https://github.com/Switchbord/wats");
+      expect(readme, `${pkg} package README has license line`).toContain("MIT");
+      expect(readme.split("\n").filter((line) => line.trim().length > 0).length, `${pkg} package README must be useful on npm`).toBeGreaterThanOrEqual(10);
+
       const exportsMap = manifest.exports as JsonRecord;
       expect(exportsMap["."], `${pkg} root export`).toEqual({
         types: "./dist/index.d.ts",
