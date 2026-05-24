@@ -74,7 +74,8 @@ describe("WATS 0.3.3 public docs truth contract", () => {
     expect(cliGuide).toContain("wats onboarding --public-url <https URL>");
     expect(cliGuide).toContain("wats onboarding --public-url https://example.test/wats");
     expect(cliGuide).toContain("wats onboarding --public-url https://example.test --webhook-path /webhooks/whatsapp");
-    expect(cliGuide).not.toContain("wats init --yes");
+    const commandBlocks = Array.from(cliGuide.matchAll(/```bash\n([\s\S]*?)```/gu)).map((match) => match[1] ?? "").join("\n");
+    expect(commandBlocks).not.toContain("wats init --yes");
   });
 
   test("release policy documents why private @wats/testing does not follow the public package version line", () => {

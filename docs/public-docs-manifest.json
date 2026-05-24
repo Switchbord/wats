@@ -28,6 +28,7 @@
   "pages": [
     "index.md",
     "getting-started.md",
+    "privacy.md",
     "reference/index.md",
     "reference/client.md",
     "reference/endpoints.md",

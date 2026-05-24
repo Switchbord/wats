@@ -29,6 +29,8 @@ wats openapi --help
 wats serve --config <path> --dry-run
 wats serve --config <path> --dry-run --print-routes
 wats serve --help
+wats onboarding --public-url <https URL>
+wats onboarding --public-url <https URL> --webhook-path /webhooks/whatsapp
 wats webhook token
 wats webhook token --help
 ```
@@ -44,23 +46,26 @@ The CLI still does not:
 
 ## WATS-47 first-run operator flow
 
-Design target:
+Implemented credential-free first-run flow:
 
 ```bash
 wats init --dry-run
-wats init --yes --format yaml --profile local
-wats config validate --config wats.config.yaml --profile local
-wats doctor --config wats.config.yaml --profile local
-wats serve --config wats.config.yaml --profile local --dry-run
+wats init ./my-bot --format yaml --profile local
+cd ./my-bot
+wats config validate --config wats.config.yaml
+wats doctor --config wats.config.yaml --check-env
+wats serve --config wats.config.yaml --dry-run
 ```
 
-The first-run flow must be safe for local onboarding:
+The first-run flow is safe for local onboarding:
 
 1. Preview generated files with `wats init --dry-run`.
 2. Generate config/env placeholder files only when the operator runs `wats init` without dry-run.
 3. Validate the generated config through `@wats/config`.
 4. Run doctor offline diagnostics.
 5. Start a local dry-run service wrapper around `@wats/service`.
+
+There is no `wats init --yes` flag in the current CLI. Non-interactive setup should pass the target directory, format, and profile explicitly as shown above.
 
 ## Env placeholder policy
 
@@ -262,6 +267,7 @@ The CLI remains credential-safe by default:
 ## Related
 
 - Linear: WATS-47
+- Linear: WATS-118
 - `docs/reference/cli.md`
 - `docs/reference/config.md`
 - `docs/reference/openapi.md`
