@@ -26,6 +26,7 @@ export default defineConfig({
         items: [
           item("Overview", "index.md"),
           item("Getting Started", "getting-started.md"),
+          item("Privacy", "privacy.md"),
           item("Migration from pywa", "migration/pywa-to-wats.md"),
           item("Parity Matrix", "parity/pywa-parity-matrix.md"),
           item("Live Testing Campaign", "parity/live-testing-campaign.md")

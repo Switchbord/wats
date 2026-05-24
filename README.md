@@ -53,6 +53,10 @@ bun add @wats/config @wats/service
 
 test account credentials are not needed for default install or CI. Live Meta validation remains a separate credential-gated campaign.
 
+## Privacy and telemetry
+
+WATS sends no telemetry to maintainer-owned endpoints by default. The CLI does not phone home; credential-free commands and dry-run examples stay local unless you explicitly configure Graph/API calls. See `docs/privacy.md` for the privacy and redaction stance.
+
 ## Quickstart with CLI
 
 For one-off commands in a fresh project, use the package specifier so Bun resolves the scoped CLI package instead of the unrelated unscoped `wats` package:
@@ -100,6 +104,7 @@ Useful references:
 - `docs/getting-started.md` — end-to-end foundations walkthrough
 - `docs/reference/index.md` — reference map
 - `docs/reference/cli.md` — safe local operator tooling reference
+- `docs/privacy.md` — telemetry, privacy, and redaction stance
 - `docs/parity/pywa-parity-matrix.md` — implemented vs deferred coverage
 - `docs/architecture/package-map.md` — package boundaries
 - `docs/architecture/release-policy.md` — version and release rules

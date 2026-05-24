@@ -60,6 +60,10 @@ After `1.0.0`:
 - Minor bump: backward-compatible public API additions.
 - Major bump: breaking public contract changes.
 
+## WATS-119 private testing version policy
+
+WATS-119 documents the private `@wats/testing` version policy: this package is workspace-only and intentionally outside the public package version-alignment contract. See `packages/testing/README.md` for the package-local rationale and `packages/testing/tests/wats030-release-contract.test.ts` for the test that enforces public-package alignment while excluding the private testing package.
+
 ## Monorepo package policy
 
 The root package remains private. Published packages should be scoped packages under `@wats/*` until a future rename/scope decision is made. The alpha CLI/runtime/operator layer stays in this monorepo per architecture notes; a second repository is not the default release target for `@wats/cli`, `@wats/service`, config templates, persistence contracts, Docker/deploy docs, or alpha launch documentation.
@@ -79,6 +83,8 @@ Publishable packages:
 Private packages:
 
 - `@wats/testing`
+
+`@wats/testing` is private and intentionally follows its own workspace-only version line. Its package version is not part of the public `@wats/*` registry release train because it is never published, keeps `workspace:*` dependencies for local fixtures, and exists only to host consumer fixtures, docs-lock tests, and release-policy checks. The public package alignment contract is enforced by `packages/testing/tests/wats030-release-contract.test.ts`, while the private testing package remains outside that alignment by design.
 
 Before any public release, publishable packages must expose built artifacts via `exports` and `types`; source-only `./src/*.ts` exports are acceptable for the local Bun workspace but not for registry release.
 

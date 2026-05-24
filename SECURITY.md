@@ -40,6 +40,10 @@ Security-relevant surfaces include:
 
 No live Meta credentials are required for default tests or CI. Live validation campaigns must be explicitly authorized, skipped by default, and run with cleanup/redaction plans. No live Meta credentials, webhook secrets, service bearer tokens, or raw Graph responses should be committed to the repository or attached to public issues.
 
+## Privacy stance
+
+WATS sends no telemetry to maintainer-owned endpoints by default. The CLI does not phone home, and credential-free commands stay local unless the operator explicitly configures Graph/API calls. See `docs/privacy.md` for the privacy, telemetry, and redaction stance.
+
 ## Maintainer response expectations
 
 Maintainers should acknowledge confidential reports, reproduce with synthetic or redacted data when possible, track remediation privately until disclosure is safe, and publish a public advisory or changelog note once a fix is available if disclosure is appropriate.

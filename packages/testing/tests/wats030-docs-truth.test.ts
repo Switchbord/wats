@@ -68,4 +68,33 @@ describe("WATS 0.3.3 public docs truth contract", () => {
     expect(cliReference).toContain("optional secret-token prompts state they can be left blank to generate local values");
     expect(cliGuide).toContain("Secret prompts display an `Input hidden` hint before reading so pasted tokens and app secrets intentionally do not echo.");
   });
+
+  test("CLI guide lists implemented onboarding command and keeps first-run examples executable", () => {
+    const cliGuide = read("docs/guides/cli-init.md");
+    expect(cliGuide).toContain("wats onboarding --public-url <https URL>");
+    expect(cliGuide).toContain("wats onboarding --public-url https://example.test/wats");
+    expect(cliGuide).toContain("wats onboarding --public-url https://example.test --webhook-path /webhooks/whatsapp");
+    const commandBlocks = Array.from(cliGuide.matchAll(/```bash\n([\s\S]*?)```/gu)).map((match) => match[1] ?? "").join("\n");
+    expect(commandBlocks).not.toContain("wats init --yes");
+  });
+
+  test("release policy documents why private @wats/testing does not follow the public package version line", () => {
+    const releasePolicy = read("docs/architecture/release-policy.md");
+    const testingReadme = read("packages/testing/README.md");
+    expect(releasePolicy).toContain("`@wats/testing` is private and intentionally follows its own workspace-only version line");
+    expect(releasePolicy).toContain("packages/testing/tests/wats030-release-contract.test.ts");
+    expect(testingReadme).toContain("@wats/testing version policy");
+    expect(testingReadme).toContain("private workspace package");
+  });
+
+  test("privacy stance is linked from README and SECURITY and forbids default maintainer telemetry", () => {
+    const privacy = read("docs/privacy.md");
+    const readme = read("README.md");
+    const security = read("SECURITY.md");
+    expect(privacy).toContain("WATS sends no telemetry to any maintainer-owned endpoint by default");
+    expect(privacy).toContain("Future telemetry, if ever added, will be opt-in and documented");
+    expect(privacy).toContain("The CLI does not phone home");
+    expect(readme).toContain("docs/privacy.md");
+    expect(security).toContain("docs/privacy.md");
+  });
 });
