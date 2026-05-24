@@ -16,6 +16,8 @@ Patch alpha compatibility and community-governance release for WATS. This releas
 - Expands WATS-114 per-package README coverage so every publishable `@wats/*` package has install commands, a usage example, docs link, and MIT license line for npm rendering.
 - Adds the WATS-115 API stability policy, marking stable-for-0.x, experimental, and internal surfaces; Flow and Calling endpoint barrels now carry `@experimental` JSDoc markers checked by `bun run api:check`.
 - Adds the WATS-113 60-second offline getting-started onramp with a runnable `examples/minimal-bot` package, CI smoke wiring, and credential-free MockTransport/service demo output.
+- Adds WATS-109 repo settings hygiene docs plus Dependabot/CodeQL configuration for release-governance readiness.
+- Adds WATS-117 launch-day checklist and announce draft as maintainer docs; this is docs-only work and does not claim that provenance, npm publish, or GitHub Release side effects have already happened.
 
 ### WATS-108 — community governance files
 

@@ -17,6 +17,7 @@ export default defineConfig({
   description: "Bun-first TypeScript WhatsApp Cloud API toolkit inspired by pywa.",
   cleanUrls: true,
   ignoreDeadLinks: false,
+  srcExclude: manifest.exclude ?? [],
   themeConfig: {
     nav: manifest.nav,
     search: { provider: "local" },
