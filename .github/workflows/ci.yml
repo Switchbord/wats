@@ -31,6 +31,9 @@ jobs:
       - name: Run tests
         run: bun test
 
+      - name: Run minimal bot example smoke
+        run: bun run examples:minimal-bot
+
       - name: Typecheck publishable packages
         run: bun run typecheck
 

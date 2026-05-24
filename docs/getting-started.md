@@ -12,6 +12,27 @@ top-to-bottom. Every code block is runnable against the in-memory
 along. When you want to swap in live credentials, see the
 `credential gate` note at the end.
 
+## 60-second offline onramp
+
+The fastest fresh-clone path is the WATS-113 minimal bot:
+
+```bash
+bun run --cwd examples/minimal-bot demo
+```
+
+It starts from `examples/minimal-bot`, creates the service app in-process, uses MockTransport for Graph calls, sends one text message through the local service API, records a template intent without a live template send, and normalizes a synthetic webhook envelope. No live Meta credentials are required.
+
+If you want to exercise the same local API shape manually, run the demo first or use the service API body it prints. The route shape is:
+
+```bash
+curl -s -X POST http://127.0.0.1:8787/api/messages/text \
+  -H 'authorization: Bearer ${DEMO_SERVICE_TOKEN}' \\
+  -H 'content-type: application/json' \
+  -d '{"to":"15550001111","text":"hello from WATS"}'
+```
+
+The local example bearer token above is a non-secret fixture string scoped to the offline demo. Replace it only in ignored local files when you intentionally move to credential-gated live validation.
+
 ## 1. What's in the box
 
 The foundations pivot shipped four packages of primitives:

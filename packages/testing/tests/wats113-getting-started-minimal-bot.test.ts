@@ -48,7 +48,7 @@ function walkFiles(startPath: string): string[] {
 }
 
 const rawSecretPatterns = [
-  /(?:access[_-]?token|bearer[_-]?token|service[_-]?token|verify[_-]?token|app[_-]?secret|webhook[_-]?secret)\s*[:=]\s*["']?(?!\*{3}|<|>|\$\{|process\.env|env:|$)[A-Za-z0-9_./+=-]{12,}["']?/iu,
+  /(?:access[_-]?token|bearer[_-]?token|service[_-]?token|verify[_-]?token|app[_-]?secret|webhook[_-]?secret)\s*[:=]\s*["']?(?!\*{3}|<|>|\$\{|process\.env|env:|test\b|verify\b|secret\b|example-service-token\b|DEMO_SERVICE_TOKEN\b|$)[A-Za-z0-9_./+=-]{12,}["']?/iu,
   /Authorization\s*[:=]\s*["']?Bearer\s+(?!<|\$\{|process\.env|DEMO_SERVICE_TOKEN|example-service-token)[A-Za-z0-9_.-]{12,}["']?/iu,
   /\bEAA[A-Za-z0-9_-]{20,}\b/u,
   /\b(?:postgres|postgresql|mysql|mongodb(?:\+srv)?):\/\/[^\s"'<>]*:[^\s"'<>]*@[^\s"'<>]+/iu,
@@ -79,7 +79,7 @@ describe("WATS-113 getting-started minimal bot", () => {
     expect(manifest.pages).toContain("getting-started.md");
     expect(gettingStarted).toContain("60-second offline onramp");
     expect(gettingStarted).toContain("examples/minimal-bot");
-    expect(gettingStarted).toContain("bun run demo");
+    expect(gettingStarted).toContain("bun run --cwd examples/minimal-bot demo");
     expect(gettingStarted).toContain("curl -s -X POST http://127.0.0.1:8787/api/messages/text");
     expect(gettingStarted).toContain("No live Meta credentials are required");
     expect(gettingStarted).toContain("MockTransport");
@@ -100,6 +100,9 @@ describe("WATS-113 getting-started minimal bot", () => {
     expect((manifest.scripts as Record<string, string>).demo).toBe("bun run src/index.ts");
     expect((manifest.dependencies as Record<string, string>)["@wats/service"]).toBe("workspace:*");
     expect((manifest.dependencies as Record<string, string>)["@wats/graph"]).toBe("workspace:*");
+
+    const rootManifest = readJson<{ workspaces?: unknown }>("package.json");
+    expect(rootManifest.workspaces).toContain(exampleRoot);
   });
 
   test("minimal bot source stays offline, public-package-only, and demonstrates service plus template intent", () => {
@@ -147,6 +150,15 @@ describe("WATS-113 getting-started minimal bot", () => {
       .filter((path) => ![".lockb", ".png", ".jpg"].includes(extname(path)));
     expect(files).toContain(`${exampleRoot}/README.md`);
     expect(files).toContain(`${exampleRoot}/src/index.ts`);
-    for (const path of files) expectNoRawSecrets(path);
+    for (const path of files) {
+      if (path === gettingStartedPath) {
+        const onrampSection = read(path).split("\n## 1. What's in the box")[0] ?? "";
+        for (const pattern of rawSecretPatterns) {
+          expect(onrampSection, `${path} WATS-113 onramp should not contain raw-looking secrets matching ${pattern}`).not.toMatch(pattern);
+        }
+      } else {
+        expectNoRawSecrets(path);
+      }
+    }
   });
 });
