@@ -36,7 +36,8 @@ declare const process: MinimalProcess;
 function promptText(request: CliPromptRequest): string {
   const label = request.label ?? request.message ?? "value";
   const defaultSuffix = request.defaultValue === undefined ? "" : ` [${request.defaultValue}]`;
-  return `${label}${defaultSuffix}: `;
+  if (request.hint === undefined) return `${label}${defaultSuffix}: `;
+  return `${label}${defaultSuffix}\n  ${request.hint}\n${label}${defaultSuffix}: `;
 }
 
 async function createReadlineInterface(): Promise<ReadlineInterface> {

@@ -59,7 +59,9 @@ Prompted input policy:
 
 - profile names are limited to safe 1..32 character identifiers and cannot contain token/secret/password-like words;
 - access token and app secret are required, non-empty strings, max 4096 characters, and cannot contain control characters;
+- access-token and app-secret prompts state `Input hidden` before reading so operators know pasted values will not echo;
 - verify and service tokens may be left blank, in which case WATS generates local random `wats_wh_...` and `wats_srv_...` values;
+- optional secret-token prompts state they can be left blank to generate local values;
 - WABA and phone-number ids must be digit strings;
 - webhook path and service API prefix must be absolute safe paths with no traversal, encoded traversal, query, fragment, or control characters;
 - service host and port use the same safe local validation as dry-run serve.

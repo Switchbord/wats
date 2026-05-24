@@ -17,6 +17,7 @@ type PromptRequest = {
   label?: string;
   message?: string;
   defaultValue?: string;
+  hint?: string;
   secret?: boolean;
   required?: boolean;
 };
@@ -206,6 +207,12 @@ function secretPromptLabels(prompts: readonly PromptRequest[]): string[] {
     .map((prompt) => prompt.label ?? prompt.message ?? "");
 }
 
+function secretPromptHints(prompts: readonly PromptRequest[]): string[] {
+  return prompts
+    .filter((prompt) => prompt.secret === true)
+    .map((prompt) => prompt.hint ?? "");
+}
+
 describe("wats setup", () => {
   test("--help documents the non-live credential setup wizard", async () => {
     const { result, prompts } = await runSetup(["setup", "--help"], []);
@@ -290,6 +297,12 @@ profiles:
         "Webhook verify token",
         "WATS service bearer token"
       ]);
+      expect(secretPromptHints(prompts)).toEqual([
+        "Input hidden. Paste the token, then press Enter.",
+        "Input hidden. Paste the app secret, then press Enter.",
+        "Optional; input hidden. Leave blank to generate a local token.",
+        "Optional; input hidden. Leave blank to generate a local bearer token."
+      ]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -331,6 +344,10 @@ profiles:
       expect(completed.error, `${completed.stdout}\n${completed.stderr}`).toBeUndefined();
       expect(completed.signal).toBeNull();
       expect(completed.status, completed.stderr).toBe(0);
+      expect(completed.stdout).toContain("Meta access token\n  Input hidden. Paste the token, then press Enter.\nMeta access token: ");
+      expect(completed.stdout).toContain("Meta app secret\n  Input hidden. Paste the app secret, then press Enter.\nMeta app secret: ");
+      expect(completed.stdout).toContain("Webhook verify token\n  Optional; input hidden. Leave blank to generate a local token.\nWebhook verify token: ");
+      expect(completed.stdout).toContain("WATS service bearer token\n  Optional; input hidden. Leave blank to generate a local bearer token.\nWATS service bearer token: ");
       expect(completed.stdout).toContain("setup complete");
       expect(completed.stdout).toContain("files: 2");
       expect(completed.stderr).toBe("");

@@ -60,4 +60,12 @@ describe("WATS 0.3.3 public docs truth contract", () => {
     expect(guide).toContain("credential-gated live serve mode, live Meta validation, Dockerfiles, Compose files, release automation, image publication, and a full community gallery remain outside this scaffold");
     expect(guide).not.toContain("This WATS-52A scaffold predates WATS-69/WATS-70/WATS-71.");
   });
+
+  test("CLI docs explain hidden setup secret prompts before users paste credentials", () => {
+    const cliReference = read("docs/reference/cli.md");
+    const cliGuide = read("docs/guides/cli-init.md");
+    expect(cliReference).toContain("access-token and app-secret prompts state `Input hidden` before reading");
+    expect(cliReference).toContain("optional secret-token prompts state they can be left blank to generate local values");
+    expect(cliGuide).toContain("Secret prompts display an `Input hidden` hint before reading so pasted tokens and app secrets intentionally do not echo.");
+  });
 });
