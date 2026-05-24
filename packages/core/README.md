@@ -16,7 +16,9 @@ import { TypedRouter, filtersTyped, type TypedMessageUpdate } from "@wats/core";
 
 const router = new TypedRouter();
 router.on(filtersTyped.message.text(), async ({ update }) => {
-  console.log(update.message.text.body);
+  if (update.message.type === "text") {
+    console.log(update.message.text.body);
+  }
 });
 
 const update: TypedMessageUpdate = {
@@ -25,8 +27,8 @@ const update: TypedMessageUpdate = {
   phoneNumberId: "1234567890",
   wabaId: "WABA_EXAMPLE",
   receivedAt: Date.now(),
-  message: { id: "wamid.example", timestamp: "1713697100", type: "text", text: { body: "hello" } },
-  rawChange: { field: "messages", value: { messaging_product: "whatsapp", metadata: {}, messages: [] } }
+  message: { id: "wamid.example", from: "15551234567", timestamp: "1713697100", type: "text", text: { body: "hello" } },
+  rawChange: { field: "messages", value: { messagingProduct: "whatsapp", metadata: { displayPhoneNumber: "15551230000", phoneNumberId: "1234567890" }, messages: [] } }
 };
 
 await router.dispatch(update);
