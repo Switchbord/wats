@@ -1,17 +1,25 @@
 # @wats/cli
 
-Alpha WATS package. See the repository README and docs at https://github.com/Switchbord/wats.
+Safe local operator CLI for WATS onboarding, config validation, diagnostics, OpenAPI export, dry-run service checks, and webhook setup helpers.
 
-Useful commands:
+## Install
 
 ```bash
-wats init --dry-run
-wats onboarding --public-url https://example.test/wats
-wats serve --config wats.config.yaml --dry-run --host 127.0.0.1 --port 3000
-wats serve --config wats.config.yaml --dry-run --print-routes
-wats webhook token
+bun add @wats/cli
+npm i @wats/cli
 ```
 
-`wats onboarding` prints the webhook callback address plus generated local `WATS_VERIFY_TOKEN` / `WATS_SERVICE_TOKEN` values and names the Meta-side credentials the user must provide. It does not call Meta Graph APIs or read existing live credentials.
+## Usage
 
-`wats serve --dry-run` starts the local `@wats/service` app with synthetic in-memory secrets and a no-network Graph transport. It does not resolve env-secret values, read `.env.local`, or call Meta Graph APIs. Credential-gated live serve mode remains future work.
+```bash
+bunx --bun @wats/cli --help
+bunx --bun @wats/cli setup
+bunx --bun @wats/cli doctor --config wats.config.yaml --check-env
+bunx --bun @wats/cli onboarding --public-url https://example.test/wats
+bunx --bun @wats/cli serve --config wats.config.yaml --dry-run --print-routes
+```
+
+`wats setup` writes env-secret references to `wats.config.yaml` and local values to ignored `.env.local`. Secret prompts explain when input is hidden. Default commands do not call Meta Graph APIs or validate credentials against Meta.
+
+Docs: https://github.com/Switchbord/wats
+License: MIT

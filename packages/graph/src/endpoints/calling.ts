@@ -3,6 +3,9 @@
 // Credential-free Graph parity for pywa initiate/pre-accept/accept/reject/
 // terminate call operations. Public input uses camelCase; Graph wire bodies
 // use snake_case only at this transport boundary.
+/**
+ * @experimental Calling endpoint helpers may change in 0.x minors while live calling parity expands.
+ */
 
 import { defineEndpoint, type EndpointInvokeOptions } from "../endpoint.js";
 import { GraphRequestValidationError } from "../errors.js";
