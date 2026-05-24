@@ -4,6 +4,12 @@
 
 Patch alpha compatibility and community-governance release for WATS. This release keeps the 0.3.2 package-manager fix line, adds the post-0.3.2 credential-free WhatsApp/Graph compatibility deltas, and publishes the WATS-108 public community governance files.
 
+### CLI setup prompt hardening
+
+- Keeps `wats setup` interactive prompts on one TTY readline session so hidden token/app-secret prompts remain masked while later prompts keep consuming terminal input in order.
+- Adds a non-TTY buffered prompt path so scripted/piped `wats setup` runs consume all answers in order and exit without waiting for stdin producers that stay open after enough answers.
+- Adds dist-level setup regressions for closed piped stdin, open stdin after setup answers, and no-prompt `--help` commands with open stdin; no Meta calls or credential validation are added.
+
 ### WATS-108 — community governance files
 
 - Adds a Contributor Covenant 2.1 `CODE_OF_CONDUCT.md`, GitHub issue forms with public-secret safety prompts, a blank-issue-off config, and a pull request template that asks for issue tracking, docs-in-lockstep verification, non-goals, and credential/no-live-call boundaries.

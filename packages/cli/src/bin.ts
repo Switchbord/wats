@@ -3,7 +3,14 @@ import { runCli, type CliPromptProvider, type CliPromptRequest } from "./index.j
 
 type MinimalStdin = Readonly<{
   isTTY?: boolean;
+  on?(event: "data" | "end" | "error", listener: (...args: unknown[]) => void): unknown;
+  off?(event: "data" | "end" | "error", listener: (...args: unknown[]) => void): unknown;
+  pause?(): unknown;
+  resume?(): unknown;
+  setEncoding?(encoding: "utf8"): unknown;
 }>;
+
+type PromptWithClose = CliPromptProvider & { close?: () => void };
 
 type MinimalProcess = Readonly<{
   argv: string[];
@@ -37,29 +44,123 @@ async function createReadlineInterface(): Promise<ReadlineInterface> {
   const readline = await import(
     /* @vite-ignore */ readlineSpecifier
   ) as ReadlinePromisesModule;
-  return readline.createInterface({ input: process.stdin, output: process.stdout, terminal: process.stdin?.isTTY === true });
+  return readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
 }
 
-function createProcessPrompt(): CliPromptProvider {
-  return async (request: CliPromptRequest): Promise<string> => {
-    const rl = await createReadlineInterface();
-    try {
-      const text = promptText(request);
-      if (request.secret === true && process.stdin?.isTTY === true) {
-        process.stdout.write(text);
-        rl._writeToOutput = (): void => undefined;
+function createTtyPrompt(): CliPromptProvider {
+  let readlinePromise: Promise<ReadlineInterface> | undefined;
+  let readline: ReadlineInterface | undefined;
+  const getReadline = async (): Promise<ReadlineInterface> => {
+    if (readlinePromise === undefined) {
+      readlinePromise = createReadlineInterface().then((created) => {
+        readline = created;
+        return created;
+      });
+    }
+    return readlinePromise;
+  };
+
+  const prompt = async (request: CliPromptRequest): Promise<string> => {
+    const rl = await getReadline();
+    const text = promptText(request);
+    if (request.secret === true) {
+      process.stdout.write(text);
+      const originalWriteToOutput = rl._writeToOutput;
+      rl._writeToOutput = (): void => undefined;
+      try {
         const answer = await rl.question("");
         process.stdout.write("\n");
         return answer;
+      } finally {
+        if (originalWriteToOutput === undefined) {
+          delete (rl as { _writeToOutput?: (output: string) => void })._writeToOutput;
+        } else {
+          rl._writeToOutput = originalWriteToOutput;
+        }
       }
-      return await rl.question(text);
-    } finally {
-      rl.close();
     }
+    return await rl.question(text);
   };
+  (prompt as PromptWithClose).close = (): void => {
+    readline?.close();
+    readline = undefined;
+    readlinePromise = undefined;
+  };
+  return prompt;
 }
 
-const result = await runCli(process.argv.slice(2), { prompt: createProcessPrompt() });
+type BufferedInput = {
+  readLine(): Promise<string>;
+};
+
+function createBufferedInput(stdin: MinimalStdin | undefined): BufferedInput & { close(): void } {
+  let buffer = "";
+  let ended = false;
+  let streamError = false;
+  const waiters: Array<() => void> = [];
+  const wake = (): void => {
+    while (waiters.length > 0) waiters.shift()?.();
+  };
+  const onData = (chunk: unknown): void => {
+    buffer += typeof chunk === "string" ? chunk : String(chunk);
+    wake();
+  };
+  const onEnd = (): void => {
+    ended = true;
+    wake();
+  };
+  const onError = (): void => {
+    streamError = true;
+    ended = true;
+    wake();
+  };
+  stdin?.setEncoding?.("utf8");
+  stdin?.on?.("data", onData);
+  stdin?.on?.("end", onEnd);
+  stdin?.on?.("error", onError);
+  stdin?.resume?.();
+  return Object.freeze({
+    readLine: async (): Promise<string> => {
+      while (true) {
+        const newlineIndex = buffer.indexOf("\n");
+        if (newlineIndex !== -1) {
+          const line = buffer.slice(0, newlineIndex).replace(/\r$/u, "");
+          buffer = buffer.slice(newlineIndex + 1);
+          return line;
+        }
+        if (ended) {
+          const line = buffer.replace(/\r$/u, "");
+          buffer = "";
+          return streamError ? "" : line;
+        }
+        await new Promise<void>((resolve) => waiters.push(resolve));
+      }
+    },
+    close: (): void => {
+      stdin?.off?.("data", onData);
+      stdin?.off?.("end", onEnd);
+      stdin?.off?.("error", onError);
+      stdin?.pause?.();
+      ended = true;
+      wake();
+    }
+  });
+}
+
+function createBufferedPrompt(): CliPromptProvider {
+  const input = createBufferedInput(process.stdin);
+  const prompt = async (request: CliPromptRequest): Promise<string> => {
+    process.stdout.write(promptText(request));
+    return await input.readLine();
+  };
+  (prompt as PromptWithClose).close = input.close;
+  return prompt;
+}
+
+const processPrompt = process.stdin?.isTTY === true ? createTtyPrompt() : createBufferedPrompt();
+const result = await runCli(process.argv.slice(2), { prompt: processPrompt }).finally(() => {
+  (processPrompt as PromptWithClose).close?.();
+});
 
 if (result.stdout.length > 0) {
   process.stdout.write(result.stdout);

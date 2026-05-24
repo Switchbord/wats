@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync, lstatSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -67,6 +68,7 @@ function findRepoRoot(startDir: string): string {
 }
 
 const repoRoot = findRepoRoot(import.meta.dir);
+const distEntrypoint = join(repoRoot, "packages/cli/dist/bin.js");
 
 function makeTempDir(): string {
   return mkdtempSync(join(tmpdir(), "wats-cli-setup-"));
@@ -82,6 +84,36 @@ function expectNoSecrets(output: string): void {
   }
   expect(output).not.toMatch(/EAA[A-Za-z0-9_-]{20,}/u);
   expect(output).not.toMatch(/raw-[A-Za-z0-9_-]*token[A-Za-z0-9_-]*/iu);
+}
+
+type ChildReadable = {
+  setEncoding(encoding: "utf8"): unknown;
+  on(event: "data", listener: (chunk: unknown) => void): unknown;
+  on(event: "error", listener: (error: unknown) => void): unknown;
+  on(event: "end", listener: () => void): unknown;
+};
+
+type SpawnedChild = ReturnType<typeof spawn>;
+type ChildExit = { code: number | null; signal: string | null };
+
+function collectChildOutput(stream: ChildReadable | null): Promise<string> {
+  if (stream === null) return Promise.resolve("");
+  return new Promise<string>((resolve, reject) => {
+    let output = "";
+    stream.setEncoding("utf8");
+    stream.on("data", (chunk: unknown) => {
+      output += typeof chunk === "string" ? chunk : String(chunk);
+    });
+    stream.on("error", reject);
+    stream.on("end", () => resolve(output));
+  });
+}
+
+async function waitForExit(child: SpawnedChild): Promise<ChildExit> {
+  return await new Promise((resolve, reject) => {
+    child.once("error", reject);
+    child.once("exit", (code: number | null, signal: string | null) => resolve({ code, signal }));
+  });
 }
 
 function envValue(envText: string, name: string): string {
@@ -277,6 +309,94 @@ profiles:
       expect(envValue(envText, "WATS_SERVICE_TOKEN")).toBe(SERVICE_TOKEN);
     } finally {
       rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("dist setup consumes piped answers in order and exits", () => {
+    const dir = makeTempDir();
+    try {
+      const input = validAnswers({
+        profile: "local",
+        accessToken: ACCESS_TOKEN,
+        appSecret: APP_SECRET,
+        verifyToken: VERIFY_TOKEN,
+        serviceToken: SERVICE_TOKEN
+      }).join("\n") + "\n";
+      const completed = spawnSync("bun", [distEntrypoint, "setup"], {
+        cwd: dir,
+        input,
+        encoding: "utf8",
+        timeout: 5_000
+      });
+      expect(completed.error, `${completed.stdout}\n${completed.stderr}`).toBeUndefined();
+      expect(completed.signal).toBeNull();
+      expect(completed.status, completed.stderr).toBe(0);
+      expect(completed.stdout).toContain("setup complete");
+      expect(completed.stdout).toContain("files: 2");
+      expect(completed.stderr).toBe("");
+      expectNoSecrets(`${completed.stdout}\n${completed.stderr}`);
+      expect(existsSync(join(dir, "wats.config.yaml"))).toBe(true);
+      expect(existsSync(join(dir, ".env.local"))).toBe(true);
+      expect(envValue(read(join(dir, ".env.local")), "WATS_ACCESS_TOKEN")).toBe(ACCESS_TOKEN);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("dist setup exits after enough answers even when stdin stays open", async () => {
+    const dir = makeTempDir();
+    const child = spawn("bun", [distEntrypoint, "setup"], {
+      cwd: dir,
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+    const stdout = collectChildOutput(child.stdout);
+    const stderr = collectChildOutput(child.stderr);
+    try {
+      child.stdin.write(validAnswers({
+        profile: "local",
+        accessToken: ACCESS_TOKEN,
+        appSecret: APP_SECRET,
+        verifyToken: VERIFY_TOKEN,
+        serviceToken: SERVICE_TOKEN
+      }).join("\n") + "\n");
+      const timeout = new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 5_000));
+      const exit = await Promise.race([waitForExit(child), timeout]);
+      expect(exit).not.toBe("timeout");
+      if (exit === "timeout") return;
+      expect(exit.code).toBe(0);
+      expect(exit.signal).toBeNull();
+      const stdoutText = await stdout;
+      const stderrText = await stderr;
+      expect(stdoutText).toContain("setup complete");
+      expect(stderrText).toBe("");
+      expectNoSecrets(`${stdoutText}\n${stderrText}`);
+      expect(existsSync(join(dir, "wats.config.yaml"))).toBe(true);
+      expect(existsSync(join(dir, ".env.local"))).toBe(true);
+    } finally {
+      child.kill("SIGTERM");
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("dist non-prompt commands exit even when stdin stays open", async () => {
+    const child = spawn("bun", [distEntrypoint, "--help"], {
+      cwd: repoRoot,
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+    const stdout = collectChildOutput(child.stdout);
+    const stderr = collectChildOutput(child.stderr);
+    try {
+      child.stdin.write("unused input kept open\n");
+      const timeout = new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 5_000));
+      const exit = await Promise.race([waitForExit(child), timeout]);
+      expect(exit).not.toBe("timeout");
+      if (exit === "timeout") return;
+      expect(exit.code).toBe(0);
+      expect(exit.signal).toBeNull();
+      expect(await stdout).toContain("WATS CLI");
+      expect(await stderr).toBe("");
+    } finally {
+      child.kill("SIGTERM");
     }
   });
 
