@@ -32,6 +32,17 @@ const DOC_PACKET = [
   "CHANGELOG.md"
 ] as const;
 
+const EXPERIMENTAL_SOURCE_TAGS = [
+  {
+    path: "packages/graph/src/endpoints/flows.ts",
+    label: "Flow DSL and data-channel helpers"
+  },
+  {
+    path: "packages/graph/src/endpoints/calling.ts",
+    label: "Calling endpoint helpers"
+  }
+] as const;
+
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -176,13 +187,29 @@ function checkEntry(root: string, entry: GraphEndpointSubpathEntry): string[] {
   return failures;
 }
 
+function checkExperimentalTags(root: string): string[] {
+  const failures: string[] = [];
+  const stabilityDoc = readFileSync(safeRepoPath(root, "docs/api-stability.md", "API stability policy"), "utf8");
+  for (const entry of EXPERIMENTAL_SOURCE_TAGS) {
+    const source = readFileSync(safeRepoPath(root, entry.path, `${entry.label} source`), "utf8");
+    if (!source.includes("@experimental")) {
+      failures.push(`${entry.label}: ${entry.path} must include an @experimental JSDoc marker`);
+    }
+    if (!stabilityDoc.includes(entry.label)) {
+      failures.push(`${entry.label}: docs/api-stability.md must classify this experimental surface`);
+    }
+  }
+  return failures;
+}
+
 function run(): number {
   const root = repoRoot();
   const manifestRelPath = manifestPathFromArgs(Bun.argv.slice(2));
   const manifest = parseManifest(root, manifestRelPath);
   const failures = [
     ...assertUniqueSpecifiers(manifest.graphEndpointSubpaths),
-    ...manifest.graphEndpointSubpaths.flatMap((entry) => checkEntry(root, entry))
+    ...manifest.graphEndpointSubpaths.flatMap((entry) => checkEntry(root, entry)),
+    ...checkExperimentalTags(root)
   ];
 
   if (failures.length > 0) {
