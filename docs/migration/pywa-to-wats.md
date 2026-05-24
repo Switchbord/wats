@@ -13,7 +13,7 @@ This guide helps teams migrate Python `pywa` integrations to WATS without overst
 Use this guide together with:
 
 - `docs/parity/pywa-parity-matrix.md` for capability status.
-- `docs/parity/live-testing-campaign.md` for the future credentialed validation runbook.
+- `docs/parity/live-testing-campaign.md` for the credentialed validation runbook.
 - `packages/testing/fixtures/*/verify-imports.ts` for executable package-specifier examples.
 
 ## Status labels
@@ -217,7 +217,7 @@ Do not migrate code assuming WATS already has pywa parity for:
 - pywa's full Flow JSON DSL, encrypted Flow request decrypt/encrypt, Flow hosting, metrics, migration.
 - calling permissions, calling settings/SIP mutations, and real call orchestration.
 - mutating admin APIs, token flows, callback overrides, QR codes, block/unblock users, and phone registration/deregistration.
-- full Meta Graph OpenAPI generation and live/production operator modes beyond the current credential-free `wats init`, `wats doctor`, and dry-run `wats serve` tooling.
+- full Meta Graph OpenAPI generation and production operator modes beyond the current credential-free `wats init`, `wats doctor`, dry-run `wats serve`, and credential-gated local live `wats serve` tooling.
 
 ## Migration checklist
 

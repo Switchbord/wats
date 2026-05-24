@@ -14,7 +14,7 @@ WATS is alpha software. The foundations are in place and tested: Graph transport
 
 Endpoint breadth is still expanding. Today WATS ships text message send, `WhatsApp.startChat(...)` / `PhoneNumberClient.sendText(...)` for arbitrary-recipient text starts, WABA phone-number listing, pagination, WATS-37 media runtime (single-POST upload, metadata resolution, binary download, delete, encrypted decrypt, and upload sessions), WATS-39 templates, WATS-40 flows, WATS-41 calling, WATS-42A read-only business-management inventory (`getWabaInfo`, subscribed-app listing, phone-number info/settings, business profile, and commerce settings), and service `POST {apiPrefix}/messages` routes for text, media, location, contacts, reaction, remove-reaction, and interactive message bodies.
 
-The 0.3.4 line is an alpha compatibility and public-onboarding patch release. It keeps the safe local `wats setup` wizard and 0.3.2 package-manager fix line, then adds credential-free WhatsApp/Graph compatibility deltas, refreshed platform guidance, and public community governance files. `wats setup` writes a safe `wats.config.yaml` with env-secret references plus an ignored `.env.local` for local secrets without making Meta calls. live serve mode, env-file secret resolution, Docker image publication, persistence/outbox, and live Meta validation are not included. Token validation against Meta and multi-profile credential editing are also not included.
+The 0.3.4 line is an alpha compatibility and public-onboarding patch release. It keeps the safe local `wats setup` wizard and 0.3.2 package-manager fix line, then adds credential-free WhatsApp/Graph compatibility deltas, refreshed platform guidance, public community governance files, and credential-gated local live `wats serve` for webhook/Graph smoke testing. `wats setup` writes a safe `wats.config.yaml` with env-secret references plus an ignored `.env.local` for local secrets without making Meta calls. Live serve requires explicit `--live --yes-live --env-file .env.local`; WATS does not read `.env.local` implicitly. Docker image publication, persistence/outbox, production hosting, token validation against Meta, and multi-profile credential editing are not included.
 
 ## Shape
 
@@ -86,10 +86,13 @@ Verify local readiness after setup:
 bunx --bun @wats/cli doctor --config wats.config.yaml --check-env
 ```
 
-Get the webhook callback URL to paste into Meta App Dashboard → WhatsApp → Configuration:
+For a local live webhook smoke, expose the local service with a secure HTTPS tunnel. Meta will not verify plain HTTP or a bare local IP callback:
 
 ```bash
-bunx --bun @wats/cli onboarding --public-url https://your-public-url.example
+ngrok http 8787
+bunx --bun @wats/cli onboarding --public-url https://<your-tunnel-host> --webhook-path /webhooks/whatsapp
+WATS_LIVE_ENABLE=1 WATS_YES_LIVE=1 \
+  bunx --bun @wats/cli serve --config wats.config.yaml --live --yes-live --env-file .env.local
 ```
 
 See `docs/reference/cli.md` for all commands and `docs/parity/live-testing-campaign.md` for the full credentialed live-testing runbook.

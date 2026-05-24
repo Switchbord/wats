@@ -200,25 +200,36 @@ Do not commit the generated token.
 
 ## Serve local flow
 
-This section defines the serve local flow for WATS-47.
-
-WATS-47 target:
+Dry-run mode is still the safest first check:
 
 ```bash
 wats serve --config wats.config.yaml --profile local --dry-run
-wats serve --config wats.config.yaml --profile local --host 127.0.0.1 --port 3000
+wats serve --config wats.config.yaml --dry-run --print-routes
 ```
 
-Alpha `serve` should default to dry-run/mock mode. In dry-run mode it loads config, starts the `@wats/service` process wrapper with synthetic in-memory secrets, exposes health/readiness/OpenAPI/webhook routes, and makes no live Meta calls by default.
+Dry-run loads config, starts the `@wats/service` process wrapper with synthetic in-memory secrets, exposes health/readiness/OpenAPI/webhook routes, and makes no live Meta calls.
 
-Live service mode is explicitly credential-gated, but the current build only ships the guard contract and still fails closed before secret resolution or service bind:
+For live webhook testing, Meta needs a public HTTPS callback. Start a secure HTTPS tunnel first, then run the live wrapper with an explicit env file:
 
 ```bash
-wats serve --config wats.config.yaml --profile prod --live --yes-live
-WATS_LIVE_ENABLE=1 WATS_YES_LIVE=1 wats serve --config wats.config.yaml --profile prod --live --yes-live
+ngrok http 8787
+wats onboarding --public-url https://<your-tunnel-host> --webhook-path /webhooks/whatsapp
+WATS_LIVE_ENABLE=1 WATS_YES_LIVE=1 \
+  wats serve --config wats.config.yaml --live --yes-live --env-file .env.local
 ```
 
-`--live` declares live intent and `--yes-live` acknowledges live Graph/API side effects; `WATS_LIVE_ENABLE=1` and `WATS_YES_LIVE=1` are the equivalent environment-level gate. The follow-up secret-resolution slice will decide and implement explicit `--env-file <path>` support. Until then, `--env-file` is rejected, `.env.local` is never read implicitly, startup makes no Meta Graph call, and authenticated service routes cannot run in live mode.
+`--live` declares live intent. `--yes-live` acknowledges that service routes can call Graph when you hit them. `--env-file .env.local` is required; WATS does not read `.env.local` implicitly. Keep the env file local and gitignored. The command is for local live testing behind ngrok or an equivalent secure HTTPS tunnel, not for production hosting.
+
+The env file may contain the setup-generated keys. Live serve resolves only the four secret keys below; WABA/phone ids and live-gate markers can remain in the file:
+
+```env
+WATS_ACCESS_TOKEN=<copy from Meta>
+WATS_VERIFY_TOKEN=<local verify token>
+WATS_APP_SECRET=<copy from Meta App Dashboard>
+WATS_SERVICE_TOKEN=<local service bearer token>
+```
+
+Output stays status-only: no profile names, config paths, env names, tokens, app secrets, verify tokens, service bearer values, or Graph responses.
 
 ## Troubleshooting matrix
 
@@ -228,14 +239,14 @@ This troubleshooting matrix is safe to publish because it names failure classes 
 | --- | --- | --- |
 | `config_not_found` | no config discovered | pass `--config wats.config.yaml` or run `wats init --dry-run` |
 | `profile_not_found` | selected profile missing | check `--profile`, `WATS_PROFILE`, and `defaultProfile` |
-| `missing_secret_env` | future live mode requested without required env value | set the env var outside the CLI; explicit `--env-file` support is a follow-up slice |
+| `missing_secret_env` | live mode requested without a required env value | keep secrets in `.env.local` or the process environment and pass `--env-file .env.local` explicitly |
 | `output_exists` | generated file already exists | inspect the file; do not overwrite unless a future command documents safe force behavior |
 | `port_in_use` | service bind port already taken | choose another `--port` or stop the existing process |
 | `live_confirmation_required` | live check/service requested without acknowledgement | rerun only after reviewing side effects and adding `--yes-live` |
 
 ## Credential gate
 
-No live Meta calls by default. The live guard requires both live intent and acknowledgement (`--live` plus `--yes-live`, or the paired `WATS_LIVE_ENABLE=1` / `WATS_YES_LIVE=1` environment gate). In the current guard-only slice the command still fails closed after recognizing the gate, so CI/docs/tests remain credential-free and no secrets are resolved.
+No live Meta calls happen by default. Live serve requires `--live`, `--yes-live`, and explicit `--env-file .env.local`; WATS never reads `.env.local` implicitly. CI, docs, and tests stay credential-free unless a maintainer deliberately stages local credentials and starts the live wrapper.
 
 ## Webhook onboarding checklist
 

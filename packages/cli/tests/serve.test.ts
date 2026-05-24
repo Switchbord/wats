@@ -484,6 +484,7 @@ describe("wats serve dry-run process wrapper", () => {
       ["--config", configPath, "--live"],
       ["--config", configPath, "--yes-live"],
       ["--config", configPath, "--live", "--yes-live"],
+      ["--config", configPath, "--env-file", ".env.local"],
       ["--config", configPath, "--live", "--env-file", ".env.local"],
       ["--config", configPath, "--yes-live", "--env-file", ".env.local"],
       ["--config", configPath, "--dry-run", "--live", "--yes-live"],

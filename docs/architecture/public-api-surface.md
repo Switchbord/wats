@@ -145,11 +145,11 @@ Current commands:
 - `wats openapi --config <path> --out <path>`
 - `wats openapi --help`
 - `wats serve --config <path> --dry-run [--profile <name>] [--host <host>] [--port <port>] [--print-routes]`
-- `wats serve --config <path> --live --yes-live ...` guard recognition only; still fails closed before secret resolution or service bind
+- `wats serve --config <path> --live --yes-live --env-file .env.local [--profile <name>] [--host <host>] [--port <port>]`
 - `wats serve --help`
 - `wats webhook token`
 
-Status: experimental CLI foundation. It generates WATS config/env placeholder files with `wats init`, validates config files safely, exports WATS service OpenAPI, runs offline diagnostics, starts a dry-run local service process with `wats serve --dry-run`, recognizes the WATS-72 live-intent/acknowledgement guard while still failing closed, and generates local webhook verify tokens without resolving env-secret values or calling Meta Graph.
+Status: experimental CLI foundation. It generates WATS config/env placeholder files with `wats init`, validates config files safely, exports WATS service OpenAPI, runs offline diagnostics, starts a dry-run local service process with `wats serve --dry-run`, starts a credential-gated local live service with explicit `--live --yes-live --env-file .env.local`, and generates local webhook verify tokens. It does not read `.env.local` implicitly or call Meta Graph unless the operator starts live serve and hits a service route.
 
 WATS-68 messages endpoint module split note: the public `@wats/graph/endpoints/messages` subpath and root exports are preserved while the broad message composer internals move into focused `packages/graph/src/endpoints/messages/` files; this is an internal split with no payload behavior changes.
 
@@ -177,7 +177,7 @@ Current routes:
 - `POST {profile.service.apiPrefix}/messages/text`
 - `POST {profile.service.apiPrefix}/messages`
 
-Status: experimental service foundation. It composes config profile shape, explicit resolved secrets, Graph client, WebhookAdapter, WhatsApp facade, and a generated OpenAPI 3.1 document for current WATS service routes. The `@wats/cli` dry-run wrapper can serve it locally; production/live wrappers and public docs UI remain later work.
+Status: experimental service foundation. It composes config profile shape, explicit resolved secrets, Graph client, WebhookAdapter, WhatsApp facade, and a generated OpenAPI 3.1 document for current WATS service routes. The `@wats/cli` dry-run and local live wrappers can serve it locally; production hosting, Docker, persistence, and public docs UI remain later work.
 
 ### Internal support and workspace packages
 
@@ -194,7 +194,6 @@ These are not implemented as runtime APIs yet:
 - mutating WABA/phone-number/business-management/admin APIs beyond WATS-42A read-only inventory and the bounded WATS-95 request-shape helpers; no automatic user-block decisions or policy/appeal automation are implemented
 - catalog/product management APIs beyond WATS-42A read-only getCommerceSettings
 - full Meta Graph API OpenAPI generation
-- live-capable credentialed `wats serve` startup and env-file secret resolution; the guard-only `--live`/`--yes-live` contract is recognized but fails closed
 - `@wats/persistence` package and SQLite/Postgres adapters are WATS-48 design targets only. In docs-lock wording, @wats/persistence package and SQLite/Postgres adapters are WATS-48 design targets only. No current package export, no service persistence integration, no config persistence schema, and no migration runner exists yet.
 - no supported Dockerfile, Compose file, container image, or container-registry publication yet. WATS-49 keeps Docker/deployment as a design scaffold until live/deploy packaging is explicitly authorized.
 

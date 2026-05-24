@@ -37,6 +37,21 @@ await app.fetch(new Request("http://127.0.0.1:8787/api/messages/text", {
 
 The local example bearer variable above is a non-secret fixture scoped to the offline demo. Replace it only in ignored local files when you intentionally move to credential-gated live validation.
 
+## Quick live webhook smoke with ngrok
+
+Meta requires a public HTTPS webhook URL. For a quick local test, run WATS on `localhost:8787` and put ngrok, Cloudflare Tunnel, Tailscale Funnel, or an equivalent secure HTTPS tunnel in front of it. Plain HTTP and bare local IP callbacks will not verify in the Meta dashboard.
+
+```bash
+bunx --bun @wats/cli setup
+cd <your-wats-project>
+ngrok http 8787
+wats onboarding --public-url https://<your-tunnel-host> --webhook-path /webhooks/whatsapp
+WATS_LIVE_ENABLE=1 WATS_YES_LIVE=1 \
+  wats serve --config wats.config.yaml --live --yes-live --env-file .env.local
+```
+
+Use the onboarding callback URL and verify token in Meta App Dashboard > WhatsApp > Configuration. Keep the ngrok URL out of git; free ngrok hostnames rotate. This is for local live testing, not a production hosting recipe.
+
 ## 1. What's in the box
 
 The foundations pivot shipped four packages of primitives:

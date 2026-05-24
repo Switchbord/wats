@@ -4,6 +4,13 @@
 
 Patch alpha public-onboarding and release-governance release for WATS. This release batches post-0.3.3 CLI setup hardening, scoped Bun command docs, public docs trust/onboarding updates, package README/API policy docs, the minimal offline bot onramp, and release-governance maintainer docs.
 
+### WATS-101 — live serve and tunnel quickstart
+
+- Adds credential-gated live `wats serve` for local live testing with explicit `--live --yes-live --env-file .env.local` guardrails.
+- Resolves config env-secret refs only from the explicit env file plus process environment; `.env.local` is not read implicitly and serve output stays status-only.
+- Updates quick-start docs to recommend ngrok or equivalent HTTPS tunnel because Meta requires a public secure HTTPS webhook callback for local testing.
+- No Docker image publication, persistence/outbox, or production-hosting guarantee is included.
+
 ### CLI setup and public-onboarding docs hardening
 
 - Keeps `wats setup` interactive prompts on one TTY readline session so hidden token/app-secret prompts remain masked while later prompts keep consuming terminal input in order.
@@ -111,7 +118,7 @@ Patch alpha compatibility and community-governance release for WATS. This releas
 
 - Release metadata is aligned for 0.3.4 across root/package manifests, public internal dependency ranges, service OpenAPI default version, generated OpenAPI docs, and release-policy tests.
 - This is an alpha compatibility/tooling/community patch release, not a 1.0 stability claim.
-- No live Meta calls, token validation against Meta, credential collection, live-capable `wats serve`, Docker image publication, or persistence/outbox are included in the release gates. No live Meta validation campaign execution is included.
+- No automatic live Meta validation campaign execution, token validation against Meta, credential collection, Docker image publication, production hosting, or persistence/outbox is included in the release gates.
 
 ## [0.3.2] - 2026-05-18
 
