@@ -69,5 +69,8 @@
     "architecture/public-api-surface.md",
     "architecture/roadmap-to-whatsapp-pywa-parity.md",
     "architecture/release-policy.md"
+  ],
+  "exclude": [
+    "maintainers/**"
   ]
 }

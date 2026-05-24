@@ -89,7 +89,7 @@ describe("WATS-109/WATS-117 release governance docs", () => {
 
   test("launch checklist and announce draft cover public-alpha launch day without claiming release side effects", () => {
     const checklist = read("docs/maintainers/launch-checklist.md");
-    const announce = read(".hermes/plans/wats-public-alpha-announce-draft.md");
+    const announce = read("docs/maintainers/announce-draft.md");
 
     expectAll(checklist, [
       "WATS-117",

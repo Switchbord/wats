@@ -1,5 +1,7 @@
 # WATS
 
+[![CI](https://github.com/Switchbord/wats/actions/workflows/ci.yml/badge.svg)](https://github.com/Switchbord/wats/actions/workflows/ci.yml)
+
 WATS is a TypeScript toolkit for WhatsApp operations: a small set of composable packages for Graph calls, webhook ingestion, typed routing, listeners, filters, service routes, CLI operator checks, and testable runtime adapters.
 
 It is intentionally not a single framework. The repository is a toolkit first; the CLI and standalone service sit on top of these packages rather than replace them.

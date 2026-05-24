@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const docsRoot = join(repoRoot, "docs");
-const manifest = JSON.parse(readFileSync(join(docsRoot, "public-docs-manifest.json"), "utf8")) as { pages: string[] };
+const manifest = JSON.parse(readFileSync(join(docsRoot, "public-docs-manifest.json"), "utf8")) as { pages: string[]; exclude?: string[] };
 
 const DISALLOWED_PUBLIC_STRINGS = ["TODO(A2)", "/tmp/", "/root/"] as const;
 const RAW_HTML_PATTERNS = [/<script\b/iu, /<iframe\b/iu, /<object\b/iu, /<embed\b/iu, /\son[a-z]+\s*=/iu, /javascript:/iu] as const;
@@ -69,8 +69,19 @@ export function scanGeneratedOutputForSecrets(): void {
     for (const secret of poisoned) if (text.includes(secret)) fail(`generated output leaked poisoned secret ${secret}`);
   }
 }
+function globToRegExp(glob: string): RegExp {
+  if (glob === "maintainers/**") return /^maintainers\//u;
+  const escaped = glob.replace(/[.+^${}()|[\]\\]/gu, "\\$&").replace(/\*\*/gu, ".*").replace(/\*/gu, "[^/]*");
+  return new RegExp(`^${escaped}$`, "u");
+}
+function isExcluded(page: string): boolean {
+  return (manifest.exclude ?? []).some((glob) => globToRegExp(glob).test(page));
+}
+
 const manifestSet = new Set(manifest.pages);
 for (const page of manifest.pages) validatePage(page);
-for (const page of walkMarkdown(docsRoot)) if (!manifestSet.has(page)) fail(`docs markdown file is not in public manifest: ${page}`);
+for (const page of walkMarkdown(docsRoot)) {
+  if (!manifestSet.has(page) && !isExcluded(page)) fail(`docs markdown file is not in public manifest: ${page}`);
+}
 scanGeneratedOutputForSecrets();
 console.log(`checked ${manifest.pages.length} public docs pages`);
