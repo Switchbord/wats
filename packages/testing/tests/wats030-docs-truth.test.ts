@@ -31,7 +31,8 @@ describe("WATS 0.3.4 public docs truth contract", () => {
     expect(readme).not.toContain("bunx --bun wats setup");
     expect(readme).not.toContain("bunx --bun wats --help");
     expect(readme).toContain("`wats setup` writes a safe `wats.config.yaml`");
-    expect(readme).toContain("live serve mode, env-file secret resolution, Docker image publication, persistence/outbox, and live Meta validation are not included");
+    expect(readme).toContain("Live serve requires explicit `--live --yes-live --env-file .env.local`");
+    expect(readme).toContain("Docker image publication, persistence/outbox, production hosting, token validation against Meta, and multi-profile credential editing are not included");
 
     expect(readme).not.toContain("After the alpha packages are published");
   });
@@ -43,21 +44,22 @@ describe("WATS 0.3.4 public docs truth contract", () => {
     expect(changelog).toContain("canonical `@wats/*` package scope");
     expect(changelog).toContain("### WATS-98 — Marketing Messages API compatibility surfaces");
     expect(changelog).toContain("Release metadata is aligned for 0.3.4");
-    expect(changelog).toContain("No live Meta calls, token validation against Meta, credential collection");
-    expect(changelog).toContain("No live Meta validation campaign execution");
+    expect(changelog).toContain("credential-gated live `wats serve`");
+    expect(changelog).toContain("No automatic live Meta validation campaign execution, token validation against Meta, credential collection");
     expect(changelog).not.toContain("No GitHub release/tag creation until the public repository is pushed and reviewed");
   });
 
   test("migration guide no longer lists implemented operator tooling as a gap", () => {
     const migration = read("docs/migration/pywa-to-wats.md");
     expect(migration).not.toContain("full Meta Graph OpenAPI generation, CLI `serve`, CLI `init`, and deeper `doctor` diagnostics");
-    expect(migration).toContain("full Meta Graph OpenAPI generation and live/production operator modes beyond the current credential-free `wats init`, `wats doctor`, and dry-run `wats serve` tooling");
+    expect(migration).toContain("full Meta Graph OpenAPI generation and production operator modes beyond the current credential-free `wats init`, `wats doctor`, dry-run `wats serve`, and credential-gated local live `wats serve` tooling");
   });
 
   test("community examples point users at current CLI tooling while preserving live/deploy non-goals", () => {
     const guide = read("docs/guides/community-examples.md");
-    expect(guide).toContain("Current WATS now implements safe local `wats init` config/env placeholder generation, real offline `wats doctor` diagnostics, and dry-run `wats serve`");
-    expect(guide).toContain("credential-gated live serve mode, live Meta validation, Dockerfiles, Compose files, release automation, image publication, and a full community gallery remain outside this scaffold");
+    expect(guide).toContain("Current WATS now implements safe local `wats init` config/env placeholder generation, real offline `wats doctor` diagnostics, dry-run `wats serve`");
+    expect(guide).toContain("credential-gated local live `wats serve` for webhook/Graph smoke testing behind a secure HTTPS tunnel");
+    expect(guide).toContain("Dockerfiles, Compose files, release automation, image publication, production hosting, and a full community gallery remain outside this scaffold");
     expect(guide).not.toContain("This WATS-52A scaffold predates WATS-69/WATS-70/WATS-71.");
   });
 
