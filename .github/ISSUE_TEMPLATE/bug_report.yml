@@ -1,0 +1,76 @@
+name: Bug report
+description: Report a defect, regression, or unexpected behavior in WATS.
+title: "bug: <one-line summary>"
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report. Please redact any tokens, app secrets, phone numbers, or WABA IDs before posting.
+        For security-sensitive defects, use a private security advisory instead: https://github.com/Switchbord/wats/security/advisories/new
+  - type: input
+    id: wats-version
+    attributes:
+      label: WATS version
+      description: Output of `wats --version` or the relevant `@wats/*` package versions.
+      placeholder: "e.g. 0.3.2"
+    validations:
+      required: true
+  - type: input
+    id: runtime
+    attributes:
+      label: Runtime
+      description: Bun and/or Node.js version. Include OS if you suspect it matters.
+      placeholder: "e.g. Bun 1.1.30, Node 20.11.1, Linux x64"
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the observed behavior. Include exact error messages and stack traces, with secrets redacted.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: Smallest code, config, or command sequence that reproduces the issue. Prefer credential-free repros using the documented dry-run / synthetic transport surfaces.
+      render: shell
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Which surface is affected?
+      multiple: true
+      options:
+        - "@wats/core (high-level client, router, filters, listeners)"
+        - "@wats/graph (Graph endpoints and MockTransport)"
+        - "@wats/http (webhook signature / HTTP adapters)"
+        - "@wats/service (Bun.serve runtime)"
+        - "@wats/config (configuration loading and validation)"
+        - "@wats/cli (init / setup / serve / doctor / openapi / config validate)"
+        - "@wats/types"
+        - "@wats/crypto"
+        - "Docs / examples"
+        - "Other / not sure"
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Pre-submission checks
+      options:
+        - label: I have searched existing issues and discussions.
+          required: true
+        - label: I have redacted tokens, app secrets, phone numbers, WABA IDs, and account identifiers from the report.
+          required: true
+        - label: I understand this report is public and is not the right channel for security disclosures.
+          required: true

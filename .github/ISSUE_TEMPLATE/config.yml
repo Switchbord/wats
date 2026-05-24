@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security disclosure
+    url: https://github.com/Switchbord/wats/security/advisories/new
+    about: Please report security issues privately via GitHub Security Advisories, not as public issues.
+  - name: Discussions and questions
+    url: https://github.com/Switchbord/wats/discussions
+    about: Ask usage questions or propose ideas in Discussions before opening a feature request.
