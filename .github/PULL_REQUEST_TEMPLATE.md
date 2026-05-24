@@ -4,10 +4,10 @@
 
 <!-- One paragraph: what does this PR change, and why? -->
 
-## Linear
+## Issue tracking
 
-<!-- Required: link the Linear issue this PR closes or contributes to (e.g. WATS-NN).
-     Pre-public-alpha behavior changes without a Linear issue will be asked to file one before review. -->
+<!-- Link the Linear issue, GitHub issue, or discussion this PR closes or contributes to.
+     Maintainers may create/link a Linear issue during triage for behavior-bearing changes. -->
 
 Closes WATS-
 
@@ -40,7 +40,7 @@ Behavior-bearing changes must update docs in the same PR. Check what applies:
 - [ ] `docs/guides/*` — usage guide / runnable example
 - [ ] `docs/parity/pywa-parity-matrix.md` — parity status
 - [ ] `docs/migration/pywa-to-wats.md` — import / migration mapping
-- [ ] `CHANGELOG.md` — Unreleased entry
+- [ ] `CHANGELOG.md` — release entry for the next patch/minor line
 - [ ] `docs/public-docs-manifest.json` (if public docs added / removed)
 
 ## Non-goals (verified)

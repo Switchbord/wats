@@ -264,34 +264,48 @@ describe("WATS-108 community files docs-lock", () => {
     const prPath = join(repoRoot, ".github/PULL_REQUEST_TEMPLATE.md");
     expect(existsSync(prPath)).toBe(true);
     const content = readUtf8(prPath);
+    expect(content).toContain("Issue tracking");
     expect(content).toContain("Linear");
+    expect(content).toContain("GitHub issue");
     expect(content).toContain("non-goals");
     expect(content).toContain("no live Meta calls");
     expect(content).toContain("no real credentials");
+    expect(content).not.toContain("Pre-public-alpha behavior changes without a Linear issue");
   });
 
   test(".github/ISSUE_TEMPLATE/bug_report.yml is a valid GitHub issue form", () => {
     const formPath = join(repoRoot, ".github/ISSUE_TEMPLATE/bug_report.yml");
     expect(existsSync(formPath)).toBe(true);
-    const parsed = parseYaml(readUtf8(formPath));
+    const content = readUtf8(formPath);
+    const parsed = parseYaml(content);
     expect(isJsonRecord(parsed)).toBe(true);
     const obj = parsed as JsonRecord;
     expect(typeof obj.name).toBe("string");
     expect(typeof obj.description).toBe("string");
     expect(Array.isArray(obj.body)).toBe(true);
     expect((obj.body as unknown[]).length).toBeGreaterThan(0);
+    expect(content).toContain("@wats/*");
+    expect(content).toContain("@wats/core");
+    expect(content).toContain("@wats/graph");
+    expect(content).not.toContain("@switchbord/");
+    expect(content).toContain("redacted tokens, app secrets, phone numbers, WABA IDs, and account identifiers");
   });
 
   test(".github/ISSUE_TEMPLATE/feature_request.yml is a valid GitHub issue form", () => {
     const formPath = join(repoRoot, ".github/ISSUE_TEMPLATE/feature_request.yml");
     expect(existsSync(formPath)).toBe(true);
-    const parsed = parseYaml(readUtf8(formPath));
+    const content = readUtf8(formPath);
+    const parsed = parseYaml(content);
     expect(isJsonRecord(parsed)).toBe(true);
     const obj = parsed as JsonRecord;
     expect(typeof obj.name).toBe("string");
     expect(typeof obj.description).toBe("string");
     expect(Array.isArray(obj.body)).toBe(true);
     expect((obj.body as unknown[]).length).toBeGreaterThan(0);
+    expect(content).toContain("@wats/core");
+    expect(content).toContain("@wats/graph");
+    expect(content).not.toContain("@switchbord/");
+    expect(content).toContain("Please do not include tokens, app secrets, phone numbers, WABA IDs, or account identifiers");
   });
 
   test(".github/ISSUE_TEMPLATE/config.yml disables blank issues", () => {

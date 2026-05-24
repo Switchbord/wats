@@ -7,7 +7,8 @@ body:
     attributes:
       value: |
         Use Discussions for open-ended ideas. Open a feature request when you have a concrete proposal with a desired API or behavior in mind.
-        Substantial behavior changes typically also need a Linear issue and may require an ADR; a maintainer will guide you.
+        Please do not include tokens, app secrets, phone numbers, WABA IDs, or account identifiers in public proposals or examples.
+        Substantial behavior changes typically also need a tracked maintainer issue and may require an ADR; a maintainer will guide you.
   - type: textarea
     id: problem
     attributes:
@@ -36,12 +37,14 @@ body:
       label: Which surface would this touch?
       multiple: true
       options:
-        - "@switchbord/client (high-level)"
-        - "@switchbord/graph (Graph endpoints)"
-        - "@switchbord/webhook (signature / dispatcher)"
-        - "@switchbord/service (Bun.serve runtime)"
-        - "@switchbord/cli (init / setup / serve / doctor / openapi / config validate)"
-        - "@switchbord/types"
+        - "@wats/core (high-level client, router, filters, listeners)"
+        - "@wats/graph (Graph endpoints and MockTransport)"
+        - "@wats/http (webhook signature / HTTP adapters)"
+        - "@wats/service (Bun.serve runtime)"
+        - "@wats/config (configuration loading and validation)"
+        - "@wats/cli (init / setup / serve / doctor / openapi / config validate)"
+        - "@wats/types"
+        - "@wats/crypto"
         - "Docs / examples"
         - "Cross-package / unsure"
     validations:

@@ -1,11 +1,14 @@
 # Changelog
 
-## [0.3.2] - 2026-05-18
+## [0.3.3] - 2026-05-24
+
+Patch alpha compatibility and community-governance release for WATS. This release keeps the 0.3.2 package-manager fix line, adds the post-0.3.2 credential-free WhatsApp/Graph compatibility deltas, and publishes the WATS-108 public community governance files.
 
 ### WATS-108 — community governance files
 
-- Adds a Contributor Covenant 2.1 `CODE_OF_CONDUCT.md`, GitHub issue forms with public-secret safety prompts, a blank-issue-off config, and a pull request template requiring Linear, docs-in-lockstep verification, non-goals, and credential/no-live-call boundaries.
-- No package code, public API, live Meta calls, CI workflow changes, npm publish, GitHub release, or git tag are included.
+- Adds a Contributor Covenant 2.1 `CODE_OF_CONDUCT.md`, GitHub issue forms with public-secret safety prompts, a blank-issue-off config, and a pull request template that asks for issue tracking, docs-in-lockstep verification, non-goals, and credential/no-live-call boundaries.
+- The GitHub issue templates use the canonical `@wats/*` package scope and avoid stale `@switchbord/*` package names.
+- No package code, live Meta calls, credential validation, CI workflow side effects, npm publish, GitHub release, or git tag are included by the WATS-108 governance-file slice itself.
 
 ### WATS-68 — messages endpoint module split
 
@@ -80,6 +83,18 @@
 - Adds audio voice-message designation via `buildSendAudioPayload({ to, mediaId, voice: true })` and `PhoneNumberClient.sendAudio({ ..., voice: true })`.
 - Updates service `/messages` composer docs for `type: "callPermissionRequest"` and audio `voice: true`; all coverage is credential-free MockTransport only.
 
+### CI maintenance
+
+- Updates GitHub Actions checkout steps to `actions/checkout@v5` so the credential-free CI and release dry-run workflows are ready for GitHub's Node 24 action runtime.
+
+### Release metadata and safety boundaries
+
+- Release metadata is aligned for 0.3.3 across root/package manifests, public internal dependency ranges, service OpenAPI default version, generated OpenAPI docs, and release-policy tests.
+- This is an alpha compatibility/tooling/community patch release, not a 1.0 stability claim.
+- No live Meta calls, token validation against Meta, credential collection, live-capable `wats serve`, Docker image publication, or persistence/outbox are included in the release gates. No live Meta validation campaign execution is included.
+
+## [0.3.2] - 2026-05-18
+
 Patch alpha package release for WATS. This release keeps the 0.3.1 setup-wizard/tooling behavior and publishes corrected `@wats/*` npm packages with package-manager-safe ESM imports and CLI bin metadata.
 
 ### Package release correction
@@ -89,9 +104,6 @@ Patch alpha package release for WATS. This release keeps the 0.3.1 setup-wizard/
 - Corrects the `@wats/cli` bin metadata to `dist/bin.js`, preserving the executable `wats` command for package-manager installs.
 - `0.3.1` should be treated as superseded on npm; use `0.3.2` or `latest`.
 
-### CI maintenance
-
-- Updates GitHub Actions checkout steps to `actions/checkout@v5` so the credential-free CI and release dry-run workflows are ready for GitHub's Node 24 action runtime.
 
 ### CLI setup wizard
 

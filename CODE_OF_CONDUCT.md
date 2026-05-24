@@ -40,9 +40,9 @@ Examples of representing the project include using an official project email add
 
 ## Reporting
 
-Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the project maintainers through GitHub's private security advisory channel when privacy is important, or through the repository maintainers for non-sensitive conduct concerns.
+Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the project maintainers by contacting the repository owner or maintainers directly through a private channel. If you are unsure where to report, open a GitHub Discussion or issue only with non-sensitive details and ask for a private maintainer contact.
 
-Security vulnerabilities should not be reported as public conduct issues; use GitHub Security Advisories instead. Reports will be reviewed and investigated promptly and fairly. Maintainers are obligated to respect the privacy and security of the reporter of any incident.
+Security vulnerabilities should not be reported as public conduct issues; use GitHub Security Advisories as described in `SECURITY.md` instead. Conduct reports will be reviewed and investigated promptly and fairly. Maintainers are obligated to respect the privacy and security of the reporter of any incident.
 
 ## Enforcement guidelines
 
