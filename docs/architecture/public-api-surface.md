@@ -206,4 +206,4 @@ Track these through Linear roadmap issues and `docs/architecture/roadmap-to-what
 - Experimental / expanding: endpoint catalog breadth, media runtime, template/Flow/calling management helpers, config, CLI, service, OpenAPI, docs site.
 - Internal support/private: `@wats/internal-utils` is published internal support for runtime dependency closure; `@wats/testing` remains private.
 
-See `docs/architecture/release-policy.md` for versioning rules.
+See `docs/architecture/release-policy.md` for versioning rules and `docs/api-stability.md` for the stable-for-0.x, experimental, and internal API policy.

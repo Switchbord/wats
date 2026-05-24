@@ -13,6 +13,8 @@ Patch alpha compatibility and community-governance release for WATS. This releas
 - Fixes WATS-118 CLI guide drift by listing the implemented `wats onboarding` command and removing the unimplemented `wats init --yes` command from executable first-run examples.
 - Documents the WATS-119 private `@wats/testing` version policy in the release policy and package README.
 - Adds the WATS-111 privacy and telemetry stance: WATS sends no maintainer-owned telemetry by default, the CLI does not phone home, and future telemetry would be opt-in and documented.
+- Expands WATS-114 per-package README coverage so every publishable `@wats/*` package has install commands, a usage example, docs link, and MIT license line for npm rendering.
+- Adds the WATS-115 API stability policy, marking stable-for-0.x, experimental, and internal surfaces; Flow and Calling endpoint barrels now carry `@experimental` JSDoc markers checked by `bun run api:check`.
 
 ### WATS-108 — community governance files
 

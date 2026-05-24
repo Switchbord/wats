@@ -78,6 +78,9 @@ export type {
 // ---------------------------------------------------------------------------
 // WATS-40 WhatsApp Flows endpoint parity.
 // ---------------------------------------------------------------------------
+/**
+ * @experimental Flow DSL and data-channel helpers may change in 0.x minors while WATS expands Flow parity.
+ */
 
 export {
   FLOW_JSON_MAX_ARRAY_LENGTH,

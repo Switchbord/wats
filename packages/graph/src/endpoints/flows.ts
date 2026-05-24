@@ -1,6 +1,9 @@
 // WATS-53/WATS-66 public WhatsApp Flow endpoint subpath.
 //
 // Thin compatibility barrel over the WATS-66 Flow endpoint family modules.
+/**
+ * @experimental Flow DSL and data-channel helpers may change in 0.x minors while WATS expands Flow parity.
+ */
 
 export {
   FLOW_JSON_MAX_ARRAY_LENGTH,

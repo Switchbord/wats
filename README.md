@@ -105,6 +105,7 @@ Useful references:
 - `docs/reference/index.md` — reference map
 - `docs/reference/cli.md` — safe local operator tooling reference
 - `docs/privacy.md` — telemetry, privacy, and redaction stance
+- `docs/api-stability.md` — stable, experimental, and internal API policy
 - `docs/parity/pywa-parity-matrix.md` — implemented vs deferred coverage
 - `docs/architecture/package-map.md` — package boundaries
 - `docs/architecture/release-policy.md` — version and release rules
