@@ -2,6 +2,11 @@
 
 ## [0.3.2] - 2026-05-18
 
+### WATS-108 — community governance files
+
+- Adds a Contributor Covenant 2.1 `CODE_OF_CONDUCT.md`, GitHub issue forms with public-secret safety prompts, a blank-issue-off config, and a pull request template requiring Linear, docs-in-lockstep verification, non-goals, and credential/no-live-call boundaries.
+- No package code, public API, live Meta calls, CI workflow changes, npm publish, GitHub release, or git tag are included.
+
 ### WATS-68 — messages endpoint module split
 
 - Moves the broad messages endpoint composer internals into focused `packages/graph/src/endpoints/messages/` modules while preserving root `@wats/graph`, `@wats/graph/endpoints/messages`, `GraphMessagesEndpoint`, `sendMessage`, and Marketing Messages helper exports.
