@@ -84,7 +84,7 @@ The runnable `examples/minimal-bot` package is the 60-second offline onramp for 
 bun run --cwd examples/minimal-bot demo
 ```
 
-It creates a `createWatsServiceApp` app, injects MockTransport, sends one text message through the local service API, records a template intent without a live template send, and counts one synthetic webhook envelope update. No live Meta credentials are required.
+It creates a `createWatsServiceApp` app, injects MockTransport, sends one text message through the local service API, records a template intent without a live template send, and calls `normalizeWebhookEnvelope(...)` on one synthetic webhook envelope. No live Meta credentials are required.
 
 ## Service app fetch and OpenAPI example
 

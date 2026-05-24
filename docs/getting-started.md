@@ -22,16 +22,20 @@ bun run --cwd examples/minimal-bot demo
 
 It starts from `examples/minimal-bot`, creates the service app in-process, uses MockTransport for Graph calls, sends one text message through the local service API, records a template intent without a live template send, and normalizes a synthetic webhook envelope. No live Meta credentials are required.
 
-If you want to exercise the same local API shape manually, run the demo first or use the service API body it prints. The route shape is:
+The demo runs in-process with `app.fetch(...)`; it does not leave a server listening on `127.0.0.1`. The equivalent local service API shape is:
 
-```bash
-curl -s -X POST http://127.0.0.1:8787/api/messages/text \
-  -H 'authorization: Bearer ${DEMO_SERVICE_TOKEN}' \\
-  -H 'content-type: application/json' \
-  -d '{"to":"15550001111","text":"hello from WATS"}'
+```ts
+await app.fetch(new Request("http://127.0.0.1:8787/api/messages/text", {
+  method: "POST",
+  headers: {
+    authorization: `Bearer ${DEMO_SERVICE_TOKEN}`,
+    "content-type": "application/json"
+  },
+  body: JSON.stringify({ to: "15550001111", text: "hello from WATS" })
+}));
 ```
 
-The local example bearer token above is a non-secret fixture string scoped to the offline demo. Replace it only in ignored local files when you intentionally move to credential-gated live validation.
+The local example bearer variable above is a non-secret fixture scoped to the offline demo. Replace it only in ignored local files when you intentionally move to credential-gated live validation.
 
 ## 1. What's in the box
 

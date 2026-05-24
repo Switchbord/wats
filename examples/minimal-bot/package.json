@@ -7,7 +7,8 @@
   },
   "dependencies": {
     "@wats/service": "workspace:*",
-    "@wats/graph": "workspace:*"
+    "@wats/graph": "workspace:*",
+    "@wats/core": "workspace:*"
   },
   "devDependencies": {}
 }

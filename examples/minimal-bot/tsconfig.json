@@ -1,6 +1,7 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "ignoreDeprecations": "6.0",
     "baseUrl": "../..",
     "paths": {
       "@wats/types": ["./packages/types/src/index.ts"],

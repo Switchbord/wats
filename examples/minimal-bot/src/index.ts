@@ -1,4 +1,5 @@
 import type { WatsProfileConfig } from "@wats/config";
+import { normalizeWebhookEnvelope } from "@wats/core";
 import { createMockTransport } from "@wats/graph/testing";
 import { createWatsServiceApp } from "@wats/service";
 import type { WatsServiceConfig } from "@wats/service";
@@ -90,9 +91,8 @@ const syntheticWebhookEnvelope = {
   }]
 };
 
-const syntheticWebhookUpdates = syntheticWebhookEnvelope.entry.reduce((count, entry) => {
-  return count + entry.changes.filter((change) => change.field === "messages").length;
-}, 0);
+const normalizedWebhook = normalizeWebhookEnvelope(syntheticWebhookEnvelope);
+const syntheticWebhookUpdates = normalizedWebhook.updates.length;
 
 if (textResponse.status !== 200) {
   const body = await textResponse.text();

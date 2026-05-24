@@ -26,7 +26,7 @@ graphRequests=1
 - Creating a `createWatsServiceApp` app with synthetic secrets.
 - Sending a text message through the service API against MockTransport.
 - Recording a template-send intent without calling Meta.
-- Normalizing one synthetic webhook envelope to prove the inbound path shape.
+- Calling `normalizeWebhookEnvelope(...)` on one synthetic webhook envelope to prove the inbound path shape.
 - Keeping all imports on public `@wats/*` package specifiers.
 
 The template path is intentionally an intent record, not a live template send. Live template creation, WABA approval, and credentialed Graph validation remain gated work.

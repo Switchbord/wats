@@ -80,7 +80,8 @@ describe("WATS-113 getting-started minimal bot", () => {
     expect(gettingStarted).toContain("60-second offline onramp");
     expect(gettingStarted).toContain("examples/minimal-bot");
     expect(gettingStarted).toContain("bun run --cwd examples/minimal-bot demo");
-    expect(gettingStarted).toContain("curl -s -X POST http://127.0.0.1:8787/api/messages/text");
+    expect(gettingStarted).toContain("await app.fetch(new Request(\"http://127.0.0.1:8787/api/messages/text\"");
+    expect(gettingStarted).toContain("does not leave a server listening");
     expect(gettingStarted).toContain("No live Meta credentials are required");
     expect(gettingStarted).toContain("MockTransport");
     expect(gettingStarted).toContain("synthetic webhook envelope");
@@ -100,6 +101,7 @@ describe("WATS-113 getting-started minimal bot", () => {
     expect((manifest.scripts as Record<string, string>).demo).toBe("bun run src/index.ts");
     expect((manifest.dependencies as Record<string, string>)["@wats/service"]).toBe("workspace:*");
     expect((manifest.dependencies as Record<string, string>)["@wats/graph"]).toBe("workspace:*");
+    expect((manifest.dependencies as Record<string, string>)["@wats/core"]).toBe("workspace:*");
 
     const rootManifest = readJson<{ workspaces?: unknown }>("package.json");
     expect(rootManifest.workspaces).toContain(exampleRoot);
@@ -109,6 +111,7 @@ describe("WATS-113 getting-started minimal bot", () => {
     const source = read(`${exampleRoot}/src/index.ts`);
     expect(source).toContain("createWatsServiceApp");
     expect(source).toContain("createMockTransport");
+    expect(source).toContain("normalizeWebhookEnvelope");
     expect(source).toContain("syntheticWebhookEnvelope");
     expect(source).toContain("sendTemplateIntent");
     expect(source).not.toContain("createFetchTransport");

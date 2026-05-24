@@ -15,6 +15,7 @@
     "examples/minimal-bot": {
       "name": "@wats/example-minimal-bot",
       "dependencies": {
+        "@wats/core": "workspace:*",
         "@wats/graph": "workspace:*",
         "@wats/service": "workspace:*",
       },
