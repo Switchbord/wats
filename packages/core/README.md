@@ -15,7 +15,7 @@ npm i @wats/core
 import { TypedRouter, filtersTyped, type TypedMessageUpdate } from "@wats/core";
 
 const router = new TypedRouter();
-router.on(filtersTyped.message.text(), async (update) => {
+router.on(filtersTyped.message.text(), async ({ update }) => {
   console.log(update.message.text.body);
 });
 
