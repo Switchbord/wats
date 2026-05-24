@@ -1,8 +1,8 @@
 # Changelog
 
-## [0.3.3] - 2026-05-24
+## [0.3.4] - 2026-05-24
 
-Patch alpha compatibility and community-governance release for WATS. This release keeps the 0.3.2 package-manager fix line, adds the post-0.3.2 credential-free WhatsApp/Graph compatibility deltas, and publishes the WATS-108 public community governance files.
+Patch alpha public-onboarding and release-governance release for WATS. This release batches post-0.3.3 CLI setup hardening, scoped Bun command docs, public docs trust/onboarding updates, package README/API policy docs, the minimal offline bot onramp, and release-governance maintainer docs.
 
 ### CLI setup and public-onboarding docs hardening
 
@@ -20,6 +20,11 @@ Patch alpha compatibility and community-governance release for WATS. This releas
 - Adds WATS-117 launch-day checklist and announce draft as maintainer docs; this is docs-only work and does not claim that provenance, npm publish, or GitHub Release side effects have already happened.
 
 ### WATS-108 — community governance files
+
+## [0.3.3] - 2026-05-24
+
+Patch alpha compatibility and community-governance release for WATS. This release keeps the 0.3.2 package-manager fix line, adds the post-0.3.2 credential-free WhatsApp/Graph compatibility deltas, and publishes the WATS-108 public community governance files.
+
 
 - Adds a Contributor Covenant 2.1 `CODE_OF_CONDUCT.md`, GitHub issue forms with public-secret safety prompts, a blank-issue-off config, and a pull request template that asks for issue tracking, docs-in-lockstep verification, non-goals, and credential/no-live-call boundaries.
 - The GitHub issue templates use the canonical `@wats/*` package scope and avoid stale `@switchbord/*` package names.
@@ -104,7 +109,7 @@ Patch alpha compatibility and community-governance release for WATS. This releas
 
 ### Release metadata and safety boundaries
 
-- Release metadata is aligned for 0.3.3 across root/package manifests, public internal dependency ranges, service OpenAPI default version, generated OpenAPI docs, and release-policy tests.
+- Release metadata is aligned for 0.3.4 across root/package manifests, public internal dependency ranges, service OpenAPI default version, generated OpenAPI docs, and release-policy tests.
 - This is an alpha compatibility/tooling/community patch release, not a 1.0 stability claim.
 - No live Meta calls, token validation against Meta, credential collection, live-capable `wats serve`, Docker image publication, or persistence/outbox are included in the release gates. No live Meta validation campaign execution is included.
 
