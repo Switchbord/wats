@@ -94,7 +94,7 @@ wats init ./my-bot --format=json --profile prod
 
 `wats init` writes `wats.config.yaml` or `wats.config.json` plus `.env.example`, refuses to overwrite either file, prints only a redacted count summary, and keeps `.env.example` secret-bearing values blank. Copy `.env.example` to an ignored local file such as `.env.local` before filling real values, or use `wats setup` for a guided local-only file write.
 
-`wats setup [dir] [--profile <name>]` prompts for one profile's Graph defaults, WABA id, phone-number id, access token, app secret, webhook path, and local service defaults. It writes `wats.config.yaml` with env-secret references and `.env.local` with local values, validates the generated config, refuses to overwrite either target, and rolls back the config if `.env.local` cannot be created. Blank verify/service-token answers generate local random `wats_wh_...` and `wats_srv_...` values. Success output is only:
+`wats setup [dir] [--profile <name>]` prompts for one profile's Graph defaults, WABA id, phone-number id, access token, app secret, webhook path, and local service defaults. Secret prompts display an `Input hidden` hint before reading so pasted tokens and app secrets intentionally do not echo. It writes `wats.config.yaml` with env-secret references and `.env.local` with local values, validates the generated config, refuses to overwrite either target, and rolls back the config if `.env.local` cannot be created. Blank verify/service-token answers generate local random `wats_wh_...` and `wats_srv_...` values. Success output is only:
 
 ```text
 setup complete

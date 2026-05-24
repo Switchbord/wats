@@ -12,6 +12,7 @@ export type CliPromptRequest = Readonly<{
   label?: string;
   message?: string;
   defaultValue?: string;
+  hint?: string;
   secret?: boolean;
   required?: boolean;
 }>;
@@ -873,10 +874,30 @@ async function collectSetupAnswers(parsed: SetupArgs & { ok: true }, prompt: Cli
   const baseUrlRaw = await readSetupAnswer(prompt, { label: "Graph base URL", defaultValue: SETUP_DEFAULT_BASE_URL, required: false });
   const wabaIdRaw = await readSetupAnswer(prompt, { label: "WABA ID", required: true });
   const phoneNumberIdRaw = await readSetupAnswer(prompt, { label: "Phone number ID", required: true });
-  const accessTokenRaw = await readSetupAnswer(prompt, { label: "Meta access token", secret: true, required: true });
-  const appSecretRaw = await readSetupAnswer(prompt, { label: "Meta app secret", secret: true, required: true });
-  const verifyTokenRaw = await readSetupAnswer(prompt, { label: "Webhook verify token", secret: true, required: false });
-  const serviceTokenRaw = await readSetupAnswer(prompt, { label: "WATS service bearer token", secret: true, required: false });
+  const accessTokenRaw = await readSetupAnswer(prompt, {
+    label: "Meta access token",
+    hint: "Input hidden. Paste the token, then press Enter.",
+    secret: true,
+    required: true
+  });
+  const appSecretRaw = await readSetupAnswer(prompt, {
+    label: "Meta app secret",
+    hint: "Input hidden. Paste the app secret, then press Enter.",
+    secret: true,
+    required: true
+  });
+  const verifyTokenRaw = await readSetupAnswer(prompt, {
+    label: "Webhook verify token",
+    hint: "Optional; input hidden. Leave blank to generate a local token.",
+    secret: true,
+    required: false
+  });
+  const serviceTokenRaw = await readSetupAnswer(prompt, {
+    label: "WATS service bearer token",
+    hint: "Optional; input hidden. Leave blank to generate a local bearer token.",
+    secret: true,
+    required: false
+  });
   const webhookPathRaw = await readSetupAnswer(prompt, { label: "Webhook path", defaultValue: SETUP_DEFAULT_WEBHOOK_PATH, required: false });
   const serviceHostRaw = await readSetupAnswer(prompt, { label: "Service host", defaultValue: SETUP_DEFAULT_SERVICE_HOST, required: false });
   const servicePortRaw = await readSetupAnswer(prompt, { label: "Service port", defaultValue: SETUP_DEFAULT_SERVICE_PORT, required: false });
