@@ -53,6 +53,35 @@ bun add @wats/config @wats/service
 
 test account credentials are not needed for default install or CI. Live Meta validation remains a separate credential-gated campaign.
 
+## Quickstart with CLI
+
+Install the CLI and run the setup wizard:
+
+```bash
+bun add @wats/cli
+bunx --bun wats setup
+```
+
+`wats setup` prompts for your Meta access token, app secret, WABA ID, and phone number ID, then writes `wats.config.yaml` (env-secret references, safe to commit) and `.env.local` (your actual secrets, gitignored). Verify token and service token are generated for you if left blank — or generate one explicitly first:
+
+```bash
+bunx --bun wats webhook token
+```
+
+Verify local readiness after setup:
+
+```bash
+bunx --bun wats doctor --config wats.config.yaml --check-env
+```
+
+Get the webhook callback URL to paste into Meta App Dashboard → WhatsApp → Configuration:
+
+```bash
+bunx --bun wats onboarding --public-url https://your-public-url.example
+```
+
+See `docs/reference/cli.md` for all commands and `docs/parity/live-testing-campaign.md` for the full credentialed live-testing runbook.
+
 ## Local development
 
 ```bash
