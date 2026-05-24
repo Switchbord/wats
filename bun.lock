@@ -22,7 +22,7 @@
     },
     "packages/cli": {
       "name": "@wats/cli",
-      "version": "0.3.3",
+      "version": "0.3.4",
       "bin": {
         "wats": "./src/bin.ts",
       },
@@ -33,48 +33,48 @@
     },
     "packages/config": {
       "name": "@wats/config",
-      "version": "0.3.3",
+      "version": "0.3.4",
       "dependencies": {
-        "@wats/internal-utils": "^0.3.3",
+        "@wats/internal-utils": "^0.3.4",
       },
     },
     "packages/core": {
       "name": "@wats/core",
-      "version": "0.3.3",
+      "version": "0.3.4",
       "dependencies": {
-        "@wats/graph": "^0.3.3",
+        "@wats/graph": "^0.3.4",
       },
     },
     "packages/crypto": {
       "name": "@wats/crypto",
-      "version": "0.3.3",
+      "version": "0.3.4",
     },
     "packages/graph": {
       "name": "@wats/graph",
-      "version": "0.3.3",
+      "version": "0.3.4",
     },
     "packages/http": {
       "name": "@wats/http",
-      "version": "0.3.3",
+      "version": "0.3.4",
       "dependencies": {
-        "@wats/core": "^0.3.3",
-        "@wats/crypto": "^0.3.3",
-        "@wats/types": "^0.3.3",
+        "@wats/core": "^0.3.4",
+        "@wats/crypto": "^0.3.4",
+        "@wats/types": "^0.3.4",
       },
     },
     "packages/internal-utils": {
       "name": "@wats/internal-utils",
-      "version": "0.3.3",
+      "version": "0.3.4",
     },
     "packages/service": {
       "name": "@wats/service",
-      "version": "0.3.3",
+      "version": "0.3.4",
       "dependencies": {
-        "@wats/config": "^0.3.3",
-        "@wats/core": "^0.3.3",
-        "@wats/crypto": "^0.3.3",
-        "@wats/graph": "^0.3.3",
-        "@wats/http": "^0.3.3",
+        "@wats/config": "^0.3.4",
+        "@wats/core": "^0.3.4",
+        "@wats/crypto": "^0.3.4",
+        "@wats/graph": "^0.3.4",
+        "@wats/http": "^0.3.4",
       },
     },
     "packages/testing": {
@@ -149,7 +149,7 @@
     },
     "packages/types": {
       "name": "@wats/types",
-      "version": "0.3.3",
+      "version": "0.3.4",
     },
   },
   "packages": {
