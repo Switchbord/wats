@@ -19,11 +19,11 @@ Patch alpha public-onboarding and release-governance release for WATS. This rele
 - Adds WATS-109 repo settings hygiene docs plus Dependabot/CodeQL configuration for release-governance readiness.
 - Adds WATS-117 launch-day checklist and announce draft as maintainer docs; this is docs-only work and does not claim that provenance, npm publish, or GitHub Release side effects have already happened.
 
-### WATS-108 — community governance files
-
 ## [0.3.3] - 2026-05-24
 
 Patch alpha compatibility and community-governance release for WATS. This release keeps the 0.3.2 package-manager fix line, adds the post-0.3.2 credential-free WhatsApp/Graph compatibility deltas, and publishes the WATS-108 public community governance files.
+
+### WATS-108 — community governance files
 
 
 - Adds a Contributor Covenant 2.1 `CODE_OF_CONDUCT.md`, GitHub issue forms with public-secret safety prompts, a blank-issue-off config, and a pull request template that asks for issue tracking, docs-in-lockstep verification, non-goals, and credential/no-live-call boundaries.
