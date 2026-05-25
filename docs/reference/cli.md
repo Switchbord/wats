@@ -227,11 +227,29 @@ wats serve --config wats.config.yaml --dry-run --print-routes
 
 Dry-run serve never resolves env-secret values, reads `.env.local`, calls Meta Graph APIs, or prints config paths, profile names, env names, synthetic secret values, or token-like arguments.
 
-WATS-72 adds the live-mode guard contract without enabling live service startup yet. `--live` declares live intent and `--yes-live` acknowledges live Graph/API side effects. Operators may also set `WATS_LIVE_ENABLE=1` and `WATS_YES_LIVE=1` for the same intent/acknowledgement pair. In this build every live-guard path still fails closed before env-secret resolution, env-file parsing, service binding, or Meta Graph calls. `--env-file` remains rejected until the separate secret-resolution slice lands; `.env.local` is never read implicitly.
+### `wats serve --config <path> --live --yes-live --env-file .env.local [--profile <name>] [--host <host>] [--port <port>]`
+
+Live mode starts the same local service with real env-secret values and the fetch-backed Graph transport. It is built for local live testing: run it behind a secure HTTPS tunnel such as ngrok because Meta requires a public HTTPS webhook URL.
+
+```bash
+ngrok http 8787
+wats onboarding --public-url https://<your-tunnel-host> --webhook-path /webhooks/whatsapp
+WATS_LIVE_ENABLE=1 WATS_YES_LIVE=1 \
+  wats serve --config wats.config.yaml --live --yes-live --env-file .env.local
+```
+
+Rules:
+
+- `--live`, `--yes-live`, and `--env-file .env.local` must be present together.
+- The CLI does not read `.env.local` implicitly.
+- `--env-file` must be a relative local env filename; absolute paths, traversal, duplicate flags, and token-looking path values fail closed.
+- The env file may contain the setup-generated keys `WATS_ACCESS_TOKEN`, `WATS_VERIFY_TOKEN`, `WATS_APP_SECRET`, `WATS_SERVICE_TOKEN`, `WATS_WABA_ID`, `WATS_PHONE_NUMBER_ID`, `WATS_LIVE_ENABLE`, and `WATS_YES_LIVE` plus comments/blanks. Live serve resolves only the four secret keys.
+- Output is status-only and does not print env names, profile names, config paths, token values, app secrets, verify tokens, service bearer tokens, or Graph responses.
+- This is not a production hosting or Docker contract.
 
 ### `wats serve --help`
 
-Prints dry-run serve usage and exits 0.
+Prints serve usage and exits 0.
 
 WATS-49 deployment note: Docker packaging must target implemented `wats serve`, but the current dry-run serve usage is not a supported Docker or live-production contract.
 
@@ -291,8 +309,7 @@ WATS-47 target error families include `CliUsageError`, `CliConfigError`, `Config
 
 Future implementation work may add:
 
-- live-capable `wats serve` startup after explicit flags and resolved secrets;
-- explicit `--env-file` secret resolution with unsafe-path/duplicate-key/value-shape rejection;
+- production hosting/deployment wrappers around `wats serve`;
 - optional live checks behind explicit credential-gated flags;
 - deeper doctor integrations beyond the current offline runtime/package/config/profile/routes/OpenAPI/env-presence checks.
 

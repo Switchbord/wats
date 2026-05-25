@@ -6,7 +6,7 @@
 
 ## Current implementation status
 
-`wats serve --config <path> --dry-run` is implemented for local Bun smoke checks. There is still no supported root Dockerfile, no supported Compose file, no credential-gated live serve mode, no container image release, and no container-registry workflow in WATS today.
+`wats serve --config <path> --dry-run` is implemented for local Bun smoke checks, and `wats serve --config <path> --live --yes-live --env-file .env.local` is implemented for local live testing behind a secure HTTPS tunnel. There is still no supported root Dockerfile, no supported Compose file, no container image release, no production hosting contract, and no container-registry workflow in WATS today.
 
 This guide is the WATS-49 deployment contract scaffold. It documents the shape future Docker artifacts should take around the implemented serve contract once live/deploy packaging is explicitly authorized.
 

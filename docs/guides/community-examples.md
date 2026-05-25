@@ -164,6 +164,6 @@ Community examples should prefer existing public seams:
 
 ## What is not implemented yet
 
-Current WATS now implements safe local `wats init` config/env placeholder generation, real offline `wats doctor` diagnostics, and dry-run `wats serve` for local service smoke checks. credential-gated live serve mode, live Meta validation, Dockerfiles, Compose files, release automation, image publication, and a full community gallery remain outside this scaffold.
+Current WATS now implements safe local `wats init` config/env placeholder generation, real offline `wats doctor` diagnostics, dry-run `wats serve` for local service smoke checks, and credential-gated local live `wats serve` for webhook/Graph smoke testing behind a secure HTTPS tunnel. Dockerfiles, Compose files, release automation, image publication, production hosting, and a full community gallery remain outside this scaffold.
 
 Use Linear issue scope for future backlog. Do not add repo-local deferred ledgers for WATS-52 follow-up work.

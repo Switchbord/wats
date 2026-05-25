@@ -43,7 +43,7 @@ Internal and unsupported surfaces carry no application stability guarantee.
 - `@wats/internal-utils` is published internal support for WATS runtime dependency closure. It is not a stable application API even though npm must install it for dependent packages.
 - `@wats/testing` is private workspace-only test infrastructure and is not published.
 - `@wats/persistence` package, SQLite adapter, Postgres adapter, migrations, service persistence integration, and config persistence schema are design targets only. They are not exported yet.
-- Live credentialed `wats serve` startup and env-file secret resolution are not implemented yet; the current live guard fails closed before secret resolution or service bind.
+- Credentialed local live `wats serve` is experimental operator tooling. It requires explicit `--live --yes-live --env-file .env.local` and is not a production hosting contract.
 
 ## Policy for changes
 

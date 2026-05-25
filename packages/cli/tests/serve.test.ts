@@ -30,12 +30,23 @@ type SignalListenerRegistration = Readonly<{
 
 const SENTINELS = [
   "WATS_ACCESS_TOKEN",
+  "WATS_VERIFY_TOKEN",
+  "WATS_APP_SECRET",
+  "WATS_SERVICE_TOKEN",
   "WATS_WEBHOOK_VERIFY_TOKEN",
   "WATS_WEBHOOK_APP_SECRET",
   "WATS_SERVICE_BEARER_TOKEN",
   "TOKEN_SENTINEL_DO_NOT_PRINT_1234567890",
   "APP_SECRET_DO_NOT_PRINT",
   "raw-service-bearer-token-do-not-print",
+  "LIVE_ACCESS_TOKEN_DO_NOT_PRINT_1234567890",
+  "LIVE_VERIFY_TOKEN_DO_NOT_PRINT",
+  "LIVE_APP_SECRET_DO_NOT_PRINT",
+  "LIVE_SERVICE_TOKEN_DO_NOT_PRINT",
+  "FILE_ACCESS_TOKEN_DO_NOT_PRINT_1234567890",
+  "FILE_VERIFY_TOKEN_DO_NOT_PRINT",
+  "FILE_APP_SECRET_DO_NOT_PRINT",
+  "FILE_SERVICE_TOKEN_DO_NOT_PRINT",
   "../../.env.local"
 ] as const;
 
@@ -94,8 +105,8 @@ function runCli(args: readonly string[], cwd = repoRoot, env: Record<string, str
     env: {
       ...process.env,
       WATS_ACCESS_TOKEN: "TOKEN_SENTINEL_DO_NOT_PRINT_1234567890",
-      WATS_WEBHOOK_APP_SECRET: "APP_SECRET_DO_NOT_PRINT",
-      WATS_SERVICE_BEARER_TOKEN: "raw-service-bearer-token-do-not-print",
+      WATS_APP_SECRET: "APP_SECRET_DO_NOT_PRINT",
+      WATS_SERVICE_TOKEN: "raw-service-bearer-token-do-not-print",
       ...env
     }
   });
@@ -106,7 +117,10 @@ function runCli(args: readonly string[], cwd = repoRoot, env: Record<string, str
   };
 }
 
-function spawnServe(args: readonly string[]): { proc: ServeProcess; stdout: Promise<string>; stderr: Promise<string> } {
+function spawnServe(
+  args: readonly string[],
+  env: Record<string, string | undefined> = {}
+): { proc: ServeProcess; stdout: Promise<string>; stderr: Promise<string> } {
   const proc = Bun.spawn(["bun", entrypoint, ...args], {
     cwd: repoRoot,
     stdout: "pipe",
@@ -114,8 +128,9 @@ function spawnServe(args: readonly string[]): { proc: ServeProcess; stdout: Prom
     env: {
       ...process.env,
       WATS_ACCESS_TOKEN: "TOKEN_SENTINEL_DO_NOT_PRINT_1234567890",
-      WATS_WEBHOOK_APP_SECRET: "APP_SECRET_DO_NOT_PRINT",
-      WATS_SERVICE_BEARER_TOKEN: "raw-service-bearer-token-do-not-print"
+      WATS_APP_SECRET: "APP_SECRET_DO_NOT_PRINT",
+      WATS_SERVICE_TOKEN: "raw-service-bearer-token-do-not-print",
+      ...env
     }
   });
   const stdout = new Response(proc.stdout).text();
@@ -134,15 +149,15 @@ function validConfig(overrides: Partial<JsonRecord> = {}): JsonRecord {
     auth: { accessToken: { env: "WATS_ACCESS_TOKEN" } },
     webhook: {
       path: "/webhooks/whatsapp",
-      verifyToken: { env: "WATS_WEBHOOK_VERIFY_TOKEN" },
-      appSecret: { env: "WATS_WEBHOOK_APP_SECRET" },
+      verifyToken: { env: "WATS_VERIFY_TOKEN" },
+      appSecret: { env: "WATS_APP_SECRET" },
       maxBodyBytes: 1048576
     },
     service: {
       host: "127.0.0.1",
       port: 8787,
       apiPrefix: "/api",
-      bearerToken: { env: "WATS_SERVICE_BEARER_TOKEN" }
+      bearerToken: { env: "WATS_SERVICE_TOKEN" }
     }
   } satisfies JsonRecord;
 
@@ -251,6 +266,33 @@ async function canBind(port: number): Promise<boolean> {
       await new Promise<void>((resolvePromise) => server.close(() => resolvePromise()));
     }
   }
+}
+
+function createFakeGraphServer(): {
+  readonly baseUrl: string;
+  readonly requests: Array<{ readonly method: string; readonly pathname: string; readonly authorization: string | null; readonly body: string }>;
+  readonly stop: () => void;
+} {
+  const requests: Array<{ readonly method: string; readonly pathname: string; readonly authorization: string | null; readonly body: string }> = [];
+  const server = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    async fetch(request) {
+      const url = new URL(request.url);
+      requests.push({
+        method: request.method,
+        pathname: url.pathname,
+        authorization: request.headers.get("authorization"),
+        body: await request.text()
+      });
+      return Response.json({ messaging_product: "whatsapp", messages: [{ id: "wamid.LIVE_TEST" }] });
+    }
+  });
+  return {
+    baseUrl: `http://127.0.0.1:${server.port}`,
+    requests,
+    stop: () => server.stop(true)
+  };
 }
 
 describe("exported runCli process side effects", () => {
@@ -434,42 +476,63 @@ describe("wats serve dry-run process wrapper", () => {
     }
   });
 
-  test("live guard flags are documented but fail closed before env resolution or bind", async () => {
+  test("live mode requires intent acknowledgement and explicit env-file", async () => {
     const dir = makeTempDir();
     const configPath = writeConfig(dir);
     const port = await getFreePort();
+    const missingEnvCases: readonly (readonly string[])[] = [
+      ["--config", configPath, "--live"],
+      ["--config", configPath, "--yes-live"],
+      ["--config", configPath, "--live", "--yes-live"],
+      ["--config", configPath, "--env-file", ".env.local"],
+      ["--config", configPath, "--live", "--env-file", ".env.local"],
+      ["--config", configPath, "--yes-live", "--env-file", ".env.local"],
+      ["--config", configPath, "--dry-run", "--live", "--yes-live"],
+      ["--config", configPath, "--live", "--yes-live", "--env-file"]
+    ];
 
     try {
       const help = runCli(["serve", "--help"]);
       expect(help.exitCode, help.stderr).toBe(0);
       expect(help.stdout).toContain("--live");
       expect(help.stdout).toContain("--yes-live");
-      expect(help.stdout).toContain("WATS_LIVE_ENABLE=1");
-      expect(help.stdout).toContain("WATS_YES_LIVE=1");
-      expect(help.stdout).toContain("env-file secret resolution is not implemented");
+      expect(help.stdout).toContain("--env-file <path>");
+      expect(help.stdout).not.toContain("env-file secret resolution is not implemented");
 
-      const cases: readonly Readonly<{ args: readonly string[]; env?: Record<string, string | undefined> }>[] = [
-        { args: ["--config", configPath, "--live"] },
-        { args: ["--config", configPath, "--yes-live"] },
-        { args: ["--config", configPath, "--live", "--yes-live"] },
-        { args: ["--config", configPath, "--dry-run", "--live", "--yes-live"] },
-        { args: ["--config", configPath, "--live", "--yes-live", "--env-file", "../../.env.local"] },
-        { args: ["--config", configPath, "--live", "--yes-live", "--env-file", "TOKEN_SENTINEL_DO_NOT_PRINT_1234567890"] },
-        { args: ["--config", configPath, "--live", "--yes-live", "--env-file"] },
-        { args: ["--config", configPath, "--live", "--yes-live", "--env-file", "safe.env", "--env-file", "other.env"] },
-        { args: ["--config", configPath, "--live", "--yes-live", "--env-file=../../.env.local"] },
-        { args: ["--config", configPath, "--dry-run"], env: { WATS_LIVE_ENABLE: "1", WATS_YES_LIVE: undefined } },
-        { args: ["--config", configPath, "--dry-run"], env: { WATS_LIVE_ENABLE: undefined, WATS_YES_LIVE: "1" } },
-        { args: ["--config", configPath, "--dry-run"], env: { WATS_LIVE_ENABLE: "1", WATS_YES_LIVE: "1" } }
-      ] as const;
-
-      for (const { args, env } of cases) {
-        const result = runCli(["serve", ...args, "--host", "127.0.0.1", "--port", String(port)], repoRoot, env);
+      for (const args of missingEnvCases) {
+        const result = runCli(["serve", ...args, "--host", "127.0.0.1", "--port", String(port)]);
         expect(result.exitCode, `args=${JSON.stringify(args)} stdout=${result.stdout}`).toBe(1);
         expect(result.stdout).toBe("");
-        expect(result.stderr).toContain("Live serve mode is gated and not available in this build");
+        expect(result.stderr).toContain("Live serve requires --live --yes-live and --env-file");
         expect(result.stderr).toContain("wats serve --help");
         expect(result.stderr).not.toContain("Invalid serve arguments");
+        expect(await canBind(port)).toBe(true);
+        expectNoLeaks(result.stderr, configPath);
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("unsafe live env-file arguments fail closed without echoing attacker values", async () => {
+    const dir = makeTempDir();
+    const configPath = writeConfig(dir);
+    const port = await getFreePort();
+    const cases: readonly (readonly string[])[] = [
+      ["--config", configPath, "--live", "--yes-live", "--env-file", "../../.env.local"],
+      ["--config", configPath, "--live", "--yes-live", "--env-file", "TOKEN_SENTINEL_DO_NOT_PRINT_1234567890"],
+      ["--config", configPath, "--live", "--yes-live", "--env-file", "safe.env", "--env-file", "other.env"],
+      ["--config", configPath, "--live", "--yes-live", "--env-file=../../.env.local"],
+      ["--config", configPath, "--live", "--yes-live", "--env-file", "/tmp/.env.local"]
+    ];
+
+    try {
+      for (const args of cases) {
+        const result = runCli(["serve", ...args, "--host", "127.0.0.1", "--port", String(port)]);
+        expect(result.exitCode, `args=${JSON.stringify(args)} stdout=${result.stdout}`).toBe(1);
+        expect(result.stdout).toBe("");
+        expect(result.stderr).toContain("Invalid serve arguments");
+        expect(result.stderr).toContain("wats serve --help");
         expect(result.stderr).not.toContain("../../.env.local");
         expect(result.stderr).not.toContain("TOKEN_SENTINEL_DO_NOT_PRINT_1234567890");
         expect(result.stderr).not.toContain("safe.env");
@@ -478,6 +541,68 @@ describe("wats serve dry-run process wrapper", () => {
         expectNoLeaks(result.stderr, configPath);
       }
     } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("starts credential-gated live service from explicit env-file and forwards message requests to Graph", async () => {
+    const dir = makeTempDir();
+    const graph = createFakeGraphServer();
+    const config = validConfig();
+    (((config.profiles as JsonRecord).local as JsonRecord).graph as JsonRecord).baseUrl = graph.baseUrl;
+    const configPath = writeConfig(dir, config);
+    const port = await getFreePort();
+    const envPath = join(dir, ".env.local");
+    writeFileSync(envPath, [
+      "WATS_ACCESS_TOKEN=FILE_ACCESS_TOKEN_DO_NOT_PRINT_1234567890",
+      "WATS_VERIFY_TOKEN=FILE_VERIFY_TOKEN_DO_NOT_PRINT",
+      "WATS_APP_SECRET=FILE_APP_SECRET_DO_NOT_PRINT",
+      "WATS_SERVICE_TOKEN=FILE_SERVICE_TOKEN_DO_NOT_PRINT",
+      ""
+    ].join("\n"), "utf8");
+    const serve = spawnServe(["serve", "--config", configPath, "--live", "--yes-live", "--env-file", ".env.local", "--host", "127.0.0.1", "--port", String(port)], {
+      WATS_ACCESS_TOKEN: undefined,
+      WATS_APP_SECRET: undefined,
+      WATS_SERVICE_TOKEN: undefined,
+      WATS_LIVE_ENABLE: "1",
+      WATS_YES_LIVE: "1"
+    });
+
+    try {
+      const baseUrl = `http://127.0.0.1:${port}`;
+      const health = await waitForHttpStatus(serve.proc, `${baseUrl}/healthz`, 200);
+      expect(await health.json()).toEqual({ ok: true, service: "wats" });
+
+      const send = await fetch(`${baseUrl}/api/messages/text`, {
+        method: "POST",
+        headers: { authorization: "Bearer FILE_SERVICE_TOKEN_DO_NOT_PRINT", "content-type": "application/json" },
+        body: JSON.stringify({ to: "15551230000", text: "hello live" })
+      });
+      expect(send.status).toBe(200);
+      const sendBody = await send.json() as JsonRecord;
+      expect(sendBody.messages).toEqual([{ id: "wamid.LIVE_TEST" }]);
+      expect(graph.requests).toHaveLength(1);
+      expect(graph.requests[0]?.method).toBe("POST");
+      expect(graph.requests[0]?.pathname).toBe("/v25.0/15551234567/messages");
+      expect(graph.requests[0]?.authorization).toBe("Bearer FILE_ACCESS_TOKEN_DO_NOT_PRINT_1234567890");
+      expect(graph.requests[0]?.body).toContain("hello live");
+
+      const exitCode = await stopServe(serve.proc);
+      const stdout = await serve.stdout;
+      const stderr = await serve.stderr;
+      expect(exitCode).toBe(0);
+      expect(stderr).toBe("");
+      expect(stdout).toContain("serve live");
+      expect(stdout).toContain("status: listening");
+      expect(stdout).toContain(`address: http://127.0.0.1:${port}`);
+      expect(stdout).toContain("graph: live fetch transport");
+      expect(stdout).toContain("profile: [REDACTED_PROFILE]");
+      expectNoLeaks(stdout + stderr, configPath);
+    } finally {
+      graph.stop();
+      if ((await Promise.race([serve.proc.exited.then(() => true), delay(1).then(() => false)])) === false) {
+        serve.proc.kill("SIGKILL");
+      }
       rmSync(dir, { recursive: true, force: true });
     }
   });

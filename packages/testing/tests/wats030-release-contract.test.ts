@@ -1,4 +1,4 @@
-// WATS 0.3.4 release-prep contract.
+// WATS 0.3.5 release-prep contract.
 
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
@@ -17,7 +17,7 @@ type Manifest = JsonRecord & {
   optionalDependencies?: Record<string, string>;
 };
 
-const RELEASE_VERSION = "0.3.4";
+const RELEASE_VERSION = "0.3.5";
 const PREVIOUS_RELEASE_VERSION = "0.2.1";
 const PUBLISHABLE_PACKAGES = ["types", "crypto", "graph", "core", "http", "internal-utils", "config", "service", "cli"] as const;
 const PRIVATE_PACKAGES = ["testing"] as const;
@@ -46,7 +46,7 @@ function readManifest(pkg: string): Manifest {
   return readJson(`packages/${pkg}/package.json`) as Manifest;
 }
 
-describe("WATS 0.3.4 release-prep contract", () => {
+describe("WATS 0.3.5 release-prep contract", () => {
   test("root and publishable package manifests are aligned on the next release version", () => {
     const root = readJson("package.json");
     expect(root.version).toBe(RELEASE_VERSION);
