@@ -15,6 +15,8 @@
       "@wats/http/*": ["./packages/http/src/*"],
       "@wats/cli": ["./packages/cli/src/index.ts"],
       "@wats/cli/*": ["./packages/cli/src/*"],
+      "@wats/persistence": ["./packages/persistence/src/index.ts"],
+      "@wats/persistence/*": ["./packages/persistence/src/*"],
       "@wats/service": ["./packages/service/src/index.ts"],
       "@wats/service/*": ["./packages/service/src/*"],
       "@wats/config": ["./packages/config/src/index.ts"],
@@ -32,6 +34,7 @@
     "packages/internal-utils/src/**/*.ts",
     "packages/cli/src/**/*.ts",
     "packages/service/src/**/*.ts",
-    "packages/config/src/**/*.ts"
+    "packages/config/src/**/*.ts",
+    "packages/persistence/src/**/*.ts"
   ]
 }

@@ -57,6 +57,6 @@ describe("WATS-101 live serve and HTTPS tunnel onboarding docs", () => {
     expect(changelog).toContain("credential-gated live `wats serve`");
     expect(changelog).toContain("--live --yes-live --env-file .env.local");
     expect(changelog).toContain("ngrok or equivalent HTTPS tunnel");
-    expect(changelog).toContain("No Docker image publication, persistence/outbox, or production-hosting guarantee is included");
+    expect(changelog).toContain("No Docker image publication, service persistence integration/outbox worker, or production-hosting guarantee is included");
   });
 });

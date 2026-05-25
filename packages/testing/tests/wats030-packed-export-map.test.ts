@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 type JsonRecord = Record<string, unknown>;
 
-const PUBLISHABLE_PACKAGES = ["types", "crypto", "graph", "core", "http", "internal-utils", "config", "service", "cli"] as const;
+const PUBLISHABLE_PACKAGES = ["types", "crypto", "graph", "core", "http", "internal-utils", "config", "persistence", "service", "cli"] as const;
 
 function findRepoRoot(startDir: string): string {
   let current = startDir;
@@ -41,6 +41,6 @@ describe("WATS 0.3.0 packed export-map smoke contract", () => {
       const exportsMap = manifest.exports as JsonRecord;
       return count + Object.keys(exportsMap).length;
     }, 0);
-    expect(specifierCount).toBe(44);
+    expect(specifierCount).toBe(46);
   });
 });

@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 type JsonRecord = Record<string, unknown>;
 
-const PUBLISHABLE_PACKAGES = ["types", "crypto", "graph", "core", "http", "internal-utils", "config", "service", "cli"] as const;
+const PUBLISHABLE_PACKAGES = ["types", "crypto", "graph", "core", "http", "internal-utils", "config", "persistence", "service", "cli"] as const;
 const PRIVATE_PACKAGES = ["testing"] as const;
 
 function findRepoRoot(startDir: string): string {

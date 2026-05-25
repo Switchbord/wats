@@ -11,7 +11,8 @@ const PUBLISHABLE_PACKAGE_NAMES = [
   "@wats/internal-utils",
   "@wats/cli",
   "@wats/service",
-  "@wats/config"
+  "@wats/config",
+  "@wats/persistence"
 ] as const;
 
 const PRIVATE_PACKAGE_NAMES = ["@wats/testing"] as const;

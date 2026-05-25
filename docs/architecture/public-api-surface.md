@@ -177,7 +177,22 @@ Current routes:
 - `POST {profile.service.apiPrefix}/messages/text`
 - `POST {profile.service.apiPrefix}/messages`
 
-Status: experimental service foundation. It composes config profile shape, explicit resolved secrets, Graph client, WebhookAdapter, WhatsApp facade, and a generated OpenAPI 3.1 document for current WATS service routes. The `@wats/cli` dry-run and local live wrappers can serve it locally; production hosting, Docker, persistence, and public docs UI remain later work.
+Status: experimental service foundation. It composes config profile shape, explicit resolved secrets, Graph client, WebhookAdapter, WhatsApp facade, and a generated OpenAPI 3.1 document for current WATS service routes. The `@wats/cli` dry-run and local live wrappers can serve it locally; production hosting, Docker, service persistence integration, and public docs UI remain later work.
+
+### Persistence package
+
+Public package: `@wats/persistence`
+
+Implemented WATS-120 surfaces:
+
+- `PersistenceStore`
+- `MigrationReport`
+- `PersistenceHealth`
+- `PersistenceError`
+- `CURRENT_SCHEMA_VERSION`
+- `createSqlitePersistence` from `@wats/persistence/sqlite`
+
+Status: experimental local persistence foundation. SQLite migrations, schema metadata, migration locks, webhook-event/request-idempotency/outbox tables, and redacted health diagnostics exist. Service integration, conversation APIs, CLI navigation, status UI wiring, Postgres, and production hosting remain later work.
 
 ### Internal support and workspace packages
 
@@ -194,7 +209,7 @@ These are not implemented as runtime APIs yet:
 - mutating WABA/phone-number/business-management/admin APIs beyond WATS-42A read-only inventory and the bounded WATS-95 request-shape helpers; no automatic user-block decisions or policy/appeal automation are implemented
 - catalog/product management APIs beyond WATS-42A read-only getCommerceSettings
 - full Meta Graph API OpenAPI generation
-- `@wats/persistence` package and SQLite/Postgres adapters are WATS-48 design targets only. In docs-lock wording, @wats/persistence package and SQLite/Postgres adapters are WATS-48 design targets only. No current package export, no service persistence integration, no config persistence schema, and no migration runner exists yet.
+- Postgres persistence adapter, service persistence integration, config persistence schema, CLI database navigation, conversation APIs, and observed status UI are not implemented yet.
 - no supported Dockerfile, Compose file, container image, or container-registry publication yet. WATS-49 keeps Docker/deployment as a design scaffold until live/deploy packaging is explicitly authorized.
 
 Track these through Linear roadmap issues and `docs/architecture/roadmap-to-whatsapp-pywa-parity.md`.
@@ -202,7 +217,7 @@ Track these through Linear roadmap issues and `docs/architecture/roadmap-to-what
 ## Release compatibility labels
 
 - Stable foundations: `@wats/types`, `@wats/crypto`, Graph transport/client/error substrate, webhook adapter, normalizer, filters, router, listeners, facade.
-- Experimental / expanding: endpoint catalog breadth, media runtime, template/Flow/calling management helpers, config, CLI, service, OpenAPI, docs site.
+- Experimental / expanding: endpoint catalog breadth, media runtime, template/Flow/calling management helpers, config, CLI, service, persistence, OpenAPI, docs site.
 - Internal support/private: `@wats/internal-utils` is published internal support for runtime dependency closure; `@wats/testing` remains private.
 
 See `docs/architecture/release-policy.md` for versioning rules and `docs/api-stability.md` for the stable-for-0.x, experimental, and internal API policy.

@@ -16,6 +16,7 @@ const symbols = [
   { name: "@wats/http", entry: "packages/http/src/index.ts" },
   { name: "@wats/internal-utils", entry: "packages/internal-utils/src/index.ts" },
   { name: "@wats/config", entry: "packages/config/src/index.ts" },
+  { name: "@wats/persistence", entry: "packages/persistence/src/index.ts" },
   { name: "@wats/service", entry: "packages/service/src/index.ts" },
   { name: "@wats/cli", entry: "packages/cli/src/index.ts" }
 ];
