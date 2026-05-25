@@ -170,8 +170,8 @@ describe("wats CLI version and package upgrades", () => {
     const dir = makeTempDir();
     try {
       writeFileSync(join(dir, "package.json"), packageJson({
-        "@wats/cli": "0.3.4",
-        "@wats/core": "0.3.5",
+        "@wats/cli": "0.3.5",
+        "@wats/core": cliVersion,
         "@wats/service": "workspace:*",
         "left-pad": "1.3.0"
       }), "utf8");
