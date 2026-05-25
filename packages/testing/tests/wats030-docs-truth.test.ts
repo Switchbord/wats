@@ -28,6 +28,8 @@ describe("WATS 0.3.5 public docs truth contract", () => {
     expect(readme).toContain("alpha compatibility and public-onboarding patch release");
     expect(readme).toContain("bunx --bun @wats/cli setup");
     expect(readme).toContain("bunx --bun @wats/cli --help");
+    expect(readme).toContain("bunx --bun @wats/cli --version");
+    expect(readme).toContain("bunx --bun @wats/cli upgrade --dry-run");
     expect(readme).not.toContain("bunx --bun wats setup");
     expect(readme).not.toContain("bunx --bun wats --help");
     expect(readme).toContain("`wats setup` writes a safe `wats.config.yaml`");
@@ -45,6 +47,8 @@ describe("WATS 0.3.5 public docs truth contract", () => {
     expect(changelog).toContain("### WATS-98 — Marketing Messages API compatibility surfaces");
     expect(changelog).toContain("Release metadata is aligned for 0.3.5");
     expect(changelog).toContain("credential-gated live `wats serve`");
+    expect(changelog).toContain("### WATS-126 — CLI version and package upgrades");
+    expect(changelog).toContain("Adds `wats --version`");
     expect(changelog).toContain("No automatic live Meta validation campaign execution, token validation against Meta, credential collection");
     expect(changelog).not.toContain("No GitHub release/tag creation until the public repository is pushed and reviewed");
   });
@@ -68,7 +72,11 @@ describe("WATS 0.3.5 public docs truth contract", () => {
     const cliGuide = read("docs/guides/cli-init.md");
     expect(cliReference).toContain("access-token and app-secret prompts state `Input hidden` before reading");
     expect(cliReference).toContain("optional secret-token prompts state they can be left blank to generate local values");
+    expect(cliReference).toContain("### `wats upgrade [--dry-run]`");
+    expect(cliReference).toContain("bun update --latest @wats/cli @wats/core @wats/graph @wats/http @wats/config @wats/service");
     expect(cliGuide).toContain("Secret prompts display an `Input hidden` hint before reading so pasted tokens and app secrets intentionally do not echo.");
+    expect(cliGuide).toContain("wats --version");
+    expect(cliGuide).toContain("wats upgrade --dry-run");
   });
 
   test("CLI guide lists implemented onboarding command and keeps first-run examples executable", () => {

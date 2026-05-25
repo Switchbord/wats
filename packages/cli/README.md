@@ -1,6 +1,6 @@
 # @wats/cli
 
-Safe local operator CLI for WATS onboarding, config validation, diagnostics, OpenAPI export, dry-run service checks, and webhook setup helpers.
+Safe local operator CLI for WATS onboarding, config validation, diagnostics, package upgrades, OpenAPI export, dry-run service checks, and webhook setup helpers.
 
 ## Install
 
@@ -13,8 +13,11 @@ npm i @wats/cli
 
 ```bash
 bunx --bun @wats/cli --help
+bunx --bun @wats/cli --version
 bunx --bun @wats/cli setup
 bunx --bun @wats/cli doctor --config wats.config.yaml --check-env
+bunx --bun @wats/cli upgrade --dry-run
+bunx --bun @wats/cli upgrade
 bunx --bun @wats/cli onboarding --public-url https://example.test/wats
 bunx --bun @wats/cli serve --config wats.config.yaml --dry-run --print-routes
 WATS_LIVE_ENABLE=1 WATS_YES_LIVE=1 \

@@ -22,7 +22,17 @@ export type CliPromptProvider = (request: CliPromptRequest) => unknown | Promise
 export type CliCommandContext = Readonly<{
   cwd?: string;
   prompt?: CliPromptProvider;
+  spawn?: CliSpawnProvider;
 }>;
+
+export type CliSpawnResult = Readonly<{
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+}>;
+
+export type CliSpawnProvider = (command: string, args: readonly string[], options: Readonly<{ cwd: string }>) => CliSpawnResult | Promise<CliSpawnResult>;
+
 
 type ParsedOptionValue = Readonly<{
   ok: true;
@@ -103,6 +113,14 @@ type DoctorArgs = Readonly<{
   reason: "help" | "usage";
 }>;
 
+type UpgradeArgs = Readonly<{
+  ok: true;
+  dryRun: boolean;
+}> | Readonly<{
+  ok: false;
+  reason: "help" | "usage";
+}>;
+
 type InitFormat = "yaml" | "json";
 
 type InitArgs = Readonly<{
@@ -156,6 +174,7 @@ const NO_LIVE_CREDENTIALS = "No live credentials are read or required by this co
 const ROOT_HELP = `WATS CLI
 
 Usage: wats <command> [options]
+       wats --version
 
 Implemented commands:
   wats init [dir] [--dry-run]              Generate WATS config/env placeholders safely.
@@ -164,6 +183,9 @@ Implemented commands:
   wats config validate <path>              Validate a WATS config file safely.
   wats config validate --config <path>     Validate a WATS config file safely.
   wats doctor --help                       Show offline diagnostics help.
+  wats upgrade [--dry-run]                 Update public @wats/* packages with Bun.
+  wats update [--dry-run]                  Alias for wats upgrade.
+  wats --version                           Print the installed @wats/cli version.
   wats openapi --config <path>             Print WATS service OpenAPI JSON.
   wats serve --config <path> --dry-run     Start the local dry-run service process.
   wats webhook token [--help]              Print a local webhook verify token.
@@ -211,10 +233,20 @@ const DOCTOR_HELP = `Usage: wats doctor --config <path> [--profile <name>] [--ch
 
 Run real offline diagnostics for a WATS project.
 
-Checks: runtime compatibility, package imports, config validation, selected profile, route collision safety, local OpenAPI generation, and optional env presence only when --check-env is passed.
+Checks: runtime compatibility, package imports, package version drift, config validation, selected profile, route collision safety, local OpenAPI generation, and optional env presence only when --check-env is passed.
 
 The command does not resolve env-secret values, does not print env names or values, makes no Graph API calls, and does not write files.
 ${NO_LIVE_CREDENTIALS}
+`;
+
+const UPGRADE_HELP = `Usage: wats upgrade [--dry-run]
+       wats update [--dry-run]
+
+Update the public WATS package set in the current Bun project.
+
+Runs bun update --latest for: @wats/cli, @wats/core, @wats/graph, @wats/http, @wats/config, and @wats/service. --dry-run prints the command without writing package.json or bun.lock.
+
+The command does not read .env.local, does not call Meta Graph APIs, and does not print credential values.
 `;
 
 const OPENAPI_HELP = `Usage: wats openapi --config <path> [--profile <name>] [--server-url <http(s) URL>] [--out <path>]
@@ -294,6 +326,8 @@ const ONBOARDING_DEFAULT_WEBHOOK_PATH = "/webhooks/whatsapp" as const;
 const ONBOARDING_VALUE_FLAGS = ["--public-url", "--webhook-path"] as const;
 const DOCTOR_VALUE_FLAGS = ["--config", "--profile", "--format"] as const;
 const DOCTOR_ALLOWED_FLAGS = ["--config", "--profile", "--format", "--check-env"] as const;
+const UPGRADE_ALLOWED_FLAGS = ["--dry-run"] as const;
+const PUBLIC_WATS_UPGRADE_PACKAGES = ["@wats/cli", "@wats/core", "@wats/graph", "@wats/http", "@wats/config", "@wats/service"] as const;
 const SERVE_VALUE_FLAGS = ["--config", "--profile", "--host", "--port", "--env-file"] as const;
 const SERVE_ALLOWED_FLAGS = ["--config", "--profile", "--host", "--port", "--dry-run", "--print-routes", "--live", "--yes-live", "--env-file"] as const;
 const LIVE_MISSING_ERROR = "Live serve requires --live --yes-live and --env-file. Run `wats serve --help` for usage.\n";
@@ -1510,6 +1544,130 @@ type DoctorCheck = Readonly<{
   message: string;
 }>;
 
+
+function parseUpgradeArgs(args: readonly string[]): UpgradeArgs {
+  let dryRun = false;
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index] ?? "";
+    if (!arg.startsWith("-")) return { ok: false, reason: "usage" };
+    const flagName = arg.includes("=") ? arg.slice(0, arg.indexOf("=")) : arg;
+    if (ROOT_HELP_FLAGS.has(flagName)) {
+      const unknownHelpSidecar = args.find((sidecar) => sidecar.startsWith("-") && !ROOT_HELP_FLAGS.has(sidecar.includes("=") ? sidecar.slice(0, sidecar.indexOf("=")) : sidecar));
+      return unknownHelpSidecar === undefined ? { ok: false, reason: "help" } : { ok: false, reason: "usage" };
+    }
+    if (!UPGRADE_ALLOWED_FLAGS.includes(flagName as typeof UPGRADE_ALLOWED_FLAGS[number])) return { ok: false, reason: "usage" };
+    if (flagName === "--dry-run") {
+      if (dryRun || arg.includes("=")) return { ok: false, reason: "usage" };
+      dryRun = true;
+    }
+  }
+  return { ok: true, dryRun };
+}
+
+async function readProjectPackageJson(cwd: string): Promise<Record<string, unknown> | null> {
+  try {
+    const fsPromisesSpecifier = "node:fs/promises";
+    const fs = await import(/* @vite-ignore */ fsPromisesSpecifier) as { readFile(path: string, encoding: "utf8"): Promise<string> };
+    const text = await fs.readFile(`${cwd.endsWith("/") ? cwd.slice(0, -1) : cwd}/package.json`, "utf8");
+    const parsed = JSON.parse(text) as unknown;
+    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed) ? parsed as Record<string, unknown> : null;
+  } catch {
+    return null;
+  }
+}
+
+async function readCliPackageVersion(): Promise<string | null> {
+  try {
+    const fsPromisesSpecifier = "node:fs/promises";
+    const fs = await import(/* @vite-ignore */ fsPromisesSpecifier) as { readFile(path: string | URL, encoding: "utf8"): Promise<string> };
+    const text = await fs.readFile(new URL("../package.json", import.meta.url), "utf8");
+    const parsed = JSON.parse(text) as unknown;
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return null;
+    const version = (parsed as { version?: unknown }).version;
+    return typeof version === "string" && parseVersionTuple(version) !== null ? version : null;
+  } catch {
+    return null;
+  }
+}
+
+function manifestSections(manifest: Record<string, unknown>): readonly Record<string, unknown>[] {
+  const sections: Record<string, unknown>[] = [];
+  for (const key of ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"] as const) {
+    const value = manifest[key];
+    if (typeof value === "object" && value !== null && !Array.isArray(value)) sections.push(value as Record<string, unknown>);
+  }
+  return sections;
+}
+
+function manifestWatsVersions(manifest: Record<string, unknown>): Record<string, string> {
+  const versions: Record<string, string> = {};
+  for (const section of manifestSections(manifest)) {
+    for (const packageName of PUBLIC_WATS_UPGRADE_PACKAGES) {
+      const version = section[packageName];
+      if (typeof version === "string") versions[packageName] = version;
+    }
+  }
+  return versions;
+}
+
+function parseVersionTuple(value: string): readonly [number, number, number] | null {
+  const match = /^(?:workspace:|npm:)?\^?~?(\d+)\.(\d+)\.(\d+)(?:[-+][A-Za-z0-9.-]+)?$/u.exec(value.trim());
+  if (match === null) return null;
+  return [Number.parseInt(match[1] ?? "0", 10), Number.parseInt(match[2] ?? "0", 10), Number.parseInt(match[3] ?? "0", 10)] as const;
+}
+
+function isVersionOlderThan(value: string, referenceVersion: string): boolean {
+  if (value.startsWith("workspace:") || value.startsWith("link:") || value.startsWith("file:")) return false;
+  const current = parseVersionTuple(value);
+  const cli = parseVersionTuple(referenceVersion);
+  if (current === null || cli === null) return false;
+  for (let index = 0; index < 3; index += 1) {
+    if (current[index] < cli[index]) return true;
+    if (current[index] > cli[index]) return false;
+  }
+  return false;
+}
+
+function countOutdatedWatsPackages(manifest: Record<string, unknown>, referenceVersion: string): number {
+  return Object.values(manifestWatsVersions(manifest)).filter((version) => isVersionOlderThan(version, referenceVersion)).length;
+}
+
+function upgradeCommandText(): string {
+  return `bun update --latest ${PUBLIC_WATS_UPGRADE_PACKAGES.join(" ")}`;
+}
+
+async function defaultSpawn(command: string, args: readonly string[], options: Readonly<{ cwd: string }>): Promise<CliSpawnResult> {
+  try {
+    const proc = (globalThis as { Bun?: { spawnSync?: (command: readonly string[], options: { cwd: string; stdout: "pipe"; stderr: "pipe" }) => { exitCode: number | null; stdout: Uint8Array; stderr: Uint8Array } } }).Bun;
+    if (proc?.spawnSync === undefined) return { exitCode: 1, stdout: "", stderr: "" };
+    const completed = proc.spawnSync([command, ...args], { cwd: options.cwd, stdout: "pipe", stderr: "pipe" });
+    const decoder = new TextDecoder();
+    return { exitCode: completed.exitCode ?? 1, stdout: decoder.decode(completed.stdout), stderr: decoder.decode(completed.stderr) };
+  } catch {
+    return { exitCode: 1, stdout: "", stderr: "" };
+  }
+}
+
+async function upgradeCommand(args: readonly string[], context: CliCommandContext = {}): Promise<CliCommandResult> {
+  const parsed = parseUpgradeArgs(args);
+  if (!parsed.ok) {
+    if (parsed.reason === "help") return ok(UPGRADE_HELP);
+    return cliUsageError("wats upgrade --help");
+  }
+
+  const cwd = context.cwd ?? (globalThis as { process?: { cwd(): string } }).process?.cwd?.() ?? ".";
+  const manifest = await readProjectPackageJson(cwd);
+  if (manifest === null) return fail("PackageManifestError\npackage manifest could not be read. Run `wats upgrade --help` for usage.\n");
+
+  const commandArgs = ["update", "--latest", ...PUBLIC_WATS_UPGRADE_PACKAGES] as const;
+  if (parsed.dryRun) return ok(["upgrade dry-run", `command: ${upgradeCommandText()}`].join("\n") + "\n");
+
+  const spawn = context.spawn ?? defaultSpawn;
+  const result = await spawn("bun", commandArgs, { cwd });
+  if (result.exitCode !== 0) return fail("PackageUpgradeError\nbun update failed. Run `wats upgrade --help` for usage.\n");
+  return ok(["upgrade complete", `packages: ${PUBLIC_WATS_UPGRADE_PACKAGES.length}`].join("\n") + "\n");
+}
+
 function parseDoctorArgs(args: readonly string[]): DoctorArgs {
   let checkEnv = false;
   for (let index = 0; index < args.length; index += 1) {
@@ -1594,7 +1752,7 @@ function countMissingEnv(profile: WatsProfileConfig): number {
   return missing;
 }
 
-async function doctorCommand(args: readonly string[]): Promise<CliCommandResult> {
+async function doctorCommand(args: readonly string[], context: CliCommandContext = {}): Promise<CliCommandResult> {
   const parsed = parseDoctorArgs(args);
   if (!parsed.ok) {
     if (parsed.reason === "help") return ok(DOCTOR_HELP);
@@ -1605,6 +1763,17 @@ async function doctorCommand(args: readonly string[]): Promise<CliCommandResult>
     doctorCheck("runtime", "ok", "Runtime supports WATS CLI offline diagnostics."),
     doctorCheck("package-imports", "ok", "Required WATS packages are importable.")
   ];
+
+  const manifest = await readProjectPackageJson(context.cwd ?? (globalThis as { process?: { cwd(): string } }).process?.cwd?.() ?? ".");
+  const cliVersion = await readCliPackageVersion();
+  if (manifest === null || cliVersion === null) {
+    checks.push(doctorCheck("packages", "warning", "Package versions could not be checked."));
+  } else {
+    const outdatedCount = countOutdatedWatsPackages(manifest, cliVersion);
+    checks.push(outdatedCount === 0
+      ? doctorCheck("packages", "ok", "WATS package versions look current for this CLI.")
+      : doctorCheck("packages", "warning", `${outdatedCount} WATS package${outdatedCount === 1 ? " appears" : "s appear"} older than this CLI.`));
+  }
 
   let config: WatsConfig | null = null;
   try {
@@ -1887,8 +2056,18 @@ export async function runCli(argv: readonly string[] = [], context: CliCommandCo
   const args = argv.filter((arg) => arg.length > 0);
   const [command, ...rest] = args;
 
-  if (command === undefined || ROOT_HELP_FLAGS.has(command)) {
+  if (command === undefined) {
     return ok(ROOT_HELP);
+  }
+
+  if (ROOT_HELP_FLAGS.has(command)) {
+    return rest.length === 0 ? ok(ROOT_HELP) : cliUsageError("wats --help");
+  }
+
+  if (command === "--version" || command === "-v") {
+    if (rest.length !== 0) return cliUsageError("wats --help");
+    const version = await readCliPackageVersion();
+    return version === null ? fail("VersionError\nCLI package version could not be read. Run `wats --help` for usage.\n") : ok(`${version}\n`);
   }
 
   if (command.startsWith("-")) {
@@ -1917,7 +2096,11 @@ export async function runCli(argv: readonly string[] = [], context: CliCommandCo
     }
 
     case "doctor":
-      return doctorCommand(rest);
+      return doctorCommand(rest, context);
+
+    case "upgrade":
+    case "update":
+      return upgradeCommand(rest, context);
 
     case "openapi":
       return openApiCommand(rest);
