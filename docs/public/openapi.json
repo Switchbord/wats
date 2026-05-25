@@ -237,6 +237,19 @@
             "serviceBearerAuth": []
           }
         ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "description": "Optional local service idempotency key when a PersistenceStore is injected. Same key and same body hash replays the stored response; same key with a different body returns 409."
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -249,7 +262,7 @@
         },
         "responses": {
           "200": {
-            "description": "Graph response passthrough.",
+            "description": "Graph response passthrough or idempotency replay.",
             "content": {
               "application/json": {
                 "schema": {
@@ -259,7 +272,7 @@
             }
           },
           "400": {
-            "description": "Malformed JSON or unsupported body.",
+            "description": "Malformed JSON, unsupported body, or invalid Idempotency-Key.",
             "content": {
               "application/json": {
                 "schema": {
@@ -280,6 +293,16 @@
           },
           "405": {
             "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency-Key conflicts with a different request body.",
             "content": {
               "application/json": {
                 "schema": {
@@ -312,6 +335,19 @@
             "serviceBearerAuth": []
           }
         ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "description": "Optional local service idempotency key when a PersistenceStore is injected. Same key and same body hash replays the stored response; same key with a different body returns 409."
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -324,7 +360,7 @@
         },
         "responses": {
           "200": {
-            "description": "Graph response passthrough.",
+            "description": "Graph response passthrough or idempotency replay.",
             "content": {
               "application/json": {
                 "schema": {
@@ -334,7 +370,7 @@
             }
           },
           "400": {
-            "description": "Malformed JSON or unsupported body.",
+            "description": "Malformed JSON, unsupported body, or invalid Idempotency-Key.",
             "content": {
               "application/json": {
                 "schema": {
@@ -355,6 +391,16 @@
           },
           "405": {
             "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency-Key conflicts with a different request body.",
             "content": {
               "application/json": {
                 "schema": {

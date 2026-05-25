@@ -4,18 +4,20 @@
 
 Patch alpha live-testing/onboarding release for WATS. This release batches post-0.3.3 CLI setup hardening, scoped Bun command docs, public docs trust/onboarding updates, package README/API policy docs, the minimal offline bot onramp, and release-governance maintainer docs.
 
-### WATS-120 — SQLite persistence package foundation
+### WATS-120/WATS-121 — SQLite persistence and service idempotency foundation
 
 - Adds experimental `@wats/persistence` root contracts and a SQLite adapter subpath for local/single-instance runtime state.
 - Adds a forward-only SQLite migration runner with schema metadata, checksum verification, a migration lock table, webhook-event/request-idempotency/outbox tables, and redacted health diagnostics.
-- Keeps service integration, conversation APIs, CLI thread navigation, observed status UI wiring, Postgres, raw webhook body storage, production hosting, and live Meta validation out of scope.
+- Adds optional `PersistenceStore` injection to `@wats/service`; the service does not read database env vars directly.
+- Uses persistence to acknowledge duplicate signed webhook deliveries without redispatch and to support `Idempotency-Key` replay/conflict behavior on service message send routes.
+- Keeps conversation APIs, CLI thread navigation, observed status UI wiring, Postgres, raw webhook body storage, background outbox workers, production hosting, and live Meta validation out of scope.
 
 ### WATS-101 — live serve and tunnel quickstart
 
 - Adds credential-gated live `wats serve` for local live testing with explicit `--live --yes-live --env-file .env.local` guardrails.
 - Resolves config env-secret refs only from the explicit env file plus process environment; `.env.local` is not read implicitly and serve output stays status-only.
 - Updates quick-start docs to recommend ngrok or equivalent HTTPS tunnel because Meta requires a public secure HTTPS webhook callback for local testing.
-- No Docker image publication, service persistence integration/outbox worker, or production-hosting guarantee is included.
+- No Docker image publication, background outbox worker, or production-hosting guarantee is included.
 
 ### CLI setup and public-onboarding docs hardening
 

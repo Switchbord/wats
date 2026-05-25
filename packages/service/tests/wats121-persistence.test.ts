@@ -1,29 +1,68 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import type { WatsProfileConfig } from "@wats/config";
-import { createCryptoProvider } from "@wats/crypto";
-import { createMockTransport } from "@wats/graph/testing";
-import { createSqlitePersistence, type PersistenceStore } from "@wats/persistence";
-import { mkdtempSync, rmSync } from "node:fs";
-import { join } from "node:path";
-import { createWatsServiceApp, type WatsServiceConfig } from "@wats/service";
+import { createWatsServiceApp, type WatsServiceConfig } from "../src/index";
 
-const tempDirs: string[] = [];
+type MemoryStore = {
+  readonly backend: "sqlite";
+  events: Set<string>;
+  requests: Map<string, { requestHash: string; responseJson: string }>;
+  migrate(): Promise<{ currentVersion: number; appliedMigrations: readonly string[]; alreadyCurrent: boolean }>;
+  health(): Promise<{ ok: boolean; backend: "sqlite"; currentVersion: number; redactedLocation: string }>;
+  recordWebhookEvent(input: { eventKey: string; eventHash: string; receivedAt: string }): Promise<"recorded" | "duplicate">;
+  getServiceRequest(input: { idempotencyKey: string; requestHash: string }): Promise<null | "conflict" | { responseJson: string }>;
+  recordServiceRequest(input: { idempotencyKey: string; requestHash: string; responseJson: string; createdAt: string }): Promise<void>;
+  close(): Promise<void>;
+};
 
-function tempDb(): string {
-  const dir = mkdtempSync(join(import.meta.dir, "tmp-wats121-service-"));
-  tempDirs.push(dir);
-  return join(dir, "wats.sqlite");
+function memoryStore(): MemoryStore {
+  return {
+    backend: "sqlite",
+    events: new Set<string>(),
+    requests: new Map<string, { requestHash: string; responseJson: string }>(),
+    async migrate() { return { currentVersion: 1, appliedMigrations: [], alreadyCurrent: true }; },
+    async health() { return { ok: true, backend: "sqlite", currentVersion: 1, redactedLocation: "[REDACTED_SQLITE_DATABASE]" }; },
+    async recordWebhookEvent(input) {
+      if (this.events.has(input.eventKey)) return "duplicate";
+      this.events.add(input.eventKey);
+      return "recorded";
+    },
+    async getServiceRequest(input) {
+      const existing = this.requests.get(input.idempotencyKey);
+      if (existing === undefined) return null;
+      if (existing.requestHash !== input.requestHash) return "conflict";
+      return { responseJson: existing.responseJson };
+    },
+    async recordServiceRequest(input) {
+      if (!this.requests.has(input.idempotencyKey)) {
+        this.requests.set(input.idempotencyKey, { requestHash: input.requestHash, responseJson: input.responseJson });
+      }
+    },
+    async close() {}
+  };
 }
 
-async function sqliteStore(): Promise<PersistenceStore> {
-  const store = await createSqlitePersistence({ filename: tempDb() });
-  await store.migrate();
-  return store;
-}
+type MockRequest = { method: string; url: string; headers: Headers; body?: unknown };
 
-afterEach(() => {
-  for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
-});
+function createLocalMockTransport(responseBody: unknown) {
+  const requests: MockRequest[] = [];
+  return {
+    requests,
+    transport: {
+      async request(req: MockRequest) {
+        requests.push(req);
+        const text = JSON.stringify(responseBody);
+        return {
+          status: 200,
+          headers: new Headers({ "content-type": "application/json" }),
+          body: null,
+          async arrayBuffer() { return new TextEncoder().encode(text).buffer; },
+          async text() { return text; },
+          async json<T = unknown>() { return responseBody as T; }
+        };
+      }
+    }
+  };
+}
 
 function profile(): WatsProfileConfig {
   return {
@@ -46,9 +85,7 @@ function profile(): WatsProfileConfig {
 }
 
 function config(overrides: Partial<WatsServiceConfig> = {}): WatsServiceConfig {
-  const mock = createMockTransport({
-    defaultResponse: { status: 200, body: { messages: [{ id: "wamid.TEST" }] } }
-  });
+  const mock = createLocalMockTransport({ messages: [{ id: "wamid.TEST" }] });
   return {
     profile: profile(),
     secrets: {
@@ -81,8 +118,15 @@ function bytesToHex(bytes: Uint8Array): string {
 }
 
 async function signature(secret: string, body: string): Promise<string> {
-  const provider = await createCryptoProvider();
-  return `sha256=${bytesToHex(await provider.hmacSha256(secret, body))}`;
+  const key = await globalThis.crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const digest = await globalThis.crypto.subtle.sign("HMAC", key, new TextEncoder().encode(body));
+  return `sha256=${bytesToHex(new Uint8Array(digest))}`;
 }
 
 function webhookEnvelope(messageId = "wamid.WEBHOOK"): Record<string, unknown> {
@@ -104,13 +148,14 @@ function webhookEnvelope(messageId = "wamid.WEBHOOK"): Record<string, unknown> {
 
 describe("WATS-121 optional service persistence", () => {
   test("duplicate signed webhooks dispatch once when persistence is injected", async () => {
-    const persistence = await sqliteStore();
+    const persistence = memoryStore();
     const body = JSON.stringify(webhookEnvelope());
     const dispatches: unknown[] = [];
-    const app = createWatsServiceApp(config({
+    const app = createWatsServiceApp({
+      ...config(),
       persistence,
       whatsapp: { dispatch: (update: unknown) => { dispatches.push(update); } } as never
-    } as Partial<WatsServiceConfig>));
+    });
 
     const signedHeader = await signature("app-secret", body);
     const request = () => new Request("https://service.test/webhooks/whatsapp", {
@@ -129,15 +174,12 @@ describe("WATS-121 optional service persistence", () => {
     expect(second.status).toBe(200);
     expect(dispatches.length).toBe(1);
     expect(await second.json()).toEqual({ status: "ok", received: 1, dispatched: 0, skipped: 1 });
-    await persistence.close();
   });
 
   test("service request idempotency replays matching response and rejects conflicting body", async () => {
-    const persistence = await sqliteStore();
-    const mock = createMockTransport({
-      defaultResponse: { status: 200, body: { messages: [{ id: "wamid.IDEMPOTENT" }] } }
-    });
-    const app = createWatsServiceApp(config({ persistence, transport: mock.transport } as Partial<WatsServiceConfig>));
+    const persistence = memoryStore();
+    const mock = createLocalMockTransport({ messages: [{ id: "wamid.IDEMPOTENT" }] });
+    const app = createWatsServiceApp({ ...config({ transport: mock.transport }), persistence });
 
     const first = await app.fetch(new Request("https://service.test/api/messages/text", authed({
       to: "15550001111",
@@ -160,13 +202,10 @@ describe("WATS-121 optional service persistence", () => {
     const conflictText = await conflict.text();
     expect(conflictText).not.toContain("changed");
     expect(conflictText).not.toContain("service-bearer");
-    await persistence.close();
   });
 
   test("service behavior remains unchanged when persistence is omitted", async () => {
-    const mock = createMockTransport({
-      defaultResponse: { status: 200, body: { messages: [{ id: "wamid.NO_STORE" }] } }
-    });
+    const mock = createLocalMockTransport({ messages: [{ id: "wamid.NO_STORE" }] });
     const app = createWatsServiceApp(config({ transport: mock.transport }));
 
     const first = await app.fetch(new Request("https://service.test/api/messages/text", authed({ to: "15550001111", text: "hello" }, "same-key")));

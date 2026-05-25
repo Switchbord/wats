@@ -78,7 +78,7 @@ describe("WATS-121 persistence idempotency records", () => {
     }
   });
 
-  test("record APIs reject malformed keys with typed non-leaking errors", async () => {
+  test("record APIs reject malformed keys and timestamps with typed non-leaking errors", async () => {
     const store = await createSqlitePersistence({ filename: tempDb() });
     await store.migrate();
     try {
@@ -90,6 +90,13 @@ describe("WATS-121 persistence idempotency records", () => {
         eventHash: "sha256:webhook-shape-only",
         receivedAt: "2026-05-25T00:00:00.000Z"
       })).rejects.toBeInstanceOf(PersistenceError);
+      for (const receivedAt of ["1", "2026-05-25", "Mon, 25 May 2026 00:00:00 GMT"]) {
+        await expect(recorder.recordWebhookEvent({
+          eventKey: `message:bad-time:${receivedAt}`,
+          eventHash: "sha256:webhook-shape-only",
+          receivedAt
+        })).rejects.toBeInstanceOf(PersistenceError);
+      }
     } finally {
       await store.close();
     }
