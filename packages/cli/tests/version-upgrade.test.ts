@@ -84,6 +84,18 @@ describe("wats CLI version and package upgrades", () => {
     expect(result.stdout).toContain("wats update");
   });
 
+  test("upgrade --help documents the updater and credential boundary", async () => {
+    const result = await runCli(["upgrade", "--help"]);
+    expect(result.exitCode, result.stderr).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(result.stdout).toContain("Usage: wats upgrade");
+    expect(result.stdout).toContain("wats update");
+    expect(result.stdout).toContain("bun update --latest");
+    expect(result.stdout).toContain("@wats/service");
+    expect(result.stdout).toContain("does not read .env.local");
+    expectNoSecrets(result.stdout + result.stderr);
+  });
+
   test("upgrade --dry-run reports the Bun update command without modifying package.json", async () => {
     const dir = makeTempDir();
     try {
@@ -201,6 +213,31 @@ describe("wats CLI version and package upgrades", () => {
       expect(packagesCheck?.message).toBe("1 WATS package appears older than this CLI.");
       expect(result.stdout).not.toContain("left-pad");
       expect(result.stdout).not.toContain(dir);
+      expectNoSecrets(result.stdout + result.stderr);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("upgrade invokes Bun for the public WATS package set only", async () => {
+    const dir = makeTempDir();
+    try {
+      writeFileSync(join(dir, "package.json"), packageJson({ "@wats/cli": "0.3.4" }), "utf8");
+      const calls: Array<{ command: string; args: readonly string[]; cwd: string }> = [];
+      const result = await runCli(["upgrade"], {
+        cwd: dir,
+        spawn: (command, args, options) => {
+          calls.push({ command, args, cwd: options.cwd });
+          return { exitCode: 0, stdout: "UPDATED_SENTINEL", stderr: "ERR_SENTINEL" };
+        }
+      });
+
+      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.stderr).toBe("");
+      expect(result.stdout).toBe("upgrade complete\npackages: 6\n");
+      expect(calls).toEqual([{ command: "bun", args: ["update", "--latest", ...PUBLIC_WATS_PACKAGES], cwd: dir }]);
+      expect(result.stdout).not.toContain("UPDATED_SENTINEL");
+      expect(result.stdout).not.toContain("ERR_SENTINEL");
       expectNoSecrets(result.stdout + result.stderr);
     } finally {
       rmSync(dir, { recursive: true, force: true });

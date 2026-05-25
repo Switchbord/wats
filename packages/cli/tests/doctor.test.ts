@@ -154,10 +154,10 @@ describe("wats doctor offline diagnostics", () => {
       expect(result.exitCode, result.stderr).toBe(0);
       const json = parseDoctorJson(result.stdout);
       expect(json.ok).toBe(true);
-      expect(json.summary).toEqual({ ok: 6, warning: 0, error: 0 });
+      expect(json.summary).toEqual({ ok: 7, warning: 0, error: 0 });
       expect(Array.isArray(json.checks)).toBe(true);
       const checks = json.checks as JsonRecord[];
-      expect(checks.map((check) => check.name)).toEqual(["runtime", "package-imports", "config", "profile", "routes", "openapi"]);
+      expect(checks.map((check) => check.name)).toEqual(["runtime", "package-imports", "packages", "config", "profile", "routes", "openapi"]);
       for (const check of checks) {
         expect(check.status).toBe("ok");
         expect(typeof check.message).toBe("string");
@@ -176,7 +176,7 @@ describe("wats doctor offline diagnostics", () => {
       expect(result.exitCode, result.stderr).toBe(1);
       const json = parseDoctorJson(result.stdout);
       expect(json.ok).toBe(false);
-      expect(json.summary).toEqual({ ok: 6, warning: 0, error: 1 });
+      expect(json.summary).toEqual({ ok: 7, warning: 0, error: 1 });
       const envCheck = (json.checks as JsonRecord[]).find((check) => check.name === "env");
       expect(envCheck).toBeDefined();
       expect(envCheck?.status).toBe("error");

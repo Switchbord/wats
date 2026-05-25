@@ -2,16 +2,17 @@
 
 - status: experimental
 - applies-to: WATS-33, WATS-47, and WATS-69; WATS-104 setup wizard
-- lastReviewed: 2026-05-16
+- lastReviewed: 2026-05-25
 
 ## Purpose
 
-The WATS CLI is the package-manager entry point for safe local onboarding and inspection. WATS-33 ships credential-safe help surfaces, local verify-token generation, offline config validation, and OpenAPI export. WATS-69 implements the safe `wats init` bootstrap for config/env placeholder generation. WATS-104 implements the safe single-profile `wats setup` wizard for writing local credential files. WATS-70 implements real offline `wats doctor` diagnostics. WATS-71 implements a dry-run `wats serve` process wrapper for local service smoke checks without live credentials.
+The WATS CLI is the package-manager entry point for safe local onboarding and inspection. WATS-33 ships credential-safe help surfaces, local verify-token generation, offline config validation, and OpenAPI export. WATS-69 implements the safe `wats init` bootstrap for config/env placeholder generation. WATS-104 implements the safe single-profile `wats setup` wizard for writing local credential files. WATS-70 implements real offline `wats doctor` diagnostics. WATS-71 implements a dry-run `wats serve` process wrapper for local service smoke checks without live credentials. WATS-126 adds `wats --version`, `wats upgrade`, and package-version drift checks in `wats doctor`.
 
 ## Current commands
 
 ```bash
 wats --help
+wats --version
 wats init --help
 wats setup --help
 wats setup ./my-bot --profile test
@@ -21,6 +22,9 @@ wats doctor --config <path>
 wats doctor --config <path> --profile <name> --check-env
 wats doctor --config <path> --format json
 wats doctor --help
+wats upgrade --dry-run
+wats upgrade
+wats update --dry-run
 wats openapi --config <path>
 wats openapi --config <path> --profile <name>
 wats openapi --config <path> --server-url https://service.example
@@ -41,7 +45,6 @@ The CLI still does not:
 - call Meta Graph APIs
 - validate tokens against Meta
 - manage multiple credential profiles interactively
-- start live/credentialed service mode
 - overwrite output files
 
 ## WATS-47 first-run operator flow
@@ -53,6 +56,7 @@ wats init --dry-run
 wats init ./my-bot --format yaml --profile local
 cd ./my-bot
 wats config validate --config wats.config.yaml
+wats --version
 wats doctor --config wats.config.yaml --check-env
 wats serve --config wats.config.yaml --dry-run
 ```
@@ -143,6 +147,7 @@ wats doctor --config wats.config.yaml --format json
 
 - runtime compatibility
 - package imports
+- package-version drift from `package.json` for public `@wats/*` dependencies
 - config discovery and validation
 - selected profile existence
 - route collision checks
@@ -155,14 +160,34 @@ The text output is status-only and redacted:
 doctor ok
 runtime: ok
 package-imports: ok
+packages: ok
 config: ok
 profile: ok
 routes: ok
 openapi: ok
-summary: ok=6 warning=0 error=0
+summary: ok=7 warning=0 error=0
 ```
 
-`--format json` returns `{ ok, summary, checks }` with stable check names. `--check-env` reports counts only, for example `missing 1 required env value`; it does not print env names or values. Doctor never calls Meta Graph APIs and never writes files.
+`--format json` returns `{ ok, summary, checks }` with stable check names. The `packages` check reads `package.json` only and warns when a listed WATS dependency appears older than the installed CLI. It does not call npm. `--check-env` reports counts only, for example `missing 1 required env value`; it does not print env names or values. Doctor never calls Meta Graph APIs and never writes files.
+
+
+## Check and upgrade WATS package versions
+
+```bash
+wats --version
+wats upgrade --dry-run
+wats upgrade
+# alias
+wats update
+```
+
+`wats --version` prints the installed `@wats/cli` version. `wats upgrade` runs Bun's package updater for the public WATS runtime package set:
+
+```bash
+bun update --latest @wats/cli @wats/core @wats/graph @wats/http @wats/config @wats/service
+```
+
+Use `--dry-run` first if you want to see the command without touching `package.json` or `bun.lock`. The command reads only the current project's `package.json` before running Bun and does not read `.env.local` or call Meta Graph APIs.
 
 ## Export service OpenAPI
 

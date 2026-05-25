@@ -3,9 +3,9 @@
 - status: experimental
 - applies-to: WATS-33, WATS-47, and WATS-69; WATS-104 setup wizard
 - package: `@wats/cli`
-- lastReviewed: 2026-05-16
+- lastReviewed: 2026-05-25
 
-`@wats/cli` provides the `wats` command for safe local onboarding and inspection. WATS-33 ships real offline config validation and OpenAPI export. WATS-69 adds safe `wats init` config/env placeholder generation. WATS-104 adds safe single-profile `wats setup` credential-file generation. WATS-70 adds real offline `wats doctor` diagnostics. WATS-71 adds a real dry-run `wats serve` process wrapper around `@wats/service`.
+`@wats/cli` provides the `wats` command for safe local onboarding and inspection. WATS-33 ships real offline config validation and OpenAPI export. WATS-69 adds safe `wats init` config/env placeholder generation. WATS-104 adds safe single-profile `wats setup` credential-file generation. WATS-70 adds real offline `wats doctor` diagnostics. WATS-71 adds a real dry-run `wats serve` process wrapper around `@wats/service`. WATS-126 adds package-version visibility and Bun-powered WATS package upgrades.
 
 ## No-live-credentials default
 
@@ -18,6 +18,11 @@ Do not paste production access tokens or app secrets into CLI arguments. Unknown
 ### `wats --help`
 
 Prints top-level help and exits 0.
+
+### `wats --version`
+
+Prints the installed `@wats/cli` package version and exits 0. No config, env files, package manifests, or live credentials are read.
+
 
 ### `wats init [dir] [--dry-run] [--format yaml|json] [--profile <name>]`
 
@@ -135,7 +140,7 @@ Failure behavior:
 
 ### `wats doctor --config <path> [--profile <name>] [--check-env] [--format text|json]`
 
-Runs real offline diagnostics for local operator readiness. The command checks runtime compatibility, package imports, config validation, selected profile availability, service route collision safety, and local OpenAPI generation.
+Runs real offline diagnostics for local operator readiness. The command checks runtime compatibility, package imports, WATS package-version drift from the current project `package.json`, config validation, selected profile availability, service route collision safety, and local OpenAPI generation.
 
 Default text output is status-only and does not print profile names, config paths, env-secret reference names, or secret values:
 
@@ -143,20 +148,46 @@ Default text output is status-only and does not print profile names, config path
 doctor ok
 runtime: ok
 package-imports: ok
+packages: ok
 config: ok
 profile: ok
 routes: ok
 openapi: ok
-summary: ok=6 warning=0 error=0
+summary: ok=7 warning=0 error=0
 ```
 
-`--format json` returns a stable `{ ok, summary, checks }` object. `--check-env` adds one env-presence check that reports counts only, such as `missing 1 required env value`; it does not print env names or values. Expected config/profile/route/OpenAPI failures are aggregated into safe findings instead of host stack traces.
+`--format json` returns a stable `{ ok, summary, checks }` object. The `packages` check reads only `package.json` dependency ranges for the public WATS package set and warns when a listed WATS dependency appears older than the installed CLI version; it does not call npm. `--check-env` adds one env-presence check that reports counts only, such as `missing 1 required env value`; it does not print env names or values. Expected config/profile/route/OpenAPI failures are aggregated into safe findings instead of host stack traces.
 
 The command does not call Meta Graph APIs, does not resolve or print credential values, and does not write files.
 
 ### `wats doctor --help`
 
 Prints doctor usage and exits 0.
+
+
+### `wats upgrade [--dry-run]`
+
+Updates the public WATS package set in the current Bun project without making users remember the package list. `wats update` is an alias.
+
+```bash
+wats --version
+wats upgrade --dry-run
+wats upgrade
+# alias
+wats update
+```
+
+`wats upgrade` checks that the current directory has a readable `package.json`, then runs:
+
+```bash
+bun update --latest @wats/cli @wats/core @wats/graph @wats/http @wats/config @wats/service
+```
+
+`--dry-run` prints the Bun command and exits without changing `package.json` or `bun.lock`. Output is status-only: it does not print config paths, env names, `.env.local`, token values, or Graph responses. The command does not read credentials and does not call Meta Graph APIs.
+
+### `wats upgrade --help`
+
+Prints upgrade/update usage and exits 0. Unknown options fail closed and do not echo attacker-supplied values.
 
 ### `wats openapi --config <path>`
 
@@ -278,6 +309,9 @@ wats config print --redacted
 wats config paths
 wats doctor --config wats.config.yaml --profile local
 wats doctor --check-env
+wats --version
+wats upgrade --dry-run
+wats upgrade
 wats serve --config wats.config.yaml --profile local --host 127.0.0.1 --port 3000
 wats serve --dry-run
 wats serve --live --yes-live --env-file .env.local
@@ -290,7 +324,8 @@ WATS-47 target rules:
 - `wats init` writes `wats.config.yaml` or `wats.config.json` and `.env.example` only with explicit command intent.
 - Generated configs use env-secret references rather than embedded secret values.
 - All CLI file creation uses no overwrite by default.
-- `wats doctor` is offline by default and reports env variable presence by name/presence only.
+- `wats doctor` is offline by default and reports env variable presence by name/presence only; it may inspect `package.json` for WATS package-version drift without calling npm.
+- `wats upgrade` shells out to Bun for the public WATS package set only after explicit command intent.
 - `wats serve` wraps `@wats/service` and starts in dry-run/mock mode by default for alpha.
 - Credential-gated live validation requires explicit live flags and an acknowledgement.
 - The phrase credential-gated live validation means the CLI requires both a live flag and an operator acknowledgement before any live check can run.
@@ -311,6 +346,6 @@ Future implementation work may add:
 
 - production hosting/deployment wrappers around `wats serve`;
 - optional live checks behind explicit credential-gated flags;
-- deeper doctor integrations beyond the current offline runtime/package/config/profile/routes/OpenAPI/env-presence checks.
+- deeper doctor integrations beyond the current offline runtime/package/version/config/profile/routes/OpenAPI/env-presence checks.
 
 Those planned commands must keep the no-live-credentials default unless a user explicitly opts into live validation.

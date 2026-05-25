@@ -18,7 +18,7 @@ Normal WATS runtime traffic is limited to endpoints the operator chooses:
 - Webhook traffic received from Meta or from the operator's local tunnel/service environment.
 - Local development traffic between the operator, test fixtures, and the local WATS service when running dry-run examples.
 
-Credential-free commands such as `wats init`, `wats doctor`, `wats openapi`, `wats webhook token`, `wats onboarding`, and `wats serve --dry-run` do not call Meta Graph APIs and do not contact maintainer infrastructure.
+Credential-free commands such as `wats init`, `wats doctor`, `wats openapi`, `wats webhook token`, `wats onboarding`, and `wats serve --dry-run` do not call Meta Graph APIs and do not contact maintainer infrastructure. `wats upgrade` is also credential-free, but it intentionally shells out to Bun's package manager and can contact the npm registry to update public `@wats/*` packages.
 
 ## Data handling
 

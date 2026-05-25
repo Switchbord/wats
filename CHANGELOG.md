@@ -4,6 +4,13 @@
 
 Patch alpha live-testing/onboarding release for WATS. This release batches post-0.3.3 CLI setup hardening, scoped Bun command docs, public docs trust/onboarding updates, package README/API policy docs, the minimal offline bot onramp, and release-governance maintainer docs.
 
+### WATS-126 — CLI version and package upgrades
+
+- Adds `wats --version` for the installed `@wats/cli` package version.
+- Adds `wats upgrade` plus `wats update` alias to run Bun updates for the public WATS package set: `@wats/cli`, `@wats/core`, `@wats/graph`, `@wats/http`, `@wats/config`, and `@wats/service`.
+- Extends `wats doctor` with an offline package-version check that reads `package.json` only and warns when listed WATS dependencies appear older than the installed CLI.
+- Keeps upgrade/version diagnostics credential-free: no `.env.local` reads, no Meta Graph calls, and no token/app-secret output.
+
 ### WATS-120/WATS-121 — SQLite persistence and service idempotency foundation
 
 - Adds experimental `@wats/persistence` root contracts and a SQLite adapter subpath for local/single-instance runtime state.

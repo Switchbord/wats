@@ -48,6 +48,7 @@ The public packages are standard npm registry packages and Bun can install them 
 ```bash
 bun add @wats/cli
 bunx --bun @wats/cli --help
+bunx --bun @wats/cli --version
 
 bun add @wats/core @wats/graph @wats/http
 bun add @wats/config @wats/service
@@ -57,7 +58,7 @@ test account credentials are not needed for default install or CI. Live Meta val
 
 ## Privacy and telemetry
 
-WATS sends no telemetry to maintainer-owned endpoints by default. The CLI does not phone home; credential-free commands and dry-run examples stay local unless you explicitly configure Graph/API calls. See `docs/privacy.md` for the privacy and redaction stance.
+WATS sends no telemetry to maintainer-owned endpoints by default. The CLI does not phone home; credential-free commands and dry-run examples stay local unless you explicitly configure Graph/API calls. `wats upgrade` is credential-free but intentionally asks Bun to contact npm for public `@wats/*` package updates. See `docs/privacy.md` for the privacy and redaction stance.
 
 ## Quickstart with CLI
 
@@ -84,6 +85,14 @@ Verify local readiness after setup:
 
 ```bash
 bunx --bun @wats/cli doctor --config wats.config.yaml --check-env
+```
+
+Check and update your installed WATS packages from a Bun project:
+
+```bash
+bunx --bun @wats/cli --version
+bunx --bun @wats/cli upgrade --dry-run
+bunx --bun @wats/cli upgrade
 ```
 
 For a local live webhook smoke, expose the local service with a secure HTTPS tunnel. Meta will not verify plain HTTP or a bare local IP callback:
