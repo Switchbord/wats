@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "WATS Service API",
-    "version": "0.3.5",
+    "version": "0.3.6",
     "description": "Runtime-neutral OpenAPI description for the standalone WATS service routes currently implemented."
   },
   "servers": [

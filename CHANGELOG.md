@@ -1,8 +1,8 @@
 # Changelog
 
-## [0.3.5] - 2026-05-25
+## [0.3.6] - 2026-05-25
 
-Patch alpha live-testing/onboarding release for WATS. This release batches post-0.3.3 CLI setup hardening, scoped Bun command docs, public docs trust/onboarding updates, package README/API policy docs, the minimal offline bot onramp, and release-governance maintainer docs.
+Patch alpha persistence and local-operator release for WATS. This release publishes the post-0.3.5 SQLite persistence foundation, service idempotency integration, and CLI package version/upgrade UX.
 
 ### WATS-126 — CLI version and package upgrades
 
@@ -18,6 +18,16 @@ Patch alpha live-testing/onboarding release for WATS. This release batches post-
 - Adds optional `PersistenceStore` injection to `@wats/service`; the service does not read database env vars directly.
 - Uses persistence to acknowledge duplicate signed webhook deliveries without redispatch and to support `Idempotency-Key` replay/conflict behavior on service message send routes.
 - Keeps conversation APIs, CLI thread navigation, observed status UI wiring, Postgres, raw webhook body storage, background outbox workers, production hosting, and live Meta validation out of scope.
+
+### Release metadata and safety boundaries
+
+- Release metadata is aligned for 0.3.6 across root/package manifests, public internal dependency ranges, service OpenAPI default version, generated OpenAPI docs, and release-policy tests.
+- This is an alpha compatibility/local-operator patch release, not a 1.0 stability claim.
+- No automatic live Meta validation campaign execution, token validation against Meta, credential collection, Docker image publication, production hosting, or background outbox worker is included in the release gates.
+
+## [0.3.5] - 2026-05-25
+
+Patch alpha live-testing/onboarding release for WATS. This release batches post-0.3.3 CLI setup hardening, scoped Bun command docs, public docs trust/onboarding updates, package README/API policy docs, the minimal offline bot onramp, release-governance maintainer docs, and credential-gated local live serve.
 
 ### WATS-101 — live serve and tunnel quickstart
 
@@ -128,12 +138,6 @@ Patch alpha compatibility and community-governance release for WATS. This releas
 ### CI maintenance
 
 - Updates GitHub Actions checkout steps to `actions/checkout@v5` so the credential-free CI and release dry-run workflows are ready for GitHub's Node 24 action runtime.
-
-### Release metadata and safety boundaries
-
-- Release metadata is aligned for 0.3.5 across root/package manifests, public internal dependency ranges, service OpenAPI default version, generated OpenAPI docs, and release-policy tests.
-- This is an alpha compatibility/tooling/community patch release, not a 1.0 stability claim.
-- No automatic live Meta validation campaign execution, token validation against Meta, credential collection, Docker image publication, production hosting, or persistence/outbox is included in the release gates.
 
 ## [0.3.2] - 2026-05-18
 
