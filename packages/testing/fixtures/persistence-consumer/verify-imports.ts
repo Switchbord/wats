@@ -11,7 +11,7 @@ const checks = {
   sqliteFactory: typeof createSqlitePersistence === "function"
 };
 
-const store: PersistenceStore = createSqlitePersistence({ filename: ":memory:" });
+const store: PersistenceStore = await createSqlitePersistence({ filename: ":memory:" });
 await store.close();
 
 console.log(JSON.stringify({ ok: Object.values(checks).every(Boolean), checks }));

@@ -142,23 +142,16 @@ The facade binds a `GraphClient`, optional `PhoneNumberClient` / `WABAClient`, a
 - Dependencies out: `@wats/config`, `@wats/core`, `@wats/http`, `@wats/graph`, `@wats/crypto`.
 - Stability: experimental until CLI serve/openapi integration and broader route coverage settle.
 
-## WATS-48 planned package boundary
+### `@wats/persistence`
 
-WATS-48 defines a design target, not current package surface until implementation lands.
-
-Future public package and subpaths:
-
-- `@wats/persistence`
-- `@wats/persistence/sqlite`
-- `@wats/persistence/postgres`
-- `@wats/persistence/testing`
-
-Intended dependency direction:
-
-- `@wats/persistence` may depend on `@wats/types` and `@wats/internal-utils`.
-- `@wats/service` may later consume `@wats/persistence` through injected stores, not direct env reads.
-- `@wats/cli` may later compose config/service/persistence for doctor and serve lifecycle checks.
-- The current dependency graph does not include `@wats/persistence`.
+- Purpose: experimental persistence contracts plus the WATS-120 SQLite local adapter and migration runner.
+- Runtime targets: Bun for `@wats/persistence/sqlite`; root contracts are TypeScript-only.
+- Public: yes, experimental.
+- Published subpaths: `@wats/persistence`, `@wats/persistence/sqlite`.
+- Future subpaths: `@wats/persistence/postgres`, `@wats/persistence/testing`.
+- Dependencies out: none.
+- Dependency direction: `@wats/service` may later consume `@wats/persistence` through injected stores, not direct env reads; `@wats/cli` may later compose config/service/persistence for doctor and serve lifecycle checks.
+- Stability: experimental until WATS-121 service integration and WATS-125 Postgres semantics settle.
 
 ### `@wats/internal-utils`
 

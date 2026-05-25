@@ -15,6 +15,7 @@ const PUBLISHABLE_PACKAGES = [
   "http",
   "internal-utils",
   "config",
+  "persistence",
   "service",
   "cli"
 ] as const;

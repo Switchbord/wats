@@ -31,7 +31,8 @@ Current experimental surfaces:
 - Flow DSL and data-channel helpers in `@wats/graph/endpoints/flows` and root Graph Flow exports.
 - Calling endpoint helpers in `@wats/graph/endpoints/calling` and root Graph Calling exports.
 - Endpoint catalog breadth beyond the stable Graph substrate, including new admin/business, template, media, marketing-message, and future parity families.
-- `@wats/config`, `@wats/cli`, and `@wats/service` operator/application-edge surfaces while live mode, deployment, and persistence are still evolving.
+- `@wats/config`, `@wats/cli`, `@wats/service`, and `@wats/persistence` operator/application-edge surfaces while live mode, deployment, and persistence are still evolving.
+- `@wats/persistence/sqlite` is experimental local/single-instance persistence; Postgres and service integration are separate follow-up surfaces.
 - Generated OpenAPI details and docs-site navigation during public alpha.
 
 The marking convention is a JSDoc `@experimental` tag on exported source barrels or declarations for surfaces called out here. Generated API docs should surface those tags when TypeDoc output is expanded beyond the current package API index.
@@ -42,7 +43,7 @@ Internal and unsupported surfaces carry no application stability guarantee.
 
 - `@wats/internal-utils` is published internal support for WATS runtime dependency closure. It is not a stable application API even though npm must install it for dependent packages.
 - `@wats/testing` is private workspace-only test infrastructure and is not published.
-- `@wats/persistence` package, SQLite adapter, Postgres adapter, migrations, service persistence integration, and config persistence schema are design targets only. They are not exported yet.
+- Postgres persistence adapter, service persistence integration, config persistence schema, raw webhook-body persistence, CLI thread navigation, and observed status UI are not exported yet.
 - Credentialed local live `wats serve` is experimental operator tooling. It requires explicit `--live --yes-live --env-file .env.local` and is not a production hosting contract.
 
 ## Policy for changes

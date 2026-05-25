@@ -19,7 +19,7 @@ type Manifest = JsonRecord & {
 
 const RELEASE_VERSION = "0.3.5";
 const PREVIOUS_RELEASE_VERSION = "0.2.1";
-const PUBLISHABLE_PACKAGES = ["types", "crypto", "graph", "core", "http", "internal-utils", "config", "service", "cli"] as const;
+const PUBLISHABLE_PACKAGES = ["types", "crypto", "graph", "core", "http", "internal-utils", "config", "persistence", "service", "cli"] as const;
 const PRIVATE_PACKAGES = ["testing"] as const;
 
 function findRepoRoot(startDir: string): string {

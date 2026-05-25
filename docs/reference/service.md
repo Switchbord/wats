@@ -180,11 +180,11 @@ Common HTTP error codes:
 - `405` method not allowed
 - `502` Graph request failure
 
-## WATS-48 persistence design target
+## Persistence boundary
 
-WATS-48 documents a future injected PersistenceStore for service runtimes. There is no persistence integration in current @wats/service runtime.
+WATS-120 adds experimental `@wats/persistence` contracts plus a SQLite local adapter. There is still no persistence integration in current `@wats/service` runtime.
 
-Future service integration should accept an injected PersistenceStore instead of reading database environment variables directly. The service must not log secrets or raw webhook bodies through persistence diagnostics, and persistence failures must not expose database URLs, access tokens, app secrets, webhook verify tokens, service bearer tokens, message text, or raw webhook envelopes.
+Future WATS-121 service integration should accept an injected `PersistenceStore` instead of reading database environment variables directly. The service must not log secrets or raw webhook bodies through persistence diagnostics, and persistence failures must not expose database URLs, access tokens, app secrets, webhook verify tokens, service bearer tokens, message text, or raw webhook envelopes.
 
 ## WATS-71/WATS-101 CLI wrappers
 

@@ -39,8 +39,5 @@
     "sqlite",
     "persistence",
     "wats"
-  ],
-  "dependencies": {
-    "@wats/internal-utils": "^0.3.5"
-  }
+  ]
 }

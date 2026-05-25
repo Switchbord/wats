@@ -127,7 +127,7 @@ Future Postgres deployment should use an env-secret reference such as `WATS_DATA
 
 ## Volumes and persistence
 
-Current WATS has no persistence runtime. Future SQLite examples should mount a writable data directory such as `/var/lib/wats` and document that SQLite is for local/single-instance operation. Future multi-replica deployments should use Postgres once the adapter exists.
+Current WATS has an experimental `@wats/persistence/sqlite` local adapter, but `@wats/service` does not consume it yet. Future container examples should mount a writable data directory such as `/var/lib/wats` for SQLite local/single-instance testing. Future multi-replica deployments should use Postgres once the adapter and service integration exist.
 
 ## Non-root runtime
 

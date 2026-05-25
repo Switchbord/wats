@@ -1,78 +1,64 @@
 # Persistence Reference
 
-- status: design
-- applies-to: WATS-48
-- package: future `@wats/persistence`
-- lastReviewed: 2026-05-01
-
-## Design target
-
-WATS-48 defines the public persistence design target for future durable runtime state. The design covers a `PersistenceStore`, SQLite adapter target, Postgres adapter target, schema migration contract, webhook event idempotency, service request idempotency, and redacted diagnostics.
+- status: experimental
+- applies-to: WATS-48, WATS-87, WATS-120
+- package: `@wats/persistence`
+- lastReviewed: 2026-05-25
 
 ## Current implementation status
 
-`@wats/persistence is not exported yet`. There is no package export yet, no adapters implemented in this slice, no config schema field, no service persistence integration, and no migration runner.
-
-This page is public so future CLI/service/deployment work can align before behavior lands.
-
-## Intended package surface
-
-Future package targets:
+WATS-120 adds the first public persistence package:
 
 ```ts
-import type {
-  PersistenceStore,
-  PersistenceAdapter,
-  PersistenceTransaction,
-  MigrationReport,
-  PersistenceHealth
+import {
+  CURRENT_SCHEMA_VERSION,
+  PersistenceError,
+  type MigrationReport,
+  type PersistenceHealth,
+  type PersistenceStore
 } from "@wats/persistence";
+import { createSqlitePersistence } from "@wats/persistence/sqlite";
 ```
 
-Potential subpaths:
+The SQLite adapter is for local and single-instance testing. It is not a production or multi-replica recommendation.
+
+## SQLite quickstart
 
 ```ts
-import { createSqlitePersistence } from "@wats/persistence/sqlite";
-import { createPostgresPersistence } from "@wats/persistence/postgres";
+const store = await createSqlitePersistence({ filename: "./wats.sqlite" });
+await store.migrate();
+const health = await store.health();
+await store.close();
 ```
 
-These imports are not available in the current implementation.
+Use a local path or `:memory:`. Database paths are operationally sensitive and diagnostics report only `[REDACTED_SQLITE_DATABASE]`.
 
-## Core concepts
+## Implemented schema
 
-### `PersistenceStore`
+The WATS-120 migration runner creates:
 
-The top-level lifecycle object. It exposes schema version, health checks, migrations, transactions, and close behavior.
+- `wats_schema_migrations`
+- `wats_persistence_lock`
+- `wats_webhook_events`
+- `wats_service_requests`
+- `wats_outbox`
 
-### `PersistenceAdapter`
+Migrations are forward-only for alpha. Already-applied migration checksums must match the package migration definitions. Checksum drift fails closed with `PersistenceError`.
 
-The dialect-specific implementation boundary. SQLite and Postgres must satisfy the same public contract before either is documented as implemented.
+## Runtime contract
 
-### `PersistenceTransaction`
+`PersistenceStore` exposes:
 
-A scoped transactional handle for migration metadata, webhook idempotency, and service request idempotency writes.
+- `backend`
+- `migrate(): Promise<MigrationReport>`
+- `health(): Promise<PersistenceHealth>`
+- `close(): Promise<void>`
 
-## SQLite adapter target
+`MigrationReport` returns the current schema version, applied migration IDs, and whether the database was already current.
 
-SQLite is the local/dev default target once implemented. It should use deterministic local tests, safe file paths, foreign keys, WAL mode, busy timeouts, and clear docs that SQLite is not the multi-replica production recommendation.
+`PersistenceHealth` returns status-only fields: backend, current version, ok flag, and redacted location. It does not print database paths or URLs.
 
-## Postgres adapter target
-
-Postgres is the optional deploy/production target once implemented. Database URLs must come from env-secret references such as `WATS_DATABASE_URL`, and diagnostics must never print credentials or connection strings.
-
-## Schema migration contract
-
-The schema migration contract is forward-only for alpha. Migrations must be idempotent, versioned, checksummed, and guarded by a migration lock. Unsupported schema versions fail closed. Destructive migrations require explicit release notes and review before implementation.
-
-## Webhook event idempotency
-
-Webhook event idempotency records scoped event keys and hashes so duplicate deliveries do not trigger duplicate processing. The default design stores safe metadata and hashes only, with no raw webhook payload persistence by default.
-
-## Service request idempotency
-
-Service request idempotency records scoped request keys and request hashes. The same idempotency key with the same request hash may replay a stored response; the same key with a different request hash conflicts.
-
-## Redacted diagnostics
+## Redaction boundary
 
 Persistence diagnostics must not print:
 
@@ -81,29 +67,33 @@ Persistence diagnostics must not print:
 - webhook verify tokens
 - service bearer tokens
 - authorization headers
-- database URLs
+- database URLs or SQLite paths
 - raw webhook bodies
 - message text or contact payloads
 
-## Credential-free tests
+## Relationship to service and CLI
 
-WATS-48 requires credential-free tests. Future Postgres tests should be opt-in or mocked until an explicit local/integration environment is available; default CI must not require database credentials or live Meta credentials.
+Current `@wats/service` does not consume persistence yet. WATS-121 will inject a persistence store into service for webhook deduplication and service request idempotency.
+
+Current `@wats/cli` has no database navigation commands. WATS-123 will add thread/message navigation after service exposes persisted conversation/event-store APIs.
+
+## Postgres target
+
+Postgres remains a follow-up adapter target. It must satisfy the same root contract and keep database URLs secret. Default CI must not require Postgres credentials.
 
 ## Non-goals
 
-- no package export yet
-- no adapter implementation yet
-- no production ready persistence
+- no Postgres adapter yet
+- no service persistence integration yet
+- no CLI thread navigation yet
+- no observed delivery/read status UI yet
 - no raw webhook body storage by default
-- no service persistence integration
-- no config persistence schema
-- no Docker/deploy packaging
+- no production hosting guarantee
 - no live Meta validation
-- no second repository
 
 ## Related
 
-- `docs/reference/persistence.md`
-- `docs/architecture/roadmap-to-whatsapp-pywa-parity.md`
 - `docs/reference/config.md`
 - `docs/reference/service.md`
+- `docs/architecture/package-map.md`
+- `docs/architecture/public-api-surface.md`

@@ -17,5 +17,6 @@ A later WATS-36B pass can swap this stub generator for full `typedoc --options t
 | `@wats/http` | `packages/http/src/index.ts` |
 | `@wats/internal-utils` | `packages/internal-utils/src/index.ts` |
 | `@wats/config` | `packages/config/src/index.ts` |
+| `@wats/persistence` | `packages/persistence/src/index.ts` |
 | `@wats/service` | `packages/service/src/index.ts` |
 | `@wats/cli` | `packages/cli/src/index.ts` |

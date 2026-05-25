@@ -13,6 +13,7 @@ const PUBLISHABLE_PACKAGES = [
   "http",
   "internal-utils",
   "config",
+  "persistence",
   "service",
   "cli"
 ] as const;
@@ -71,6 +72,7 @@ const packageEntrypoints: Record<PackageName, readonly string[]> = {
   ],
   "internal-utils": ["index", "isRecord"],
   config: ["index"],
+  persistence: ["index", "sqlite"],
   service: ["index"],
   cli: ["index", "bin"]
 };
@@ -132,6 +134,7 @@ function buildPackage(pkg: PackageName): void {
         "@wats/crypto/*": ["./packages/crypto/src/*"],
         "@wats/types/*": ["./packages/types/src/*"],
         "@wats/config/*": ["./packages/config/src/*"],
+        "@wats/persistence/*": ["./packages/persistence/src/*"],
         "@wats/service/*": ["./packages/service/src/*"],
         "@wats/cli/*": ["./packages/cli/src/*"]
       },

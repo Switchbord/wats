@@ -66,6 +66,10 @@
       "name": "@wats/internal-utils",
       "version": "0.3.5",
     },
+    "packages/persistence": {
+      "name": "@wats/persistence",
+      "version": "0.3.5",
+    },
     "packages/service": {
       "name": "@wats/service",
       "version": "0.3.5",
@@ -131,6 +135,12 @@
       "name": "internal-utils-consumer",
       "dependencies": {
         "@wats/internal-utils": "workspace:*",
+      },
+    },
+    "packages/testing/fixtures/persistence-consumer": {
+      "name": "persistence-consumer-fixture",
+      "dependencies": {
+        "@wats/persistence": "workspace:*",
       },
     },
     "packages/testing/fixtures/service-consumer": {
@@ -543,6 +553,8 @@
 
     "@wats/internal-utils": ["@wats/internal-utils@workspace:packages/internal-utils"],
 
+    "@wats/persistence": ["@wats/persistence@workspace:packages/persistence"],
+
     "@wats/service": ["@wats/service@workspace:packages/service"],
 
     "@wats/testing": ["@wats/testing@workspace:packages/testing"],
@@ -878,6 +890,8 @@
     "pathe": ["pathe@2.0.3", "", {}, "sha512-WUjGcAqP1gQacoQe+OBJsFA7Ld4DyXuUIjZ5cc75cLHvJ7dtNsTugphxIADwspS+AraAUePCKrSVtPLFj/F88w=="],
 
     "perfect-debounce": ["perfect-debounce@1.0.0", "", {}, "sha512-xCy9V055GLEqoFaHoC1SoLIaLmWctgCUaBaWxDZ7/Zx4CTyX7cJQLJOok/orfjZAh9kEYpjJa4d0KcJmCbctZA=="],
+
+    "persistence-consumer-fixture": ["persistence-consumer-fixture@workspace:packages/testing/fixtures/persistence-consumer"],
 
     "picocolors": ["picocolors@1.1.1", "", {}, "sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA=="],
 
