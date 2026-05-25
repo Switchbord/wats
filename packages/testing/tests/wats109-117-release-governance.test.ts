@@ -128,6 +128,6 @@ describe("WATS-109/WATS-117 release governance docs", () => {
     expect(changelog).toContain("WATS-117");
     expect(changelog).toContain("repo settings hygiene");
     expect(changelog).toContain("launch-day checklist");
-    expect(changelog).not.toContain("provenance attestation verified for 0.3.4");
+    expect(changelog).not.toContain("provenance attestation verified for 0.3.5");
   });
 });

@@ -410,6 +410,7 @@ describe("wats serve dry-run help", () => {
     expect(result.stdout).toContain("--print-routes");
     expect(result.stdout).toContain("dry-run mock transport");
     expect(result.stdout).not.toContain("server runtime is not implemented");
-    expect(result.stdout).toContain("No live credentials are read or required");
+    expect(result.stdout).toContain("Live mode requires --live, --yes-live, and --env-file together");
+    expect(result.stdout).toContain("secure HTTPS tunnel such as ngrok");
   });
 });

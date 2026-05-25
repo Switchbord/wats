@@ -8,7 +8,7 @@
 
 `@wats/service` is the first standalone WATS application boundary. It exposes a runtime-neutral `Request -> Response` app that composes the existing Graph client, webhook adapter, config profile shape, and WhatsApp facade.
 
-It is not a production server by itself. WATS-71 adds a CLI-owned Bun dry-run process wrapper around this app for local smoke checks. WATS-101 adds a credential-gated CLI live wrapper for local testing behind an HTTPS tunnel. Node/Docker packaging, persistence, metrics, and production hosting remain separate roadmap items. WATS-35 adds a generated OpenAPI 3.1 document for the routes listed below.
+It is not a production server by itself. WATS-71 adds a CLI-owned Bun dry-run process wrapper around this app for local smoke checks. WATS-101 adds credential-gated live `wats serve` execution for local testing behind an HTTPS tunnel. Node/Docker packaging, persistence, metrics, and production hosting remain separate roadmap items. WATS-35 adds a generated OpenAPI 3.1 document for the routes listed below.
 
 ## Public API
 

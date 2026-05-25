@@ -1,8 +1,8 @@
 # Changelog
 
-## [0.3.4] - 2026-05-24
+## [0.3.5] - 2026-05-25
 
-Patch alpha public-onboarding and release-governance release for WATS. This release batches post-0.3.3 CLI setup hardening, scoped Bun command docs, public docs trust/onboarding updates, package README/API policy docs, the minimal offline bot onramp, and release-governance maintainer docs.
+Patch alpha live-testing/onboarding release for WATS. This release batches post-0.3.3 CLI setup hardening, scoped Bun command docs, public docs trust/onboarding updates, package README/API policy docs, the minimal offline bot onramp, and release-governance maintainer docs.
 
 ### WATS-101 — live serve and tunnel quickstart
 
@@ -116,7 +116,7 @@ Patch alpha compatibility and community-governance release for WATS. This releas
 
 ### Release metadata and safety boundaries
 
-- Release metadata is aligned for 0.3.4 across root/package manifests, public internal dependency ranges, service OpenAPI default version, generated OpenAPI docs, and release-policy tests.
+- Release metadata is aligned for 0.3.5 across root/package manifests, public internal dependency ranges, service OpenAPI default version, generated OpenAPI docs, and release-policy tests.
 - This is an alpha compatibility/tooling/community patch release, not a 1.0 stability claim.
 - No automatic live Meta validation campaign execution, token validation against Meta, credential collection, Docker image publication, production hosting, or persistence/outbox is included in the release gates.
 
