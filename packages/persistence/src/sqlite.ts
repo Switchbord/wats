@@ -4,7 +4,12 @@ import {
   REDACTED_SQLITE_LOCATION,
   type MigrationReport,
   type PersistenceHealth,
-  type PersistenceStore
+  type PersistenceStore,
+  type ServiceRequestLookupInput,
+  type ServiceRequestLookupResult,
+  type ServiceRequestRecordInput,
+  type WebhookEventRecordInput,
+  type WebhookEventRecordResult
 } from "./index";
 
 interface BunSqliteDatabase {
@@ -144,6 +149,66 @@ function validateOptions(options: SqlitePersistenceOptions): { filename: string;
   return { filename, readonly: readonly ?? false };
 }
 
+function validateRecordInput(value: unknown, label: string): Record<string, unknown> {
+  if (!isOptionsRecord(value)) {
+    throw new PersistenceError("invalid_record", `${label} must be an object.`);
+  }
+  return value;
+}
+
+function validateRecordString(value: unknown, label: string): string {
+  if (typeof value !== "string" || value.trim().length === 0 || value.length > 1024 || hasControlChars(value)) {
+    throw new PersistenceError("invalid_record", `${label} must be a safe non-empty string.`);
+  }
+  return value;
+}
+
+function validateTimestamp(value: unknown, label: string): string {
+  const raw = validateRecordString(value, label);
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u.test(raw)) {
+    throw new PersistenceError("invalid_record", `${label} must be an ISO timestamp.`);
+  }
+  const normalized = new Date(raw).toISOString();
+  if (normalized !== raw) {
+    throw new PersistenceError("invalid_record", `${label} must be an ISO timestamp.`);
+  }
+  return raw;
+}
+
+function validateWebhookEventRecord(input: WebhookEventRecordInput): WebhookEventRecordInput {
+  const record = validateRecordInput(input, "webhook event record");
+  return Object.freeze({
+    eventKey: validateRecordString(record.eventKey, "eventKey"),
+    eventHash: validateRecordString(record.eventHash, "eventHash"),
+    receivedAt: validateTimestamp(record.receivedAt, "receivedAt")
+  });
+}
+
+function validateServiceRequestLookup(input: ServiceRequestLookupInput): ServiceRequestLookupInput {
+  const record = validateRecordInput(input, "service request lookup");
+  return Object.freeze({
+    idempotencyKey: validateRecordString(record.idempotencyKey, "idempotencyKey"),
+    requestHash: validateRecordString(record.requestHash, "requestHash")
+  });
+}
+
+function validateServiceRequestRecord(input: ServiceRequestRecordInput): ServiceRequestRecordInput {
+  const record = validateRecordInput(input, "service request record");
+  const responseJson = validateRecordString(record.responseJson, "responseJson");
+  try {
+    JSON.parse(responseJson);
+  } catch (cause) {
+    throw new PersistenceError("invalid_record", "responseJson must be valid JSON.", { cause });
+  }
+  return Object.freeze({
+    idempotencyKey: validateRecordString(record.idempotencyKey, "idempotencyKey"),
+    requestHash: validateRecordString(record.requestHash, "requestHash"),
+    responseJson,
+    createdAt: validateTimestamp(record.createdAt, "createdAt")
+  });
+}
+
+
 function nowIso(): string {
   return new Date().toISOString();
 }
@@ -237,6 +302,47 @@ class SqlitePersistenceStore implements PersistenceStore {
       currentVersion: typeof row?.version === "number" ? row.version : 0,
       redactedLocation: REDACTED_SQLITE_LOCATION
     });
+  }
+
+  async recordWebhookEvent(input: WebhookEventRecordInput): Promise<WebhookEventRecordResult> {
+    this.#assertOpen();
+    const record = validateWebhookEventRecord(input);
+    try {
+      this.#database.run(
+        "INSERT INTO wats_webhook_events (event_key, event_hash, received_at) VALUES (?, ?, ?)",
+        record.eventKey,
+        record.eventHash,
+        record.receivedAt
+      );
+      return "recorded";
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      if (/UNIQUE|constraint/i.test(message)) return "duplicate";
+      throw new PersistenceError("migration_failed", "SQLite webhook event record failed.", { cause });
+    }
+  }
+
+  async getServiceRequest(input: ServiceRequestLookupInput): Promise<ServiceRequestLookupResult> {
+    this.#assertOpen();
+    const lookup = validateServiceRequestLookup(input);
+    const row = this.#database.query<{ request_hash: string; response_json: string }>(
+      "SELECT request_hash, response_json FROM wats_service_requests WHERE idempotency_key = ?"
+    ).get(lookup.idempotencyKey);
+    if (row === null) return null;
+    if (row.request_hash !== lookup.requestHash) return "conflict";
+    return Object.freeze({ responseJson: row.response_json });
+  }
+
+  async recordServiceRequest(input: ServiceRequestRecordInput): Promise<void> {
+    this.#assertOpen();
+    const record = validateServiceRequestRecord(input);
+    this.#database.run(
+      "INSERT OR IGNORE INTO wats_service_requests (idempotency_key, request_hash, response_json, created_at) VALUES (?, ?, ?, ?)",
+      record.idempotencyKey,
+      record.requestHash,
+      record.responseJson,
+      record.createdAt
+    );
   }
 
   async close(): Promise<void> {

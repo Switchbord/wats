@@ -32,7 +32,7 @@ describe("WATS 0.3.5 public docs truth contract", () => {
     expect(readme).not.toContain("bunx --bun wats --help");
     expect(readme).toContain("`wats setup` writes a safe `wats.config.yaml`");
     expect(readme).toContain("Live serve requires explicit `--live --yes-live --env-file .env.local`");
-    expect(readme).toContain("Docker image publication, service persistence integration/outbox worker, production hosting, token validation against Meta, and multi-profile credential editing are not included");
+    expect(readme).toContain("Docker image publication, background outbox workers, production hosting, token validation against Meta, and multi-profile credential editing are not included");
 
     expect(readme).not.toContain("After the alpha packages are published");
   });

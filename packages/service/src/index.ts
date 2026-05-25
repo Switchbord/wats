@@ -24,6 +24,7 @@ import {
   type Transport
 } from "@wats/graph";
 import type { CryptoProvider } from "@wats/crypto";
+import type { PersistenceStore } from "@wats/persistence";
 import {
   createFetchWebhookHandler,
   createWebhookAdapter,
@@ -43,6 +44,7 @@ export interface WatsServiceConfig {
   readonly transport?: Transport;
   readonly cryptoProvider?: CryptoProvider;
   readonly whatsapp?: WebhookFacadeLike;
+  readonly persistence?: PersistenceStore;
 }
 
 export type WatsServiceErrorCode =
@@ -53,7 +55,8 @@ export type WatsServiceErrorCode =
   | "invalid_path"
   | "invalid_transport"
   | "invalid_crypto_provider"
-  | "invalid_whatsapp";
+  | "invalid_whatsapp"
+  | "invalid_persistence";
 
 export class WatsServiceError extends Error {
   readonly code: WatsServiceErrorCode;
@@ -101,6 +104,8 @@ interface RuntimeConfig {
   readonly secrets: WatsServiceSecrets;
   readonly graphClient: GraphClient;
   readonly whatsapp: WebhookFacadeLike;
+  readonly cryptoProvider?: CryptoProvider;
+  readonly persistence?: PersistenceStore;
   readonly webhookHandler: (request: Request) => Promise<Response>;
   readonly webhookPath: string;
   readonly apiPrefix: string;
@@ -201,6 +206,22 @@ function validateWhatsapp(value: unknown): WebhookFacadeLike | undefined {
   return value as unknown as WebhookFacadeLike;
 }
 
+function validatePersistence(value: unknown): PersistenceStore | undefined {
+  if (value === undefined) return undefined;
+  if (
+    !isRecord(value) ||
+    typeof value.migrate !== "function" ||
+    typeof value.health !== "function" ||
+    typeof value.recordWebhookEvent !== "function" ||
+    typeof value.getServiceRequest !== "function" ||
+    typeof value.recordServiceRequest !== "function" ||
+    typeof value.close !== "function"
+  ) {
+    throw new WatsServiceError("invalid_persistence", "persistence must be a PersistenceStore.");
+  }
+  return value as unknown as PersistenceStore;
+}
+
 function jsonResponse(status: number, payload: unknown, headers?: HeadersInit): Response {
   return new Response(JSON.stringify(payload), {
     status,
@@ -248,6 +269,47 @@ async function parseJsonRequest(request: Request): Promise<unknown | "malformed"
   } catch {
     return "malformed";
   }
+}
+
+async function readRequestText(request: Request): Promise<string | "malformed"> {
+  try {
+    return await request.text();
+  } catch {
+    return "malformed";
+  }
+}
+
+function parseJsonText(source: string): unknown | "malformed" {
+  try {
+    return JSON.parse(source) as unknown;
+  } catch {
+    return "malformed";
+  }
+}
+
+async function sha256Hex(input: string): Promise<string> {
+  const bytes = new TextEncoder().encode(input);
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function safeIdempotencyKey(request: Request): string | null | "invalid" {
+  const raw = request.headers.get("idempotency-key");
+  if (raw === null) return null;
+  if (raw.trim().length === 0 || raw.length > 256 || hasControlChars(raw)) return "invalid";
+  return raw;
+}
+
+function responseToJsonText(payload: unknown): string | null {
+  try {
+    return JSON.stringify(payload);
+  } catch {
+    return null;
+  }
+}
+
+function jsonTextResponse(status: number, payloadText: string): Response {
+  return new Response(payloadText, { status, headers: { "content-type": JSON_CONTENT_TYPE } });
 }
 
 function isNonEmptyString(value: unknown): value is string {
@@ -342,15 +404,23 @@ function messageOperation(summary: string, schemaName: string): Record<string, u
     tags: ["messages"],
     summary,
     security: [{ serviceBearerAuth: [] }],
+    parameters: [{
+      name: "Idempotency-Key",
+      in: "header",
+      required: false,
+      schema: { type: "string", minLength: 1, maxLength: 256 },
+      description: "Optional local service idempotency key when a PersistenceStore is injected. Same key and same body hash replays the stored response; same key with a different body returns 409."
+    }],
     requestBody: {
       required: true,
       ...jsonContentSchema(schemaRef(schemaName))
     },
     responses: {
-      "200": okResponseSpec("Graph response passthrough.", "GraphResponsePassthrough"),
-      "400": errorResponseSpec("Malformed JSON or unsupported body."),
+      "200": okResponseSpec("Graph response passthrough or idempotency replay.", "GraphResponsePassthrough"),
+      "400": errorResponseSpec("Malformed JSON, unsupported body, or invalid Idempotency-Key."),
       "401": errorResponseSpec("Missing or invalid service bearer token."),
       "405": errorResponseSpec("Method not allowed."),
+      "409": errorResponseSpec("Idempotency-Key conflicts with a different request body."),
       "502": errorResponseSpec("Graph request failed.")
     }
   };
@@ -980,6 +1050,71 @@ function buildServiceCommerceInteractivePayload(input: ServiceCommerceInteractiv
   }
 }
 
+function deepSortJson(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map((item) => deepSortJson(item));
+  if (isRecord(value)) {
+    const out: Record<string, unknown> = {};
+    for (const key of Object.keys(value).sort()) out[key] = deepSortJson(value[key]);
+    return out;
+  }
+  return value;
+}
+
+async function persistedWebhookKey(ctx: RuntimeConfig, request: Request): Promise<{ eventKey: string; eventHash: string } | null> {
+  if (ctx.persistence === undefined || request.method.toUpperCase() !== "POST") return null;
+  const clone = request.clone();
+  let envelope: unknown;
+  try {
+    envelope = JSON.parse(await clone.text()) as unknown;
+  } catch {
+    return null;
+  }
+  const eventKey = `webhook:${await sha256Hex(JSON.stringify(deepSortJson(envelope)))}`;
+  return { eventKey, eventHash: eventKey.replace(/^webhook:/u, "sha256:") };
+}
+
+async function handleWebhook(ctx: RuntimeConfig, request: Request): Promise<Response> {
+  const event = await persistedWebhookKey(ctx, request);
+  if (event === null || ctx.persistence === undefined) return ctx.webhookHandler(request);
+
+  const dispatches: unknown[] = [];
+  const facade: WebhookFacadeLike = {
+    dispatch: (update: unknown) => {
+      dispatches.push(update);
+      return "wats:persistence-staged-dispatch";
+    }
+  };
+  const webhookAdapter = createWebhookAdapter({
+    verifyToken: ctx.secrets.webhookVerifyToken,
+    appSecret: ctx.secrets.webhookAppSecret,
+    whatsapp: facade,
+    maxBodyBytes: ctx.profile.webhook.maxBodyBytes,
+    ...(ctx.cryptoProvider !== undefined ? { cryptoProvider: ctx.cryptoProvider } : {})
+  });
+  const response = await createFetchWebhookHandler(webhookAdapter)(request);
+  if (response.status !== 200 || dispatches.length === 0) return response;
+
+  const record = await ctx.persistence.recordWebhookEvent({
+    eventKey: event.eventKey,
+    eventHash: event.eventHash,
+    receivedAt: new Date().toISOString()
+  });
+  if (record === "duplicate") {
+    return jsonResponse(200, { status: "ok", received: dispatches.length, dispatched: 0, skipped: dispatches.length });
+  }
+
+  let dispatched = 0;
+  for (const update of dispatches) {
+    try {
+      await ctx.whatsapp.dispatch(update);
+      dispatched += 1;
+    } catch {
+      // Preserve WebhookAdapter's acknowledge-on-handler-failure contract.
+    }
+  }
+  return jsonResponse(200, { status: "ok", received: dispatches.length, dispatched, skipped: 0 });
+}
+
 function buildSupportedMessageBody(body: unknown): GraphMessagesSendBody | null {
   const text = validateGenericTextMessageBody(body);
   if (text !== null) return text;
@@ -1002,10 +1137,22 @@ function buildSupportedMessageBody(body: unknown): GraphMessagesSendBody | null 
 }
 
 async function handleTextMessage(ctx: RuntimeConfig, request: Request): Promise<Response> {
-  const parsed = await parseJsonRequest(request);
+  const rawBody = await readRequestText(request);
+  if (rawBody === "malformed") return errorResponse(400, "malformed_json", "Request body must be valid JSON.");
+  const parsed = parseJsonText(rawBody);
   if (parsed === "malformed") return errorResponse(400, "malformed_json", "Request body must be valid JSON.");
   const input = validateTextBody(parsed);
   if (input === null) return errorResponse(400, "malformed_body", "Text message body is invalid.");
+
+  const idempotencyKey = safeIdempotencyKey(request);
+  if (idempotencyKey === "invalid") return errorResponse(400, "invalid_idempotency_key", "Idempotency-Key is invalid.");
+  const requestHash = idempotencyKey !== null && ctx.persistence !== undefined ? `sha256:${await sha256Hex(rawBody)}` : null;
+  if (idempotencyKey !== null && requestHash !== null && ctx.persistence !== undefined) {
+    const existing = await ctx.persistence.getServiceRequest({ idempotencyKey, requestHash });
+    if (existing === "conflict") return errorResponse(409, "idempotency_conflict", "Idempotency-Key conflicts with a different request body.");
+    if (existing !== null) return jsonTextResponse(200, existing.responseJson);
+  }
+
   const payload: GraphMessagesSendBody = {
     messaging_product: "whatsapp",
     to: input.to,
@@ -1020,6 +1167,12 @@ async function handleTextMessage(ctx: RuntimeConfig, request: Request): Promise<
       text: payload.text.body,
       previewUrl: input.previewUrl
     });
+    if (idempotencyKey !== null && requestHash !== null && ctx.persistence !== undefined) {
+      const responseJson = responseToJsonText(result);
+      if (responseJson !== null) {
+        await ctx.persistence.recordServiceRequest({ idempotencyKey, requestHash, responseJson, createdAt: new Date().toISOString() });
+      }
+    }
     return jsonResponse(200, result);
   } catch {
     return errorResponse(502, "graph_request_failed", "Graph request failed.");
@@ -1027,10 +1180,22 @@ async function handleTextMessage(ctx: RuntimeConfig, request: Request): Promise<
 }
 
 async function handleGenericMessage(ctx: RuntimeConfig, request: Request): Promise<Response> {
-  const parsed = await parseJsonRequest(request);
+  const rawBody = await readRequestText(request);
+  if (rawBody === "malformed") return errorResponse(400, "malformed_json", "Request body must be valid JSON.");
+  const parsed = parseJsonText(rawBody);
   if (parsed === "malformed") return errorResponse(400, "malformed_json", "Request body must be valid JSON.");
   const body = buildSupportedMessageBody(parsed);
   if (body === null) return errorResponse(400, "malformed_body", "Message body is invalid or unsupported.");
+
+  const idempotencyKey = safeIdempotencyKey(request);
+  if (idempotencyKey === "invalid") return errorResponse(400, "invalid_idempotency_key", "Idempotency-Key is invalid.");
+  const requestHash = idempotencyKey !== null && ctx.persistence !== undefined ? `sha256:${await sha256Hex(rawBody)}` : null;
+  if (idempotencyKey !== null && requestHash !== null && ctx.persistence !== undefined) {
+    const existing = await ctx.persistence.getServiceRequest({ idempotencyKey, requestHash });
+    if (existing === "conflict") return errorResponse(409, "idempotency_conflict", "Idempotency-Key conflicts with a different request body.");
+    if (existing !== null) return jsonTextResponse(200, existing.responseJson);
+  }
+
   try {
     const result = await ctx.graphClient.request({
       method: "POST",
@@ -1038,6 +1203,12 @@ async function handleGenericMessage(ctx: RuntimeConfig, request: Request): Promi
       body,
       headers: { "content-type": "application/json" }
     });
+    if (idempotencyKey !== null && requestHash !== null && ctx.persistence !== undefined) {
+      const responseJson = responseToJsonText(result);
+      if (responseJson !== null) {
+        await ctx.persistence.recordServiceRequest({ idempotencyKey, requestHash, responseJson, createdAt: new Date().toISOString() });
+      }
+    }
     return jsonResponse(200, result);
   } catch {
     return errorResponse(502, "graph_request_failed", "Graph request failed.");
@@ -1056,6 +1227,7 @@ function makeRuntimeConfig(config: WatsServiceConfig): RuntimeConfig {
   const transport = validateTransport(config.transport);
   const cryptoProvider = validateCryptoProvider(config.cryptoProvider);
   const suppliedWhatsapp = validateWhatsapp(config.whatsapp);
+  const persistence = validatePersistence(config.persistence);
 
   const graphClient = new GraphClient({
     accessToken: secrets.accessToken,
@@ -1081,6 +1253,8 @@ function makeRuntimeConfig(config: WatsServiceConfig): RuntimeConfig {
     secrets,
     graphClient,
     whatsapp,
+    ...(cryptoProvider !== undefined ? { cryptoProvider } : {}),
+    ...(persistence !== undefined ? { persistence } : {}),
     webhookHandler: createFetchWebhookHandler(webhookAdapter),
     webhookPath,
     apiPrefix,
@@ -1120,7 +1294,7 @@ export function createWatsServiceApp(config: WatsServiceConfig): WatsServiceApp 
 
       if (path === ctx.webhookPath) {
         if (method !== "GET" && method !== "POST") return methodNotAllowed("GET, POST");
-        return ctx.webhookHandler(request);
+        return handleWebhook(ctx, request);
       }
 
       if (path === ctx.textPath) {

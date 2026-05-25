@@ -6,6 +6,7 @@ export type PersistenceBackend = "sqlite" | "postgres";
 export type PersistenceErrorCode =
   | "invalid_options"
   | "invalid_filename"
+  | "invalid_record"
   | "migration_failed"
   | "migration_checksum_mismatch"
   | "migration_lock_failed"
@@ -24,10 +25,33 @@ export interface PersistenceHealth {
   readonly redactedLocation: string;
 }
 
+export interface WebhookEventRecordInput {
+  readonly eventKey: string;
+  readonly eventHash: string;
+  readonly receivedAt: string;
+}
+
+export type WebhookEventRecordResult = "recorded" | "duplicate";
+
+export interface ServiceRequestLookupInput {
+  readonly idempotencyKey: string;
+  readonly requestHash: string;
+}
+
+export interface ServiceRequestRecordInput extends ServiceRequestLookupInput {
+  readonly responseJson: string;
+  readonly createdAt: string;
+}
+
+export type ServiceRequestLookupResult = null | "conflict" | { readonly responseJson: string };
+
 export interface PersistenceStore {
   readonly backend: PersistenceBackend;
   migrate(): Promise<MigrationReport>;
   health(): Promise<PersistenceHealth>;
+  recordWebhookEvent(input: WebhookEventRecordInput): Promise<WebhookEventRecordResult>;
+  getServiceRequest(input: ServiceRequestLookupInput): Promise<ServiceRequestLookupResult>;
+  recordServiceRequest(input: ServiceRequestRecordInput): Promise<void>;
   close(): Promise<void>;
 }
 

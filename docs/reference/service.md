@@ -182,9 +182,14 @@ Common HTTP error codes:
 
 ## Persistence boundary
 
-WATS-120 adds experimental `@wats/persistence` contracts plus a SQLite local adapter. There is still no persistence integration in current `@wats/service` runtime.
+WATS-121 adds optional `PersistenceStore` injection to `createWatsServiceApp(...)`. The service does not read database environment variables directly; callers pass an already-created store.
 
-Future WATS-121 service integration should accept an injected `PersistenceStore` instead of reading database environment variables directly. The service must not log secrets or raw webhook bodies through persistence diagnostics, and persistence failures must not expose database URLs, access tokens, app secrets, webhook verify tokens, service bearer tokens, message text, or raw webhook envelopes.
+When persistence is injected:
+
+- signed webhook POSTs are recorded by event key/hash and duplicate deliveries are acknowledged without redispatching the same update;
+- message send routes honor `Idempotency-Key`: matching key/body hash replays the stored response, while the same key with a different body returns `409 idempotency_conflict`.
+
+The service must not log secrets or raw webhook bodies through persistence diagnostics, and persistence failures must not expose database URLs, access tokens, app secrets, webhook verify tokens, service bearer tokens, message text, or raw webhook envelopes.
 
 ## WATS-71/WATS-101 CLI wrappers
 
@@ -204,7 +209,7 @@ WATS-35/WATS-48/WATS-49 do not implement:
 
 - a full Meta Graph API OpenAPI document
 - live Meta credential checks
-- persistence integration, queues, metrics, Docker, TLS, or rate limiting
+- background queues/outbox workers, metrics, Docker, TLS, or rate limiting
 - additional future service message schemas beyond the current WATS-73 text/media/location/contacts/reaction/interactive slices
 
 ## Related
