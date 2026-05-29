@@ -8,13 +8,13 @@ It is intentionally not a single framework. The repository is a toolkit first; t
 
 ## Status
 
-Current release: `0.3.6-alpha-compatibility`.
+Current release: `0.3.7-alpha-compatibility`.
 
 WATS is alpha software. The foundations are in place and tested: Graph transport, endpoint definitions, error taxonomy, webhook verification, runtime-neutral webhook adapters, typed update normalization, filters, routers, listeners, and the `WhatsApp` facade.
 
 Endpoint breadth is still expanding. Today WATS ships text message send, `WhatsApp.startChat(...)` / `PhoneNumberClient.sendText(...)` for arbitrary-recipient text starts, WABA phone-number listing, pagination, WATS-37 media runtime (single-POST upload, metadata resolution, binary download, delete, encrypted decrypt, and upload sessions), WATS-39 templates, WATS-40 flows, WATS-41 calling, WATS-42A read-only business-management inventory (`getWabaInfo`, subscribed-app listing, phone-number info/settings, business profile, and commerce settings), and service `POST {apiPrefix}/messages` routes for text, media, location, contacts, reaction, remove-reaction, and interactive message bodies.
 
-The 0.3.6 line is an alpha compatibility and local-operator patch release. It keeps the safe local setup/live-serve flow, then adds the first experimental `@wats/persistence` SQLite package foundation, optional service idempotency injection, and CLI package version/upgrade checks. `wats setup` writes a safe `wats.config.yaml` with env-secret references plus an ignored `.env.local` for local secrets without making Meta calls. Live serve requires explicit `--live --yes-live --env-file .env.local`; WATS does not read `.env.local` implicitly. Docker image publication, background outbox workers, production hosting, token validation against Meta, and multi-profile credential editing are not included.
+The 0.3.7 line is an alpha compatibility and local-operator patch release. It keeps the safe local setup/live-serve flow and the experimental `@wats/persistence` SQLite package foundation, optional service idempotency injection, and CLI package version/upgrade checks, then adds a container deployment recipe (`deploy/railway/`, see `deploy/railway/README.md`) and an opt-in `WATS_LOG_WEBHOOK_EVENTS` inbound-webhook observability flag. `wats setup` writes a safe `wats.config.yaml` with env-secret references plus an ignored `.env.local` for local secrets without making Meta calls. Live serve requires explicit `--live --yes-live --env-file .env.local`; WATS does not read `.env.local` implicitly. Published Docker registry images, background outbox workers, production hosting, token validation against Meta, and multi-profile credential editing are not included.
 
 ## Shape
 

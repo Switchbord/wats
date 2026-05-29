@@ -371,3 +371,27 @@ Future live harnesses must:
 - write manifests outside the repository;
 - redact before printing any request, response, or error;
 - keep GitHub Actions and default package scripts credential-free.
+
+## Execution log
+
+Authorized live runs are recorded here as redacted, non-secret summaries. This
+section documents that an operator-authorized campaign occurred; it does not
+change the default credential-free posture. Each entry must omit tokens, app
+secrets, verify tokens, and recipient PII.
+
+### 2026-05-29 — Railway container, outbound + status webhooks
+
+- Environment: WATS deployed as a container on Railway, live mode
+  (`WATS_SERVE_MODE=live`), public HTTPS callback. See
+  `deploy/railway/README.md`.
+- Authorization: explicit operator authorization for a disposable test number;
+  token deactivated after the run.
+- Outbound text and approved-template sends returned HTTP 200 with real Meta
+  message ids (`accepted`).
+- Meta delivered `status` webhooks to the WATS service; with
+  `WATS_LOG_WEBHOOK_EVENTS=1` the service logged normalized `kind="status"`
+  updates (wabaId/phoneNumberId only, no PII), confirming HMAC verification,
+  webhook normalization, router dispatch, and acknowledgement end to end.
+- Result: outbound send and inbound `status` webhook delivery are
+  live-validated for the test asset. Inbound `message` and richer update
+  families remain to be exercised with recipient-initiated traffic.

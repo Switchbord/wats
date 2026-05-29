@@ -1,0 +1,15 @@
+# Build context hygiene for the WATS Docker image.
+# The builder stage reinstalls deps and rebuilds dist, so exclude them from the
+# context to keep uploads small and reproducible. examples/ is kept because the
+# root package.json declares it as a Bun workspace (install fails without it).
+.git
+node_modules
+**/node_modules
+**/dist
+docs
+.hermes
+*.log
+*.pdf
+*.tex
+coverage
+.DS_Store
