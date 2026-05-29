@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.3.8] - 2026-05-29
+
+Patch alpha compatibility and local-operator release. Enriches inbound-webhook observability and adds an opt-in demo auto-reply, validated against live Meta infrastructure (operator-authorized disposable test asset).
+
+### Enriched webhook observability
+
+- `WATS_LOG_WEBHOOK_EVENTS=1` now logs a PII-safe `detail` alongside each dispatched update: the normalized message type (`text`, `image`, `interactive`, `reaction`, ...) for `message` updates, or the status value (`sent`/`delivered`/`read`/...) for `status` updates. No message text or sender id is logged.
+
+### Opt-in demo auto-reply
+
+- Adds `WATS_ECHO_REPLY=1` to `@wats/service`: the service-built facade replies to inbound text messages with a fixed acknowledgement, exercising the dispatch-to-send round-trip in a single process. Auto-reply failures never affect webhook acknowledgement. Isolated and fork-strippable; unset (default) registers no responder.
+
+### Live validation
+
+- Live-validated on the container deployment: outbound text/template/interactive sends, the full `sent`/`delivered`/`read` status lifecycle, inbound `text` and `interactive` (button-tap) messages, all verified, normalized, and dispatched end to end. See `docs/parity/live-testing-campaign.md` Execution log.
+- No automatic live Meta validation campaign execution, token validation against Meta, credential collection, or production publication is performed by default; live runs require explicit operator authorization and gated flags.
+
+### Release metadata
+
+- Release metadata is aligned for 0.3.8 across the root manifest and the publishable `@wats/*` packages, preserving the canonical `@wats/*` package scope, the credential-gated live `wats serve` flow, and the WATS-126 CLI version/upgrade UX.
+
 ## [0.3.7] - 2026-05-29
 
 Patch alpha compatibility and local-operator release for WATS. This release adds a container deployment recipe and opt-in inbound-webhook observability, validated against live Meta infrastructure with an operator-authorized disposable test asset.
