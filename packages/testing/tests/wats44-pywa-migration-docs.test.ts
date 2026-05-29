@@ -87,7 +87,8 @@ describe("WATS-44 pywa migration docs", () => {
       "## Redaction rules",
       "## Cleanup and rollback",
       "## Abort criteria",
-      "## Docs and test locks"
+      "## Docs and test locks",
+      "## Execution log"
     ]);
 
     expectAll(campaign, [

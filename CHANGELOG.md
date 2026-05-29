@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.3.7] - 2026-05-29
+
+Patch alpha compatibility and local-operator release for WATS. This release adds a container deployment recipe and opt-in inbound-webhook observability, validated against live Meta infrastructure with an operator-authorized disposable test asset.
+
+### Container deployment (Railway)
+
+- Adds `Dockerfile`, `railway.json`, and `deploy/railway/` (Bun multi-stage image, `$PORT`/`0.0.0.0` entrypoint shim, healthcheck config-as-code, deploy README). Railway auto-detects the Dockerfile and provides the public HTTPS callback URL Meta requires.
+- The entrypoint maps the platform environment onto explicit `wats serve` flags and materializes the live env-file/config at startup from service variables; secrets are never baked into image layers.
+- Published Docker registry images, background outbox workers, and production hosting remain out of scope.
+
+### Opt-in inbound webhook observability
+
+- Adds `WATS_LOG_WEBHOOK_EVENTS=1` to `@wats/service`: logs a compact, redaction-safe summary (`kind`, `updateId`, `wabaId`, `phoneNumberId`, timestamp) of each dispatched webhook update to stdout. No message text or recipient PII is logged.
+- Isolated and fork-strippable: unset (default) registers no handler and leaves behavior unchanged. Only attached to a service-built facade.
+
+### Live validation execution log
+
+- Records an operator-authorized live run (see `docs/parity/live-testing-campaign.md` Execution log): outbound text and approved-template sends returned real Meta message ids, and Meta-delivered `status` webhooks were verified and dispatched end to end.
+- No automatic live Meta validation campaign execution, token validation against Meta, credential collection, or production publication is performed by default; live runs require explicit operator authorization and gated flags.
+
+### Release metadata
+
+- Release metadata is aligned for 0.3.7 across the root manifest and the publishable `@wats/*` packages, preserving the canonical `@wats/*` package scope, the credential-gated live `wats serve` flow, and the WATS-126 CLI version/upgrade UX.
+
 ## [0.3.6] - 2026-05-25
 
 Patch alpha persistence and local-operator release for WATS. This release publishes the post-0.3.5 SQLite persistence foundation, service idempotency integration, and CLI package version/upgrade UX.

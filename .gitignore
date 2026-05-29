@@ -28,8 +28,14 @@ bun-debug.log*
 wats.config.yaml
 wats.config.yml
 wats.config.json
+# ...but the Railway deploy placeholder config (env-secret refs only, no real
+# secrets) must ship in the build context.
+!deploy/railway/wats.config.yaml
 
 # OS / editor
 .DS_Store
 .vscode/
 .idea/
+
+# Local Hermes planning scratch (not part of the package)
+.hermes/

@@ -1,5 +1,5 @@
 import type { WatsProfileConfig } from "@wats/config";
-import { WhatsApp } from "@wats/core";
+import { WhatsApp, filtersTyped } from "@wats/core";
 import {
   buildSendAudioPayload,
   buildSendDocumentPayload,
@@ -117,7 +117,7 @@ const JSON_CONTENT_TYPE = "application/json; charset=utf-8";
 const SERVICE_NAME = "wats";
 const OPENAPI_PATH = "/openapi.json";
 const DEFAULT_OPENAPI_TITLE = "WATS Service API";
-const DEFAULT_OPENAPI_VERSION = "0.3.6";
+const DEFAULT_OPENAPI_VERSION = "0.3.7";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -1215,6 +1215,13 @@ async function handleGenericMessage(ctx: RuntimeConfig, request: Request): Promi
   }
 }
 
+function readWebhookLogFlag(): boolean {
+  // Single isolated env read for opt-in observability. Kept narrow on purpose:
+  // the service is otherwise env-agnostic and takes resolved config/secrets.
+  const raw = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.WATS_LOG_WEBHOOK_EVENTS;
+  return raw === "1" || raw === "true";
+}
+
 function makeRuntimeConfig(config: WatsServiceConfig): RuntimeConfig {
   if (!isRecord(config)) {
     throw new WatsServiceError("invalid_config", "config must be an object.");
@@ -1235,11 +1242,43 @@ function makeRuntimeConfig(config: WatsServiceConfig): RuntimeConfig {
     baseUrl: profile.graph.baseUrl,
     ...(transport !== undefined ? { transport } : {})
   });
-  const whatsapp = suppliedWhatsapp ?? new WhatsApp({
-    graphClient,
-    phoneNumberId: profile.whatsapp.phoneNumberId,
-    wabaId: profile.whatsapp.wabaId
-  });
+  let whatsapp: WebhookFacadeLike;
+  if (suppliedWhatsapp !== undefined) {
+    whatsapp = suppliedWhatsapp;
+  } else {
+    const facade = new WhatsApp({
+      graphClient,
+      phoneNumberId: profile.whatsapp.phoneNumberId,
+      wabaId: profile.whatsapp.wabaId
+    });
+    // Opt-in inbound webhook observability (WATS_LOG_WEBHOOK_EVENTS=1). Logs a
+    // compact, redaction-safe summary of every dispatched update to stdout so
+    // operators can confirm live receipt of messages/statuses without exposing
+    // message text or PII. Isolated and fork-strippable: when the flag is unset
+    // (default) no handler is registered and behavior is unchanged.
+    if (readWebhookLogFlag()) {
+      facade.on(
+        filtersTyped.custom((u): u is import("@wats/core").TypedUpdate => u !== undefined),
+        (ctx) => {
+          const update = ctx.update;
+          try {
+            // eslint-disable-next-line no-console
+            console.log(JSON.stringify({
+              event: "wats.webhook.update",
+              kind: update.kind ?? "unknown",
+              updateId: (update as { updateId?: string }).updateId ?? null,
+              wabaId: (update as { wabaId?: string }).wabaId ?? null,
+              phoneNumberId: (update as { phoneNumberId?: string }).phoneNumberId ?? null,
+              at: new Date().toISOString()
+            }));
+          } catch {
+            // Never let logging affect dispatch.
+          }
+        }
+      );
+    }
+    whatsapp = facade;
+  }
   const webhookAdapter = createWebhookAdapter({
     verifyToken: secrets.webhookVerifyToken,
     appSecret: secrets.webhookAppSecret,

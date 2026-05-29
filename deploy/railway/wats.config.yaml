@@ -1,0 +1,26 @@
+version: 1
+defaultProfile: railway
+profiles:
+  railway:
+    graph:
+      apiVersion: v25.0
+      baseUrl: https://graph.facebook.com
+    whatsapp:
+      wabaId: "000000000000000"
+      phoneNumberId: "00000000000"
+    auth:
+      accessToken:
+        env: WATS_ACCESS_TOKEN
+    webhook:
+      path: /webhooks/whatsapp
+      verifyToken:
+        env: WATS_VERIFY_TOKEN
+      appSecret:
+        env: WATS_APP_SECRET
+      maxBodyBytes: 1048576
+    service:
+      host: 0.0.0.0
+      port: 8080
+      apiPrefix: /api
+      bearerToken:
+        env: WATS_SERVICE_TOKEN
