@@ -117,7 +117,7 @@ const JSON_CONTENT_TYPE = "application/json; charset=utf-8";
 const SERVICE_NAME = "wats";
 const OPENAPI_PATH = "/openapi.json";
 const DEFAULT_OPENAPI_TITLE = "WATS Service API";
-const DEFAULT_OPENAPI_VERSION = "0.3.7";
+const DEFAULT_OPENAPI_VERSION = "0.3.8";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -1222,6 +1222,15 @@ function readWebhookLogFlag(): boolean {
   return raw === "1" || raw === "true";
 }
 
+function readEchoReplyFlag(): boolean {
+  // Opt-in demo auto-reply (WATS_ECHO_REPLY=1). When set, the service-built
+  // facade replies to inbound text messages with a fixed acknowledgement,
+  // exercising the dispatch -> outbound round-trip in a single process. Isolated
+  // and fork-strippable; unset (default) registers no responder.
+  const raw = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.WATS_ECHO_REPLY;
+  return raw === "1" || raw === "true";
+}
+
 function makeRuntimeConfig(config: WatsServiceConfig): RuntimeConfig {
   if (!isRecord(config)) {
     throw new WatsServiceError("invalid_config", "config must be an object.");
@@ -1262,10 +1271,22 @@ function makeRuntimeConfig(config: WatsServiceConfig): RuntimeConfig {
         (ctx) => {
           const update = ctx.update;
           try {
+            // Derive a PII-safe detail: the discriminant of the normalized
+            // message (text/image/reaction/interactive/...) or the status value
+            // (sent/delivered/read/...). Never the message text or sender id.
+            let detail: string | null = null;
+            if (update.kind === "message") {
+              const msg = (update as { message?: { type?: string } }).message;
+              detail = typeof msg?.type === "string" ? msg.type : null;
+            } else if (update.kind === "status") {
+              const st = (update as { status?: { status?: string } }).status;
+              detail = typeof st?.status === "string" ? st.status : null;
+            }
             // eslint-disable-next-line no-console
             console.log(JSON.stringify({
               event: "wats.webhook.update",
               kind: update.kind ?? "unknown",
+              detail,
               updateId: (update as { updateId?: string }).updateId ?? null,
               wabaId: (update as { wabaId?: string }).wabaId ?? null,
               phoneNumberId: (update as { phoneNumberId?: string }).phoneNumberId ?? null,
@@ -1273,6 +1294,29 @@ function makeRuntimeConfig(config: WatsServiceConfig): RuntimeConfig {
             }));
           } catch {
             // Never let logging affect dispatch.
+          }
+        }
+      );
+    }
+    // Opt-in demo auto-reply (WATS_ECHO_REPLY=1). Replies to inbound text
+    // messages with a fixed acknowledgement, exercising the dispatch -> send
+    // round-trip in one process. Only the `message` kind with a text body and a
+    // valid `from` triggers a reply; failures are swallowed so a send error can
+    // never break webhook acknowledgement. Isolated and fork-strippable.
+    if (readEchoReplyFlag()) {
+      facade.on(
+        filtersTyped.message.text(),
+        async (ctx) => {
+          try {
+            const msg = (ctx.update as { message?: { from?: string } }).message;
+            const from = typeof msg?.from === "string" ? msg.from : null;
+            if (from === null) return;
+            await facade.startChat({
+              to: from,
+              text: "Received by WATS. (automated echo — live deployment test)"
+            });
+          } catch {
+            // Never let an auto-reply failure affect webhook acknowledgement.
           }
         }
       );

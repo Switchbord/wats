@@ -70,3 +70,12 @@ dispatched webhook update to stdout:
 It logs only `kind` + ids (no message text or PII), is opt-in, and is isolated —
 unset (default) registers no handler and leaves behavior unchanged. Useful for
 confirming live receipt of `message` / `status` webhooks via `railway logs`.
+
+## Demo auto-reply
+
+Set `WATS_ECHO_REPLY=1` to make the service reply to inbound text messages with a
+fixed acknowledgement ("Received by WATS."). This exercises the dispatch-to-send
+round-trip in one process — a minimal bot. Auto-reply failures never affect
+webhook acknowledgement. Opt-in and fork-strippable; unset (default) does nothing.
+The enriched `WATS_LOG_WEBHOOK_EVENTS` log also includes a PII-safe `detail`
+(message type or status value).
