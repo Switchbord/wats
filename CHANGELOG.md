@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.9] - 2026-05-30
+
+Patch alpha compatibility and local-operator release. Makes the opt-in demo auto-reply observable.
+
+### Observable echo auto-reply
+
+- The `WATS_ECHO_REPLY` demo responder now logs a PII-safe outcome for each attempt: `wats.echo.reply` with `outcome: "sent"` (and whether a Meta message id was returned), or `outcome: "failed"` with the mapped Meta error code/subcode and error name. No message text, sender id, or secrets are logged. This makes a reply blocked by WhatsApp's 24-hour customer-service window observable instead of silently swallowed; send failures still never affect webhook acknowledgement.
+
+### Release metadata
+
+- Release metadata is aligned for 0.3.9 across the root manifest and the publishable `@wats/*` packages, preserving the canonical `@wats/*` package scope, the credential-gated live `wats serve` flow, and the WATS-126 CLI version/upgrade UX.
+
 ## [0.3.8] - 2026-05-29
 
 Patch alpha compatibility and local-operator release. Enriches inbound-webhook observability and adds an opt-in demo auto-reply, validated against live Meta infrastructure (operator-authorized disposable test asset).
