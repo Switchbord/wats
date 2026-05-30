@@ -117,7 +117,7 @@ const JSON_CONTENT_TYPE = "application/json; charset=utf-8";
 const SERVICE_NAME = "wats";
 const OPENAPI_PATH = "/openapi.json";
 const DEFAULT_OPENAPI_TITLE = "WATS Service API";
-const DEFAULT_OPENAPI_VERSION = "0.3.8";
+const DEFAULT_OPENAPI_VERSION = "0.3.9";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -1307,16 +1307,40 @@ function makeRuntimeConfig(config: WatsServiceConfig): RuntimeConfig {
       facade.on(
         filtersTyped.message.text(),
         async (ctx) => {
+          const msg = (ctx.update as { message?: { from?: string } }).message;
+          const from = typeof msg?.from === "string" ? msg.from : null;
+          if (from === null) return;
           try {
-            const msg = (ctx.update as { message?: { from?: string } }).message;
-            const from = typeof msg?.from === "string" ? msg.from : null;
-            if (from === null) return;
-            await facade.startChat({
+            const result = await facade.startChat({
               to: from,
               text: "Received by WATS. (automated echo — live deployment test)"
             });
-          } catch {
-            // Never let an auto-reply failure affect webhook acknowledgement.
+            const sentId = (result as { messages?: ReadonlyArray<{ id?: string }> }).messages?.[0]?.id;
+            // eslint-disable-next-line no-console
+            console.log(JSON.stringify({
+              event: "wats.echo.reply",
+              outcome: "sent",
+              sent: typeof sentId === "string",
+              at: new Date().toISOString()
+            }));
+          } catch (error) {
+            // Surface a PII-safe failure reason (Meta error code/subcode if the
+            // SDK mapped one) so a failed auto-reply is observable instead of
+            // silently swallowed. Never re-throw: a send failure must not break
+            // webhook acknowledgement.
+            const e = (error ?? undefined) as { code?: number; errorSubcode?: number } | undefined;
+            const code = e?.code;
+            const subcode = e?.errorSubcode;
+            const name = error instanceof Error ? error.name : "Error";
+            // eslint-disable-next-line no-console
+            console.log(JSON.stringify({
+              event: "wats.echo.reply",
+              outcome: "failed",
+              errorName: name,
+              metaCode: typeof code === "number" ? code : null,
+              metaSubcode: typeof subcode === "number" ? subcode : null,
+              at: new Date().toISOString()
+            }));
           }
         }
       );

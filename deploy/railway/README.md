@@ -78,4 +78,6 @@ fixed acknowledgement ("Received by WATS."). This exercises the dispatch-to-send
 round-trip in one process — a minimal bot. Auto-reply failures never affect
 webhook acknowledgement. Opt-in and fork-strippable; unset (default) does nothing.
 The enriched `WATS_LOG_WEBHOOK_EVENTS` log also includes a PII-safe `detail`
-(message type or status value).
+(message type or status value). Each echo attempt logs a PII-safe outcome
+(`wats.echo.reply`: `sent`, or `failed` with the Meta error code/subcode), so a
+reply blocked by the 24-hour window is observable rather than silent.
