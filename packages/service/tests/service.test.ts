@@ -217,6 +217,75 @@ describe("WATS-34 service bearer auth and message APIs", () => {
     });
   });
 
+  test("POST /messages/text surfaces sanitized Meta Graph error details", async () => {
+    const mock = createMockTransport({
+      defaultResponse: {
+        status: 400,
+        body: {
+          error: {
+            message: "(#131030) Recipient phone number not in allowed list",
+            code: 131030,
+            error_subcode: 2494073,
+            type: "OAuthException",
+            fbtrace_id: "TRACE123"
+          }
+        }
+      }
+    });
+    const app = createWatsServiceApp(config({ transport: mock.transport }));
+
+    const res = await app.fetch(new Request("https://service.test/api/messages/text", authed({
+      to: "15550001111",
+      text: "hello"
+    })));
+
+    const text = await res.clone().text();
+    expect(res.status).toBe(502);
+    expect(await json(res)).toEqual({
+      error: {
+        code: "graph_request_failed",
+        message: "Graph request failed.",
+        metaCode: 131030,
+        metaSubcode: 2494073,
+        metaType: "OAuthException",
+        fbtraceId: "TRACE123"
+      }
+    });
+    expect(text).not.toContain("graph-access-token");
+    expect(text).not.toContain("Recipient phone number");
+  });
+
+  test("POST /messages surfaces sanitized Meta Graph error details", async () => {
+    const mock = createMockTransport({
+      defaultResponse: {
+        status: 400,
+        body: { error: { message: "Template paused", code: 132015, type: "OAuthException", fbtrace_id: "TRACE456" } }
+      }
+    });
+    const app = createWatsServiceApp(config({ transport: mock.transport }));
+
+    const res = await app.fetch(new Request("https://service.test/api/messages", authed({
+      messaging_product: "whatsapp",
+      to: "15550001111",
+      type: "text",
+      text: { body: "generic" }
+    })));
+
+    const text = await res.clone().text();
+    expect(res.status).toBe(502);
+    expect(await json(res)).toEqual({
+      error: {
+        code: "graph_request_failed",
+        message: "Graph request failed.",
+        metaCode: 132015,
+        metaType: "OAuthException",
+        fbtraceId: "TRACE456"
+      }
+    });
+    expect(text).not.toContain("graph-access-token");
+    expect(text).not.toContain("Template paused");
+  });
+
   test("POST /messages accepts generic supported message body passthrough", async () => {
     const mock = createMockTransport({
       defaultResponse: { status: 200, body: { messages: [{ id: "wamid.GENERIC" }] } }

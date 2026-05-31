@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.11] - 2026-05-30
+
+Patch alpha compatibility and local-operator release. Surfaces PII-safe Meta Graph error diagnostics from service send routes.
+
+### Service Graph error diagnostics
+
+- `POST /api/messages/text` and `POST /api/messages` 502 responses now preserve the stable `graph_request_failed` code while adding sanitized Meta details when available: `metaCode`, `metaSubcode`, `metaType`, and `fbtraceId`.
+- The service deliberately omits Meta's free-form `error.message` because it may quote request/account identifiers; no access token, service bearer, app secret, verify token, authorization header, or request body is returned.
+- The OpenAPI `ErrorEnvelope` and service reference now document the optional diagnostic fields.
+
+### Release metadata
+
+- Release metadata is aligned for 0.3.11 across the root manifest and the publishable `@wats/*` packages, preserving the canonical `@wats/*` package scope and credential-gated live `wats serve` flow.
+
 ## [0.3.10] - 2026-05-30
 
 Patch alpha compatibility and local-operator release. Adds opt-in ky-like Graph transport reliability without introducing a dependency.
