@@ -196,10 +196,11 @@ describe("F-4 @wats/graph consumer fixture", () => {
 
     // Required phrases that anchor the guide's three required sections:
     //   1. MockTransport recipe for tests.
-    //   2. Custom Transport recipe (e.g. retry/auth-refresh/tracing).
+    //   2. Opt-in reliable Transport recipe (retry/backoff/timeout).
     //   3. Interceptor primer.
     expect(source).toContain("createMockTransport");
-    expect(source).toContain("Custom Transport");
+    expect(source).toContain("createReliableTransport");
+    expect(source).toContain("Opt-in reliable transport");
     expect(source).toContain("Interceptor");
     expect(source).toContain("@wats/graph/testing");
   });

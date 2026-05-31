@@ -162,10 +162,10 @@ WATS-42A implements read-only business/admin inventory: WABA info, subscribed-ap
 ### Media credential-gated validation (WATS-37)
 - live Meta checks for upload / metadata / binary download / delete / decrypt / upload-session behavior
 
-### Rate-limit retry / backoff
-- decorator on `Transport` honouring `Retry-After`
-- jittered backoff for `GraphRateLimitError`
-- per-endpoint concurrency caps
+### Rate-limit retry / backoff (WATS-86)
+- `@wats/graph` ships opt-in `createReliableTransport(inner, policy)` for ky-like retries/backoff/timeouts without an external dependency.
+- Retries transient `GET`/`DELETE` failures (`GraphNetworkError`, HTTP `429`, HTTP `5xx`) with bounded exponential full-jitter backoff, honors `Retry-After`, and composes per-attempt `timeoutMs` with caller `AbortSignal`.
+- Non-idempotent `POST`/`PUT`/`PATCH` failure retries stay off by default to avoid duplicate WhatsApp sends; HTTP `429` is the narrow rate-limit exception across methods. Per-endpoint concurrency caps remain future work.
 
 ### Observability standardization
 - OpenTelemetry span emission from `TypedRouter` + `GraphClient`

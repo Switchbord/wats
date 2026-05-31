@@ -14,6 +14,7 @@ import * as templatesSubpath from "@wats/graph/endpoints/templates";
 import * as flowsSubpath from "@wats/graph/endpoints/flows";
 import * as callingSubpath from "@wats/graph/endpoints/calling";
 import * as businessManagementSubpath from "@wats/graph/endpoints/business-management";
+import * as transportSubpath from "@wats/graph/transport";
 import {
   GraphApiError,
   GraphAuthError,
@@ -50,6 +51,7 @@ import {
   clearErrorRegistry,
   createGraphApiError,
   createFetchTransport,
+  createReliableTransport,
   decryptEncryptedMedia,
   deleteMedia,
   defineEndpoint,
@@ -161,6 +163,10 @@ async function verify(): Promise<VerifyReportOk> {
     typeof GraphClient.prototype.requestRaw === "function";
   checks["createFetchTransport is a function"] =
     typeof createFetchTransport === "function";
+  checks["createReliableTransport is a function"] =
+    typeof createReliableTransport === "function";
+  checks["transport subpath exposes createReliableTransport"] =
+    typeof transportSubpath.createReliableTransport === "function";
   checks["createMockTransport is a function"] =
     typeof createMockTransport === "function";
   checks["scrubErrorCause is a function"] =
