@@ -178,7 +178,21 @@ Common HTTP error codes:
 - `401` missing or invalid service bearer token
 - `404` route not found
 - `405` method not allowed
-- `502` Graph request failure
+- `502` Graph request failure. When the underlying `GraphApiError` exposes sanitized Meta details, the body includes `metaCode`, `metaSubcode`, `metaType`, and `fbtraceId` alongside the stable `graph_request_failed` code. The service deliberately omits Meta's free-form error message because it may quote request/account identifiers; it never includes access tokens, app secrets, verify tokens, service bearer tokens, request bodies, or `Authorization` headers.
+
+Example:
+
+```json
+{
+  "error": {
+    "code": "graph_request_failed",
+    "message": "Graph request failed.",
+    "metaCode": 131030,
+    "metaType": "OAuthException",
+    "fbtraceId": "TRACE123"
+  }
+}
+```
 
 ## Persistence boundary
 

@@ -18,6 +18,7 @@ import {
   buildSendReactionPayload,
   buildSendStickerPayload,
   buildSendVideoPayload,
+  GraphApiError,
   GraphClient,
   GraphRequestValidationError,
   type GraphMessagesSendBody,
@@ -117,7 +118,7 @@ const JSON_CONTENT_TYPE = "application/json; charset=utf-8";
 const SERVICE_NAME = "wats";
 const OPENAPI_PATH = "/openapi.json";
 const DEFAULT_OPENAPI_TITLE = "WATS Service API";
-const DEFAULT_OPENAPI_VERSION = "0.3.10";
+const DEFAULT_OPENAPI_VERSION = "0.3.11";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -231,6 +232,20 @@ function jsonResponse(status: number, payload: unknown, headers?: HeadersInit): 
 
 function errorResponse(status: number, code: string, message?: string, headers?: HeadersInit): Response {
   return jsonResponse(status, { error: { code, ...(message ? { message } : {}) } }, headers);
+}
+
+function graphFailureResponse(error: unknown): Response {
+  const payload: Record<string, unknown> = {
+    code: "graph_request_failed",
+    message: "Graph request failed."
+  };
+  if (error instanceof GraphApiError) {
+    if (error.code !== undefined) payload.metaCode = error.code;
+    if (error.errorSubcode !== undefined) payload.metaSubcode = error.errorSubcode;
+    if (error.type !== undefined) payload.metaType = error.type;
+    if (error.fbtraceId !== undefined) payload.fbtraceId = error.fbtraceId;
+  }
+  return jsonResponse(502, { error: payload });
 }
 
 function methodNotAllowed(allow: string): Response {
@@ -457,7 +472,11 @@ function createOpenApiSchemas(): Record<string, Record<string, unknown>> {
           required: ["code"],
           properties: {
             code: { type: "string" },
-            message: { type: "string" }
+            message: { type: "string" },
+            metaCode: { type: "integer", description: "Sanitized Meta Graph error code when available." },
+            metaSubcode: { type: "integer", description: "Sanitized Meta Graph error subcode when available." },
+            metaType: { type: "string", description: "Sanitized Meta Graph error type when available." },
+            fbtraceId: { type: "string", description: "Meta trace id for support correlation when available." }
           }
         }
       }
@@ -1174,8 +1193,8 @@ async function handleTextMessage(ctx: RuntimeConfig, request: Request): Promise<
       }
     }
     return jsonResponse(200, result);
-  } catch {
-    return errorResponse(502, "graph_request_failed", "Graph request failed.");
+  } catch (error) {
+    return graphFailureResponse(error);
   }
 }
 
@@ -1210,8 +1229,8 @@ async function handleGenericMessage(ctx: RuntimeConfig, request: Request): Promi
       }
     }
     return jsonResponse(200, result);
-  } catch {
-    return errorResponse(502, "graph_request_failed", "Graph request failed.");
+  } catch (error) {
+    return graphFailureResponse(error);
   }
 }
 
