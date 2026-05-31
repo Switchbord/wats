@@ -63,3 +63,11 @@ export interface TransportInterceptor {
     res: TransportResponse
   ): TransportResponse | Promise<TransportResponse>;
 }
+
+export {
+  createReliableTransport
+} from "./reliableTransport.js";
+export type {
+  ReliableTransportOptions,
+  ReliableTransportRetryContext
+} from "./reliableTransport.js";

@@ -83,55 +83,39 @@ Response specs can be objects `{ status, headers?, body? }` or functions `(req) 
 
 The handle exposes `respond(spec)` to push into the queue mid-test and `reset()` to clear both the queue and the recorded requests.
 
-## Recipe 2 — Writing a Custom Transport
+## Recipe 2 — Opt-in reliable transport
 
-Any `Transport` is just an object with a `request` method. Wrap the default transport to add retry, auth refresh, or tracing without touching `GraphClient`.
+Any `Transport` is just an object with a `request` method. WATS ships `createReliableTransport` as an opt-in decorator for ky-like retries, backoff, and per-attempt timeouts without adding a dependency or changing the default `GraphClient` behavior.
 
 ```ts
 import {
+  GraphClient,
   createFetchTransport,
-  type Transport,
-  type TransportRequest
+  createReliableTransport
 } from "@wats/graph";
 
-export function createRetryingTransport(
-  inner: Transport,
-  opts: { retries: number; baseDelayMs: number }
-): Transport {
-  return {
-    async request(req, options) {
-      let attempt = 0;
-      for (;;) {
-        try {
-          const res = await inner.request(req, options);
-          if (res.status < 500 || attempt >= opts.retries) {
-            return res;
-          }
-        } catch (error) {
-          if (attempt >= opts.retries) {
-            throw error;
-          }
-        }
-        attempt += 1;
-        const delay = Math.min(opts.baseDelayMs * 2 ** (attempt - 1), 30_000);
-        await new Promise((r) => setTimeout(r, delay));
-      }
-    }
-  };
-}
+const transport = createReliableTransport(createFetchTransport(), {
+  retries: 3,
+  baseDelayMs: 200,
+  maxDelayMs: 30_000,
+  timeoutMs: 10_000,
+  onRetry: ({ attempt, delayMs, response }) => {
+    console.log(`retry ${attempt} after ${response?.status} in ${delayMs}ms`);
+  }
+});
 
-const base = createFetchTransport();
-const retry = createRetryingTransport(base, { retries: 3, baseDelayMs: 200 });
 const client = new GraphClient({
   accessToken: token,
   apiVersion: "v25.0",
-  transport: retry
+  transport
 });
 ```
 
-The same shape composes: `auth-refresh -> retry -> tracing -> fetch`. Each layer is a function that takes `(inner: Transport) => Transport`. Because every layer sees the same `TransportRequest`/`TransportResponse` shape, the layers stay independently testable.
+The decorator retries transient `GET`/`DELETE` failures (`GraphNetworkError`, HTTP `429`, and HTTP `5xx`) using exponential backoff with full jitter. It honors Meta's `Retry-After` header for `429` / `503` responses and caps every delay at `maxDelayMs`. Caller aborts are never retried; per-attempt timeouts compose with a caller-provided `AbortSignal` via native `AbortSignal.any` / `AbortSignal.timeout`.
 
-`TransportRetryPolicy` is exposed as a shared type for retry decorators to consume a standard config: `{ retries, baseDelayMs, maxDelayMs, jitter? }`. The default constant `DEFAULT_TRANSPORT_RETRY_POLICY` exposes conservative values (`retries: 3`, `baseDelayMs: 200`, `maxDelayMs: 30_000`). F-4 does NOT apply retries by default — retry is opt-in.
+WATS does **not** retry non-idempotent `POST` / `PUT` / `PATCH` request failures by default, with one narrow exception: HTTP `429` is treated as a rate-limit response across methods. Retrying `POST /messages` after an ambiguous network failure or `5xx` can double-send a WhatsApp message if Meta received the first request but the client lost the response. If you override `retryOn` to retry those POST failures, pair the request with an application idempotency strategy (for example the service-level `Idempotency-Key` flow). F-4 still applies no retries by default — reliability is explicit, composable, and removable.
+
+The same shape composes: `auth-refresh -> reliability -> tracing -> fetch`. Each layer is a function that takes `(inner: Transport) => Transport`. Because every layer sees the same `TransportRequest`/`TransportResponse` shape, the layers stay independently testable.
 
 ## Recipe 2a — Streaming request bodies (`ReadableStream`)
 

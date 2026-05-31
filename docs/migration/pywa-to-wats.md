@@ -182,7 +182,7 @@ Migration notes:
 
 - Do not match Python class names in TypeScript code; import WATS subclasses from `@wats/graph`.
 - WATS validation failures reject before transport with WATS-specific validation errors.
-- Rate-limit retry/backoff is still a planned transport decorator, not automatic.
+- Rate-limit retry/backoff is available as the opt-in `createReliableTransport` decorator, not automatic. The default GraphClient transport still does not retry; opt in explicitly and avoid non-idempotent POST retries unless you also provide idempotency.
 
 ## Import and subpath cheat sheet
 

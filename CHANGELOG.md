@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.3.10] - 2026-05-30
+
+Patch alpha compatibility and local-operator release. Adds opt-in ky-like Graph transport reliability without introducing a dependency.
+
+### Opt-in reliable transport
+
+- Adds `createReliableTransport(inner, options?)` to `@wats/graph`: a composable `Transport` decorator for retries, bounded exponential full-jitter backoff, `Retry-After` handling, and per-attempt timeouts.
+- Reliability is explicit and default-off. `GraphClient` still uses the bare fetch transport unless callers pass the decorator. No `ky` or other dependency is added.
+- The decorator retries transient `GET`/`DELETE` failures plus HTTP `429` rate limits across methods, preserves final errors/responses, composes native `AbortSignal.timeout` / `AbortSignal.any`, cancels discarded retry response bodies, and avoids ambiguous non-idempotent POST `5xx`/network retries by default.
+
+### Docs and release metadata
+
+- Documents the reliability recipe in the Transport and Testing guide, client reference, migration guide, and parity matrix.
+- Release metadata is aligned for 0.3.10 across the root manifest and the publishable `@wats/*` packages, preserving the canonical `@wats/*` package scope and credential-gated live `wats serve` flow.
+
 ## [0.3.9] - 2026-05-30
 
 Patch alpha compatibility and local-operator release. Makes the opt-in demo auto-reply observable.

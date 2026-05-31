@@ -101,9 +101,10 @@ F-4 introduces the `Transport` seam so every HTTP concern — retry, auth-refres
 
 - `Transport`, `TransportRequest`, `TransportResponse`, `TransportHttpMethod`, `TransportInterceptor`, `TransportRetryPolicy`, `DEFAULT_TRANSPORT_RETRY_POLICY`
 - `createFetchTransport(options?)` — production default wrapping `globalThis.fetch`
+- `createReliableTransport(inner, options?)` — opt-in retry/backoff/per-attempt-timeout decorator; default GraphClient behavior is unchanged
 - `createMockTransport(config?)` — in-memory Transport for tests, exposed via the `@wats/graph/testing` subpath
 
-The default transport does NOT retry; retry is opt-in via a Transport decorator. See the [Transport and Testing guide](../guides/transport-and-testing.md) for the full recipe.
+The default transport does NOT retry. Reliability is opt-in via `createReliableTransport`: it retries transient `GET`/`DELETE` failures and HTTP `429` rate limits, honors `Retry-After`, composes native `AbortSignal.timeout` / `AbortSignal.any`, and avoids ambiguous non-idempotent POST `5xx`/network retries by default. See the [Transport and Testing guide](../guides/transport-and-testing.md) for the full recipe.
 
 ### Endpoint scaffold
 
