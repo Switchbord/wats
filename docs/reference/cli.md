@@ -231,7 +231,7 @@ Failure behavior:
 
 Prints OpenAPI export help and exits 0. OpenAPI export remains service-only: it describes the WATS standalone service API, not Meta Graph.
 
-### `wats serve --config <path> --dry-run [--profile <name>] [--host <host>] [--port <port>] [--print-routes]`
+### `wats serve --config <path> --dry-run [--profile <name>] [--host <host>] [--port <port>] [--paas] [--print-routes]`
 
 Starts the `@wats/service` Request-to-Response app as a local Bun process in dry-run mode. The command loads a WATS config file, selects the default or named profile, optionally overrides `profile.service.host` and `profile.service.port`, injects synthetic in-memory secrets plus a no-network Graph transport, and exposes:
 
@@ -277,6 +277,26 @@ Rules:
 - The env file may contain the setup-generated keys `WATS_ACCESS_TOKEN`, `WATS_VERIFY_TOKEN`, `WATS_APP_SECRET`, `WATS_SERVICE_TOKEN`, `WATS_WABA_ID`, `WATS_PHONE_NUMBER_ID`, `WATS_LIVE_ENABLE`, and `WATS_YES_LIVE` plus comments/blanks. Live serve resolves only the four secret keys.
 - Output is status-only and does not print env names, profile names, config paths, token values, app secrets, verify tokens, service bearer tokens, or Graph responses.
 - This is not a production hosting or Docker contract.
+
+### `wats serve ... --paas`
+
+PaaS deploy mode for platforms that inject a `$PORT` and require binding `0.0.0.0` (Railway, Fly, Render, Cloud Run). `--paas` is opt-in and works with both dry-run and live serve:
+
+```bash
+# Railway/Fly/Render/Cloud Run inject $PORT; bind it on 0.0.0.0:
+wats serve --config wats.config.yaml --dry-run --paas
+wats serve --config wats.config.yaml --live --yes-live --env-file .env.local --paas
+```
+
+Resolution rules:
+
+- With `--paas`, the bind port comes from the platform `$PORT` unless `--port` is given, and the bind host defaults to `0.0.0.0` unless `--host` is given.
+- Explicit `--host` / `--port` always override the PaaS defaults.
+- Serve fails closed if `--paas` needs `$PORT` but it is missing or not an integer in `1..65535`.
+- Without `--paas`, `$PORT` is ignored entirely; `profile.service.port` (or `--port`) governs. This keeps default/local behavior identical for forks that do not deploy to a PaaS.
+- `--print-routes` under `--paas` validates and prints the route inventory without binding, so it does not require `$PORT`.
+
+This removes the need for an external container entrypoint shim that maps `$PORT`/`0.0.0.0` onto the static `--host`/`--port` flags.
 
 ### `wats serve --help`
 
