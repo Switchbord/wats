@@ -38,6 +38,10 @@
     "./errors": {
       "types": "./dist/errors.d.ts",
       "import": "./dist/errors.js"
+    },
+    "./groups": {
+      "types": "./dist/groups.d.ts",
+      "import": "./dist/groups.js"
     }
   },
   "files": [

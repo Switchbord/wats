@@ -28,6 +28,7 @@ const REQUIRED_TYPE_FILES = [
   "packages/types/src/messages/unsupported.ts",
   "packages/types/src/messages/interactive.ts",
   "packages/types/src/messages/button.ts",
+  "packages/types/src/groups.ts",
   "packages/types/src/index.ts"
 ] as const;
 
@@ -39,7 +40,8 @@ const PACKAGE_ENTRYPOINTS = [
   "@wats/types/messages",
   "@wats/types/statuses",
   "@wats/types/contacts",
-  "@wats/types/errors"
+  "@wats/types/errors",
+  "@wats/types/groups"
 ] as const;
 
 const REQUIRED_RUNTIME_EXPORTS: Record<(typeof PACKAGE_ENTRYPOINTS)[number], readonly string[]> = {
@@ -50,7 +52,8 @@ const REQUIRED_RUNTIME_EXPORTS: Record<(typeof PACKAGE_ENTRYPOINTS)[number], rea
     "WATS_TYPES_MESSAGES_EXPORTS",
     "WATS_TYPES_STATUSES_EXPORTS",
     "WATS_TYPES_CONTACTS_EXPORTS",
-    "WATS_TYPES_ERRORS_EXPORTS"
+    "WATS_TYPES_ERRORS_EXPORTS",
+    "WATS_TYPES_GROUPS_EXPORTS"
   ],
   "@wats/types/config": ["WATS_TYPES_CONFIG_EXPORTS"],
   "@wats/types/webhook": ["WATS_TYPES_WEBHOOK_EXPORTS"],
@@ -58,7 +61,8 @@ const REQUIRED_RUNTIME_EXPORTS: Record<(typeof PACKAGE_ENTRYPOINTS)[number], rea
   "@wats/types/messages": ["WATS_TYPES_MESSAGES_EXPORTS"],
   "@wats/types/statuses": ["WATS_TYPES_STATUSES_EXPORTS"],
   "@wats/types/contacts": ["WATS_TYPES_CONTACTS_EXPORTS"],
-  "@wats/types/errors": ["WATS_TYPES_ERRORS_EXPORTS"]
+  "@wats/types/errors": ["WATS_TYPES_ERRORS_EXPORTS"],
+  "@wats/types/groups": ["WATS_TYPES_GROUPS_EXPORTS"]
 } as const;
 
 const EXPECTED_CONTRACT_VALUES = {
@@ -113,6 +117,18 @@ const EXPECTED_CONTRACT_VALUES = {
   WATS_TYPES_ERRORS_EXPORTS: [
     "WhatsAppError",
     "WhatsAppErrorPayload"
+  ],
+  WATS_TYPES_GROUPS_EXPORTS: [
+    "WatsGroup",
+    "GroupParticipant",
+    "GroupJoinRequest",
+    "GroupInviteLink",
+    "GroupJoinApprovalMode",
+    "GroupRecipientType",
+    "WhatsAppGroupLifecycleUpdateValue",
+    "WhatsAppGroupParticipantsUpdateValue",
+    "WhatsAppGroupSettingsUpdateValue",
+    "WhatsAppGroupStatusUpdateValue"
   ]
 } as const;
 
@@ -212,7 +228,8 @@ describe("B1 foundational shared types", () => {
       "./messages": { types: "./dist/messages/index.d.ts", import: "./dist/messages/index.js" },
       "./statuses": { types: "./dist/statuses.d.ts", import: "./dist/statuses.js" },
       "./contacts": { types: "./dist/contacts.d.ts", import: "./dist/contacts.js" },
-      "./errors": { types: "./dist/errors.d.ts", import: "./dist/errors.js" }
+      "./errors": { types: "./dist/errors.d.ts", import: "./dist/errors.js" },
+      "./groups": { types: "./dist/groups.d.ts", import: "./dist/groups.js" }
     });
   });
 

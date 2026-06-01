@@ -63,6 +63,21 @@ export { WATS_TYPES_STATUSES_EXPORTS } from "./statuses.js";
 export { WATS_TYPES_CONTACTS_EXPORTS } from "./contacts.js";
 export { WATS_TYPES_ERRORS_EXPORTS } from "./errors.js";
 
+// WATS-131 — Groups API type foundation.
+export type {
+  WatsGroup,
+  GroupParticipant,
+  GroupJoinRequest,
+  GroupInviteLink,
+  GroupJoinApprovalMode,
+  GroupRecipientType,
+  WhatsAppGroupLifecycleUpdateValue,
+  WhatsAppGroupParticipantsUpdateValue,
+  WhatsAppGroupSettingsUpdateValue,
+  WhatsAppGroupStatusUpdateValue
+} from "./groups.js";
+export { WATS_TYPES_GROUPS_EXPORTS } from "./groups.js";
+
 // Named access to the full webhook variant union so consumers can
 // narrow without reaching into ./webhook directly.
 export type {
