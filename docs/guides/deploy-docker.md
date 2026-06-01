@@ -95,6 +95,22 @@ services:
 
 This is not a supported Compose file. It is a future shape only.
 
+## Managed PaaS platforms (`--paas`)
+
+Managed platforms (Railway, Fly, Render, Cloud Run) inject a `$PORT` env var and require the process to bind `0.0.0.0`. `wats serve --paas` reads `$PORT` and defaults the bind host to `0.0.0.0`, so no external entrypoint shim is needed to map the platform port onto the static `--host`/`--port` flags:
+
+```Dockerfile
+# Container CMD for a PaaS that injects $PORT:
+CMD ["bun", "run", "wats", "serve", "--config", "/app/config/wats.config.yaml", "--profile", "prod", "--live", "--yes-live", "--env-file", ".env.local", "--paas"]
+```
+
+- `--paas` takes the bind port from `$PORT` (the platform sets it) and binds `0.0.0.0` by default.
+- Pass `--host`/`--port` explicitly to override the PaaS defaults.
+- Serve fails closed if `--paas` needs `$PORT` but it is missing or not `1..65535`.
+- Without `--paas`, `$PORT` is ignored; this keeps local/default behavior unchanged.
+
+See the CLI reference `wats serve ... --paas` section for the full resolution rules.
+
 ## Healthcheck and readiness
 
 Use local service routes:

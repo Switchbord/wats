@@ -71,6 +71,7 @@ type ServeArgs = Readonly<{
   profileName?: string;
   host?: string;
   port?: number;
+  paas: boolean;
   printRoutes: boolean;
   envFile?: string;
 }> | Readonly<{
@@ -261,8 +262,8 @@ The document is for the WATS service API only, not the Meta Graph API. The comma
 ${NO_LIVE_CREDENTIALS}
 `;
 
-const SERVE_HELP = `Usage: wats serve --config <path> --dry-run [--profile <name>] [--host <host>] [--port <port>] [--print-routes]
-       wats serve --config <path> --live --yes-live --env-file <path> [--profile <name>] [--host <host>] [--port <port>] [--print-routes]
+const SERVE_HELP = `Usage: wats serve --config <path> --dry-run [--profile <name>] [--host <host>] [--port <port>] [--paas] [--print-routes]
+       wats serve --config <path> --live --yes-live --env-file <path> [--profile <name>] [--host <host>] [--port <port>] [--paas] [--print-routes]
 
 Start the @wats/service Request -> Response app as a local Bun.serve process.
 
@@ -278,8 +279,11 @@ Options:
   --host <host>         Override profile.service.host for local binding.
   --port <port>         Override profile.service.port; must be 1..65535.
   --print-routes        Print the safe route inventory and exit without binding a port.
+  --paas                PaaS deploy mode: bind 0.0.0.0 and read the platform-injected $PORT (Railway/Fly/Render/Cloud Run). Explicit --host/--port override these defaults; without --paas, $PORT is ignored.
 
 Live mode requires --live, --yes-live, and --env-file together. The CLI does not read .env.local implicitly. Keep live tokens in the env file or process environment, never in command arguments. For local webhook testing, put a secure HTTPS tunnel such as ngrok in front of the chosen host/port; Meta will not verify plain HTTP or a bare local IP callback.
+
+With --paas, the port comes from $PORT unless --port is given, and the host defaults to 0.0.0.0 unless --host is given; serve fails closed if --paas needs $PORT but it is missing or not 1..65535. This removes the external container entrypoint shim for PaaS deploys.
 `;
 
 const WEBHOOK_TOKEN_HELP = `Usage: wats webhook token [--help]
@@ -329,7 +333,7 @@ const DOCTOR_ALLOWED_FLAGS = ["--config", "--profile", "--format", "--check-env"
 const UPGRADE_ALLOWED_FLAGS = ["--dry-run"] as const;
 const PUBLIC_WATS_UPGRADE_PACKAGES = ["@wats/cli", "@wats/core", "@wats/graph", "@wats/http", "@wats/config", "@wats/service"] as const;
 const SERVE_VALUE_FLAGS = ["--config", "--profile", "--host", "--port", "--env-file"] as const;
-const SERVE_ALLOWED_FLAGS = ["--config", "--profile", "--host", "--port", "--dry-run", "--print-routes", "--live", "--yes-live", "--env-file"] as const;
+const SERVE_ALLOWED_FLAGS = ["--config", "--profile", "--host", "--port", "--dry-run", "--print-routes", "--live", "--yes-live", "--env-file", "--paas"] as const;
 const LIVE_MISSING_ERROR = "Live serve requires --live --yes-live and --env-file. Run `wats serve --help` for usage.\n";
 const ENV_FILE_MAX_BYTES = 65_536;
 const ENV_FILE_ALLOWED_KEYS = new Set([
@@ -1205,7 +1209,7 @@ function parseServeArgs(args: readonly string[]): ServeArgs {
       return unknownHelpSidecar === undefined ? { ok: false, reason: "help" } : { ok: false, reason: "usage" };
     }
     if (!SERVE_ALLOWED_FLAGS.includes(flagName as typeof SERVE_ALLOWED_FLAGS[number])) return { ok: false, reason: "usage" };
-    if (flagName === "--dry-run" || flagName === "--print-routes" || flagName === "--live" || flagName === "--yes-live") {
+    if (flagName === "--dry-run" || flagName === "--print-routes" || flagName === "--live" || flagName === "--yes-live" || flagName === "--paas") {
       if (arg.includes("=") || hasFlagName(args.slice(index + 1), flagName)) return { ok: false, reason: "usage" };
       continue;
     }
@@ -1225,7 +1229,7 @@ function parseServeArgs(args: readonly string[]): ServeArgs {
 
   const valueArgs = args.filter((arg) => {
     const flagName = arg.includes("=") ? arg.slice(0, arg.indexOf("=")) : arg;
-    return flagName !== "--dry-run" && flagName !== "--print-routes" && flagName !== "--live" && flagName !== "--yes-live";
+    return flagName !== "--dry-run" && flagName !== "--print-routes" && flagName !== "--live" && flagName !== "--yes-live" && flagName !== "--paas";
   });
   const dryRun = hasFlagName(args, "--dry-run");
   const liveIntent = hasFlagName(args, "--live");
@@ -1261,6 +1265,7 @@ function parseServeArgs(args: readonly string[]): ServeArgs {
     ok: true,
     configPath: configFlag.value,
     mode: dryRun ? "dry-run" : "live",
+    paas: hasFlagName(args, "--paas"),
     printRoutes: hasFlagName(args, "--print-routes"),
     ...(envFileFlag.value !== undefined ? { envFile: envFileFlag.value } : {}),
     ...(profileFlag.value !== undefined ? { profileName: profileFlag.value } : {}),
@@ -1277,6 +1282,38 @@ function serveProfileWithOverrides(profile: WatsProfileConfig, parsed: ServeArgs
       ...(parsed.host !== undefined ? { host: parsed.host } : {}),
       ...(parsed.port !== undefined ? { port: parsed.port } : {})
     })
+  }) as WatsProfileConfig;
+}
+
+// WATS-129: native PaaS bind resolution. Only consulted when --paas is passed,
+// so default/local behavior is byte-identical for forks that ignore PaaS deploy.
+// When --paas is set and the port is not pinned by an explicit --port, read the
+// platform-injected $PORT (PaaS platforms inject it); when the host is not pinned
+// by an explicit --host, default the bind host to 0.0.0.0. Explicit --host/--port
+// always win. Returns null when --paas needs $PORT but it is missing/invalid, so
+// the caller fails closed instead of binding a wrong/loopback port.
+function resolvePaasServeProfile(
+  profile: WatsProfileConfig,
+  parsed: ServeArgs & { ok: true },
+  env: Record<string, string | undefined>
+): WatsProfileConfig | null {
+  if (!parsed.paas) return profile;
+  const hostPinned = parsed.host !== undefined;
+  const portPinned = parsed.port !== undefined;
+  let port = profile.service.port;
+  if (!portPinned) {
+    const rawPort = env.PORT;
+    if (typeof rawPort !== "string") return null;
+    const parsedPort = parseServePortValue(rawPort);
+    // Reject non-canonical forms (e.g. leading zeros like "08080") for byte-exact
+    // $PORT discipline, mirroring isSafeServeHost's IP-octet canonicalization.
+    if (parsedPort === null || String(parsedPort) !== rawPort) return null;
+    port = parsedPort;
+  }
+  const host = hostPinned ? profile.service.host : "0.0.0.0";
+  return Object.freeze({
+    ...profile,
+    service: Object.freeze({ ...profile.service, host, port })
   }) as WatsProfileConfig;
 }
 
@@ -1472,17 +1509,22 @@ async function serveCommand(args: readonly string[]): Promise<CliCommandResult> 
     createWatsServiceOpenApiDocument(profile);
     if (parsed.printRoutes) return ok(formatServeRoutes(profile, parsed.mode));
 
+    // WATS-129: apply native PaaS bind resolution ($PORT / 0.0.0.0) only when --paas
+    // is set, and only on the binding path (print-routes above never needs $PORT).
+    const boundProfile = resolvePaasServeProfile(profile, parsed, processEnv());
+    if (boundProfile === null) return fail("Invalid serve arguments. Run `wats serve --help` for usage.\n");
+
     const bunRuntime = getBunRuntime();
     if (bunRuntime === null) return fail("Bun runtime unavailable. Run `wats serve --help` for usage.\n");
 
     const serviceConfig = parsed.mode === "dry-run"
-      ? syntheticServiceConfig(profile)
-      : await resolveLiveServiceSecrets(profile, parsed as ServeArgs & { ok: true; mode: "live" }).then((secrets) => secrets === null ? null : liveServiceConfig(profile, secrets));
+      ? syntheticServiceConfig(boundProfile)
+      : await resolveLiveServiceSecrets(boundProfile, parsed as ServeArgs & { ok: true; mode: "live" }).then((secrets) => secrets === null ? null : liveServiceConfig(boundProfile, secrets));
     if (serviceConfig === null) return fail("SecretResolutionError\nMissing or invalid live env values. Run `wats serve --help` for usage.\n");
 
     const app = createWatsServiceApp(serviceConfig);
-    const server = bunRuntime.serve({ hostname: profile.service.host, port: profile.service.port, fetch: app.fetch });
-    return Object.freeze({ ...ok(formatServeReady(profile.service.host, server.port, parsed.mode)), shutdown: createServeShutdown(server) });
+    const server = bunRuntime.serve({ hostname: boundProfile.service.host, port: boundProfile.service.port, fetch: app.fetch });
+    return Object.freeze({ ...ok(formatServeReady(boundProfile.service.host, server.port, parsed.mode)), shutdown: createServeShutdown(server) });
   } catch (error) {
     if (error instanceof ConfigValidationError) {
       return fail(formatConfigValidationError(error, "wats serve --help"));
