@@ -4,7 +4,7 @@
 - decisionStatus: locked
 - labels: [camelCaseOnly, asyncOnly, aggressiveParity, monorepo]
 - lastReviewed: 2026-04-22
-- applies-to: `[0.2.0-foundations-complete]`
+- applies-to: `0.3.x-alpha-tooling`
 
 This is the single end-to-end walkthrough for WATS consumers. Read it
 top-to-bottom. Every code block is runnable against the in-memory
@@ -54,7 +54,7 @@ Use the onboarding callback URL and verify token in Meta App Dashboard > WhatsAp
 
 ## 1. What's in the box
 
-The foundations pivot shipped four packages of primitives:
+The foundations pivot shipped five packages of primitives:
 
 | Package              | What's inside                                                       |
 | -------------------- | ------------------------------------------------------------------- |

@@ -1,7 +1,7 @@
 # WATS Package Map
 
 - status: active
-- applies-to: `0.2.0-foundations-complete` + WATS-31/32/33/34/35/WATS-37/38/39/40/41/42A/53/54/56 consistency line
+- applies-to: `0.3.x-alpha-tooling` + WATS-31/32/33/34/35/WATS-37/38/39/40/41/42A/53/54/56 consistency line
 - lastReviewed: 2026-05-04
 
 ## Purpose

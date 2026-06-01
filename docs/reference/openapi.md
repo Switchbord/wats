@@ -55,7 +55,7 @@ Defaults:
 
 - `openapi`: `3.1.0`
 - `info.title`: `WATS Service API`
-- `info.version`: current package foundation version (`0.2.0`)
+- `info.version`: current package version
 - `servers[0].url`: `http://{profile.service.host}:{profile.service.port}` when no `serverUrl` is provided
 
 Construction failures throw `WatsServiceError`, not raw host errors:
