@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.3.12] - 2026-06-01
+
+Patch alpha compatibility and local-operator release. Adds an opt-in native PaaS serve mode so `wats serve` works on managed platforms without an external container entrypoint shim.
+
+### WATS-129 — native PaaS serve mode (`--paas`)
+
+- Adds an opt-in `wats serve --paas` flag. In PaaS mode the CLI reads the platform-injected `$PORT` and binds `0.0.0.0` by default, so managed platforms (Railway, Fly, Render, Cloud Run) no longer need an external entrypoint shim to map `$PORT`/`0.0.0.0` onto the static `--host`/`--port` flags.
+- Explicit `--host` and `--port` always override the PaaS defaults. Serve fails closed when `--paas` needs `$PORT` but it is missing or not a canonical integer in `1..65535` (leading zeros and non-numeric forms are rejected).
+- `$PORT` is consulted only when `--paas` is passed, so default and local behavior is byte-identical for forks that do not deploy to a PaaS. `--print-routes` under `--paas` validates and prints the route inventory without binding and never requires `$PORT`.
+- `--paas` composes with both dry-run and live serve; it changes only the bind host/port and never the resolved secrets, webhook, or auth configuration. Serve output stays status-only with no secret, env-name, profile-name, or config-path leakage.
+
+### Release metadata
+
+- Release metadata is aligned for 0.3.12 across the root manifest and the publishable `@wats/*` packages, preserving the canonical `@wats/*` package scope and credential-gated live `wats serve` flow.
+
 ## [0.3.11] - 2026-05-30
 
 Patch alpha compatibility and local-operator release. Surfaces PII-safe Meta Graph error diagnostics from service send routes.

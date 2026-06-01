@@ -1,6 +1,6 @@
 {
   "name": "@wats/service",
-  "version": "0.3.11",
+  "version": "0.3.12",
   "private": false,
   "license": "MIT",
   "type": "module",
@@ -37,11 +37,11 @@
     "wats"
   ],
   "dependencies": {
-    "@wats/config": "^0.3.11",
-    "@wats/core": "^0.3.11",
-    "@wats/crypto": "^0.3.11",
-    "@wats/graph": "^0.3.11",
-    "@wats/http": "^0.3.11",
-    "@wats/persistence": "^0.3.11"
+    "@wats/config": "^0.3.12",
+    "@wats/core": "^0.3.12",
+    "@wats/crypto": "^0.3.12",
+    "@wats/graph": "^0.3.12",
+    "@wats/http": "^0.3.12",
+    "@wats/persistence": "^0.3.12"
   }
 }
