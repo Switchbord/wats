@@ -1305,7 +1305,9 @@ function resolvePaasServeProfile(
     const rawPort = env.PORT;
     if (typeof rawPort !== "string") return null;
     const parsedPort = parseServePortValue(rawPort);
-    if (parsedPort === null) return null;
+    // Reject non-canonical forms (e.g. leading zeros like "08080") for byte-exact
+    // $PORT discipline, mirroring isSafeServeHost's IP-octet canonicalization.
+    if (parsedPort === null || String(parsedPort) !== rawPort) return null;
     port = parsedPort;
   }
   const host = hostPinned ? profile.service.host : "0.0.0.0";

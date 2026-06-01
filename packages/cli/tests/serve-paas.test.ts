@@ -246,7 +246,7 @@ describe("wats serve --paas native PaaS mode (WATS-129)", () => {
   test("--paas fails closed when $PORT is out of range or non-numeric", () => {
     const dir = makeTempDir();
     const configPath = writeConfig(dir);
-    for (const bad of ["0", "65536", "abc", "-1", "80 ", "0x50", "8080.0", ""]) {
+    for (const bad of ["0", "65536", "abc", "-1", "80 ", "0x50", "8080.0", "08080", "+8080", ""]) {
       const result = runCli(["serve", "--config", configPath, "--dry-run", "--paas"], { PORT: bad });
       expect(result.exitCode, `PORT=${JSON.stringify(bad)} should fail closed`).toBe(1);
       expect(result.stdout).not.toContain("status: listening");
