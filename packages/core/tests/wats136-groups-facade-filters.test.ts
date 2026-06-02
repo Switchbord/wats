@@ -174,10 +174,12 @@ describe("WATS-136 WhatsApp facade group helpers and listeners", () => {
     const { graphClient, handle } = makeGraphClientWithHandle();
     const wa = new WhatsApp({ graphClient, phoneNumberId: "1234567890" });
 
-    await wa.createGroup({ subject: "Operators" });
+    const created = await wa.createGroup({ subject: "Operators" });
     await wa.sendGroupMessage({ groupId: "group-1", text: "hello group" });
     const gc = wa.group("group-1");
 
+    expect(created).toEqual({ messages: [{ id: "wamid.GROUP" }], requestId: "req-group" });
+    expect("request_id" in (created as unknown as Record<string, unknown>)).toBe(false);
     expect(gc.groupId).toBe("group-1");
     expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v25.0/1234567890/groups");
     expect(JSON.parse(String(handle.requests[0]?.body))).toEqual({

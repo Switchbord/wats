@@ -45,6 +45,18 @@ function parseBody(body: unknown): Record<string, unknown> {
   return JSON.parse(body as string) as Record<string, unknown>;
 }
 
+function snakeCaseKeys(value: unknown, prefix = ""): string[] {
+  if (Array.isArray(value)) {
+    return value.flatMap((item, index) => snakeCaseKeys(item, `${prefix}[${index}]`));
+  }
+  if (typeof value !== "object" || value === null) return [];
+  return Object.entries(value as Record<string, unknown>).flatMap(([key, nested]) => {
+    const path = prefix.length > 0 ? `${prefix}.${key}` : key;
+    const own = key.includes("_") ? [path] : [];
+    return [...own, ...snakeCaseKeys(nested, path)];
+  });
+}
+
 describe("WATS-133 scoped Groups clients", () => {
   test("GroupClient rejects invalid groupId at construction and phone.group uses the same validation", () => {
     const { client } = clientWith(ok());
@@ -90,6 +102,22 @@ describe("WATS-133 scoped Groups clients", () => {
     expect(handle.requests[1]?.url).toBe(
       "https://graph.facebook.com/v25.0/555000111/groups?limit=25&after=CUR"
     );
+  });
+
+  test("PhoneNumberClient group responses expose only camelCase public keys", async () => {
+    const { client } = clientWith([
+      ok({ request_id: "req-create" }),
+      ok({ data: { groups: [{ id: "grp-1", subject: "Team", created_at: "1700000000" }] } })
+    ]);
+    const phone = new PhoneNumberClient({ graphClient: client, phoneNumberId: "555000111" });
+
+    const created = await phone.createGroup({ subject: "Team" });
+    const listed = await phone.listGroups();
+
+    expect(created).toEqual({ requestId: "req-create" });
+    expect(listed.data?.groups?.[0]).toEqual({ id: "grp-1", subject: "Team", createdAt: "1700000000" });
+    expect(snakeCaseKeys(created)).toEqual([]);
+    expect(snakeCaseKeys(listed)).toEqual([]);
   });
 
   test("phone.group returns a GroupClient bound to the supplied groupId", async () => {
@@ -139,6 +167,44 @@ describe("WATS-133 scoped Groups clients", () => {
     expect(handle.requests[3]?.url).toBe(
       "https://graph.facebook.com/v25.0/grp-bound/join_requests?limit=25&after=CUR"
     );
+  });
+
+  test("GroupClient read/link responses expose only camelCase public keys", async () => {
+    const { client } = clientWith([
+      ok({
+        id: "grp-bound",
+        subject: "Team",
+        join_approval_mode: "approval_required",
+        creation_timestamp: 1700000000,
+        total_participant_count: 2,
+        participants: [{ wa_id: "15551110000" }]
+      }),
+      ok({ invite_link: "https://chat.whatsapp.com/ABC123" }),
+      ok({ data: [{ join_request_id: "jr-1", wa_id: "15551110002", creation_timestamp: 1700000001 }] })
+    ]);
+    const group = new GroupClient({ graphClient: client, groupId: "grp-bound" });
+
+    const info = await group.getInfo();
+    const link = await group.getInviteLink();
+    const requests = await group.getJoinRequests();
+
+    expect(info).toEqual({
+      id: "grp-bound",
+      subject: "Team",
+      joinApprovalMode: "approval_required",
+      creationTimestamp: 1700000000,
+      totalParticipantCount: 2,
+      participants: [{ waId: "15551110000" }]
+    });
+    expect(link).toEqual({ inviteLink: "https://chat.whatsapp.com/ABC123" });
+    expect(requests.data?.[0]).toEqual({
+      joinRequestId: "jr-1",
+      waId: "15551110002",
+      creationTimestamp: 1700000001
+    });
+    expect(snakeCaseKeys(info)).toEqual([]);
+    expect(snakeCaseKeys(link)).toEqual([]);
+    expect(snakeCaseKeys(requests)).toEqual([]);
   });
 
   test("GroupClient mutation methods emit exact wire paths and bodies with the bound groupId", async () => {
