@@ -162,7 +162,9 @@ describe("WATS-52 community examples docs scaffold", () => {
       );
       for (const specifier of importSpecifiers) {
         if (specifier.includes("wats") || specifier.includes("packages/")) {
-          expect(specifier, `${path} should use public @wats/* package specifiers`).toMatch(/^@wats\/[a-z0-9-]+(?:\/testing)?$/u);
+          expect(specifier, `${path} should use public @wats/* package specifiers`).toMatch(
+            /^@wats\/[a-z0-9-]+(?:\/testing|\/endpoints\/[a-z0-9-]+)?$/u
+          );
         }
       }
     }
