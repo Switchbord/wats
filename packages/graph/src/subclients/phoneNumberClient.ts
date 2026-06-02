@@ -68,6 +68,8 @@ import {
 import {
   createGroup as createGroupEndpoint,
   listGroups as listGroupsEndpoint,
+  normalizeGroupMutationResponse,
+  normalizeListGroupsResponse,
   type CreateGroupBody,
   type GroupMutationResponse,
   type ListGroupsParams,
@@ -231,12 +233,13 @@ export class PhoneNumberClient {
     body: CreateGroupBody,
     opts?: EndpointInvokeOptions
   ): Promise<GroupMutationResponse> {
-    return createGroupEndpoint(
+    const response = await createGroupEndpoint(
       this.#graphClient,
       { phoneNumberId: this.#phoneNumberId },
       body,
       opts
     );
+    return normalizeGroupMutationResponse(response);
   }
 
   /** Graph `GET /{phoneNumberId}/groups` — list groups owned by this business number. */
@@ -249,12 +252,13 @@ export class PhoneNumberClient {
       "PhoneNumberClient.listGroups"
     );
     scopedParams.phoneNumberId = this.#phoneNumberId;
-    return listGroupsEndpoint(
+    const response = await listGroupsEndpoint(
       this.#graphClient,
       scopedParams as unknown as ListGroupsParams,
       undefined,
       opts
     );
+    return normalizeListGroupsResponse(response);
   }
 
   /** Graph `GET /{phoneNumberId}` — returns phone-number inventory/profile fields. */

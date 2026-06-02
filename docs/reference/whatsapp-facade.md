@@ -66,6 +66,35 @@ await wa.phoneNumberClient?.sendMessage({
 });
 ```
 
+## Group helpers (WATS-136)
+
+When constructed with `phoneNumberId`, the facade exposes thin Groups helpers over
+the phone-number scoped client:
+
+```ts
+await wa.createGroup({ subject: "Launch team" });
+await wa.sendGroupMessage({ groupId: "120363...", text: "Hello group" });
+const groupClient = wa.group("120363...");
+```
+
+`createGroup` returns the async Graph acknowledgement with camelCase public
+fields such as `requestId`; the group id and `inviteLink` arrive later through
+the `group_lifecycle_update` webhook. `wa.group(groupId)` returns the scoped
+GroupClient, whose read methods expose camelCase response fields such as
+`joinApprovalMode`, `creationTimestamp`, and `totalParticipantCount`. Meta
+snake_case stays only at the Graph wire boundary.
+
+`sendGroupMessage` sends a text payload to `POST /{phoneNumberId}/messages` with
+`recipient_type: "group"` and `to` set to the group id. Missing `phoneNumberId`
+or malformed group/text input rejects before transport with `GraphRequestValidationError`.
+Use `listen({ groupId: "120363..." })` to wait for a group message/status or
+`group_*_update` webhook from one group.
+
+Groups enforce Meta's bounded surface: subject ≤128, description ≤2048, and
+participant removal accepts at most 8 ids. Photo upload is not implemented in
+this facade slice; there is no direct participant-add helper and no promote/demote helper
+because official Cloud API groups are invite-only and the business is the sole admin.
+
 ## Handlers
 
 `wa.on(filter, handler)` delegates directly to the underlying `TypedRouter` and returns the same `RegistrationHandle`.
@@ -112,8 +141,9 @@ const update = await nextReply.promise;
 
 Options:
 
-- `type: "message" | "status" | "account" | "unknown"`
+- `type: "message" | "status" | "account" | "unknown" | "callConnect" | "callTerminate" | "callStatus" | "groupLifecycle" | "groupParticipants" | "groupSettings" | "groupStatus"`
 - `from?: string` — currently narrows message sender or status recipient.
+- `groupId?: string` — WATS-136 group narrower for group messages/statuses and `group_*_update` webhooks.
 - `filter?: TypedFilter<...>` — additional typed constraint.
 - `timeoutMs?: number`
 - `signal?: AbortSignal`

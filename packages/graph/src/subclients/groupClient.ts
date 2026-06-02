@@ -17,6 +17,10 @@ import {
   getGroup as getGroupEndpoint,
   getGroupInviteLink as getGroupInviteLinkEndpoint,
   listGroupJoinRequests as listGroupJoinRequestsEndpoint,
+  normalizeGroupDetailsResponse,
+  normalizeGroupInviteLinkResponse,
+  normalizeGroupJoinRequestsResponse,
+  normalizeGroupMutationResponse,
   rejectGroupJoinRequests as rejectGroupJoinRequestsEndpoint,
   removeGroupParticipants as removeGroupParticipantsEndpoint,
   resetGroupInviteLink as resetGroupInviteLinkEndpoint,
@@ -132,12 +136,13 @@ export class GroupClient {
       "GroupClient.getInfo"
     );
     scopedParams.groupId = this.#groupId;
-    return getGroupEndpoint(
+    const response = await getGroupEndpoint(
       this.#graphClient,
       scopedParams as unknown as GetGroupParams,
       undefined,
       opts
     );
+    return normalizeGroupDetailsResponse(response);
   }
 
   /** Graph `POST /{groupId}` — update subject, description, or join approval mode. */
@@ -145,12 +150,13 @@ export class GroupClient {
     body: UpdateGroupBody,
     opts?: EndpointInvokeOptions
   ): Promise<GroupMutationResponse> {
-    return updateGroupEndpoint(
+    const response = await updateGroupEndpoint(
       this.#graphClient,
       { groupId: this.#groupId },
       body,
       opts
     );
+    return normalizeGroupMutationResponse(response);
   }
 
   /** Graph `DELETE /{groupId}`. */
@@ -159,12 +165,13 @@ export class GroupClient {
     opts?: EndpointInvokeOptions
   ): Promise<GroupMutationResponse> {
     copyOptionalParamsObject(params, "GroupClient.delete");
-    return deleteGroupEndpoint(
+    const response = await deleteGroupEndpoint(
       this.#graphClient,
       { groupId: this.#groupId },
       undefined,
       opts
     );
+    return normalizeGroupMutationResponse(response);
   }
 
   /** Graph `GET /{groupId}/invite_link`. */
@@ -173,12 +180,13 @@ export class GroupClient {
     opts?: EndpointInvokeOptions
   ): Promise<GroupInviteLinkResponse> {
     copyOptionalParamsObject(params, "GroupClient.getInviteLink");
-    return getGroupInviteLinkEndpoint(
+    const response = await getGroupInviteLinkEndpoint(
       this.#graphClient,
       { groupId: this.#groupId },
       undefined,
       opts
     );
+    return normalizeGroupInviteLinkResponse(response);
   }
 
   /** Graph `POST /{groupId}/invite_link` — resets the invite link. */
@@ -187,12 +195,13 @@ export class GroupClient {
     opts?: EndpointInvokeOptions
   ): Promise<GroupInviteLinkResponse> {
     copyOptionalParamsObject(params, "GroupClient.resetInviteLink");
-    return resetGroupInviteLinkEndpoint(
+    const response = await resetGroupInviteLinkEndpoint(
       this.#graphClient,
       { groupId: this.#groupId },
       undefined,
       opts
     );
+    return normalizeGroupInviteLinkResponse(response);
   }
 
   /** Graph `DELETE /{groupId}/participants` — remove up to 8 participants. */
@@ -200,12 +209,13 @@ export class GroupClient {
     body: RemoveGroupParticipantsBody,
     opts?: EndpointInvokeOptions
   ): Promise<GroupMutationResponse> {
-    return removeGroupParticipantsEndpoint(
+    const response = await removeGroupParticipantsEndpoint(
       this.#graphClient,
       { groupId: this.#groupId },
       body,
       opts
     );
+    return normalizeGroupMutationResponse(response);
   }
 
   /** Graph `GET /{groupId}/join_requests`. */
@@ -218,12 +228,13 @@ export class GroupClient {
       "GroupClient.getJoinRequests"
     );
     scopedParams.groupId = this.#groupId;
-    return listGroupJoinRequestsEndpoint(
+    const response = await listGroupJoinRequestsEndpoint(
       this.#graphClient,
       scopedParams as unknown as ListGroupJoinRequestsParams,
       undefined,
       opts
     );
+    return normalizeGroupJoinRequestsResponse(response);
   }
 
   /** Graph `POST /{groupId}/join_requests` — approve pending join requests. */
@@ -231,12 +242,13 @@ export class GroupClient {
     body: ManageGroupJoinRequestsBody,
     opts?: EndpointInvokeOptions
   ): Promise<GroupMutationResponse> {
-    return approveGroupJoinRequestsEndpoint(
+    const response = await approveGroupJoinRequestsEndpoint(
       this.#graphClient,
       { groupId: this.#groupId },
       body,
       opts
     );
+    return normalizeGroupMutationResponse(response);
   }
 
   /** Graph `DELETE /{groupId}/join_requests` — reject pending join requests. */
@@ -244,11 +256,12 @@ export class GroupClient {
     body: ManageGroupJoinRequestsBody,
     opts?: EndpointInvokeOptions
   ): Promise<GroupMutationResponse> {
-    return rejectGroupJoinRequestsEndpoint(
+    const response = await rejectGroupJoinRequestsEndpoint(
       this.#graphClient,
       { groupId: this.#groupId },
       body,
       opts
     );
+    return normalizeGroupMutationResponse(response);
   }
 }
