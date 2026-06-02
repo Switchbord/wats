@@ -81,11 +81,26 @@ Contract at a glance:
   `conversation.origin.type = "marketing_lite"`, and promotes `account_update`
   onboarding fields into `account.marketingMessages` for events such as
   `MM_LITE_TERMS_SIGNED`.
+- `TypedGroupLifecycleUpdate` — `kind: "groupLifecycle"`. Produced by
+  `group_lifecycle_update`; normalizes `group_create` success/failure
+  and `group_delete` outcomes into `group.groupId`, `requestId`,
+  `inviteLink`, `joinApprovalMode`, and `errors`.
+- `TypedGroupParticipantsUpdate` — `kind: "groupParticipants"`. Produced by
+  `group_participants_update`; normalizes `added_participants`,
+  `removed_participants`, `failed_participants`, `join_request_id`,
+  `wa_id`, and `initiated_by` into camelCase group payload fields.
+- `TypedGroupSettingsUpdate` — `kind: "groupSettings"`. Produced by
+  `group_settings_update`; normalizes `profile_picture`,
+  `group_subject`, and `group_description` update outcomes, including
+  `updateSuccessful` and `errors`.
+- `TypedGroupStatusUpdate` — `kind: "groupStatus"`. Produced by
+  `group_status_update`; carries `group_suspend` and
+  `group_suspend_cleared` moderation lifecycle events.
 - `TypedUnknownUpdate` — `kind: "unknown"`. Catch-all for webhook
   field names Meta has not yet published a typed shape for.
   Preserves `field` + `rawChange` so the consumer can inspect.
 
-All four carry `rawChange` (the wire `WhatsAppWebhookChange`).
+All variants carry `rawChange` (the wire `WhatsAppWebhookChange`).
 
 ### Narrowing recipe
 
@@ -107,6 +122,12 @@ for (const u of updates) {
     case "account":
       console.log("account", u.eventName, u.payload);
       break;
+    case "groupLifecycle":
+    case "groupParticipants":
+    case "groupSettings":
+    case "groupStatus":
+      console.log("group", u.kind, u.group.groupId);
+      break;
     case "unknown":
       console.log("unknown field", u.field);
       break;
@@ -120,12 +141,24 @@ for (const u of updates) {
 WATS-89 updates the normalizer for recent WhatsApp Cloud API webhook changes:
 
 - `WhatsAppMessageStatusKind` includes `played`, used for voice-message playback receipts.
-- `status.conversation` remains optional; in v24+ `conversation is optional` and is absent by default except when Meta includes a conversation object for special windows.
+- `status.conversation` remains optional; in v24+ `conversation is optional` and is absent by default except when Meta includes a conversation object for special conversation windows.
 - Media references include `media.url` when incoming media webhook payloads carry a Meta lookaside download URL.
 - Unsupported messages carry `unsupported.type`, `unsupported.title`, `unsupported.description`, and `unsupported.raw`, so removed/unsupported shapes such as `request_welcome` are preserved without pretending WATS supports them.
 - Account/coexistence updates include `account.event`, `account.disconnectionInfo` for `PARTNER_REMOVED`, and typed `account_offboarded` / `account_reconnected` account update classification.
 
 All of these remain credential-free synthetic-envelope checks in CI; live Meta validation stays in the credential-gated campaign.
+
+## WATS-135 Groups webhook normalization
+
+WATS-135 adds credential-free normalization for the official Groups webhook fields:
+
+- `group_lifecycle_update`: `group_create` (success or `errors[]`) and `group_delete`; successful creates surface `groupId`, `subject`, `inviteLink`, `joinApprovalMode`, and `requestId`.
+- `group_participants_update`: `group_participants_add`, `group_join_request_created`, `group_join_request_revoked`, and `group_participants_remove`; participant arrays are camelCased (`waId`, `addedParticipants`, `removedParticipants`, `failedParticipants`, `initiatedBy`).
+- `group_settings_update`: `profilePicture`, `groupSubject`, and `groupDescription` update outcomes, including `updateSuccessful` and `errors`.
+- `group_status_update`: `group_suspend` and `group_suspend_cleared`.
+- Group inbound `messages` carry `message.groupId`. Group status webhooks carry `status.recipientType === "group"` and `status.recipientParticipantId` when Meta includes `recipient_participant_id`.
+
+Unknown future group fields still become `TypedUnknownUpdate`. Missing or unsafe `metadata.phone_number_id` / `group_id` values are reported through `skipped[]`; they do not throw.
 
 ## Input contract
 
