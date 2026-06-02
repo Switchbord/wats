@@ -7,15 +7,20 @@ export interface GraphMessagesSendMessageInput {
   previewUrl?: boolean;
 }
 
-export interface GraphMessagesSendTextInput {
+export type GraphMessagesRecipientType = "individual" | "group";
+
+export interface GraphMessagesRecipientInput {
   readonly to: string;
+  readonly recipientType?: GraphMessagesRecipientType;
+}
+
+export interface GraphMessagesSendTextInput extends GraphMessagesRecipientInput {
   readonly text: string;
   readonly previewUrl?: boolean;
   readonly replyToMessageId?: string;
 }
 
-export interface GraphMessagesSendMediaInput {
-  readonly to: string;
+export interface GraphMessagesSendMediaInput extends GraphMessagesRecipientInput {
   readonly mediaId?: string;
   readonly link?: string;
   readonly replyToMessageId?: string;
@@ -37,8 +42,7 @@ export interface GraphMessagesSendAudioInput extends GraphMessagesSendMediaInput
 }
 export type GraphMessagesSendStickerInput = GraphMessagesSendMediaInput;
 
-export interface GraphMessagesSendLocationInput {
-  readonly to: string;
+export interface GraphMessagesSendLocationInput extends GraphMessagesRecipientInput {
   readonly latitude: number;
   readonly longitude: number;
   readonly name?: string;
@@ -97,25 +101,21 @@ export interface GraphMessagesContactInput {
   readonly birthday?: string;
 }
 
-export interface GraphMessagesSendContactsInput {
-  readonly to: string;
+export interface GraphMessagesSendContactsInput extends GraphMessagesRecipientInput {
   readonly contacts: readonly GraphMessagesContactInput[];
   readonly replyToMessageId?: string;
 }
 
-export interface GraphMessagesSendReactionInput {
-  readonly to: string;
+export interface GraphMessagesSendReactionInput extends GraphMessagesRecipientInput {
   readonly messageId: string;
   readonly emoji: string;
 }
 
-export interface GraphMessagesRemoveReactionInput {
-  readonly to: string;
+export interface GraphMessagesRemoveReactionInput extends GraphMessagesRecipientInput {
   readonly messageId: string;
 }
 
-export interface GraphMessagesSendButtonsInput {
-  readonly to: string;
+export interface GraphMessagesSendButtonsInput extends GraphMessagesRecipientInput {
   readonly bodyText: string;
   readonly buttons: readonly { readonly id: string; readonly title: string }[];
   readonly headerText?: string;
@@ -123,8 +123,7 @@ export interface GraphMessagesSendButtonsInput {
   readonly replyToMessageId?: string;
 }
 
-export interface GraphMessagesSendListInput {
-  readonly to: string;
+export interface GraphMessagesSendListInput extends GraphMessagesRecipientInput {
   readonly bodyText: string;
   readonly buttonText: string;
   readonly sections: readonly {
@@ -136,8 +135,7 @@ export interface GraphMessagesSendListInput {
   readonly replyToMessageId?: string;
 }
 
-export interface GraphMessagesSendCtaUrlInput {
-  readonly to: string;
+export interface GraphMessagesSendCtaUrlInput extends GraphMessagesRecipientInput {
   readonly bodyText: string;
   readonly displayText: string;
   readonly url: string;
@@ -145,15 +143,13 @@ export interface GraphMessagesSendCtaUrlInput {
   readonly replyToMessageId?: string;
 }
 
-export interface GraphMessagesSendCallPermissionRequestInput {
-  readonly to: string;
+export interface GraphMessagesSendCallPermissionRequestInput extends GraphMessagesRecipientInput {
   readonly bodyText: string;
   readonly footerText?: string;
   readonly replyToMessageId?: string;
 }
 
-export interface GraphMessagesSendProductInput {
-  readonly to: string;
+export interface GraphMessagesSendProductInput extends GraphMessagesRecipientInput {
   readonly catalogId: string;
   readonly productRetailerId: string;
   readonly bodyText?: string;
@@ -161,8 +157,7 @@ export interface GraphMessagesSendProductInput {
   readonly replyToMessageId?: string;
 }
 
-export interface GraphMessagesSendProductsInput {
-  readonly to: string;
+export interface GraphMessagesSendProductsInput extends GraphMessagesRecipientInput {
   readonly catalogId: string;
   readonly headerText: string;
   readonly bodyText: string;
@@ -174,18 +169,23 @@ export interface GraphMessagesSendProductsInput {
   readonly replyToMessageId?: string;
 }
 
-export interface GraphMessagesSendCatalogInput {
-  readonly to: string;
+export interface GraphMessagesSendCatalogInput extends GraphMessagesRecipientInput {
   readonly bodyText: string;
   readonly footerText?: string;
   readonly thumbnailProductRetailerId?: string;
   readonly replyToMessageId?: string;
 }
 
-export interface GraphMessagesRequestLocationInput {
-  readonly to: string;
+export interface GraphMessagesRequestLocationInput extends GraphMessagesRecipientInput {
   readonly bodyText: string;
   readonly replyToMessageId?: string;
+}
+
+
+export interface GraphMessagesSendPinInput extends GraphMessagesRecipientInput {
+  readonly pinType: "pin" | "unpin";
+  readonly messageId: string;
+  readonly expirationDays: number;
 }
 
 export interface GraphMessagesMarkMessageAsReadInput {
@@ -201,8 +201,7 @@ export interface GraphMessagesTemplateComponentInput {
   readonly index?: string;
 }
 
-export interface GraphMessagesSendTemplateInput {
-  readonly to: string;
+export interface GraphMessagesSendTemplateInput extends GraphMessagesRecipientInput {
   readonly name: string;
   readonly languageCode: string;
   readonly components?: readonly GraphMessagesTemplateComponentInput[];
@@ -214,6 +213,7 @@ export type GraphMessagesMarketingMessageStatus = "accepted" | "held_for_quality
 
 export interface GraphMessagesSendMarketingTemplateInput {
   readonly to?: string;
+  readonly recipientType?: GraphMessagesRecipientType;
   readonly recipient?: string;
   readonly name: string;
   readonly languageCode: string;
@@ -261,6 +261,7 @@ export interface GraphMessagesMarketingTemplatePayload {
 
 export interface GraphMessagesTextPayload {
   messaging_product: "whatsapp";
+  recipient_type?: GraphMessagesRecipientType;
   to: string;
   type: "text";
   text: {
@@ -287,6 +288,7 @@ interface GraphMessagesAudioReferencePayload extends GraphMessagesMediaReference
 
 export type GraphMessagesImagePayload = {
   messaging_product: "whatsapp";
+  recipient_type?: GraphMessagesRecipientType;
   to: string;
   type: "image";
   image: GraphMessagesMediaReferencePayload;
@@ -295,6 +297,7 @@ export type GraphMessagesImagePayload = {
 
 export type GraphMessagesVideoPayload = {
   messaging_product: "whatsapp";
+  recipient_type?: GraphMessagesRecipientType;
   to: string;
   type: "video";
   video: GraphMessagesMediaReferencePayload;
@@ -303,6 +306,7 @@ export type GraphMessagesVideoPayload = {
 
 export type GraphMessagesAudioPayload = {
   messaging_product: "whatsapp";
+  recipient_type?: GraphMessagesRecipientType;
   to: string;
   type: "audio";
   audio: GraphMessagesAudioReferencePayload;
@@ -311,6 +315,7 @@ export type GraphMessagesAudioPayload = {
 
 export type GraphMessagesDocumentPayload = {
   messaging_product: "whatsapp";
+  recipient_type?: GraphMessagesRecipientType;
   to: string;
   type: "document";
   document: GraphMessagesMediaReferencePayload;
@@ -319,6 +324,7 @@ export type GraphMessagesDocumentPayload = {
 
 export type GraphMessagesStickerPayload = {
   messaging_product: "whatsapp";
+  recipient_type?: GraphMessagesRecipientType;
   to: string;
   type: "sticker";
   sticker: GraphMessagesMediaReferencePayload;
@@ -334,6 +340,7 @@ export type GraphMessagesMediaPayload =
 
 export type GraphMessagesLocationPayload = {
   messaging_product: "whatsapp";
+  recipient_type?: GraphMessagesRecipientType;
   to: string;
   type: "location";
   location: { latitude: number; longitude: number; name?: string; address?: string };
@@ -342,6 +349,7 @@ export type GraphMessagesLocationPayload = {
 
 export type GraphMessagesContactsPayload = {
   messaging_product: "whatsapp";
+  recipient_type?: GraphMessagesRecipientType;
   to: string;
   type: "contacts";
   contacts: readonly Record<string, unknown>[];
@@ -350,6 +358,7 @@ export type GraphMessagesContactsPayload = {
 
 export type GraphMessagesReactionPayload = {
   messaging_product: "whatsapp";
+  recipient_type?: GraphMessagesRecipientType;
   to: string;
   type: "reaction";
   reaction: { message_id: string; emoji: string };
@@ -357,6 +366,7 @@ export type GraphMessagesReactionPayload = {
 
 export type GraphMessagesInteractivePayload = {
   messaging_product: "whatsapp";
+  recipient_type?: GraphMessagesRecipientType;
   to: string;
   type: "interactive";
   interactive: Record<string, unknown>;
@@ -365,6 +375,7 @@ export type GraphMessagesInteractivePayload = {
 
 export type GraphMessagesTemplatePayload = {
   messaging_product: "whatsapp";
+  recipient_type?: GraphMessagesRecipientType;
   to: string;
   type: "template";
   template: Record<string, unknown>;
@@ -378,13 +389,22 @@ export type GraphMessagesStatusPayload = {
   typing_indicator?: { type: "text" };
 };
 
+export type GraphMessagesPinPayload = {
+  messaging_product: "whatsapp";
+  recipient_type: "group";
+  to: string;
+  type: "pin";
+  pin: { type: "pin" | "unpin"; message_id: string; expiration_days: number };
+};
+
 export type GraphMessagesRemainingPayload =
   | GraphMessagesLocationPayload
   | GraphMessagesContactsPayload
   | GraphMessagesReactionPayload
   | GraphMessagesInteractivePayload
   | GraphMessagesTemplatePayload
-  | GraphMessagesStatusPayload;
+  | GraphMessagesStatusPayload
+  | GraphMessagesPinPayload;
 
 // Structural body shape accepted by the endpoint-registry callable. The
 // class-based adapter builds this internally via buildSendMessagePayload.

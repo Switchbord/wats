@@ -12,6 +12,7 @@ import type {
   GraphMessagesTextPayload
 } from "./types.js";
 import { buildSendMarketingTemplatePayload } from "./builders-template.js";
+import { rejectGroupRecipient } from "./validation.js";
 
 interface GraphRequestExecutor {
   request<TResponse>(options: GraphRequestOptions): Promise<TResponse>;
@@ -94,7 +95,23 @@ export const sendMessage = defineEndpoint<
   method: "POST",
   pathTemplate: "/{phoneNumberId}/messages",
   params: { phoneNumberId: { in: "path", required: true } },
-  bodyContentType: "application/json"
+  bodyContentType: "application/json",
+  buildBody: (body) => {
+    if (typeof body !== "object" || body === null || Array.isArray(body)) {
+      throw new GraphRequestValidationError("Invalid sendMessage input: body must be an object.");
+    }
+    const record = body as unknown as Record<string, unknown>;
+    if (record.recipient_type === "group") {
+      if (record.type === "interactive") {
+        rejectGroupRecipient({ recipientType: "group" }, "sendMessage", "interactive messages");
+      }
+      const to = record.to;
+      if (typeof to !== "string" || /^\+?\d{1,15}$/.test(to)) {
+        throw new GraphRequestValidationError("Invalid sendMessage input: recipient_type group requires a group-id-shaped to, not a phone number.");
+      }
+    }
+    return body;
+  }
 });
 
 // --- legacy class-based endpoint (backward-compat) ---------------------

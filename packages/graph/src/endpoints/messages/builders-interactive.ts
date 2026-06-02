@@ -29,12 +29,14 @@ import {
   GRAPH_MESSAGES_ROW_TITLE_MAX_LENGTH,
   GRAPH_MESSAGES_SECTION_TITLE_MAX_LENGTH,
   GRAPH_MESSAGES_SHORT_LABEL_MAX_LENGTH,
+  applyRecipientType,
   assertBoundedArray,
+  assertMessageRecipient,
   assertNonEmptyControlFreeString,
   assertOnlyKnownKeys,
   assertValidMediaLink,
-  assertValidRecipient,
   asRecordInput,
+  rejectGroupRecipient,
   isPlainOptionsObject,
   mapValidatedArray,
   maybeText,
@@ -47,7 +49,9 @@ function interactiveBase(
   interactive: Record<string, unknown>
 ): GraphMessagesInteractivePayload {
   const record = asRecordInput(input, helperName);
-  return withReplyContext({ messaging_product: "whatsapp", to: assertValidRecipient(record.to, helperName), type: "interactive", interactive }, record);
+  rejectGroupRecipient(record, helperName, "interactive messages");
+  const { to, recipientType } = assertMessageRecipient(record, helperName);
+  return withReplyContext(applyRecipientType({ messaging_product: "whatsapp", to, type: "interactive", interactive }, recipientType), record);
 }
 
 function addHeaderFooter(target: Record<string, unknown>, record: Record<string, unknown>, helperName: string): void {

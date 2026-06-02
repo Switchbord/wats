@@ -21,6 +21,7 @@ export const GRAPH_MESSAGES_MAX_LIST_SECTIONS = 10;
 export const GRAPH_MESSAGES_MAX_LIST_ROWS = 10;
 export const GRAPH_MESSAGES_MAX_CONTACTS = 257;
 export const GRAPH_MESSAGES_MAX_PRODUCT_ITEMS = 30;
+export const GRAPH_MESSAGES_GROUP_ID_MAX_LENGTH = 256;
 
 export function isPlainOptionsObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -32,6 +33,52 @@ export function hasControlChar(value: string): boolean {
     if (code < 0x20 || code === 0x7f) return true;
   }
   return false;
+}
+
+export function assertValidGroupId(to: unknown, helperName = "sendText"): string {
+  if (typeof to !== "string") {
+    throw new GraphRequestValidationError(
+      `Invalid ${helperName} input: to must be a group id string when recipientType is group.`
+    );
+  }
+  if (to.length === 0 || to.trim().length === 0) {
+    throw new GraphRequestValidationError(
+      `Invalid ${helperName} input: to must be a non-empty group id string when recipientType is group.`
+    );
+  }
+  if (hasControlChar(to)) {
+    throw new GraphRequestValidationError(
+      `Invalid ${helperName} input: group to must not contain control characters (CR/LF/NUL/etc.).`
+    );
+  }
+  if (
+    to.includes("/") ||
+    to.includes("\\") ||
+    to.includes("?") ||
+    to.includes("#") ||
+    to.includes(":") ||
+    to.includes("@")
+  ) {
+    throw new GraphRequestValidationError(
+      `Invalid ${helperName} input: group to must be an opaque id, not a path, URL, or address.`
+    );
+  }
+  if (to.length > GRAPH_MESSAGES_GROUP_ID_MAX_LENGTH) {
+    throw new GraphRequestValidationError(
+      `Invalid ${helperName} input: group to exceeds ${GRAPH_MESSAGES_GROUP_ID_MAX_LENGTH}-character limit.`
+    );
+  }
+  if (/^\+?\d{1,15}$/.test(to)) {
+    throw new GraphRequestValidationError(
+      `Invalid ${helperName} input: recipientType group requires a group-id-shaped to, not a phone number.`
+    );
+  }
+  if (!/[A-Za-z_-]/.test(to)) {
+    throw new GraphRequestValidationError(
+      `Invalid ${helperName} input: recipientType group requires a group-id-shaped to.`
+    );
+  }
+  return to;
 }
 
 export function assertValidRecipient(to: unknown, helperName = "sendText"): string {
@@ -68,6 +115,40 @@ export function assertValidRecipient(to: unknown, helperName = "sendText"): stri
     );
   }
   return to;
+}
+
+export function assertRecipientType(value: unknown, helperName: string): "individual" | "group" | undefined {
+  if (value === undefined) return undefined;
+  if (value === "individual" || value === "group") return value;
+  throw new GraphRequestValidationError(
+    `Invalid ${helperName} input: recipientType must be individual or group when provided.`
+  );
+}
+
+export function assertMessageRecipient(record: Record<string, unknown>, helperName: string): {
+  readonly to: string;
+  readonly recipientType?: "individual" | "group";
+} {
+  const recipientType = assertRecipientType(record.recipientType, helperName);
+  if (recipientType === "group") {
+    return { to: assertValidGroupId(record.to, helperName), recipientType };
+  }
+  return { to: assertValidRecipient(record.to, helperName), recipientType };
+}
+
+export function applyRecipientType<T extends object>(
+  payload: T,
+  recipientType: "individual" | "group" | undefined
+): T & { recipient_type?: "individual" | "group" } {
+  const next = payload as T & { recipient_type?: "individual" | "group" };
+  if (recipientType !== undefined) next.recipient_type = recipientType;
+  return next;
+}
+
+export function rejectGroupRecipient(record: Record<string, unknown>, helperName: string, reason: string): void {
+  if (assertRecipientType(record.recipientType, helperName) === "group") {
+    throw new GraphRequestValidationError(`Invalid ${helperName} input: ${reason} is not supported for group recipients.`);
+  }
 }
 
 export function assertValidText(text: unknown): string {
