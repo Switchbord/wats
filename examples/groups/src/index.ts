@@ -55,7 +55,7 @@ const syntheticGroupWebhook = {
           groups: [{
             timestamp: "1780000000",
             type: "group_create",
-            request_id: createAck.request_id ?? "req-create-group",
+            request_id: createAck.requestId ?? "req-create-group",
             group_id: GROUP_ID_FROM_WEBHOOK,
             subject: "Launch operators",
             invite_link: "https://chat.whatsapp.com/EXAMPLE_INVITE",
@@ -102,7 +102,7 @@ const invite = await group.getInviteLink();
 await group.approveJoinRequests({ joinRequestIds: [JOIN_REQUEST_ID_FROM_WEBHOOK] });
 await wa.sendGroupMessage({
   groupId: GROUP_ID_FROM_WEBHOOK,
-  text: `Welcome via ${invite.invite_link ?? "placeholder invite link"}`
+  text: `Welcome via ${invite.inviteLink ?? "placeholder invite link"}`
 });
 const emittedGroupRecipientType = JSON.parse(String(mock.requests[3]?.body)) as { recipient_type?: string };
 if (emittedGroupRecipientType.recipient_type !== "group") {
@@ -138,8 +138,8 @@ if (!groupOnly.predicate({
 }
 
 console.log("wats-groups-example:ready");
-console.log(`createRequestId=${createAck.request_id ?? "missing"}`);
+console.log(`createRequestId=${createAck.requestId ?? "missing"}`);
 console.log(`syntheticGroupUpdates=${normalized.updates.length}`);
-console.log(`inviteLink=${invite.invite_link ?? "missing"}`);
+console.log(`inviteLink=${invite.inviteLink ?? "missing"}`);
 console.log(`graphRequests=${mock.requests.length}`);
 console.log(mock.requests.map((request: TransportRequest) => `${request.method} ${new URL(request.url).pathname}`).join("\n"));

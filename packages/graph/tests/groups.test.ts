@@ -80,7 +80,7 @@ describe("WATS-132 Groups endpoint family", () => {
       { phoneNumberId: "555" },
       { subject: "Team", description: "Our team", joinApprovalMode: "approval_required" }
     );
-    expect(res.request_id).toBe("req-1");
+    expect(res.requestId).toBe("req-1");
     expect(handle.requests[0]?.method).toBe("POST");
     expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v25.0/555/groups");
     expect(handle.requests[0]?.headers.get("content-type")).toBe("application/json");
@@ -153,7 +153,7 @@ describe("WATS-132 Groups endpoint family", () => {
       ok({ invite_link: "https://chat.whatsapp.com/ABC123" })
     );
     const res: GroupInviteLinkResponse = await getGroupInviteLink(client, { groupId: "grp-1" });
-    expect(res.invite_link).toBe("https://chat.whatsapp.com/ABC123");
+    expect(res.inviteLink).toBe("https://chat.whatsapp.com/ABC123");
     expect(handle.requests[0]?.method).toBe("GET");
     expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v25.0/grp-1/invite_link");
   });
@@ -161,7 +161,7 @@ describe("WATS-132 Groups endpoint family", () => {
   test("resetGroupInviteLink POSTs /{groupId}/invite_link", async () => {
     const { client, handle } = clientWith(ok({ invite_link: "https://chat.whatsapp.com/NEW999" }));
     const res: GroupInviteLinkResponse = await resetGroupInviteLink(client, { groupId: "grp-1" });
-    expect(res.invite_link).toBe("https://chat.whatsapp.com/NEW999");
+    expect(res.inviteLink).toBe("https://chat.whatsapp.com/NEW999");
     expect(handle.requests[0]?.method).toBe("POST");
     expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v25.0/grp-1/invite_link");
     expect(parseBody(handle.requests[0]?.body)).toEqual({ messaging_product: "whatsapp" });
@@ -199,7 +199,7 @@ describe("WATS-132 Groups endpoint family", () => {
       limit: "25",
       after: "CUR"
     });
-    expect(res.data?.[0]?.join_request_id).toBe("jr-1");
+    expect(res.data?.[0]?.joinRequestId).toBe("jr-1");
     expect(handle.requests[0]?.method).toBe("GET");
     expect(handle.requests[0]?.url).toBe(
       "https://graph.facebook.com/v25.0/grp-1/join_requests?limit=25&after=CUR"
