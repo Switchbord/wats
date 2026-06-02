@@ -1,6 +1,7 @@
 import type { WatsProfileConfig } from "@wats/config";
 import { WhatsApp, filtersTyped } from "@wats/core";
 import {
+  approveGroupJoinRequests,
   buildSendAudioPayload,
   buildSendDocumentPayload,
   buildRemoveReactionPayload,
@@ -15,12 +16,23 @@ import {
   buildSendCatalogPayload,
   buildRequestLocationPayload,
   buildSendLocationPayload,
+  buildSendPinPayload,
+  createGroup,
   buildSendReactionPayload,
   buildSendStickerPayload,
   buildSendVideoPayload,
+  deleteGroup,
+  getGroup,
+  getGroupInviteLink,
   GraphApiError,
   GraphClient,
   GraphRequestValidationError,
+  listGroupJoinRequests,
+  listGroups,
+  rejectGroupJoinRequests,
+  removeGroupParticipants,
+  resetGroupInviteLink,
+  updateGroup,
   type GraphMessagesSendBody,
   type Transport
 } from "@wats/graph";
@@ -46,6 +58,11 @@ export interface WatsServiceConfig {
   readonly cryptoProvider?: CryptoProvider;
   readonly whatsapp?: WebhookFacadeLike;
   readonly persistence?: PersistenceStore;
+  /**
+   * Opt in to WhatsApp Groups management service routes under apiPrefix.
+   * Defaults to false so non-group deployments keep the pre-Groups route set.
+   */
+  readonly enableGroupRoutes?: boolean;
 }
 
 export type WatsServiceErrorCode =
@@ -77,6 +94,10 @@ export interface WatsServiceOpenApiOptions {
   readonly serverUrl?: string;
   readonly title?: string;
   readonly version?: string;
+  /**
+   * Include opt-in Groups service routes in the generated document.
+   */
+  readonly enableGroupRoutes?: boolean;
 }
 
 export interface WatsServiceOpenApiDocument {
@@ -112,6 +133,13 @@ interface RuntimeConfig {
   readonly apiPrefix: string;
   readonly textPath: string;
   readonly messagesPath: string;
+  readonly enableGroupRoutes: boolean;
+  readonly groupsPath: string;
+}
+
+interface ServiceRouteMatch {
+  readonly route: "groups" | "group" | "groupInviteLink" | "groupParticipants" | "groupJoinRequests";
+  readonly groupId?: string;
 }
 
 const JSON_CONTENT_TYPE = "application/json; charset=utf-8";
@@ -346,6 +374,9 @@ function validateOpenApiOptions(value: unknown): WatsServiceOpenApiOptions {
   if (options.serverUrl !== undefined) {
     validateOpenApiServerUrl(options.serverUrl);
   }
+  if (options.enableGroupRoutes !== undefined && typeof options.enableGroupRoutes !== "boolean") {
+    throw new WatsServiceError("invalid_config", "OpenAPI enableGroupRoutes must be a boolean when provided.");
+  }
   return options as WatsServiceOpenApiOptions;
 }
 
@@ -369,11 +400,13 @@ function validateOpenApiServerUrl(value: unknown): string {
   return `${url.origin}${path}`;
 }
 
-function assertNoRouteCollisions(webhookPath: string, apiPrefix: string): void {
+function assertNoRouteCollisions(webhookPath: string, apiPrefix: string, enableGroupRoutes = false): void {
   const textPath = `${apiPrefix}/messages/text`;
   const messagesPath = `${apiPrefix}/messages`;
+  const groupsPath = `${apiPrefix}/groups`;
   const reservedStaticPaths = new Set(["/healthz", "/readyz", OPENAPI_PATH]);
-  if (reservedStaticPaths.has(webhookPath) || webhookPath === textPath || webhookPath === messagesPath) {
+  const webhookCollidesWithGroups = enableGroupRoutes && (webhookPath === groupsPath || webhookPath.startsWith(`${groupsPath}/`));
+  if (reservedStaticPaths.has(webhookPath) || webhookPath === textPath || webhookPath === messagesPath || webhookCollidesWithGroups) {
     throw new WatsServiceError("invalid_path", "profile.webhook.path must not collide with service routes.");
   }
   if (reservedStaticPaths.has(apiPrefix) || apiPrefix === webhookPath) {
@@ -436,6 +469,27 @@ function messageOperation(summary: string, schemaName: string): Record<string, u
       "401": errorResponseSpec("Missing or invalid service bearer token."),
       "405": errorResponseSpec("Method not allowed."),
       "409": errorResponseSpec("Idempotency-Key conflicts with a different request body."),
+      "502": errorResponseSpec("Graph request failed.")
+    }
+  };
+}
+
+function groupOperation(summary: string, schemaName?: string): Record<string, unknown> {
+  return {
+    tags: ["groups"],
+    summary,
+    security: [{ serviceBearerAuth: [] }],
+    ...(schemaName === undefined ? {} : {
+      requestBody: {
+        required: true,
+        ...jsonContentSchema(schemaRef(schemaName))
+      }
+    }),
+    responses: {
+      "200": okResponseSpec("Graph response passthrough.", "GraphResponsePassthrough"),
+      "400": errorResponseSpec("Malformed JSON, unsupported body, or invalid route parameter."),
+      "401": errorResponseSpec("Missing or invalid service bearer token."),
+      "405": errorResponseSpec("Method not allowed."),
       "502": errorResponseSpec("Graph request failed.")
     }
   };
@@ -646,6 +700,50 @@ function createOpenApiSchemas(): Record<string, Record<string, unknown>> {
         }
       ]
     },
+    GroupPinMessageBody: {
+      type: "object",
+      additionalProperties: false,
+      required: ["type", "to", "pinType", "messageId", "expirationDays"],
+      properties: {
+        type: { type: "string", const: "pin" },
+        to: { type: "string", minLength: 1, description: "WhatsApp group id." },
+        pinType: { type: "string", enum: ["pin", "unpin"] },
+        messageId: { type: "string", minLength: 1 },
+        expirationDays: { type: "integer", minimum: 1, maximum: 30 }
+      }
+    },
+    CreateGroupBody: {
+      type: "object",
+      additionalProperties: false,
+      required: ["subject"],
+      properties: {
+        subject: { type: "string", minLength: 1, maxLength: 128 },
+        description: { type: "string", minLength: 1, maxLength: 2048 },
+        joinApprovalMode: { type: "string", enum: ["auto_approve", "approval_required"] }
+      }
+    },
+    UpdateGroupBody: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        subject: { type: "string", minLength: 1, maxLength: 128 },
+        description: { type: "string", minLength: 1, maxLength: 2048 },
+        joinApprovalMode: { type: "string", enum: ["auto_approve", "approval_required"] }
+      },
+      anyOf: [{ required: ["subject"] }, { required: ["description"] }, { required: ["joinApprovalMode"] }]
+    },
+    RemoveGroupParticipantsBody: {
+      type: "object",
+      additionalProperties: false,
+      required: ["waIds"],
+      properties: { waIds: { type: "array", minItems: 1, maxItems: 8, items: { type: "string", minLength: 1 } } }
+    },
+    ManageGroupJoinRequestsBody: {
+      type: "object",
+      additionalProperties: false,
+      required: ["joinRequestIds"],
+      properties: { joinRequestIds: { type: "array", minItems: 1, maxItems: 64, items: { type: "string", minLength: 1 } } }
+    },
     SupportedMessageBody: {
       oneOf: [
         schemaRef("GenericTextMessageBody"),
@@ -653,6 +751,7 @@ function createOpenApiSchemas(): Record<string, Record<string, unknown>> {
         schemaRef("LocationMessageBody"),
         schemaRef("ContactsMessageBody"),
         schemaRef("ReactionMessageBody"),
+        schemaRef("GroupPinMessageBody"),
         schemaRef("BasicInteractiveMessageBody"),
         schemaRef("CommerceInteractiveMessageBody")
       ],
@@ -683,12 +782,119 @@ export function createWatsServiceOpenApiDocument(
   const options = validateOpenApiOptions(optionsInput);
   const webhookPath = validateSafeAbsolutePath(profile.webhook.path, "profile.webhook.path");
   const apiPrefix = validateSafeAbsolutePath(profile.service.apiPrefix, "profile.service.apiPrefix");
-  assertNoRouteCollisions(webhookPath, apiPrefix);
+  assertNoRouteCollisions(webhookPath, apiPrefix, options.enableGroupRoutes === true);
   const textPath = `${apiPrefix}/messages/text`;
   const messagesPath = `${apiPrefix}/messages`;
+  const groupsPath = `${apiPrefix}/groups`;
+  const groupPath = `${groupsPath}/{groupId}`;
+  const groupInvitePath = `${groupPath}/invite-link`;
+  const groupParticipantsPath = `${groupPath}/participants`;
+  const groupJoinRequestsPath = `${groupPath}/join-requests`;
+  const includeGroupRoutes = options.enableGroupRoutes === true;
   const serverUrl = options.serverUrl === undefined
     ? defaultServerUrl(profile)
     : validateOpenApiServerUrl(options.serverUrl);
+
+  const paths: Record<string, Record<string, unknown>> = {
+    "/healthz": {
+      get: {
+        tags: ["status"],
+        summary: "Health check",
+        responses: {
+          "200": okResponseSpec("Service process is alive.", "HealthResponse"),
+          "405": errorResponseSpec("Method not allowed.")
+        }
+      }
+    },
+    "/readyz": {
+      get: {
+        tags: ["status"],
+        summary: "Readiness check",
+        responses: {
+          "200": okResponseSpec("Service dependencies were constructed.", "ReadyResponse"),
+          "405": errorResponseSpec("Method not allowed.")
+        }
+      }
+    },
+    [webhookPath]: {
+      get: {
+        tags: ["webhook"],
+        summary: "Verify Meta webhook challenge",
+        parameters: [
+          { name: "hub.mode", in: "query", required: true, schema: { type: "string" } },
+          { name: "hub.verify_token", in: "query", required: true, schema: { type: "string" } },
+          { name: "hub.challenge", in: "query", required: true, schema: { type: "string" } }
+        ],
+        responses: {
+          "200": { description: "Verification challenge.", content: { "text/plain": { schema: schemaRef("WebhookVerificationResponse") } } },
+          "400": errorResponseSpec("Malformed verification query."),
+          "401": errorResponseSpec("Verification token mismatch."),
+          "405": errorResponseSpec("Method not allowed.")
+        }
+      },
+      post: {
+        tags: ["webhook"],
+        summary: "Receive signed Meta webhook payload",
+        parameters: [
+          { name: "x-hub-signature-256", in: "header", required: true, schema: { type: "string" } }
+        ],
+        requestBody: {
+          required: true,
+          ...jsonContentSchema({ type: "object", additionalProperties: true })
+        },
+        responses: {
+          "200": okResponseSpec("Webhook accepted and dispatched.", "WebhookDispatchResponse"),
+          "400": errorResponseSpec("Malformed webhook body."),
+          "401": errorResponseSpec("Missing or invalid signature."),
+          "405": errorResponseSpec("Method not allowed."),
+          "413": errorResponseSpec("Webhook body exceeds configured maxBodyBytes.")
+        }
+      }
+    },
+    [textPath]: {
+      post: messageOperation("Send a text message", "TextMessageBody")
+    },
+    [messagesPath]: {
+      post: messageOperation("Send a supported text, media, location, reaction, contacts, group pin, or interactive message body", "SupportedMessageBody")
+    },
+    [OPENAPI_PATH]: {
+      get: {
+        tags: ["openapi"],
+        summary: "Fetch this OpenAPI document",
+        responses: {
+          "200": {
+            description: "OpenAPI 3.1 document for this WATS service profile.",
+            ...jsonContentSchema({ type: "object", additionalProperties: true })
+          },
+          "405": errorResponseSpec("Method not allowed.")
+        }
+      }
+    }
+  };
+
+  if (includeGroupRoutes) {
+    paths[groupsPath] = {
+      post: groupOperation("Create a WhatsApp group", "CreateGroupBody"),
+      get: groupOperation("List WhatsApp groups for the configured business phone number")
+    };
+    paths[groupPath] = {
+      get: groupOperation("Get WhatsApp group details"),
+      post: groupOperation("Update WhatsApp group settings", "UpdateGroupBody"),
+      delete: groupOperation("Delete a WhatsApp group")
+    };
+    paths[groupInvitePath] = {
+      get: groupOperation("Get a WhatsApp group invite link"),
+      post: groupOperation("Reset a WhatsApp group invite link")
+    };
+    paths[groupParticipantsPath] = {
+      delete: groupOperation("Remove WhatsApp group participants", "RemoveGroupParticipantsBody")
+    };
+    paths[groupJoinRequestsPath] = {
+      get: groupOperation("List WhatsApp group join requests"),
+      post: groupOperation("Approve WhatsApp group join requests", "ManageGroupJoinRequestsBody"),
+      delete: groupOperation("Reject WhatsApp group join requests", "ManageGroupJoinRequestsBody")
+    };
+  }
 
   return {
     openapi: "3.1.0",
@@ -698,82 +904,7 @@ export function createWatsServiceOpenApiDocument(
       description: "Runtime-neutral OpenAPI description for the standalone WATS service routes currently implemented."
     },
     servers: [{ url: serverUrl }],
-    paths: {
-      "/healthz": {
-        get: {
-          tags: ["status"],
-          summary: "Health check",
-          responses: {
-            "200": okResponseSpec("Service process is alive.", "HealthResponse"),
-            "405": errorResponseSpec("Method not allowed.")
-          }
-        }
-      },
-      "/readyz": {
-        get: {
-          tags: ["status"],
-          summary: "Readiness check",
-          responses: {
-            "200": okResponseSpec("Service dependencies were constructed.", "ReadyResponse"),
-            "405": errorResponseSpec("Method not allowed.")
-          }
-        }
-      },
-      [webhookPath]: {
-        get: {
-          tags: ["webhook"],
-          summary: "Verify Meta webhook challenge",
-          parameters: [
-            { name: "hub.mode", in: "query", required: true, schema: { type: "string" } },
-            { name: "hub.verify_token", in: "query", required: true, schema: { type: "string" } },
-            { name: "hub.challenge", in: "query", required: true, schema: { type: "string" } }
-          ],
-          responses: {
-            "200": { description: "Verification challenge.", content: { "text/plain": { schema: schemaRef("WebhookVerificationResponse") } } },
-            "400": errorResponseSpec("Malformed verification query."),
-            "401": errorResponseSpec("Verification token mismatch."),
-            "405": errorResponseSpec("Method not allowed.")
-          }
-        },
-        post: {
-          tags: ["webhook"],
-          summary: "Receive signed Meta webhook payload",
-          parameters: [
-            { name: "x-hub-signature-256", in: "header", required: true, schema: { type: "string" } }
-          ],
-          requestBody: {
-            required: true,
-            ...jsonContentSchema({ type: "object", additionalProperties: true })
-          },
-          responses: {
-            "200": okResponseSpec("Webhook accepted and dispatched.", "WebhookDispatchResponse"),
-            "400": errorResponseSpec("Malformed webhook body."),
-            "401": errorResponseSpec("Missing or invalid signature."),
-            "405": errorResponseSpec("Method not allowed."),
-            "413": errorResponseSpec("Webhook body exceeds configured maxBodyBytes.")
-          }
-        }
-      },
-      [textPath]: {
-        post: messageOperation("Send a text message", "TextMessageBody")
-      },
-      [messagesPath]: {
-        post: messageOperation("Send a supported text, media, location, reaction, contacts, or interactive message body", "SupportedMessageBody")
-      },
-      [OPENAPI_PATH]: {
-        get: {
-          tags: ["openapi"],
-          summary: "Fetch this OpenAPI document",
-          responses: {
-            "200": {
-              description: "OpenAPI 3.1 document for this WATS service profile.",
-              ...jsonContentSchema({ type: "object", additionalProperties: true })
-            },
-            "405": errorResponseSpec("Method not allowed.")
-          }
-        }
-      }
-    },
+    paths,
     components: {
       securitySchemes: {
         serviceBearerAuth: {
@@ -802,6 +933,7 @@ function validateTextBody(body: unknown): { to: string; text: string; previewUrl
 type ServiceMediaMessageKind = "image" | "video" | "audio" | "document" | "sticker";
 type ServiceLocationReactionMessageKind = "location" | "reaction" | "removeReaction";
 type ServiceContactsMessageKind = "contacts";
+type ServiceGroupPinMessageKind = "pin";
 type ServiceBasicInteractiveMessageKind = "interactiveButtons" | "interactiveList" | "interactiveCtaUrl" | "callPermissionRequest";
 type ServiceCommerceInteractiveMessageKind = "interactiveProduct" | "interactiveProducts" | "interactiveCatalog" | "interactiveLocationRequest";
 
@@ -833,6 +965,14 @@ interface ServiceContactsMessageInput {
   readonly to: string;
   readonly contacts: readonly Record<string, unknown>[];
   readonly replyToMessageId?: string;
+}
+
+interface ServiceGroupPinMessageInput {
+  readonly type: ServiceGroupPinMessageKind;
+  readonly to: string;
+  readonly pinType: "pin" | "unpin";
+  readonly messageId: string;
+  readonly expirationDays: number;
 }
 
 type ServiceBasicInteractiveMessageInput = Record<string, unknown> & {
@@ -1008,6 +1148,22 @@ function validateServiceContactsMessageBody(body: unknown): ServiceContactsMessa
   return out;
 }
 
+function validateServiceGroupPinBody(body: unknown): ServiceGroupPinMessageInput | null {
+  if (!isRecord(body)) return null;
+  if (body.type !== "pin") return null;
+  if (!hasOnlyKeys(body, ["type", "to", "pinType", "messageId", "expirationDays"])) return null;
+  if (!isNonEmptyString(body.to) || !isNonEmptyString(body.messageId)) return null;
+  if (body.pinType !== "pin" && body.pinType !== "unpin") return null;
+  if (typeof body.expirationDays !== "number" || !Number.isInteger(body.expirationDays) || body.expirationDays < 1 || body.expirationDays > 30) return null;
+  return {
+    type: "pin",
+    to: body.to,
+    pinType: body.pinType,
+    messageId: body.messageId,
+    expirationDays: body.expirationDays
+  };
+}
+
 function buildServiceMediaMessagePayload(input: ServiceMediaMessageInput): GraphMessagesSendBody {
   switch (input.type) {
     case "image":
@@ -1036,6 +1192,10 @@ function buildServiceLocationReactionPayload(input: ServiceLocationReactionMessa
 
 function buildServiceContactsPayload(input: ServiceContactsMessageInput): GraphMessagesSendBody {
   return buildSendContactsPayload(input as unknown as Parameters<typeof buildSendContactsPayload>[0]) as GraphMessagesSendBody;
+}
+
+function buildServiceGroupPinPayload(input: ServiceGroupPinMessageInput): GraphMessagesSendBody {
+  return buildSendPinPayload(input) as GraphMessagesSendBody;
 }
 
 function buildServiceBasicInteractivePayload(input: ServiceBasicInteractiveMessageInput): GraphMessagesSendBody {
@@ -1140,13 +1300,15 @@ function buildSupportedMessageBody(body: unknown): GraphMessagesSendBody | null 
   const media = validateServiceMediaMessageBody(body);
   const locationReaction = media === null ? validateServiceLocationReactionMessageBody(body) : null;
   const contacts = media === null && locationReaction === null ? validateServiceContactsMessageBody(body) : null;
-  const interactive = media === null && locationReaction === null && contacts === null ? validateServiceBasicInteractiveMessageBody(body) : null;
-  const commerceInteractive = media === null && locationReaction === null && contacts === null && interactive === null ? validateServiceCommerceInteractiveMessageBody(body) : null;
-  if (media === null && locationReaction === null && contacts === null && interactive === null && commerceInteractive === null) return null;
+  const groupPin = media === null && locationReaction === null && contacts === null ? validateServiceGroupPinBody(body) : null;
+  const interactive = media === null && locationReaction === null && contacts === null && groupPin === null ? validateServiceBasicInteractiveMessageBody(body) : null;
+  const commerceInteractive = media === null && locationReaction === null && contacts === null && groupPin === null && interactive === null ? validateServiceCommerceInteractiveMessageBody(body) : null;
+  if (media === null && locationReaction === null && contacts === null && groupPin === null && interactive === null && commerceInteractive === null) return null;
   try {
     if (media !== null) return buildServiceMediaMessagePayload(media);
     if (locationReaction !== null) return buildServiceLocationReactionPayload(locationReaction);
     if (contacts !== null) return buildServiceContactsPayload(contacts);
+    if (groupPin !== null) return buildServiceGroupPinPayload(groupPin);
     if (interactive !== null) return buildServiceBasicInteractivePayload(interactive);
     return buildServiceCommerceInteractivePayload(commerceInteractive as ServiceCommerceInteractiveMessageInput);
   } catch (error) {
@@ -1234,6 +1396,112 @@ async function handleGenericMessage(ctx: RuntimeConfig, request: Request): Promi
   }
 }
 
+function readQueryString(url: URL, name: string, maxLength = 4096): string | undefined | "invalid" {
+  const value = url.searchParams.get(name);
+  if (value === null) return undefined;
+  if (!isNonEmptyString(value) || value.length > maxLength) return "invalid";
+  return value;
+}
+
+function matchGroupRoute(ctx: RuntimeConfig, path: string): ServiceRouteMatch | null {
+  if (path === ctx.groupsPath) return { route: "groups" };
+  if (!path.startsWith(`${ctx.groupsPath}/`)) return null;
+  const rest = path.slice(ctx.groupsPath.length + 1);
+  const parts = rest.split("/");
+  if (parts.length === 0 || !isNonEmptyString(parts[0])) return null;
+  let groupId: string;
+  try {
+    groupId = decodeURIComponent(parts[0]!);
+  } catch {
+    return null;
+  }
+  if (!isNonEmptyString(groupId) || groupId.includes("/") || groupId.includes("\\")) return null;
+  if (parts.length === 1) return { route: "group", groupId };
+  if (parts.length === 2 && parts[1] === "invite-link") return { route: "groupInviteLink", groupId };
+  if (parts.length === 2 && parts[1] === "participants") return { route: "groupParticipants", groupId };
+  if (parts.length === 2 && parts[1] === "join-requests") return { route: "groupJoinRequests", groupId };
+  return null;
+}
+
+async function readGroupJsonBody(request: Request): Promise<unknown | "malformed"> {
+  const rawBody = await readRequestText(request);
+  if (rawBody === "malformed") return "malformed";
+  return parseJsonText(rawBody);
+}
+
+async function handleGroupRoute(ctx: RuntimeConfig, request: Request, url: URL, match: ServiceRouteMatch): Promise<Response> {
+  const method = request.method.toUpperCase();
+  try {
+    if (match.route === "groups") {
+      if (method === "GET") {
+        const params: Record<string, string> = { phoneNumberId: ctx.profile.whatsapp.phoneNumberId };
+        for (const name of ["limit", "after", "before"] as const) {
+          const value = readQueryString(url, name, name === "limit" ? 32 : 4096);
+          if (value === "invalid") return errorResponse(400, "malformed_query", "Group query is invalid.");
+          if (value !== undefined) params[name] = value;
+        }
+        return jsonResponse(200, await listGroups(ctx.graphClient, params as never));
+      }
+      if (method === "POST") {
+        const body = await readGroupJsonBody(request);
+        if (body === "malformed") return errorResponse(400, "malformed_json", "Request body must be valid JSON.");
+        return jsonResponse(200, await createGroup(ctx.graphClient, { phoneNumberId: ctx.profile.whatsapp.phoneNumberId }, body as never));
+      }
+      return methodNotAllowed("GET, POST");
+    }
+
+    const groupId = match.groupId;
+    if (groupId === undefined) return errorResponse(404, "not_found", "Route not found.");
+    if (match.route === "group") {
+      if (method === "GET") {
+        const fields = readQueryString(url, "fields");
+        if (fields === "invalid") return errorResponse(400, "malformed_query", "Group query is invalid.");
+        return jsonResponse(200, await getGroup(ctx.graphClient, fields === undefined ? { groupId } : { groupId, fields }));
+      }
+      if (method === "POST") {
+        const body = await readGroupJsonBody(request);
+        if (body === "malformed") return errorResponse(400, "malformed_json", "Request body must be valid JSON.");
+        return jsonResponse(200, await updateGroup(ctx.graphClient, { groupId }, body as never));
+      }
+      if (method === "DELETE") return jsonResponse(200, await deleteGroup(ctx.graphClient, { groupId }));
+      return methodNotAllowed("GET, POST, DELETE");
+    }
+
+    if (match.route === "groupInviteLink") {
+      if (method === "GET") return jsonResponse(200, await getGroupInviteLink(ctx.graphClient, { groupId }));
+      if (method === "POST") return jsonResponse(200, await resetGroupInviteLink(ctx.graphClient, { groupId }));
+      return methodNotAllowed("GET, POST");
+    }
+
+    if (match.route === "groupParticipants") {
+      if (method !== "DELETE") return methodNotAllowed("DELETE");
+      const body = await readGroupJsonBody(request);
+      if (body === "malformed") return errorResponse(400, "malformed_json", "Request body must be valid JSON.");
+      return jsonResponse(200, await removeGroupParticipants(ctx.graphClient, { groupId }, body as never));
+    }
+
+    if (method === "GET") {
+      const params: Record<string, string> = { groupId };
+      for (const name of ["limit", "after"] as const) {
+        const value = readQueryString(url, name, name === "limit" ? 32 : 4096);
+        if (value === "invalid") return errorResponse(400, "malformed_query", "Group query is invalid.");
+        if (value !== undefined) params[name] = value;
+      }
+      return jsonResponse(200, await listGroupJoinRequests(ctx.graphClient, params as never));
+    }
+    if (method === "POST" || method === "DELETE") {
+      const body = await readGroupJsonBody(request);
+      if (body === "malformed") return errorResponse(400, "malformed_json", "Request body must be valid JSON.");
+      const fn = method === "POST" ? approveGroupJoinRequests : rejectGroupJoinRequests;
+      return jsonResponse(200, await fn(ctx.graphClient, { groupId }, body as never));
+    }
+    return methodNotAllowed("GET, POST, DELETE");
+  } catch (error) {
+    if (error instanceof GraphRequestValidationError) return errorResponse(400, "malformed_body", "Group request body or route is invalid.");
+    return graphFailureResponse(error);
+  }
+}
+
 function readWebhookLogFlag(): boolean {
   // Single isolated env read for opt-in observability. Kept narrow on purpose:
   // the service is otherwise env-agnostic and takes resolved config/secrets.
@@ -1258,7 +1526,11 @@ function makeRuntimeConfig(config: WatsServiceConfig): RuntimeConfig {
   const secrets = validateSecrets(config.secrets);
   const webhookPath = validateSafeAbsolutePath(profile.webhook.path, "profile.webhook.path");
   const apiPrefix = validateSafeAbsolutePath(profile.service.apiPrefix, "profile.service.apiPrefix");
-  assertNoRouteCollisions(webhookPath, apiPrefix);
+  if (config.enableGroupRoutes !== undefined && typeof config.enableGroupRoutes !== "boolean") {
+    throw new WatsServiceError("invalid_config", "enableGroupRoutes must be a boolean when provided.");
+  }
+  const enableGroupRoutes = config.enableGroupRoutes === true;
+  assertNoRouteCollisions(webhookPath, apiPrefix, enableGroupRoutes);
   const transport = validateTransport(config.transport);
   const cryptoProvider = validateCryptoProvider(config.cryptoProvider);
   const suppliedWhatsapp = validateWhatsapp(config.whatsapp);
@@ -1385,7 +1657,9 @@ function makeRuntimeConfig(config: WatsServiceConfig): RuntimeConfig {
     webhookPath,
     apiPrefix,
     textPath: `${apiPrefix}/messages/text`,
-    messagesPath: `${apiPrefix}/messages`
+    messagesPath: `${apiPrefix}/messages`,
+    enableGroupRoutes,
+    groupsPath: `${apiPrefix}/groups`
   };
 }
 
@@ -1415,7 +1689,7 @@ export function createWatsServiceApp(config: WatsServiceConfig): WatsServiceApp 
 
       if (path === OPENAPI_PATH) {
         if (method !== "GET") return methodNotAllowed("GET");
-        return jsonResponse(200, createWatsServiceOpenApiDocument(ctx.profile, { serverUrl: url.origin }));
+        return jsonResponse(200, createWatsServiceOpenApiDocument(ctx.profile, { serverUrl: url.origin, enableGroupRoutes: ctx.enableGroupRoutes }));
       }
 
       if (path === ctx.webhookPath) {
@@ -1433,6 +1707,14 @@ export function createWatsServiceApp(config: WatsServiceConfig): WatsServiceApp 
         if (method !== "POST") return methodNotAllowed("POST");
         if (!isAuthorized(request, ctx.secrets.serviceBearerToken)) return unauthorized();
         return handleGenericMessage(ctx, request);
+      }
+
+      if (ctx.enableGroupRoutes) {
+        const groupMatch = matchGroupRoute(ctx, path);
+        if (groupMatch !== null) {
+          if (!isAuthorized(request, ctx.secrets.serviceBearerToken)) return unauthorized();
+          return handleGroupRoute(ctx, request, url, groupMatch);
+        }
       }
 
       return errorResponse(404, "not_found", "Route not found.");

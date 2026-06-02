@@ -4,7 +4,8 @@ import { createMockTransport } from "@wats/graph/testing";
 import {
   createWatsServiceApp,
   createWatsServiceOpenApiDocument,
-  type WatsServiceConfig
+  type WatsServiceConfig,
+  WatsServiceError
 } from "@wats/service";
 
 function profile(overrides: Partial<WatsProfileConfig> = {}): WatsProfileConfig {
@@ -181,6 +182,22 @@ describe("WATS-137 opt-in group service routes", () => {
 
     expect(body(mock.requests[0]!)).toEqual({ messaging_product: "whatsapp", recipient_type: "group", to: "grp-123", type: "text", text: { body: "hello group" } });
     expect(body(mock.requests[1]!)).toEqual({ messaging_product: "whatsapp", recipient_type: "group", to: "grp-123", type: "pin", pin: { type: "pin", message_id: "wamid.TARGET", expiration_days: 7 } });
+  });
+
+  test("rejects WATS-137 route collisions only when group routes are enabled", () => {
+    const colliding = profile({ webhook: { ...profile().webhook, path: "/api/groups" } });
+    expect(() => createWatsServiceOpenApiDocument(colliding)).not.toThrow();
+    expect(() => createWatsServiceApp(config({ profile: colliding }))).not.toThrow();
+
+    expect(() => createWatsServiceOpenApiDocument(colliding, { enableGroupRoutes: true })).toThrow(WatsServiceError);
+    expect(() => createWatsServiceApp(config({ profile: colliding, enableGroupRoutes: true }))).toThrow(WatsServiceError);
+  });
+
+  test("malformed encoded group route params fail closed without throwing host errors", async () => {
+    const app = createWatsServiceApp(config({ enableGroupRoutes: true }));
+    const res = await app.fetch(new Request("https://service.test/api/groups/%E0%A4%A/join-requests", authed({ method: "GET" })));
+    expect(res.status).toBe(404);
+    expect(await res.text()).not.toContain("URIError");
   });
 
   test("OpenAPI advertises group routes only when enabled and marks them bearer-protected", () => {

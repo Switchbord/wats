@@ -1,8 +1,8 @@
 # Service Reference (`@wats/service`)
 
 - status: experimental
-- applies-to: WATS-34/WATS-35/WATS-73
-- lastReviewed: 2026-05-06
+- applies-to: WATS-34/WATS-35/WATS-73/WATS-137
+- lastReviewed: 2026-06-02
 
 ## Purpose
 
@@ -47,10 +47,14 @@ interface WatsServiceConfig {
   transport?: Transport;
   cryptoProvider?: CryptoProvider;
   whatsapp?: { dispatch(update: unknown): unknown | Promise<unknown> };
+  persistence?: PersistenceStore;
+  enableGroupRoutes?: boolean;
 }
 ```
 
 `@wats/service` still does not read environment variables. Callers resolve env refs from `@wats/config` outside the service and pass explicit secret values in memory. The CLI live wrapper resolves env-secret refs from an explicit `--env-file .env.local` and process environment, then passes the resolved secrets to this package without changing the service API.
+
+`enableGroupRoutes` is an explicit opt-in for WATS-137 Groups management routes. It defaults to `false`, so deployments that do not want Groups keep the pre-Groups route set and can strip Groups by not enabling the option.
 
 ## Routes
 
@@ -62,7 +66,12 @@ interface WatsServiceConfig {
 | `profile.webhook.path` | GET | Meta verify token | Delegates to `createWebhookAdapter`. |
 | `profile.webhook.path` | POST | Meta signature | Delegates to `createWebhookAdapter`. |
 | `${profile.service.apiPrefix}/messages/text` | POST | service bearer | Sends a text message through Graph. |
-| `${profile.service.apiPrefix}/messages` | POST | service bearer | Sends a supported generic text, media, location, reaction, contacts, or interactive message body through Graph. |
+| `${profile.service.apiPrefix}/messages` | POST | service bearer | Sends a supported generic text, media, location, reaction, contacts, group pin/unpin, or interactive message body through Graph. |
+| `${profile.service.apiPrefix}/groups` | GET, POST | service bearer | Opt-in (`enableGroupRoutes`) list/create Groups using the configured business phone-number id. |
+| `${profile.service.apiPrefix}/groups/{groupId}` | GET, POST, DELETE | service bearer | Opt-in get/update/delete a Group. |
+| `${profile.service.apiPrefix}/groups/{groupId}/invite-link` | GET, POST | service bearer | Opt-in get/reset a Group invite link. |
+| `${profile.service.apiPrefix}/groups/{groupId}/participants` | DELETE | service bearer | Opt-in remove up to 8 Group participants. |
+| `${profile.service.apiPrefix}/groups/{groupId}/join-requests` | GET, POST, DELETE | service bearer | Opt-in list/approve/reject Group join requests. |
 
 Unknown routes return `404`. Unsupported methods return `405` with an `Allow` header.
 
@@ -70,7 +79,7 @@ Unknown routes return `404`. Unsupported methods return `405` with an `Allow` he
 
 `createWatsServiceOpenApiDocument(profile, options?)` returns a plain-object OpenAPI 3.1 document for the current service routes. `createWatsServiceApp(config)` serves the same document at `GET /openapi.json` with JSON content type and no service bearer requirement. Method mismatch returns `405` with `Allow: GET`.
 
-The document includes `serviceBearerAuth` only on the protected message routes and never embeds raw service bearer, Graph access, app secret, verify token, or config env-var secret reference values. See `docs/reference/openapi.md` for option validation, schemas, body matrix, and non-goals.
+The document includes `serviceBearerAuth` only on the protected message routes and, when `enableGroupRoutes` is true, the protected Groups routes. It never embeds raw service bearer, Graph access, app secret, verify token, or config env-var secret reference values. See `docs/reference/openapi.md` for option validation, schemas, body matrix, and non-goals.
 
 ## Service bearer auth
 
@@ -144,6 +153,19 @@ Supported media `type` values are `image`, `video`, `audio`, `document`, and `st
 Location bodies use `type: "location"`, finite `latitude`/`longitude` values in Graph-supported ranges, and optional `name`, `address`, and `replyToMessageId`. Reaction bodies use `type: "reaction"` with `messageId` and non-empty `emoji`. Remove-reaction bodies use `type: "removeReaction"` with `messageId` and map to Graph reaction payloads with an empty emoji. Contacts bodies use `type: "contacts"`, a non-empty `contacts` array, and the same camelCase contact input objects as the SDK composer helper. Interactive bodies support `interactiveButtons`, `interactiveList`, `interactiveCtaUrl`, `callPermissionRequest`, `interactiveProduct`, `interactiveProducts`, `interactiveCatalog`, and `interactiveLocationRequest`, and map through the corresponding SDK builders. WATS-90 `type: "callPermissionRequest"` emits Graph `interactive.type = "call_permission_request"` and `interactive.action.name = "call_permission_request"`.
 
 The route preserves the service bearer boundary: the service bearer token authorizes the local service route, is never forwarded to Graph, and builder/validation failures return `400` without echoing tokens or request secrets.
+
+## Groups routes (opt-in)
+
+Pass `enableGroupRoutes: true` to expose WATS-137 Groups routes. Groups hang off `profile.whatsapp.phoneNumberId`, not the WABA id. Route inputs stay camelCase and are mapped to Meta snake_case only at the Graph boundary.
+
+- `POST /groups` sends `POST /<phoneNumberId>/groups` with `subject`, optional `description`, and optional `joinApprovalMode`.
+- `GET /groups` sends `GET /<phoneNumberId>/groups` with optional `limit`, `after`, and `before` query values.
+- `GET|POST|DELETE /groups/{groupId}` map to get, update, and delete on `/<groupId>`.
+- `GET|POST /groups/{groupId}/invite-link` map to `GET|POST /<groupId>/invite_link`; reset is POST, not DELETE.
+- `DELETE /groups/{groupId}/participants` removes up to 8 participants with `waIds` mapped to `participants[].wa_id`.
+- `GET|POST|DELETE /groups/{groupId}/join-requests` list, approve, or reject join requests. Reject is DELETE, not POST.
+
+All Groups routes require the service bearer token, forward only the Graph access token to Graph, and return the same sanitized `graph_request_failed` envelope as message routes on Meta errors.
 
 ## Webhook route
 
