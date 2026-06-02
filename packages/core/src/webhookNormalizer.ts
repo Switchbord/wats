@@ -1115,16 +1115,16 @@ function makeGroupItemPayload(
   groupPayload: Record<string, unknown>
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {};
-  const messagingProduct = readOwnDataField(valuePayload, "messaging_product");
-  const metadata = readOwnDataField(valuePayload, "metadata");
-  if (messagingProduct !== undefined) out.messaging_product = messagingProduct;
-  if (metadata !== undefined) out.metadata = metadata;
-
   const descriptors = Object.getOwnPropertyDescriptors(groupPayload);
   for (const [key, descriptor] of Object.entries(descriptors)) {
     if (typeof descriptor.get === "function" || typeof descriptor.set === "function") continue;
     out[key] = descriptor.value;
   }
+
+  const messagingProduct = readOwnDataField(valuePayload, "messaging_product");
+  const metadata = readOwnDataField(valuePayload, "metadata");
+  if (messagingProduct !== undefined) out.messaging_product = messagingProduct;
+  if (metadata !== undefined) out.metadata = metadata;
   return out;
 }
 
