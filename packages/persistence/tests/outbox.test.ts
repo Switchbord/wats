@@ -85,6 +85,7 @@ describe("WATS-87 SQLite outbox records", () => {
       const first = await store.claimOutboxItems({ now: "2026-06-01T02:00:00.000Z", limit: 10 });
       expect(first).toHaveLength(1);
       expect(first[0]?.attempts).toBe(1);
+      expect(first[0]?.leaseId).toBe(1);
 
       await expect(store.claimOutboxItems({
         now: "2026-06-01T02:04:59.999Z",
@@ -98,6 +99,47 @@ describe("WATS-87 SQLite outbox records", () => {
       expect(reclaimed).toHaveLength(1);
       expect(reclaimed[0]?.id).toBe("outbox-message-stale");
       expect(reclaimed[0]?.attempts).toBe(2);
+      expect(reclaimed[0]?.leaseId).toBe(2);
+    } finally {
+      await store.close();
+    }
+  });
+
+  test("rejects stale outbox completions after a reclaimed worker receives a newer lease", async () => {
+    const store = await createSqlitePersistence({ filename: tempDb() });
+    await store.migrate();
+    try {
+      await store.enqueueOutboxItem({
+        id: "outbox-message-fenced",
+        payloadHash: hash("f"),
+        createdAt: "2026-06-01T03:00:00.000Z"
+      });
+
+      const workerA = await store.claimOutboxItems({ now: "2026-06-01T03:00:00.000Z", limit: 10 });
+      expect(workerA).toHaveLength(1);
+      expect(workerA[0]?.leaseId).toBe(1);
+
+      const workerB = await store.claimOutboxItems({ now: "2026-06-01T03:05:00.000Z", limit: 10 });
+      expect(workerB).toHaveLength(1);
+      expect(workerB[0]?.leaseId).toBe(2);
+
+      await expect(store.markOutboxItemSucceeded({
+        id: "outbox-message-fenced",
+        leaseId: workerA[0]?.leaseId ?? 0,
+        updatedAt: "2026-06-01T03:05:01.000Z"
+      })).rejects.toBeInstanceOf(PersistenceError);
+
+      await store.markOutboxItemFailed({
+        id: "outbox-message-fenced",
+        leaseId: workerB[0]?.leaseId ?? 0,
+        nextAttemptAt: "2026-06-01T03:06:00.000Z",
+        updatedAt: "2026-06-01T03:05:02.000Z"
+      });
+
+      await expect(store.claimOutboxItems({ now: "2026-06-01T03:05:59.999Z", limit: 10 })).resolves.toEqual([]);
+      const retry = await store.claimOutboxItems({ now: "2026-06-01T03:06:00.000Z", limit: 10 });
+      expect(retry).toHaveLength(1);
+      expect(retry[0]?.leaseId).toBe(3);
     } finally {
       await store.close();
     }
