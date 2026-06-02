@@ -1,6 +1,6 @@
 {
   "name": "@wats/cli",
-  "version": "0.3.15",
+  "version": "0.3.16",
   "private": false,
   "license": "MIT",
   "type": "module",
@@ -40,7 +40,7 @@
     "wats"
   ],
   "dependencies": {
-    "@wats/config": "^0.3.15",
-    "@wats/service": "^0.3.15"
+    "@wats/config": "^0.3.16",
+    "@wats/service": "^0.3.16"
   }
 }

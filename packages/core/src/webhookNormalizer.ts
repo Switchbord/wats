@@ -38,6 +38,10 @@
 //     Deeper status/account normalization remains incremental.
 
 import type {
+  WhatsAppGroupLifecycleUpdateValue,
+  WhatsAppGroupParticipantsUpdateValue,
+  WhatsAppGroupSettingsUpdateValue,
+  WhatsAppGroupStatusUpdateValue,
   WhatsAppMessage,
   WhatsAppMessageStatus,
   WhatsAppWebhookChange
@@ -47,7 +51,24 @@ export type CallEvent = "connect" | "terminate";
 export type CallDirection = "USER_INITIATED" | "BUSINESS_INITIATED";
 export type CallStatusType = "RINGING" | "ACCEPTED" | "REJECTED";
 
-export type TypedUpdateKind = "message" | "status" | "account" | "unknown" | "callConnect" | "callTerminate" | "callStatus";
+export type TypedUpdateKind =
+  | "message"
+  | "status"
+  | "account"
+  | "unknown"
+  | "callConnect"
+  | "callTerminate"
+  | "callStatus"
+  | "groupLifecycle"
+  | "groupParticipants"
+  | "groupSettings"
+  | "groupStatus";
+
+export type GroupMessage = WhatsAppMessage & { readonly groupId?: string };
+export type GroupMessageStatus = WhatsAppMessageStatus & {
+  readonly recipientType?: string;
+  readonly recipientParticipantId?: string;
+};
 
 export interface TypedMessageUpdate {
   readonly kind: "message";
@@ -55,7 +76,7 @@ export interface TypedMessageUpdate {
   readonly phoneNumberId: string;
   readonly wabaId: string;
   readonly receivedAt: number;
-  readonly message: WhatsAppMessage;
+  readonly message: GroupMessage;
   readonly rawChange: WhatsAppWebhookChange;
 }
 
@@ -65,7 +86,7 @@ export interface TypedStatusUpdate {
   readonly phoneNumberId: string;
   readonly wabaId: string;
   readonly receivedAt: number;
-  readonly status: WhatsAppMessageStatus;
+  readonly status: GroupMessageStatus;
   readonly rawChange: WhatsAppWebhookChange;
 }
 
@@ -176,13 +197,60 @@ export interface TypedUnknownUpdate {
   readonly rawChange: WhatsAppWebhookChange;
 }
 
+export interface TypedGroupLifecycleUpdate {
+  readonly kind: "groupLifecycle";
+  readonly updateId: string;
+  readonly phoneNumberId: string;
+  readonly wabaId: string;
+  readonly receivedAt: number;
+  readonly group: WhatsAppGroupLifecycleUpdateValue;
+  readonly rawChange: WhatsAppWebhookChange;
+}
+
+export interface TypedGroupParticipantsUpdate {
+  readonly kind: "groupParticipants";
+  readonly updateId: string;
+  readonly phoneNumberId: string;
+  readonly wabaId: string;
+  readonly receivedAt: number;
+  readonly group: WhatsAppGroupParticipantsUpdateValue;
+  readonly rawChange: WhatsAppWebhookChange;
+}
+
+export interface TypedGroupSettingsUpdate {
+  readonly kind: "groupSettings";
+  readonly updateId: string;
+  readonly phoneNumberId: string;
+  readonly wabaId: string;
+  readonly receivedAt: number;
+  readonly group: WhatsAppGroupSettingsUpdateValue;
+  readonly rawChange: WhatsAppWebhookChange;
+}
+
+export interface TypedGroupStatusUpdate {
+  readonly kind: "groupStatus";
+  readonly updateId: string;
+  readonly phoneNumberId: string;
+  readonly wabaId: string;
+  readonly receivedAt: number;
+  readonly group: WhatsAppGroupStatusUpdateValue;
+  readonly rawChange: WhatsAppWebhookChange;
+}
+
+export type TypedGroupUpdate =
+  | TypedGroupLifecycleUpdate
+  | TypedGroupParticipantsUpdate
+  | TypedGroupSettingsUpdate
+  | TypedGroupStatusUpdate;
+
 export type TypedUpdate =
   | TypedMessageUpdate
   | TypedStatusUpdate
   | TypedCallUpdate
   | TypedCallStatusUpdate
   | TypedAccountUpdate
-  | TypedUnknownUpdate;
+  | TypedUnknownUpdate
+  | TypedGroupUpdate;
 
 export type SkippedReason =
   | "malformed_entry"
@@ -448,6 +516,11 @@ function readBooleanField(payload: Record<string, unknown>, key: string): boolea
   return typeof value === "boolean" ? value : undefined;
 }
 
+function readMetadataPhoneNumberId(value: Record<string, unknown>): string | undefined {
+  const metadata = readOwnDataField(value, "metadata");
+  return isRecord(metadata) ? readSafeIdField(metadata, "phone_number_id") : undefined;
+}
+
 function isUnsafePrototypeKey(key: string): boolean {
   return key === "__proto__" || key === "constructor" || key === "prototype";
 }
@@ -672,11 +745,13 @@ function normalizeInteractivePayload(value: unknown): Record<string, unknown> | 
   return safeCloneMessageJsonValue(value) as Record<string, unknown> | undefined;
 }
 
-function normalizeMessagePayload(raw: Record<string, unknown>): WhatsAppMessage | undefined {
+function normalizeMessagePayload(raw: Record<string, unknown>): GroupMessage | undefined {
   const type = readStringField(raw, "type");
   if (type === undefined) return undefined;
   const base = copyMessageBase(raw, type);
   if (base === undefined) return undefined;
+  const groupId = readSafeIdField(raw, "group_id");
+  if (groupId !== undefined) base.groupId = groupId;
 
   if (type === "text") {
     const text = safeCloneMessageJsonValue(readOwnDataField(raw, "text"));
@@ -868,6 +943,171 @@ function normalizeGenericAccountPayload(payload: Record<string, unknown>): Typed
   }
 
   return Object.keys(out).length > 0 ? out : undefined;
+}
+
+function safeCloneGroupJsonValue(value: unknown): unknown {
+  return safeCloneMessageJsonValue(value);
+}
+
+function normalizeGroupParticipant(value: unknown): { waId: string } | undefined {
+  if (!isRecord(value)) return undefined;
+  const waId = readSafeIdField(value, "wa_id");
+  return waId === undefined ? undefined : { waId };
+}
+
+function normalizeGroupParticipantsArray(value: unknown): { waId: string }[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const out: { waId: string }[] = [];
+  for (let i = 0; i < value.length; i += 1) {
+    const item = readArrayDataItem(value, i);
+    if (!item.ok) return undefined;
+    const participant = normalizeGroupParticipant(item.value);
+    if (participant === undefined) return undefined;
+    out.push(participant);
+  }
+  return out;
+}
+
+function normalizeRemovedParticipants(value: unknown): { input?: string; waId?: string }[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const out: { input?: string; waId?: string }[] = [];
+  for (let i = 0; i < value.length; i += 1) {
+    const item = readArrayDataItem(value, i);
+    if (!item.ok || !isRecord(item.value)) return undefined;
+    const input = readStringField(item.value, "input");
+    const waId = readSafeIdField(item.value, "wa_id");
+    const row: { input?: string; waId?: string } = {};
+    if (input !== undefined) row.input = input;
+    if (waId !== undefined) row.waId = waId;
+    out.push(row);
+  }
+  return out;
+}
+
+function normalizeFailedParticipants(value: unknown): { input?: string; waId?: string; errors?: unknown[] }[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const out: { input?: string; waId?: string; errors?: unknown[] }[] = [];
+  for (let i = 0; i < value.length; i += 1) {
+    const item = readArrayDataItem(value, i);
+    if (!item.ok || !isRecord(item.value)) return undefined;
+    const input = readStringField(item.value, "input");
+    const waId = readSafeIdField(item.value, "wa_id");
+    const errors = safeCloneGroupJsonValue(readOwnDataField(item.value, "errors"));
+    const row: { input?: string; waId?: string; errors?: unknown[] } = {};
+    if (input !== undefined) row.input = input;
+    if (waId !== undefined) row.waId = waId;
+    if (Array.isArray(errors)) row.errors = errors;
+    out.push(row);
+  }
+  return out;
+}
+
+function normalizeGroupErrors(value: unknown): unknown[] | undefined {
+  const cloned = safeCloneGroupJsonValue(value);
+  return Array.isArray(cloned) ? cloned : undefined;
+}
+
+function normalizeGroupLifecyclePayload(payload: Record<string, unknown>): WhatsAppGroupLifecycleUpdateValue {
+  const out: Record<string, unknown> = {
+    messagingProduct: "whatsapp",
+    metadata: normalizeGroupMetadata(payload),
+    type: readStringField(payload, "type") ?? ""
+  };
+  const requestId = readSafeIdField(payload, "request_id");
+  const groupId = readSafeIdField(payload, "group_id");
+  const subject = readStringField(payload, "subject");
+  const inviteLink = readStringField(payload, "invite_link");
+  const joinApprovalMode = readStringField(payload, "join_approval_mode");
+  const errors = normalizeGroupErrors(readOwnDataField(payload, "errors"));
+  if (requestId !== undefined) out.requestId = requestId;
+  if (groupId !== undefined) out.groupId = groupId;
+  if (subject !== undefined) out.subject = subject;
+  if (inviteLink !== undefined) out.inviteLink = inviteLink;
+  if (joinApprovalMode === "auto_approve" || joinApprovalMode === "approval_required") out.joinApprovalMode = joinApprovalMode;
+  if (errors !== undefined) out.errors = errors;
+  out.raw = payload;
+  return out as unknown as WhatsAppGroupLifecycleUpdateValue;
+}
+
+function normalizeGroupParticipantsPayload(payload: Record<string, unknown>, groupId: string): WhatsAppGroupParticipantsUpdateValue {
+  const out: Record<string, unknown> = {
+    messagingProduct: "whatsapp",
+    metadata: normalizeGroupMetadata(payload),
+    groupId,
+    type: readStringField(payload, "type") ?? ""
+  };
+  const reason = readStringField(payload, "reason");
+  const initiatedBy = readSafeIdField(payload, "initiated_by");
+  const requestId = readSafeIdField(payload, "request_id");
+  const joinRequestId = readSafeIdField(payload, "join_request_id");
+  const waId = readSafeIdField(payload, "wa_id");
+  const addedParticipants = normalizeGroupParticipantsArray(readOwnDataField(payload, "added_participants"));
+  const removedParticipants = normalizeRemovedParticipants(readOwnDataField(payload, "removed_participants"));
+  const failedParticipants = normalizeFailedParticipants(readOwnDataField(payload, "failed_participants"));
+  const errors = normalizeGroupErrors(readOwnDataField(payload, "errors"));
+  if (reason !== undefined) out.reason = reason;
+  if (initiatedBy !== undefined) out.initiatedBy = initiatedBy;
+  if (requestId !== undefined) out.requestId = requestId;
+  if (joinRequestId !== undefined) out.joinRequestId = joinRequestId;
+  if (waId !== undefined) out.waId = waId;
+  if (addedParticipants !== undefined) out.addedParticipants = addedParticipants;
+  if (removedParticipants !== undefined) out.removedParticipants = removedParticipants;
+  if (failedParticipants !== undefined) out.failedParticipants = failedParticipants;
+  if (errors !== undefined) out.errors = errors;
+  out.raw = payload;
+  return out as unknown as WhatsAppGroupParticipantsUpdateValue;
+}
+
+function normalizeGroupMetadata(payload: Record<string, unknown>): { displayPhoneNumber: string; phoneNumberId: string } {
+  const metadata = readOwnDataField(payload, "metadata");
+  const displayPhoneNumber = isRecord(metadata) ? readStringField(metadata, "display_phone_number") : undefined;
+  const phoneNumberId = isRecord(metadata) ? readSafeIdField(metadata, "phone_number_id") : undefined;
+  return { displayPhoneNumber: displayPhoneNumber ?? "", phoneNumberId: phoneNumberId ?? "" };
+}
+
+function normalizeGroupSettingResult(value: unknown): Record<string, unknown> | undefined {
+  if (!isRecord(value)) return undefined;
+  const out: Record<string, unknown> = {};
+  const text = readStringField(value, "text");
+  const mimeType = readStringField(value, "mime_type");
+  const sha256 = readStringField(value, "sha256");
+  const updateSuccessful = readBooleanField(value, "update_successful");
+  const errors = normalizeGroupErrors(readOwnDataField(value, "errors"));
+  if (text !== undefined) out.text = text;
+  if (mimeType !== undefined) out.mimeType = mimeType;
+  if (sha256 !== undefined) out.sha256 = sha256;
+  if (updateSuccessful !== undefined) out.updateSuccessful = updateSuccessful;
+  if (errors !== undefined) out.errors = errors;
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+function normalizeGroupSettingsPayload(payload: Record<string, unknown>, groupId: string): WhatsAppGroupSettingsUpdateValue {
+  const out: Record<string, unknown> = {
+    messagingProduct: "whatsapp",
+    metadata: normalizeGroupMetadata(payload),
+    groupId,
+    type: readStringField(payload, "type") ?? ""
+  };
+  const groupSubject = normalizeGroupSettingResult(readOwnDataField(payload, "group_subject"));
+  const groupDescription = normalizeGroupSettingResult(readOwnDataField(payload, "group_description"));
+  const profilePicture = normalizeGroupSettingResult(readOwnDataField(payload, "profile_picture"));
+  const errors = normalizeGroupErrors(readOwnDataField(payload, "errors"));
+  if (groupSubject !== undefined) out.groupSubject = groupSubject;
+  if (groupDescription !== undefined) out.groupDescription = groupDescription;
+  if (profilePicture !== undefined) out.profilePicture = profilePicture;
+  if (errors !== undefined) out.errors = errors;
+  out.raw = payload;
+  return out as unknown as WhatsAppGroupSettingsUpdateValue;
+}
+
+function normalizeGroupStatusPayload(payload: Record<string, unknown>, groupId: string): WhatsAppGroupStatusUpdateValue {
+  return {
+    messagingProduct: "whatsapp",
+    metadata: normalizeGroupMetadata(payload),
+    groupId,
+    type: readStringField(payload, "type") ?? "",
+    raw: payload
+  } as unknown as WhatsAppGroupStatusUpdateValue;
 }
 
 function normalizeTemplateAccountPayload(
@@ -1112,6 +1352,23 @@ function normalizeChange(
     return;
   }
 
+  if (field === "group_lifecycle_update") {
+    normalizeGroupFieldChange("groupLifecycle", change, path, wabaId, entryTimeMs, rawChange, acc);
+    return;
+  }
+  if (field === "group_participants_update") {
+    normalizeGroupFieldChange("groupParticipants", change, path, wabaId, entryTimeMs, rawChange, acc);
+    return;
+  }
+  if (field === "group_settings_update") {
+    normalizeGroupFieldChange("groupSettings", change, path, wabaId, entryTimeMs, rawChange, acc);
+    return;
+  }
+  if (field === "group_status_update") {
+    normalizeGroupFieldChange("groupStatus", change, path, wabaId, entryTimeMs, rawChange, acc);
+    return;
+  }
+
   if (ACCOUNT_FIELDS.has(field)) {
     const payload = readOwnDataField(change, "value");
     const template = isRecord(payload) ? normalizeTemplateAccountPayload(field, payload) : undefined;
@@ -1142,6 +1399,144 @@ function normalizeChange(
     rawChange
   };
   pushUpdate(acc, unknownUpdate, path);
+}
+
+function normalizeGroupFieldChange(
+  kind: "groupLifecycle" | "groupParticipants" | "groupSettings" | "groupStatus",
+  change: Record<string, unknown>,
+  path: string,
+  wabaId: string,
+  entryTimeMs: number,
+  rawChange: WhatsAppWebhookChange,
+  acc: NormalizerAccumulator
+): void {
+  const value = readOwnDataField(change, "value");
+  if (!isRecord(value)) {
+    pushSkip(acc, "malformed_change", `${path}.value`, "value-not-an-object");
+    return;
+  }
+  const phoneNumberId = readMetadataPhoneNumberId(value);
+  if (phoneNumberId === undefined) {
+    pushSkip(acc, "malformed_field", `${path}.value.metadata.phone_number_id`, "missing-or-unsafe-phone-number-id");
+    return;
+  }
+
+  const groups = readOwnDataField(value, "groups");
+  if (Array.isArray(groups)) {
+    for (let i = 0; i < groups.length; i += 1) {
+      if (acc.limitHit) {
+        acc.overflow += 1;
+        continue;
+      }
+      const groupPath = `${path}.value.groups[${i}]`;
+      const item = readArrayDataItem(groups, i);
+      if (!item.ok || !isRecord(item.value)) {
+        pushSkip(acc, "malformed_field", groupPath, "group-not-an-object");
+        continue;
+      }
+      normalizeGroupPayload(kind, item.value, value, groupPath, wabaId, entryTimeMs, phoneNumberId, rawChange, acc);
+    }
+    return;
+  }
+  if (Object.getOwnPropertyDescriptor(value, "groups") !== undefined) {
+    pushSkip(acc, "malformed_field", `${path}.value.groups`, "groups-not-array");
+    return;
+  }
+
+  normalizeGroupPayload(kind, value, value, `${path}.value`, wabaId, entryTimeMs, phoneNumberId, rawChange, acc);
+}
+
+function normalizeGroupPayload(
+  kind: "groupLifecycle" | "groupParticipants" | "groupSettings" | "groupStatus",
+  group: Record<string, unknown>,
+  value: Record<string, unknown>,
+  path: string,
+  wabaId: string,
+  entryTimeMs: number,
+  phoneNumberId: string,
+  rawChange: WhatsAppWebhookChange,
+  acc: NormalizerAccumulator
+): void {
+  const payload = withGroupChangeMetadata(group, value);
+  const type = readStringField(payload, "type") ?? "unknown";
+  const rawGroupId = readOwnDataField(payload, "group_id");
+  const groupId = readSafeIdField(payload, "group_id");
+  if (groupId === undefined && (rawGroupId !== undefined || !allowsLifecycleWithoutGroupId(kind, payload, type))) {
+    pushSkip(acc, "malformed_field", `${path}.group_id`, "missing-or-unsafe-group-id");
+    return;
+  }
+  const requestId = readSafeIdField(payload, "request_id");
+  const effectiveGroupId = groupId ?? "";
+  const updateId = deriveGroupSyntheticId(kind, wabaId, type, effectiveGroupId, requestId, path);
+  if (kind === "groupLifecycle") {
+    pushUpdate(acc, {
+      kind,
+      updateId,
+      phoneNumberId,
+      wabaId,
+      receivedAt: entryTimeMs,
+      group: normalizeGroupLifecyclePayload(payload),
+      rawChange
+    }, path);
+    return;
+  }
+  if (kind === "groupParticipants") {
+    pushUpdate(acc, {
+      kind,
+      updateId,
+      phoneNumberId,
+      wabaId,
+      receivedAt: entryTimeMs,
+      group: normalizeGroupParticipantsPayload(payload, effectiveGroupId),
+      rawChange
+    }, path);
+    return;
+  }
+  if (kind === "groupSettings") {
+    pushUpdate(acc, {
+      kind,
+      updateId,
+      phoneNumberId,
+      wabaId,
+      receivedAt: entryTimeMs,
+      group: normalizeGroupSettingsPayload(payload, effectiveGroupId),
+      rawChange
+    }, path);
+    return;
+  }
+  pushUpdate(acc, {
+    kind,
+    updateId,
+    phoneNumberId,
+    wabaId,
+    receivedAt: entryTimeMs,
+    group: normalizeGroupStatusPayload(payload, effectiveGroupId),
+    rawChange
+  }, path);
+}
+
+function withGroupChangeMetadata(group: Record<string, unknown>, value: Record<string, unknown>): Record<string, unknown> {
+  const payload: Record<string, unknown> = {};
+  const messagingProduct = readOwnDataField(value, "messaging_product");
+  const metadata = readOwnDataField(value, "metadata");
+  if (messagingProduct !== undefined) payload.messaging_product = messagingProduct;
+  if (metadata !== undefined) payload.metadata = metadata;
+  for (const key of Object.keys(group)) {
+    if (isUnsafePrototypeKey(key)) continue;
+    const field = readOwnDataField(group, key);
+    if (field !== undefined) payload[key] = field;
+  }
+  return payload;
+}
+
+function allowsLifecycleWithoutGroupId(
+  kind: "groupLifecycle" | "groupParticipants" | "groupSettings" | "groupStatus",
+  payload: Record<string, unknown>,
+  type: string
+): boolean {
+  if (kind !== "groupLifecycle") return false;
+  const errors = normalizeGroupErrors(readOwnDataField(payload, "errors"));
+  return type === "group_create" && errors !== undefined;
 }
 
 function normalizeMessagesChange(
@@ -1236,9 +1631,13 @@ function normalizeMessagesChange(
       const receivedAt = parseTimestampMs(readOwnDataField(st, "timestamp"), acc.clockNow);
       const statusValue = readStringField(st, "status");
       const recipientId = readSafeIdField(st, "recipient_id");
+      const recipientType = readStringField(st, "recipient_type");
+      const recipientParticipantId = readSafeIdField(st, "recipient_participant_id");
       const normalizedStatus: Record<string, unknown> = {
         id: statusId,
         ...(recipientId !== undefined ? { recipientId } : {}),
+        ...(recipientType !== undefined ? { recipientType } : {}),
+        ...(recipientParticipantId !== undefined ? { recipientParticipantId } : {}),
         ...(statusValue !== undefined ? { status: statusValue } : {}),
         ...(typeof readOwnDataField(st, "timestamp") === "string" ? { timestamp: readOwnDataField(st, "timestamp") } : {}),
         raw: st
@@ -1404,4 +1803,20 @@ function deriveSyntheticId(
   const safeField = field.replace(/[^A-Za-z0-9_-]/g, "_");
   const safePath = path.replace(/[^A-Za-z0-9_\-[\]\.]/g, "_");
   return `${prefix}:${safeWaba}:${safeField}:${safePath}`;
+}
+
+function deriveGroupSyntheticId(
+  kind: "groupLifecycle" | "groupParticipants" | "groupSettings" | "groupStatus",
+  wabaId: string,
+  type: string,
+  groupId: string,
+  requestId: string | undefined,
+  path: string
+): string {
+  const prefix = kind;
+  const safeWaba = wabaId.replace(/[^A-Za-z0-9_-]/g, "_");
+  const safeType = type.replace(/[^A-Za-z0-9_-]/g, "_");
+  const safeGroupId = groupId.length > 0 ? groupId.replace(/[^A-Za-z0-9_-]/g, "_") : "no_group";
+  const safeRequestId = requestId?.replace(/[^A-Za-z0-9_-]/g, "_") ?? path.replace(/[^A-Za-z0-9_\-[\]\.]/g, "_");
+  return `${prefix}:${safeWaba}:${safeType}:${safeGroupId}:${safeRequestId}`;
 }
