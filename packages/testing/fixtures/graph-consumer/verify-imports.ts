@@ -23,6 +23,7 @@ import {
   GraphRateLimitError,
   GraphRequestValidationError,
   GraphMessagesEndpoint,
+  GroupClient,
   InvalidParameterError,
   initiateCall,
   preAcceptCall,
@@ -809,6 +810,26 @@ async function verify(): Promise<VerifyReportOk> {
     pnButtonsBody.type === "interactive" &&
     pnButtonsBody.interactive?.type === "button" &&
     pnButtonsBody.interactive?.action?.buttons?.length === 1;
+
+  pnHandle.reset();
+  const scopedGroup = phone.group("grp-fixture");
+  const createdGroup = await phone.createGroup({ subject: "fixture group" });
+  const listedGroups = await phone.listGroups({ limit: "10" });
+  await scopedGroup.resetInviteLink();
+  const resetGroupBody = JSON.parse(String(pnHandle.requests[2]?.body)) as {
+    readonly messaging_product?: string;
+  };
+  checks["GroupClient is a class"] = typeof GroupClient === "function";
+  checks["PhoneNumberClient groups helpers bind phone number and group ids"] =
+    scopedGroup instanceof GroupClient &&
+    scopedGroup.groupId === "grp-fixture" &&
+    typeof createdGroup === "object" &&
+    typeof listedGroups === "object" &&
+    pnHandle.requests[0]?.url === "https://graph.facebook.com/v25.0/555000111/groups" &&
+    pnHandle.requests[1]?.url === "https://graph.facebook.com/v25.0/555000111/groups?limit=10" &&
+    pnHandle.requests[2]?.method === "POST" &&
+    pnHandle.requests[2]?.url === "https://graph.facebook.com/v25.0/grp-fixture/invite_link" &&
+    resetGroupBody.messaging_product === "whatsapp";
 
   // F-7: WABAClient round-trip — listPhoneNumbers under /{wabaId}/phone_numbers.
   const wabaHandle = createMockTransport({
