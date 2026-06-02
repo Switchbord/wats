@@ -14,11 +14,28 @@ Patch alpha compatibility and local-operator release. Begins the WhatsApp Groups
 - camelCase public input mapped to the snake_case Graph wire only at the transport boundary; enforces Groups limits (subject ≤128, description ≤2048, ≤8 participants) and the shared path-segment / prototype-poison guards. Group mutations are asynchronous: callables return the `request_id` correlator and the terminal outcome arrives via the matching `group_*_update` webhook.
 - Exported at the root barrel and tracked by `bun run api:check`.
 
+### WATS-133 — Groups scoped clients
+
+- Adds `PhoneNumberClient.createGroup(...)`, `PhoneNumberClient.listGroups(...)`, and `PhoneNumberClient.group(groupId)` over the WATS-132 Groups endpoint family. The phone-number client binds the constructor `phoneNumberId`; caller params cannot override that scope.
+- Adds `GroupClient` with construction-time `groupId` validation and scoped methods for `getInfo`, `update`, `delete`, `getInviteLink`, `resetInviteLink`, `removeParticipants`, `getJoinRequests`, `approveJoinRequests`, and `rejectJoinRequests`. Each method injects the bound group id and preserves the WATS-132 wire methods and snake_case bodies.
+
 ### WATS-134 — Groups send-to-group + pin/unpin
 
 - Extends message builders and `sendMessage` to accept `recipientType: "group"`, emitting Graph `recipient_type: "group"` with an opaque group id in `to` for text, media, and standard template sends.
 - Adds `buildSendPinPayload({ to, pinType, messageId, expirationDays })` for group pin/unpin messages (`type: "pin"`, `expiration_days` 1..30). Pinning is admin-only on Meta; Graph keeps at most three pinned messages and auto-unpins the oldest.
 - Rejects group-context interactive, commerce, marketing/auth-template, and phone-number-shaped group recipients before transport. Calling/edit/delete/disappearing/view-once remain unsupported for Groups.
+
+### WATS-135 — Groups webhook normalization
+
+- `@wats/core` `normalizeWebhookEnvelope` now emits typed group updates for `group_lifecycle_update`, `group_participants_update`, `group_settings_update`, and `group_status_update`, mapping Meta snake_case fields to camelCase public shapes and preserving `rawChange`.
+- Inbound group `messages` now surface `message.groupId`; group status webhooks preserve `recipientType: "group"` and `recipientParticipantId`, including group pricing categories such as `group_service`.
+- Unknown future group fields still become `TypedUnknownUpdate`; malformed group payloads with unsafe or missing `group_id` / `phone_number_id` are reported in `skipped[]` instead of throwing.
+
+### WATS-136 — Groups filters and facade ergonomics
+
+- Adds `filtersTyped.group` with helpers for group messages, participants/lifecycle/settings/status updates, and `fromGroup(groupId)` composition over normalized group updates.
+- Extends the `WhatsApp` facade with `createGroup`, `sendGroupMessage`, `group(groupId)`, and `listen({ groupId })` ergonomics over the existing typed router/listener substrate.
+
 
 ### Release metadata
 

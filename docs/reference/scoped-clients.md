@@ -123,6 +123,7 @@ endpoint callable.
 
 | Method             | Status      | Endpoint                                   |
 | ------------------ | ----------- | ------------------------------------------ |
+| `createGroup` / `listGroups` / `group(groupId)` | implemented (WATS-133) | `POST`/`GET /{phoneNumberId}/groups`; factory returns `GroupClient` bound to `groupId` |
 | `sendMessage`      | implemented | `POST /{phoneNumberId}/messages` raw body passthrough |
 | `sendText`         | implemented (WATS-30) | `POST /{phoneNumberId}/messages` text payload |
 | `sendImage`        | implemented (WATS-38) | `POST /{phoneNumberId}/messages` image payload |
@@ -155,6 +156,32 @@ Live template/Flow/calling validation, production Flow hosting, encrypted data-e
 request handling, live call sessions, and broad admin APIs remain separate credential-gated
 or roadmap issues. Consumer code may type-check this list via the exported method/input
 types.
+
+### Groups helpers (WATS-133)
+
+Groups hang off the business phone-number id, not the WABA id. `PhoneNumberClient`
+binds that id for create/list, and `phone.group(groupId)` returns a `GroupClient`
+that validates and binds the group id at construction.
+
+```ts
+const created = await phone.createGroup({
+  subject: "Launch team",
+  joinApprovalMode: "approval_required"
+});
+
+const groups = await phone.listGroups({ limit: "25" });
+
+const group = phone.group("GROUP_ID_FROM_WEBHOOK");
+await group.update({ description: "Support and launch coordination" });
+await group.resetInviteLink();
+```
+
+`GroupClient` exposes `getInfo`, `update`, `delete`, `getInviteLink`,
+`resetInviteLink`, `removeParticipants`, `getJoinRequests`,
+`approveJoinRequests`, and `rejectJoinRequests`. Each method injects the bound
+`groupId` after inspecting optional params, so caller input cannot override the
+constructor scope. Direct callables remain available from
+`@wats/graph/endpoints/groups`.
 
 
 ### `updateSettings({ storageConfiguration })` (WATS-93)

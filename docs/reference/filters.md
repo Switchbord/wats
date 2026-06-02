@@ -25,6 +25,7 @@ import {
   status,
   account,
   call,
+  group,
   unknown as unknownUpdate,
 
   // Combinators
@@ -152,6 +153,7 @@ as the base for `and(...)` / `or(...)` composition.
 - `account` — matches `TypedAccountUpdate` only.
 - `template` — WATS-39 template account-event namespace and kind-like filter. Matches `TypedAccountUpdate` values whose normalizer output carries `update.template`.
 - `call` — WATS-41 calling namespace and kind-like filter. Matches `callConnect`, `callTerminate`, and `callStatus` updates, with helpers for connect/terminate/status/ringing/answered/rejected/incoming/outgoing.
+- `group` — WATS-136 Groups namespace and kind-like filter. Matches normalized group messages, group status receipts, and the four group webhook update kinds, with `group.message()`, `group.participantsUpdate()`, `group.lifecycleUpdate()`, `group.settingsUpdate()`, `group.statusUpdate()`, and `group.fromGroup(groupId)` helpers.
 - `unknown` — matches `TypedUnknownUpdate` only (re-exported as
   `unknown` on the barrel; rename on import if it collides).
 
@@ -201,6 +203,34 @@ Helpers:
 
 Sibling-kind safety applies: every calling helper returns `false`, not a thrown
 property-access error, for message/status/account/template/unknown updates.
+
+## Groups filters (WATS-136)
+
+`group` is a branded filter namespace for normalized Groups updates. Groups are
+a beyond-pywa WATS addition; all helpers are credential-free and operate on
+`normalizeWebhookEnvelope(...)` output.
+
+```ts
+import { and, group } from "@wats/core/filtersTyped";
+
+wa.on(and(group.message(), group.fromGroup("120363...")), async (ctx) => {
+  console.log(ctx.update.message.groupId);
+});
+```
+
+Helpers:
+
+- `group` — any group message, group status receipt, or `group_*_update` webhook.
+- `group.message()` — `kind === "message"` with normalized `message.groupId`.
+- `group.participantsUpdate()` — `kind === "groupParticipants"`.
+- `group.lifecycleUpdate()` — `kind === "groupLifecycle"`.
+- `group.settingsUpdate()` — `kind === "groupSettings"`.
+- `group.statusUpdate()` — `kind === "groupStatus"` or a status receipt whose
+  normalized `recipientType` is `"group"`.
+- `group.fromGroup(groupId)` — narrows any group-bearing update to one group id.
+
+`group.fromGroup(groupId)` rejects non-string or empty/whitespace-only ids with
+`FilterValidationError`; predicates return `false` for non-group siblings.
 
 ## Combinators
 

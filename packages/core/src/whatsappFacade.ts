@@ -39,8 +39,10 @@
 import {
   GraphClient,
   GraphRequestValidationError,
+  GroupClient,
   PhoneNumberClient,
   WABAClient,
+  type CreateGroupBody,
   type GraphMessagesMarkMessageAsReadInput,
   type GraphMessagesRemoveReactionInput,
   type GraphMessagesRequestLocationInput,
@@ -63,7 +65,8 @@ import {
   type GraphMessagesMarketingTemplateResponse,
   type GraphMessagesSendTextInput,
   type GraphMessagesSendVideoInput,
-  type GraphMessagesTypingIndicatorInput
+  type GraphMessagesTypingIndicatorInput,
+  type GroupMutationResponse
 } from "@wats/graph";
 import {
   and,
@@ -72,7 +75,8 @@ import {
   status as statusFilter,
   account as accountFilter,
   unknown as unknownFilter,
-  call as callFilter
+  call as callFilter,
+  group as groupFilter
 } from "./filtersTyped/index.js";
 import type { TypedFilter } from "./filtersTyped/typedFilter.js";
 import {
@@ -81,6 +85,10 @@ import {
   type TypedAccountUpdate,
   type TypedCallStatusUpdate,
   type TypedCallUpdate,
+  type TypedGroupLifecycleUpdate,
+  type TypedGroupParticipantsUpdate,
+  type TypedGroupSettingsUpdate,
+  type TypedGroupStatusUpdate,
   type TypedMessageUpdate,
   type TypedStatusUpdate,
   type TypedUnknownUpdate,
@@ -126,6 +134,7 @@ export interface WhatsAppListenOptions<
 > {
   readonly type: TKind;
   readonly from?: string;
+  readonly groupId?: string;
   readonly filter?: TypedFilter<Extract<TypedUpdate, { kind: TKind }>>;
   readonly timeoutMs?: number;
   readonly signal?: AbortSignal;
@@ -133,6 +142,13 @@ export interface WhatsAppListenOptions<
 }
 
 export type WhatsAppStartChatInput = GraphMessagesSendTextInput;
+export type WhatsAppCreateGroupInput = CreateGroupBody;
+export interface WhatsAppSendGroupMessageInput {
+  readonly groupId: string;
+  readonly text: string;
+  readonly previewUrl?: boolean;
+  readonly replyToMessageId?: string;
+}
 export type WhatsAppSendImageInput = GraphMessagesSendImageInput;
 export type WhatsAppSendVideoInput = GraphMessagesSendVideoInput;
 export type WhatsAppSendAudioInput = GraphMessagesSendAudioInput;
@@ -199,6 +215,23 @@ function hasRequestMethod(
 
 // ---- kind → base filter dispatch ----------------------------------
 
+const groupLifecycleFilter = createTypedFilter<TypedGroupLifecycleUpdate>(
+  (u): u is TypedGroupLifecycleUpdate => u.kind === "groupLifecycle",
+  () => "groupLifecycle"
+);
+const groupParticipantsFilter = createTypedFilter<TypedGroupParticipantsUpdate>(
+  (u): u is TypedGroupParticipantsUpdate => u.kind === "groupParticipants",
+  () => "groupParticipants"
+);
+const groupSettingsFilter = createTypedFilter<TypedGroupSettingsUpdate>(
+  (u): u is TypedGroupSettingsUpdate => u.kind === "groupSettings",
+  () => "groupSettings"
+);
+const groupStatusFilter = createTypedFilter<TypedGroupStatusUpdate>(
+  (u): u is TypedGroupStatusUpdate => u.kind === "groupStatus",
+  () => "groupStatus"
+);
+
 const KIND_FILTERS: {
   readonly message: TypedFilter<TypedMessageUpdate>;
   readonly status: TypedFilter<TypedStatusUpdate>;
@@ -207,6 +240,10 @@ const KIND_FILTERS: {
   readonly callConnect: TypedFilter<TypedCallUpdate>;
   readonly callTerminate: TypedFilter<TypedCallUpdate>;
   readonly callStatus: TypedFilter<TypedCallStatusUpdate>;
+  readonly groupLifecycle: TypedFilter<TypedGroupLifecycleUpdate>;
+  readonly groupParticipants: TypedFilter<TypedGroupParticipantsUpdate>;
+  readonly groupSettings: TypedFilter<TypedGroupSettingsUpdate>;
+  readonly groupStatus: TypedFilter<TypedGroupStatusUpdate>;
 } = {
   message: messageFilter,
   status: statusFilter,
@@ -214,7 +251,11 @@ const KIND_FILTERS: {
   unknown: unknownFilter,
   callConnect: callFilter.connect(),
   callTerminate: callFilter.terminate(),
-  callStatus: callFilter.status()
+  callStatus: callFilter.status(),
+  groupLifecycle: groupLifecycleFilter,
+  groupParticipants: groupParticipantsFilter,
+  groupSettings: groupSettingsFilter,
+  groupStatus: groupStatusFilter
 };
 
 const VALID_KINDS: readonly TypedUpdate["kind"][] = [
@@ -224,7 +265,11 @@ const VALID_KINDS: readonly TypedUpdate["kind"][] = [
   "unknown",
   "callConnect",
   "callTerminate",
-  "callStatus"
+  "callStatus",
+  "groupLifecycle",
+  "groupParticipants",
+  "groupSettings",
+  "groupStatus"
 ];
 
 function buildListenFilter<TKind extends TypedUpdate["kind"]>(
@@ -253,6 +298,9 @@ function buildListenFilter<TKind extends TypedUpdate["kind"]>(
       () => `from=${from}`
     );
     parts.push(fromFilter);
+  }
+  if (options.groupId !== undefined) {
+    parts.push(groupFilter.fromGroup(options.groupId) as TypedFilter<Extract<TypedUpdate, { kind: TKind }>>);
   }
   if (options.filter !== undefined) {
     parts.push(options.filter);
@@ -429,6 +477,63 @@ export class WhatsApp {
       );
     }
     return this.#phoneNumberClient.sendText(input);
+  }
+
+  group(groupId: string): GroupClient {
+    if (this.#phoneNumberClient === undefined) {
+      throw new GraphRequestValidationError("WhatsApp.group requires a phoneNumberId-bound facade.");
+    }
+    return this.#phoneNumberClient.group(groupId);
+  }
+
+  async createGroup(
+    input: WhatsAppCreateGroupInput
+  ): Promise<GroupMutationResponse> {
+    if (this.#phoneNumberClient === undefined) {
+      throw new GraphRequestValidationError("WhatsApp.createGroup requires a phoneNumberId-bound facade.");
+    }
+    return this.#phoneNumberClient.createGroup(input);
+  }
+
+  async sendGroupMessage(
+    input: WhatsAppSendGroupMessageInput
+  ): Promise<GraphMessagesSendResponse> {
+    if (this.#phoneNumberClient === undefined) {
+      throw new GraphRequestValidationError("WhatsApp.sendGroupMessage requires a phoneNumberId-bound facade.");
+    }
+    if (typeof input !== "object" || input === null) {
+      throw new GraphRequestValidationError("Invalid WhatsApp.sendGroupMessage input: expected an options object.");
+    }
+    const record = input as unknown as Record<string, unknown>;
+    if (typeof record.groupId !== "string" || record.groupId.trim().length === 0) {
+      throw new GraphRequestValidationError("Invalid WhatsApp.sendGroupMessage input: groupId must be a non-empty string.");
+    }
+    // Reuse the scoped GroupClient constructor path sanitizer so the group id
+    // follows the same Graph path-segment rules as all other Groups helpers.
+    this.#phoneNumberClient.group(record.groupId);
+    if (typeof record.text !== "string" || record.text.length === 0) {
+      throw new GraphRequestValidationError("Invalid WhatsApp.sendGroupMessage input: text must be a non-empty string.");
+    }
+    if (record.previewUrl !== undefined && typeof record.previewUrl !== "boolean") {
+      throw new GraphRequestValidationError("Invalid WhatsApp.sendGroupMessage input: previewUrl must be a boolean when provided.");
+    }
+    if (record.replyToMessageId !== undefined && (typeof record.replyToMessageId !== "string" || record.replyToMessageId.length === 0)) {
+      throw new GraphRequestValidationError("Invalid WhatsApp.sendGroupMessage input: replyToMessageId must be a non-empty string when provided.");
+    }
+    const body: Record<string, unknown> = {
+      messaging_product: "whatsapp",
+      recipient_type: "group",
+      to: record.groupId,
+      type: "text",
+      text: { body: record.text }
+    };
+    if (record.previewUrl !== undefined) {
+      (body.text as { preview_url?: boolean }).preview_url = record.previewUrl;
+    }
+    if (record.replyToMessageId !== undefined) {
+      body.context = { message_id: record.replyToMessageId };
+    }
+    return this.#phoneNumberClient.sendMessage(body as never);
   }
 
   async sendImage(
@@ -676,6 +781,14 @@ export class WhatsApp {
         throw new WhatsAppListenOptionsError(
           "invalid_listen_from",
           "WhatsApp.listen: options.from must be a non-empty string if provided."
+        );
+      }
+    }
+    if (options.groupId !== undefined) {
+      if (typeof options.groupId !== "string" || options.groupId.length === 0) {
+        throw new WhatsAppListenOptionsError(
+          "invalid_listen_from",
+          "WhatsApp.listen: options.groupId must be a non-empty string if provided."
         );
       }
     }

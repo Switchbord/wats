@@ -458,6 +458,9 @@ await updatePhoneNumberSettings(client, {
 
 ## Related docs
 
+- [Scoped Clients Reference](./scoped-clients.md) — `PhoneNumberClient`
+  Groups helpers and `GroupClient` bound-id methods over
+  `@wats/graph/endpoints/groups` (WATS-133).
 - [Client Reference](./client.md) — `GraphClient` construction, Transport
   seam, baseUrl/accessToken/apiVersion validation.
 - [Errors Reference](./errors.md) — F-5 error code registry and seeded
