@@ -66,7 +66,7 @@ interface WatsServiceConfig {
 | `profile.webhook.path` | GET | Meta verify token | Delegates to `createWebhookAdapter`. |
 | `profile.webhook.path` | POST | Meta signature | Delegates to `createWebhookAdapter`. |
 | `${profile.service.apiPrefix}/messages/text` | POST | service bearer | Sends a text message through Graph. |
-| `${profile.service.apiPrefix}/messages` | POST | service bearer | Sends a supported generic text, media, location, reaction, contacts, group pin/unpin, or interactive message body through Graph. |
+| `${profile.service.apiPrefix}/messages` | POST | service bearer | Sends a supported generic text, media, location, reaction, contacts, or interactive message body through Graph; group text/pin bodies are accepted only when `enableGroupRoutes` is true. |
 | `${profile.service.apiPrefix}/groups` | GET, POST | service bearer | Opt-in (`enableGroupRoutes`) list/create Groups using the configured business phone-number id. |
 | `${profile.service.apiPrefix}/groups/{groupId}` | GET, POST, DELETE | service bearer | Opt-in get/update/delete a Group. |
 | `${profile.service.apiPrefix}/groups/{groupId}/invite-link` | GET, POST | service bearer | Opt-in get/reset a Group invite link. |

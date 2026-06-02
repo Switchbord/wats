@@ -164,7 +164,21 @@ describe("WATS-137 opt-in group service routes", () => {
     expect(mock.requests.length).toBe(0);
   });
 
-  test("POST /messages accepts opt-in group sends and pin bodies through the service route", async () => {
+  test("POST /messages accepts group sends and pin bodies only when group routes are enabled", async () => {
+    const disabledMock = createMockTransport({ defaultResponse: { status: 200, body: { messages: [{ id: "wamid.NOPE" }] } } });
+    const disabled = createWatsServiceApp(config({ transport: disabledMock.transport }));
+    const disabledMessage = await disabled.fetch(new Request("https://service.test/api/messages", authed({
+      method: "POST",
+      body: JSON.stringify({ messaging_product: "whatsapp", recipient_type: "group", to: "grp-123", type: "text", text: { body: "hello group" } })
+    })));
+    const disabledPin = await disabled.fetch(new Request("https://service.test/api/messages", authed({
+      method: "POST",
+      body: JSON.stringify({ type: "pin", to: "grp-123", pinType: "pin", messageId: "wamid.TARGET", expirationDays: 7 })
+    })));
+    expect(disabledMessage.status).toBe(400);
+    expect(disabledPin.status).toBe(400);
+    expect(disabledMock.requests.length).toBe(0);
+
     const mock = createMockTransport({ defaultResponse: { status: 200, body: { messages: [{ id: "wamid.GROUP" }] } } });
     const app = createWatsServiceApp(config({ transport: mock.transport, enableGroupRoutes: true }));
 

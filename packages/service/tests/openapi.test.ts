@@ -112,7 +112,6 @@ describe("WATS-35 OpenAPI document generator", () => {
       "LocationMessageBody",
       "MediaMessageBody",
       "ReactionMessageBody",
-      "GroupPinMessageBody",
       "ReadyResponse",
       "SupportedMessageBody",
       "TextMessageBody"
@@ -128,7 +127,6 @@ describe("WATS-35 OpenAPI document generator", () => {
       { "$ref": "#/components/schemas/LocationMessageBody" },
       { "$ref": "#/components/schemas/ContactsMessageBody" },
       { "$ref": "#/components/schemas/ReactionMessageBody" },
-      { "$ref": "#/components/schemas/GroupPinMessageBody" },
       { "$ref": "#/components/schemas/BasicInteractiveMessageBody" },
       { "$ref": "#/components/schemas/CommerceInteractiveMessageBody" }
     ]);

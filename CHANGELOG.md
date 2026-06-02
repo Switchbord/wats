@@ -39,7 +39,7 @@ Patch alpha compatibility and local-operator release. Begins the WhatsApp Groups
 ### WATS-137 — Groups service routes + OpenAPI
 
 - Adds explicit `enableGroupRoutes` opt-in support to `@wats/service`, exposing bearer-protected `GET|POST /groups`, `GET|POST|DELETE /groups/{groupId}`, invite-link, participants, and join-request routes under `profile.service.apiPrefix` without changing the default route set.
-- Extends `POST /messages` to accept Groups pin/unpin composer bodies through the service layer, while preserving the WATS-130 sanitized Graph error envelope and never forwarding the service bearer token to Graph.
+- Extends `POST /messages` to accept Groups text and pin/unpin bodies only when `enableGroupRoutes` is true, while preserving the WATS-130 sanitized Graph error envelope and never forwarding the service bearer token to Graph.
 - Updates the generated OpenAPI document, service reference, and parity matrix for WATS-137. No live Meta calls are added to CI.
 
 ### Release metadata
