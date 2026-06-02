@@ -72,6 +72,37 @@ describe("WATS-87 SQLite outbox records", () => {
     }
   });
 
+  test("reclaims stale processing items so a worker crash cannot strand outbox records", async () => {
+    const store = await createSqlitePersistence({ filename: tempDb() });
+    await store.migrate();
+    try {
+      await store.enqueueOutboxItem({
+        id: "outbox-message-stale",
+        payloadHash: hash("e"),
+        createdAt: "2026-06-01T02:00:00.000Z"
+      });
+
+      const first = await store.claimOutboxItems({ now: "2026-06-01T02:00:00.000Z", limit: 10 });
+      expect(first).toHaveLength(1);
+      expect(first[0]?.attempts).toBe(1);
+
+      await expect(store.claimOutboxItems({
+        now: "2026-06-01T02:04:59.999Z",
+        limit: 10
+      })).resolves.toEqual([]);
+
+      const reclaimed = await store.claimOutboxItems({
+        now: "2026-06-01T02:05:00.000Z",
+        limit: 10
+      });
+      expect(reclaimed).toHaveLength(1);
+      expect(reclaimed[0]?.id).toBe("outbox-message-stale");
+      expect(reclaimed[0]?.attempts).toBe(2);
+    } finally {
+      await store.close();
+    }
+  });
+
   test("rejects malformed outbox ids, hashes, timestamps, and claim limits with typed errors", async () => {
     const store = await createSqlitePersistence({ filename: tempDb() });
     await store.migrate();
