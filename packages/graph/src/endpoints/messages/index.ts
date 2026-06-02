@@ -36,7 +36,8 @@ export {
   buildSendLocationPayload,
   buildSendContactsPayload,
   buildSendReactionPayload,
-  buildRemoveReactionPayload
+  buildRemoveReactionPayload,
+  buildSendPinPayload
 } from "./builders-basic.js";
 export {
   buildSendButtonsPayload,

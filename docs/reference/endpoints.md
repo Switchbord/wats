@@ -245,6 +245,29 @@ F-4 typed error (`GraphRequestValidationError` whose `.message` starts
 with `"Invalid phoneNumberId."`) and then delegates path/body plumbing
 to the `sendMessage` endpoint-registry callable.
 
+### Groups send-to-group (WATS-134)
+
+Message helpers accept `recipientType: "group"` for text, media, and standard
+template sends. The Graph body uses `recipient_type: "group"`; `to` must be an
+opaque group id, not a phone number.
+
+```ts
+const body = buildSendTextPayload({
+  to: "grp-release-1",
+  recipientType: "group",
+  text: "hello group"
+});
+
+await sendMessage(client, { phoneNumberId }, body);
+```
+
+Unsupported in groups: interactive messages, commerce/catalog/product sends,
+marketing/auth templates, calling, edit/delete, disappearing, and view-once.
+These reject with `GraphRequestValidationError` before transport. Pin/unpin is
+available through `buildSendPinPayload({ to, pinType: "pin" | "unpin", messageId,
+expirationDays })`; `expirationDays` must be an integer from 1 to 30. Meta enforces
+admin-only pinning, at most three pinned messages, and oldest-auto-unpin behavior.
+
 ## Custom endpoint tutorial
 
 Defining a new endpoint is a one-declaration affair. The following

@@ -14,6 +14,12 @@ Patch alpha compatibility and local-operator release. Begins the WhatsApp Groups
 - camelCase public input mapped to the snake_case Graph wire only at the transport boundary; enforces Groups limits (subject ≤128, description ≤2048, ≤8 participants) and the shared path-segment / prototype-poison guards. Group mutations are asynchronous: callables return the `request_id` correlator and the terminal outcome arrives via the matching `group_*_update` webhook.
 - Exported at the root barrel and tracked by `bun run api:check`.
 
+### WATS-134 — Groups send-to-group + pin/unpin
+
+- Extends message builders and `sendMessage` to accept `recipientType: "group"`, emitting Graph `recipient_type: "group"` with an opaque group id in `to` for text, media, and standard template sends.
+- Adds `buildSendPinPayload({ to, pinType, messageId, expirationDays })` for group pin/unpin messages (`type: "pin"`, `expiration_days` 1..30). Pinning is admin-only on Meta; Graph keeps at most three pinned messages and auto-unpins the oldest.
+- Rejects group-context interactive, commerce, marketing/auth-template, and phone-number-shaped group recipients before transport. Calling/edit/delete/disappearing/view-once remain unsupported for Groups.
+
 ### Release metadata
 
 - Release metadata is aligned for 0.3.13 across the root manifest and the publishable `@wats/*` packages, preserving the canonical `@wats/*` package scope and credential-gated live `wats serve` flow.

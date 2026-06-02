@@ -11,6 +11,7 @@ import type {
   GraphMessagesMediaType,
   GraphMessagesReactionPayload,
   GraphMessagesRemoveReactionInput,
+  GraphMessagesPinPayload,
   GraphMessagesSendAudioInput,
   GraphMessagesSendCaptionedMediaInput,
   GraphMessagesSendContactsInput,
@@ -18,6 +19,7 @@ import type {
   GraphMessagesSendImageInput,
   GraphMessagesSendLocationInput,
   GraphMessagesSendMediaInput,
+  GraphMessagesSendPinInput,
   GraphMessagesSendReactionInput,
   GraphMessagesSendStickerInput,
   GraphMessagesSendTextInput,
@@ -35,15 +37,19 @@ import {
   GRAPH_MESSAGES_REPLY_TO_MESSAGE_ID_MAX_LENGTH,
   GRAPH_MESSAGES_SHORT_LABEL_MAX_LENGTH,
   GRAPH_MESSAGES_MAX_CONTACTS,
+  applyRecipientType,
   assertBoundedArray,
+  assertMessageRecipient,
   assertNonEmptyControlFreeString,
   assertNoUnsupportedMediaFields,
+  assertValidGroupId,
   assertValidMediaLink,
   assertValidNumberInRange,
   asRecordInput,
   assertValidRecipient,
   assertValidReplyToMessageId,
   assertValidText,
+  rejectGroupRecipient,
   hasControlChar,
   isPlainOptionsObject,
   mapValidatedArray,
@@ -60,7 +66,7 @@ export function buildSendTextPayload(
     );
   }
 
-  const to = assertValidRecipient(input.to);
+  const { to, recipientType } = assertMessageRecipient(input as unknown as Record<string, unknown>, "sendText");
   const text = assertValidText(input.text);
 
   if (input.previewUrl !== undefined && typeof input.previewUrl !== "boolean") {
@@ -81,6 +87,7 @@ export function buildSendTextPayload(
   if (input.previewUrl !== undefined) {
     payload.text.preview_url = input.previewUrl;
   }
+  applyRecipientType(payload, recipientType);
   if (input.replyToMessageId !== undefined) {
     payload.context = {
       message_id: assertValidReplyToMessageId(input.replyToMessageId)
@@ -116,7 +123,7 @@ function buildSendMediaPayload<TType extends GraphMessagesMediaType>(
   const record = input as Record<string, unknown>;
   assertNoUnsupportedMediaFields(record, helperName, options);
 
-  const to = assertValidRecipient(record.to, helperName);
+  const { to, recipientType } = assertMessageRecipient(record, helperName);
   const hasMediaId = record.mediaId !== undefined;
   const hasLink = record.link !== undefined;
   if (hasMediaId === hasLink) {
@@ -161,6 +168,7 @@ function buildSendMediaPayload<TType extends GraphMessagesMediaType>(
     [mediaType]: media
   } as unknown as GraphMessagesMediaPayload;
 
+  applyRecipientType(payload, recipientType);
   if (record.replyToMessageId !== undefined) {
     (payload as GraphMessagesMediaPayload & { context?: { message_id: string } }).context = {
       message_id: assertValidReplyToMessageId(record.replyToMessageId)
@@ -225,9 +233,11 @@ export function buildSendStickerPayload(
 
 export function buildSendLocationPayload(input: GraphMessagesSendLocationInput): GraphMessagesLocationPayload {
   const record = asRecordInput(input, "sendLocation");
+  rejectGroupRecipient(record, "sendLocation", "location messages");
+  const { to, recipientType } = assertMessageRecipient(record, "sendLocation");
   const payload: GraphMessagesLocationPayload = {
     messaging_product: "whatsapp",
-    to: assertValidRecipient(record.to, "sendLocation"),
+    to,
     type: "location",
     location: {
       latitude: assertValidNumberInRange(record.latitude, "latitude", -90, 90, "sendLocation"),
@@ -238,6 +248,7 @@ export function buildSendLocationPayload(input: GraphMessagesSendLocationInput):
   const address = maybeText(record.address, "address", GRAPH_MESSAGES_GENERAL_TEXT_MAX_LENGTH, "sendLocation");
   if (name !== undefined) payload.location.name = name;
   if (address !== undefined) payload.location.address = address;
+  applyRecipientType(payload, recipientType);
   return withReplyContext(payload, record);
 }
 
@@ -323,33 +334,66 @@ function normalizeContact(value: unknown, helperName: string): Record<string, un
 
 export function buildSendContactsPayload(input: GraphMessagesSendContactsInput): GraphMessagesContactsPayload {
   const record = asRecordInput(input, "sendContacts");
+  rejectGroupRecipient(record, "sendContacts", "contacts messages");
+  const { to, recipientType } = assertMessageRecipient(record, "sendContacts");
   const contacts = mapValidatedArray(assertBoundedArray(record.contacts, "contacts", 1, GRAPH_MESSAGES_MAX_CONTACTS, "sendContacts"), (c) => normalizeContact(c, "sendContacts"));
-  return withReplyContext({ messaging_product: "whatsapp", to: assertValidRecipient(record.to, "sendContacts"), type: "contacts", contacts }, record);
+  return withReplyContext(applyRecipientType({ messaging_product: "whatsapp", to, type: "contacts", contacts } satisfies GraphMessagesContactsPayload, recipientType), record);
 }
 
 export function buildSendReactionPayload(input: GraphMessagesSendReactionInput): GraphMessagesReactionPayload {
   const record = asRecordInput(input, "sendReaction");
+  rejectGroupRecipient(record, "sendReaction", "reaction messages");
+  const { to, recipientType } = assertMessageRecipient(record, "sendReaction");
   const emoji = assertNonEmptyControlFreeString(record.emoji, "emoji", 32, "sendReaction");
-  return {
+  return applyRecipientType({
     messaging_product: "whatsapp",
-    to: assertValidRecipient(record.to, "sendReaction"),
+    to,
     type: "reaction",
     reaction: {
       message_id: assertNonEmptyControlFreeString(record.messageId, "messageId", GRAPH_MESSAGES_REPLY_TO_MESSAGE_ID_MAX_LENGTH, "sendReaction"),
       emoji
     }
-  };
+  }, recipientType);
 }
 
 export function buildRemoveReactionPayload(input: GraphMessagesRemoveReactionInput): GraphMessagesReactionPayload {
   const record = asRecordInput(input, "removeReaction");
-  return {
+  rejectGroupRecipient(record, "removeReaction", "reaction messages");
+  const { to, recipientType } = assertMessageRecipient(record, "removeReaction");
+  return applyRecipientType({
     messaging_product: "whatsapp",
-    to: assertValidRecipient(record.to, "removeReaction"),
+    to,
     type: "reaction",
     reaction: {
       message_id: assertNonEmptyControlFreeString(record.messageId, "messageId", GRAPH_MESSAGES_REPLY_TO_MESSAGE_ID_MAX_LENGTH, "removeReaction"),
       emoji: ""
+    }
+  } satisfies GraphMessagesReactionPayload, recipientType);
+}
+
+export function buildSendPinPayload(input: GraphMessagesSendPinInput): GraphMessagesPinPayload {
+  const record = asRecordInput(input, "sendPin");
+  if (record.recipientType !== undefined && record.recipientType !== "group") {
+    throw new GraphRequestValidationError("Invalid sendPin input: recipientType must be group when provided.");
+  }
+  const to = assertValidGroupId(record.to, "sendPin");
+  const pinType = record.pinType;
+  if (pinType !== "pin" && pinType !== "unpin") {
+    throw new GraphRequestValidationError("Invalid sendPin input: pinType must be pin or unpin.");
+  }
+  const expirationDays = record.expirationDays;
+  if (typeof expirationDays !== "number" || !Number.isInteger(expirationDays) || expirationDays < 1 || expirationDays > 30) {
+    throw new GraphRequestValidationError("Invalid sendPin input: expirationDays must be an integer between 1 and 30.");
+  }
+  return {
+    messaging_product: "whatsapp",
+    recipient_type: "group",
+    to,
+    type: "pin",
+    pin: {
+      type: pinType,
+      message_id: assertNonEmptyControlFreeString(record.messageId, "messageId", GRAPH_MESSAGES_REPLY_TO_MESSAGE_ID_MAX_LENGTH, "sendPin"),
+      expiration_days: expirationDays
     }
   };
 }
