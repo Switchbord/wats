@@ -45,7 +45,7 @@ The migration runner creates:
 - `wats_service_requests`
 - `wats_outbox`
 
-Migrations are forward-only for alpha. Already-applied migration checksums must match the package migration definitions. Checksum drift fails closed with `PersistenceError`.
+Migrations are forward-only for alpha. Already-applied migration checksums must match the package migration definitions. Checksum drift fails closed with `PersistenceError`. A held migration lock fails closed with `PersistenceError` code `migration_lock_failed`.
 
 ## Runtime contract
 
@@ -88,7 +88,7 @@ const report = await runOutboxWorkerOnce(store, {
 });
 ```
 
-The persistence table stores only payload hashes, status, attempt counts, and retry timestamps. It does not store raw webhook bodies, does not store message text, and does not store Graph request bodies, contacts, or other payload content. `runOutboxWorkerOnce(...)` claims due `pending` items, calls the handler, marks successes as `succeeded`, and reschedules failures with `nextAttemptAt = now + retryDelayMs`. Claimed items use a five-minute processing lease; stale `processing` rows become claimable again so a killed worker does not strand records forever.
+The persistence table stores only payload hashes, status, attempt counts, `leaseId`, and retry timestamps. It does not store raw webhook bodies, does not store message text, and does not store Graph request bodies, contacts, or other payload content. `runOutboxWorkerOnce(...)` claims due `pending` items, calls the handler, marks successes as `succeeded`, and reschedules failures with `nextAttemptAt = now + retryDelayMs`. Claimed items use a five-minute processing lease; stale `processing` rows become claimable again so a killed worker does not strand records forever. The lease is fenced: `markOutboxItemFailed(...)` and `markOutboxItemSucceeded(...)` require the current `leaseId`, so stale workers cannot mark a newer reclaimed lease as succeeded or failed.
 
 ## Redaction boundary
 
@@ -110,7 +110,8 @@ Persistence diagnostics must not print:
 When persistence is injected:
 
 - signed webhook POSTs are recorded by event key/hash and duplicates are acknowledged without redispatch;
-- service send routes honor `Idempotency-Key` for replay/conflict behavior.
+- service send routes honor `Idempotency-Key` for replay/conflict behavior;
+- injected stores must expose the WATS-87 outbox methods as part of the accepted service persistence contract.
 
 Current `@wats/cli` has no database navigation commands. WATS-123 will add thread/message navigation after service exposes persisted conversation/event-store APIs.
 
