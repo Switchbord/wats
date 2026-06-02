@@ -506,7 +506,7 @@ function createOpenApiSchemas(enableGroupRoutes = false): Record<string, Record<
     schemaRef("BasicInteractiveMessageBody"),
     schemaRef("CommerceInteractiveMessageBody")
   ];
-  return {
+  const schemas: Record<string, Record<string, unknown>> = {
     HealthResponse: {
       type: "object",
       additionalProperties: false,
@@ -773,6 +773,14 @@ function createOpenApiSchemas(enableGroupRoutes = false): Record<string, Record<
       description: "Webhook adapter response envelope for accepted signed webhook payloads."
     }
   };
+  if (!enableGroupRoutes) {
+    delete schemas.GroupPinMessageBody;
+    delete schemas.CreateGroupBody;
+    delete schemas.UpdateGroupBody;
+    delete schemas.RemoveGroupParticipantsBody;
+    delete schemas.ManageGroupJoinRequestsBody;
+  }
+  return schemas;
 }
 
 export function createWatsServiceOpenApiDocument(
@@ -856,7 +864,12 @@ export function createWatsServiceOpenApiDocument(
       post: messageOperation("Send a text message", "TextMessageBody")
     },
     [messagesPath]: {
-      post: messageOperation("Send a supported text, media, location, reaction, contacts, group pin, or interactive message body", "SupportedMessageBody")
+      post: messageOperation(
+        includeGroupRoutes
+          ? "Send a supported text, media, location, reaction, contacts, group pin, or interactive message body"
+          : "Send a supported text, media, location, reaction, contacts, or interactive message body",
+        "SupportedMessageBody"
+      )
     },
     [OPENAPI_PATH]: {
       get: {
