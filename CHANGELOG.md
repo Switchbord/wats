@@ -28,7 +28,7 @@ Patch alpha compatibility and local-operator release. Begins the WhatsApp Groups
 ### WATS-136 — Groups filters and facade ergonomics
 
 - Adds `filtersTyped.group` with helpers for group messages, participants/lifecycle/settings/status updates, and `fromGroup(groupId)` composition over normalized group updates.
-- Extends the `WhatsApp` facade with `createGroup`, `sendGroupMessage`, `group(groupId)`, and `listen({ groupId })` ergonomics over the existing typed router/listener substrate.
+- Extends the `WhatsApp` facade with `createGroup`, `sendGroupMessage`, `group(groupId)`, and `listen({ groupId })` ergonomics over the existing typed router/listener substrate. Groups public responses now stay camelCase (`requestId`, `inviteLink`, `joinApprovalMode`, `creationTimestamp`, `totalParticipantCount`, `joinRequestId`, `waId`) while snake_case remains only at the Graph wire boundary.
 
 ### Release metadata
 

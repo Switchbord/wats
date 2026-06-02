@@ -230,7 +230,8 @@ Helpers:
 - `group.fromGroup(groupId)` — narrows any group-bearing update to one group id.
 
 `group.fromGroup(groupId)` rejects non-string or empty/whitespace-only ids with
-`FilterValidationError`; predicates return `false` for non-group siblings.
+`FilterValidationError`; predicates return `false` for non-group siblings. The
+root `filtersTyped.group` namespace mirrors the `@wats/core/filtersTyped` subpath.
 
 ## Combinators
 

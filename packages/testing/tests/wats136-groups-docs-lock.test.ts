@@ -13,20 +13,24 @@ function repoRead(path: string): string {
 
 describe("WATS-136 Groups docs lock", () => {
   test("filters, facade, parity, and changelog document the group ergonomics", () => {
-    const docs = [
-      repoRead("docs/reference/filters.md"),
-      repoRead("docs/reference/whatsapp-facade.md"),
-      repoRead("docs/parity/pywa-parity-matrix.md"),
-      repoRead("CHANGELOG.md")
-    ];
+    const filters = repoRead("docs/reference/filters.md");
+    const facade = repoRead("docs/reference/whatsapp-facade.md");
+    const parity = repoRead("docs/parity/pywa-parity-matrix.md");
+    const changelog = repoRead("CHANGELOG.md");
 
-    for (const doc of docs) {
-      expect(doc).toContain("WATS-136");
-      expect(doc).toContain("filtersTyped.group");
-      expect(doc).toContain("group.fromGroup(groupId)");
-      expect(doc).toContain("sendGroupMessage");
-      expect(doc).toContain("listen({ groupId");
-    }
+    expect(filters).toContain("WATS-136");
+    expect(filters).toContain("filtersTyped.group");
+    expect(filters).toContain("group.fromGroup(groupId)");
+    expect(facade).toContain("WATS-136");
+    expect(facade).toContain("sendGroupMessage");
+    expect(facade).toContain("listen({ groupId");
+    expect(parity).toContain("WATS-136");
+    expect(parity).toContain("filters");
+    expect(parity).toContain("facade helpers");
+    expect(changelog).toContain("WATS-136");
+    expect(changelog).toContain("filtersTyped.group");
+    expect(changelog).toContain("sendGroupMessage");
+    expect(changelog).toContain("requestId");
   });
 
   test("facade docs pin camelCase response shape and group hard limits/non-goals", () => {
@@ -37,7 +41,7 @@ describe("WATS-136 Groups docs lock", () => {
     expect(facade).toContain("joinApprovalMode");
     expect(facade).toContain("only at the Graph wire boundary");
     expect(facade).toContain("description ≤2048");
-    expect(facade).toContain("photo upload is not implemented");
+    expect(facade).toContain("Photo upload is not implemented");
     expect(facade).toContain("no direct participant-add helper");
     expect(facade).toContain("no promote/demote helper");
   });

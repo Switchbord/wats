@@ -15,6 +15,14 @@ export {
 } from "./callables.js";
 
 export {
+  normalizeGroupDetailsResponse,
+  normalizeGroupInviteLinkResponse,
+  normalizeGroupJoinRequestsResponse,
+  normalizeGroupMutationResponse,
+  normalizeListGroupsResponse
+} from "./responses.js";
+
+export {
   GROUP_DESCRIPTION_MAX_LENGTH,
   GROUP_MAX_JOIN_REQUESTS,
   GROUP_MAX_PARTICIPANTS,

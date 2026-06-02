@@ -37,6 +37,13 @@ import {
   groupString,
   groupStringArray
 } from "./shared.js";
+import {
+  normalizeGroupDetailsResponse,
+  normalizeGroupInviteLinkResponse,
+  normalizeGroupJoinRequestsResponse,
+  normalizeGroupMutationResponse,
+  normalizeListGroupsResponse
+} from "./responses.js";
 
 type WireBody = Record<string, unknown>;
 
@@ -112,12 +119,13 @@ export const createGroup = Object.assign(
     body: CreateGroupBody,
     opts?: EndpointInvokeOptions
   ): Promise<GroupMutationResponse> {
-    return createGroupRaw(
+    const response = await createGroupRaw(
       client,
       { phoneNumberId: groupPathParam(params, "createGroup", "phoneNumberId") },
       buildCreateGroupBody(body),
       opts
     );
+    return normalizeGroupMutationResponse(response);
   },
   { definition: createGroupRaw.definition }
 );
@@ -157,7 +165,8 @@ export const listGroups = Object.assign(
     if (record.before !== undefined) {
       query.before = groupString(record.before, "before", "listGroups", 4096);
     }
-    return listGroupsRaw(client, query, body, opts);
+    const response = await listGroupsRaw(client, query, body, opts);
+    return normalizeListGroupsResponse(response);
   },
   { definition: listGroupsRaw.definition }
 );
@@ -182,7 +191,8 @@ export const getGroup = Object.assign(
     if (record.fields !== undefined) {
       query.fields = groupString(record.fields, "fields", "getGroup", 4096);
     }
-    return getGroupRaw(client, query, body, opts);
+    const response = await getGroupRaw(client, query, body, opts);
+    return normalizeGroupDetailsResponse(response);
   },
   { definition: getGroupRaw.definition }
 );
@@ -201,12 +211,13 @@ export const updateGroup = Object.assign(
     body: UpdateGroupBody,
     opts?: EndpointInvokeOptions
   ): Promise<GroupMutationResponse> {
-    return updateGroupRaw(
+    const response = await updateGroupRaw(
       client,
       { groupId: groupPathParam(params, "updateGroup", "groupId") },
       buildUpdateGroupBody(body),
       opts
     );
+    return normalizeGroupMutationResponse(response);
   },
   { definition: updateGroupRaw.definition }
 );
@@ -224,12 +235,13 @@ export const deleteGroup = Object.assign(
     body?: never,
     opts?: EndpointInvokeOptions
   ): Promise<GroupMutationResponse> {
-    return deleteGroupRaw(
+    const response = await deleteGroupRaw(
       client,
       { groupId: groupPathParam(params, "deleteGroup", "groupId") },
       body,
       opts
     );
+    return normalizeGroupMutationResponse(response);
   },
   { definition: deleteGroupRaw.definition }
 );
@@ -247,12 +259,13 @@ export const getGroupInviteLink = Object.assign(
     body?: never,
     opts?: EndpointInvokeOptions
   ): Promise<GroupInviteLinkResponse> {
-    return getGroupInviteLinkRaw(
+    const response = await getGroupInviteLinkRaw(
       client,
       { groupId: groupPathParam(params, "getGroupInviteLink", "groupId") },
       body,
       opts
     );
+    return normalizeGroupInviteLinkResponse(response);
   },
   { definition: getGroupInviteLinkRaw.definition }
 );
@@ -271,12 +284,13 @@ export const resetGroupInviteLink = Object.assign(
     body?: never,
     opts?: EndpointInvokeOptions
   ): Promise<GroupInviteLinkResponse> {
-    return resetGroupInviteLinkRaw(
+    const response = await resetGroupInviteLinkRaw(
       client,
       { groupId: groupPathParam(params, "resetGroupInviteLink", "groupId") },
       { messaging_product: "whatsapp" },
       opts
     );
+    return normalizeGroupInviteLinkResponse(response);
   },
   { definition: resetGroupInviteLinkRaw.definition }
 );
@@ -312,7 +326,8 @@ export const listGroupJoinRequests = Object.assign(
     if (record.after !== undefined) {
       query.after = groupString(record.after, "after", "listGroupJoinRequests", 4096);
     }
-    return listGroupJoinRequestsRaw(client, query, body, opts);
+    const response = await listGroupJoinRequestsRaw(client, query, body, opts);
+    return normalizeGroupJoinRequestsResponse(response);
   },
   { definition: listGroupJoinRequestsRaw.definition }
 );
@@ -338,12 +353,13 @@ export const approveGroupJoinRequests = Object.assign(
     body: ManageGroupJoinRequestsBody,
     opts?: EndpointInvokeOptions
   ): Promise<GroupMutationResponse> {
-    return approveGroupJoinRequestsRaw(
+    const response = await approveGroupJoinRequestsRaw(
       client,
       { groupId: groupPathParam(params, "approveGroupJoinRequests", "groupId") },
       buildManageJoinRequestsBody(body, "approve", "approveGroupJoinRequests"),
       opts
     );
+    return normalizeGroupMutationResponse(response);
   },
   { definition: approveGroupJoinRequestsRaw.definition }
 );
@@ -355,12 +371,13 @@ export const rejectGroupJoinRequests = Object.assign(
     body: ManageGroupJoinRequestsBody,
     opts?: EndpointInvokeOptions
   ): Promise<GroupMutationResponse> {
-    return rejectGroupJoinRequestsRaw(
+    const response = await rejectGroupJoinRequestsRaw(
       client,
       { groupId: groupPathParam(params, "rejectGroupJoinRequests", "groupId") },
       buildManageJoinRequestsBody(body, "reject", "rejectGroupJoinRequests"),
       opts
     );
+    return normalizeGroupMutationResponse(response);
   },
   { definition: rejectGroupJoinRequestsRaw.definition }
 );
@@ -379,12 +396,13 @@ export const removeGroupParticipants = Object.assign(
     body: RemoveGroupParticipantsBody,
     opts?: EndpointInvokeOptions
   ): Promise<GroupMutationResponse> {
-    return removeGroupParticipantsRaw(
+    const response = await removeGroupParticipantsRaw(
       client,
       { groupId: groupPathParam(params, "removeGroupParticipants", "groupId") },
       buildRemoveParticipantsBody(body),
       opts
     );
+    return normalizeGroupMutationResponse(response);
   },
   { definition: removeGroupParticipantsRaw.definition }
 );
