@@ -14,8 +14,7 @@ import type {
 import { buildSendMarketingTemplatePayload } from "./builders-template.js";
 import {
   assertNonEmptyControlFreeString,
-  assertValidGroupId,
-  rejectGroupRecipient
+  assertValidGroupId
 } from "./validation.js";
 
 interface GraphRequestExecutor {
@@ -106,8 +105,17 @@ export const sendMessage = defineEndpoint<
     }
     const record = body as unknown as Record<string, unknown>;
     if (record.recipient_type === "group") {
-      if (record.type === "interactive") {
-        rejectGroupRecipient({ recipientType: "group" }, "sendMessage", "interactive messages");
+      if (
+        record.type !== "text" &&
+        record.type !== "image" &&
+        record.type !== "video" &&
+        record.type !== "audio" &&
+        record.type !== "document" &&
+        record.type !== "sticker" &&
+        record.type !== "template" &&
+        record.type !== "pin"
+      ) {
+        throw new GraphRequestValidationError("Invalid sendMessage input: group recipients support text, media, template, and pin message bodies only.");
       }
       assertValidGroupId(record.to, "sendMessage");
       if (record.type === "pin") {

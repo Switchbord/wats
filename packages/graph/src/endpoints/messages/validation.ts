@@ -73,11 +73,6 @@ export function assertValidGroupId(to: unknown, helperName = "sendText"): string
       `Invalid ${helperName} input: recipientType group requires a group-id-shaped to, not a phone number.`
     );
   }
-  if (!/[A-Za-z_-]/.test(to)) {
-    throw new GraphRequestValidationError(
-      `Invalid ${helperName} input: recipientType group requires a group-id-shaped to.`
-    );
-  }
   return to;
 }
 
@@ -133,7 +128,8 @@ export function assertMessageRecipient(record: Record<string, unknown>, helperNa
   if (recipientType === "group") {
     return { to: assertValidGroupId(record.to, helperName), recipientType };
   }
-  return { to: assertValidRecipient(record.to, helperName), recipientType };
+  const to = assertValidRecipient(record.to, helperName);
+  return recipientType === "individual" ? { to, recipientType } : { to };
 }
 
 export function applyRecipientType<T extends object>(

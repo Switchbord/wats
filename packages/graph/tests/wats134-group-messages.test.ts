@@ -163,6 +163,16 @@ describe("WATS-134 group message sends", () => {
       interactive: { type: "button" }
     } as GraphMessagesSendBody)).rejects.toThrow(GraphRequestValidationError);
     expect(handle.requests.length).toBe(0);
+
+    const { client: unsupportedClient, handle: unsupportedHandle } = clientWithMock();
+    await expect(sendMessage(unsupportedClient, { phoneNumberId: "555" }, {
+      messaging_product: "whatsapp",
+      recipient_type: "group",
+      to: "grp-release-1",
+      type: "location",
+      location: { latitude: 1, longitude: 2 }
+    } as GraphMessagesSendBody)).rejects.toThrow(GraphRequestValidationError);
+    expect(unsupportedHandle.requests.length).toBe(0);
   });
 
   test("pin and unpin builders emit exact group pin bodies and validate expiration_days", () => {
@@ -191,6 +201,20 @@ describe("WATS-134 group message sends", () => {
       type: "pin",
       pin: { type: "unpin", message_id: "wamid.TARGET", expiration_days: 1 }
     });
+
+    expect(() => buildSendPinPayload({
+      to: "1234567890123456",
+      pinType: "pin",
+      messageId: "wamid.TARGET",
+      expirationDays: 1
+    })).not.toThrow();
+
+    expect(() => buildSendPinPayload({
+      to: "15551230000",
+      pinType: "pin",
+      messageId: "wamid.TARGET",
+      expirationDays: 1
+    })).toThrow(GraphRequestValidationError);
 
     for (const expirationDays of [0, 31, 1.5, Number.NaN]) {
       expect(() => buildSendPinPayload({
