@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.20] - 2026-06-02
+
+### Added
+
+- **Persistence outbox first slice (WATS-87).** `@wats/persistence` gains outbox record APIs — `enqueueOutboxItem`, `claimOutboxItems`, `markOutboxItemSucceeded`, `markOutboxItemFailed` — plus a `runOutboxWorkerOnce` worker step. SQLite persists only `payloadHash`, status, attempts, `leaseId`, and retry timestamps (no raw webhook/Graph bodies, message text, or contact payloads). Claims use monotonic `leaseId` fencing so a worker whose lease was reclaimed after a timeout cannot mark rows it no longer owns; stale `processing` rows are reclaimed by `updated_at` cutoff. Existing v1 databases migrate forward via `002_outbox_lease_id`, preserving the `001_initial` checksum.
+
+### Release
+
+- Release metadata is aligned for 0.3.20: all publishable `@wats/*` packages, the service OpenAPI default version, README, and release-contract locks move together.
+
 ## [0.3.19] - 2026-06-02
 
 ### Added
