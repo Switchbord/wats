@@ -21,6 +21,144 @@ export type GroupJoinApprovalMode = "auto_approve" | "approval_required";
  */
 export type GroupRecipientType = "individual" | "group";
 
+export interface WhatsAppMessageRecipient {
+  recipientType: GroupRecipientType;
+  to: string;
+}
+
+export type GroupWebhookField =
+  | "group_lifecycle_update"
+  | "group_participants_update"
+  | "group_settings_update"
+  | "group_status_update";
+
+export type GroupLifecycleUpdateType = "group_create" | "group_delete";
+export type GroupParticipantsUpdateType =
+  | "group_participants_add"
+  | "group_join_request_created"
+  | "group_join_request_revoked"
+  | "group_participants_remove";
+export type GroupSettingsUpdateType = "group_settings_update";
+export type GroupStatusUpdateType = "group_suspend" | "group_suspend_cleared";
+
+export interface GroupWebhookWireMetadata {
+  display_phone_number: string;
+  phone_number_id: string;
+}
+
+export interface GroupWebhookWireError {
+  code: number;
+  message: string;
+  title: string;
+  error_data?: {
+    details?: string;
+  };
+  href?: string;
+}
+
+export interface GroupWireParticipant {
+  wa_id: string;
+}
+
+export interface GroupWireInputParticipant {
+  input: string;
+}
+
+export type GroupWireParticipantRef = GroupWireParticipant | GroupWireInputParticipant;
+
+export interface GroupLifecycleUpdateWireGroup {
+  timestamp: string;
+  group_id: string;
+  type: GroupLifecycleUpdateType;
+  request_id?: string;
+  subject?: string;
+  description?: string;
+  invite_link?: string;
+  join_approval_mode?: GroupJoinApprovalMode;
+  errors?: readonly GroupWebhookWireError[];
+}
+
+export interface GroupLifecycleUpdateWireValue {
+  messaging_product: "whatsapp";
+  metadata: GroupWebhookWireMetadata;
+  groups: readonly GroupLifecycleUpdateWireGroup[];
+}
+
+export type GroupLifecycleUpdateWebhookValue = WhatsAppGroupLifecycleUpdateValue;
+
+export interface GroupFailedWireParticipant {
+  wa_id?: string;
+  input?: string;
+  errors?: readonly GroupWebhookWireError[];
+}
+
+export interface GroupParticipantsUpdateWireGroup {
+  timestamp: string;
+  group_id: string;
+  type: GroupParticipantsUpdateType;
+  request_id?: string;
+  reason?: string;
+  added_participants?: readonly GroupWireParticipant[];
+  removed_participants?: readonly GroupWireParticipantRef[];
+  failed_participants?: readonly GroupFailedWireParticipant[];
+  initiated_by?: string;
+  join_request_id?: string;
+  wa_id?: string;
+  errors?: readonly GroupWebhookWireError[];
+}
+
+export interface GroupParticipantsUpdateWireValue {
+  messaging_product: "whatsapp";
+  metadata: GroupWebhookWireMetadata;
+  groups: readonly GroupParticipantsUpdateWireGroup[];
+}
+
+export type GroupParticipantsUpdateWebhookValue = WhatsAppGroupParticipantsUpdateValue;
+
+export interface GroupSettingsUpdateWireResult {
+  update_successful: boolean;
+  text?: string;
+  mime_type?: string;
+  sha256?: string;
+  errors?: readonly GroupWebhookWireError[];
+}
+
+export interface GroupSettingsUpdateWireGroup {
+  timestamp: string;
+  group_id: string;
+  type: GroupSettingsUpdateType;
+  request_id?: string;
+  profile_picture?: GroupSettingsUpdateWireResult;
+  group_subject?: GroupSettingsUpdateWireResult;
+  group_description?: GroupSettingsUpdateWireResult;
+  errors?: readonly GroupWebhookWireError[];
+}
+
+export interface GroupSettingsUpdateWireValue {
+  messaging_product: "whatsapp";
+  metadata: GroupWebhookWireMetadata;
+  groups: readonly GroupSettingsUpdateWireGroup[];
+}
+
+export type GroupSettingsUpdateWebhookValue = WhatsAppGroupSettingsUpdateValue;
+
+export interface GroupStatusUpdateWireGroup {
+  timestamp: string;
+  group_id: string;
+  type: GroupStatusUpdateType;
+  request_id?: string;
+  errors?: readonly GroupWebhookWireError[];
+}
+
+export interface GroupStatusUpdateWireValue {
+  messaging_product: "whatsapp";
+  metadata: GroupWebhookWireMetadata;
+  groups: readonly GroupStatusUpdateWireGroup[];
+}
+
+export type GroupStatusUpdateWebhookValue = WhatsAppGroupStatusUpdateValue;
+
+
 /** A single group participant, identified by WhatsApp id (wa_id). */
 export interface GroupParticipant {
   /** WhatsApp id of the participant (wire: `wa_id`). */
@@ -78,11 +216,12 @@ export interface WhatsAppGroupLifecycleUpdateValue {
     phoneNumberId: string;
   };
   /** Lifecycle event type (wire: `type`), e.g. `group_create`, group delete. */
-  type: string;
+  type: GroupLifecycleUpdateType;
   /** Correlates an async outcome to the originating request (wire: `request_id`). */
   requestId?: string;
   groupId?: string;
   subject?: string;
+  description?: string;
   inviteLink?: string;
   joinApprovalMode?: GroupJoinApprovalMode;
   /** Present on a failed lifecycle operation. */
@@ -107,7 +246,7 @@ export interface WhatsAppGroupParticipantsUpdateValue {
    * `group_join_request_created`, `group_join_request_revoked`,
    * `group_participants_remove`.
    */
-  type: string;
+  type: GroupParticipantsUpdateType;
   /** e.g. `invite_link` for adds (wire: `reason`). */
   reason?: string;
   /** Who initiated a removal (wire: `initiated_by`), e.g. `business`. */
@@ -117,7 +256,7 @@ export interface WhatsAppGroupParticipantsUpdateValue {
   waId?: string;
   addedParticipants?: GroupParticipant[];
   removedParticipants?: { input?: string; waId?: string }[];
-  failedParticipants?: { input?: string; errors?: unknown[] }[];
+  failedParticipants?: { input?: string; waId?: string; errors?: unknown[] }[];
   errors?: unknown[];
   raw?: unknown;
 }
@@ -133,10 +272,10 @@ export interface WhatsAppGroupSettingsUpdateValue {
     phoneNumberId: string;
   };
   groupId: string;
-  type: string;
+  type: GroupSettingsUpdateType;
   groupSubject?: { text?: string; updateSuccessful: boolean; errors?: unknown[] };
   groupDescription?: { text?: string; updateSuccessful: boolean; errors?: unknown[] };
-  profilePicture?: { mimeType?: string; sha256?: string; updateSuccessful: boolean };
+  profilePicture?: { mimeType?: string; sha256?: string; updateSuccessful: boolean; errors?: unknown[] };
   errors?: unknown[];
   raw?: unknown;
 }
@@ -153,7 +292,7 @@ export interface WhatsAppGroupStatusUpdateValue {
   };
   groupId: string;
   /** Status event type (wire: `type`): `group_suspend`, `group_suspend_cleared`. */
-  type: string;
+  type: GroupStatusUpdateType;
   raw?: unknown;
 }
 
@@ -169,6 +308,20 @@ export const WATS_TYPES_GROUPS_EXPORTS = [
   "GroupInviteLink",
   "GroupJoinApprovalMode",
   "GroupRecipientType",
+  "WhatsAppMessageRecipient",
+  "GroupWebhookField",
+  "GroupLifecycleUpdateType",
+  "GroupParticipantsUpdateType",
+  "GroupSettingsUpdateType",
+  "GroupStatusUpdateType",
+  "GroupLifecycleUpdateWireValue",
+  "GroupLifecycleUpdateWebhookValue",
+  "GroupParticipantsUpdateWireValue",
+  "GroupParticipantsUpdateWebhookValue",
+  "GroupSettingsUpdateWireValue",
+  "GroupSettingsUpdateWebhookValue",
+  "GroupStatusUpdateWireValue",
+  "GroupStatusUpdateWebhookValue",
   "WhatsAppGroupLifecycleUpdateValue",
   "WhatsAppGroupParticipantsUpdateValue",
   "WhatsAppGroupSettingsUpdateValue",
