@@ -27,11 +27,12 @@ export async function runOutboxWorkerOnce(store: PersistenceStore, options: Outb
   for (const item of claimed) {
     try {
       await options.handler(item);
-      await store.markOutboxItemSucceeded({ id: item.id, updatedAt: options.now });
+      await store.markOutboxItemSucceeded({ id: item.id, leaseId: item.leaseId, updatedAt: options.now });
       succeeded += 1;
     } catch {
       await store.markOutboxItemFailed({
         id: item.id,
+        leaseId: item.leaseId,
         nextAttemptAt: nextAttemptIso(options.now, options.retryDelayMs),
         updatedAt: options.now
       });
