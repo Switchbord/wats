@@ -127,11 +127,11 @@ The document includes JSON schemas for:
 - `LocationMessageBody`: WATS location composer body for `POST {apiPrefix}/messages`
 - `ContactsMessageBody`: WATS contacts composer body for `POST {apiPrefix}/messages`
 - `ReactionMessageBody`: WATS reaction/remove-reaction composer bodies for `POST {apiPrefix}/messages`
-- `GroupPinMessageBody`: WATS Groups pin/unpin body for `POST {apiPrefix}/messages`
-- `CreateGroupBody`, `UpdateGroupBody`, `RemoveGroupParticipantsBody`, and `ManageGroupJoinRequestsBody`: opt-in WATS-137 Groups route bodies
+- `GroupPinMessageBody`: WATS Groups pin/unpin body for `POST {apiPrefix}/messages` when `enableGroupRoutes` is true
+- `CreateGroupBody`, `UpdateGroupBody`, `RemoveGroupParticipantsBody`, and `ManageGroupJoinRequestsBody`: opt-in WATS-137 Groups route bodies when `enableGroupRoutes` is true
 - `BasicInteractiveMessageBody`: WATS button, list, and CTA URL interactive composer bodies for `POST {apiPrefix}/messages`
 - `CommerceInteractiveMessageBody`: WATS product, product-list, catalog, and location-request interactive composer bodies for `POST {apiPrefix}/messages`
-- `SupportedMessageBody`: `oneOf` wrapper for text, media, location, contacts, reaction, group pin, or interactive bodies on `POST {apiPrefix}/messages`
+- `SupportedMessageBody`: `oneOf` wrapper for text, media, location, contacts, reaction, optional group pin, or interactive bodies on `POST {apiPrefix}/messages`
 - `GraphResponsePassthrough`: open object for unmodified Graph JSON responses
 - webhook response helpers for the verify challenge and accepted dispatch envelope
 
@@ -140,7 +140,7 @@ The document includes JSON schemas for:
 | Route | Accepted body | Rejected body classes | Size limit |
 | --- | --- | --- | --- |
 | `POST {apiPrefix}/messages/text` | JSON object with non-empty `to`, non-empty `text`, optional boolean `previewUrl` | malformed JSON, arrays, primitives, missing fields, blank/control-character `to` or `text`, non-boolean `previewUrl` | no service-layer byte cap yet |
-| `POST {apiPrefix}/messages` | Generic Graph-native text, media composer body, location composer body, contacts composer body, reaction/remove-reaction composer body, group pin/unpin body, or interactive body | malformed JSON, arrays, primitives, unsupported message types, missing fields, blank/control-character strings, both/missing media references, caption on audio/sticker, filename outside document, invalid links, out-of-range/non-finite coordinates, invalid reaction message ids or emoji, invalid pin range | no service-layer byte cap yet |
+| `POST {apiPrefix}/messages` | Generic Graph-native text, media composer body, location composer body, contacts composer body, reaction/remove-reaction composer body, optional group text/pin body when `enableGroupRoutes` is true, or interactive body | malformed JSON, arrays, primitives, unsupported message types, group bodies while disabled, missing fields, blank/control-character strings, both/missing media references, caption on audio/sticker, filename outside document, invalid links, out-of-range/non-finite coordinates, invalid reaction message ids or emoji, invalid pin range | no service-layer byte cap yet |
 | Opt-in `GET|POST|DELETE {apiPrefix}/groups...` | Groups management bodies: `subject`/`description`/`joinApprovalMode`, `waIds`, or `joinRequestIds` depending on route | malformed JSON, arrays, primitives, unsafe route params, missing fields, blank/control-character strings, >8 participants, empty join-request ids | no service-layer byte cap yet |
 | `POST profile.webhook.path` | Signed Meta webhook JSON delegated to `@wats/http` | malformed JSON/signature/envelope per WebhookAdapter taxonomy | `profile.webhook.maxBodyBytes`, default `1_048_576` |
 

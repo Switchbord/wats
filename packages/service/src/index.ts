@@ -495,7 +495,17 @@ function groupOperation(summary: string, schemaName?: string): Record<string, un
   };
 }
 
-function createOpenApiSchemas(): Record<string, Record<string, unknown>> {
+function createOpenApiSchemas(enableGroupRoutes = false): Record<string, Record<string, unknown>> {
+  const supportedMessageBodyOneOf = [
+    schemaRef("GenericTextMessageBody"),
+    schemaRef("MediaMessageBody"),
+    schemaRef("LocationMessageBody"),
+    schemaRef("ContactsMessageBody"),
+    schemaRef("ReactionMessageBody"),
+    ...(enableGroupRoutes ? [schemaRef("GroupPinMessageBody")] : []),
+    schemaRef("BasicInteractiveMessageBody"),
+    schemaRef("CommerceInteractiveMessageBody")
+  ];
   return {
     HealthResponse: {
       type: "object",
@@ -745,16 +755,7 @@ function createOpenApiSchemas(): Record<string, Record<string, unknown>> {
       properties: { joinRequestIds: { type: "array", minItems: 1, maxItems: 64, items: { type: "string", minLength: 1 } } }
     },
     SupportedMessageBody: {
-      oneOf: [
-        schemaRef("GenericTextMessageBody"),
-        schemaRef("MediaMessageBody"),
-        schemaRef("LocationMessageBody"),
-        schemaRef("ContactsMessageBody"),
-        schemaRef("ReactionMessageBody"),
-        schemaRef("GroupPinMessageBody"),
-        schemaRef("BasicInteractiveMessageBody"),
-        schemaRef("CommerceInteractiveMessageBody")
-      ],
+      oneOf: supportedMessageBodyOneOf,
       description: "Supported POST /messages bodies: generic Graph-native text, WATS media composer, location, reaction, remove-reaction, contacts, basic interactive, or commerce interactive bodies."
     },
     GraphResponsePassthrough: {
@@ -913,7 +914,7 @@ export function createWatsServiceOpenApiDocument(
           bearerFormat: "opaque"
         }
       },
-      schemas: createOpenApiSchemas()
+      schemas: createOpenApiSchemas(includeGroupRoutes)
     }
   };
 }
@@ -1294,7 +1295,10 @@ async function handleWebhook(ctx: RuntimeConfig, request: Request): Promise<Resp
   return jsonResponse(200, { status: "ok", received: dispatches.length, dispatched, skipped: 0 });
 }
 
-function buildSupportedMessageBody(body: unknown): GraphMessagesSendBody | null {
+function buildSupportedMessageBody(body: unknown, enableGroupRoutes = false): GraphMessagesSendBody | null {
+  if (isRecord(body) && !enableGroupRoutes && (body.recipient_type === "group" || body.recipientType === "group" || body.type === "pin")) {
+    return null;
+  }
   const text = validateGenericTextMessageBody(body);
   if (text !== null) return text;
   const media = validateServiceMediaMessageBody(body);
@@ -1365,7 +1369,7 @@ async function handleGenericMessage(ctx: RuntimeConfig, request: Request): Promi
   if (rawBody === "malformed") return errorResponse(400, "malformed_json", "Request body must be valid JSON.");
   const parsed = parseJsonText(rawBody);
   if (parsed === "malformed") return errorResponse(400, "malformed_json", "Request body must be valid JSON.");
-  const body = buildSupportedMessageBody(parsed);
+  const body = buildSupportedMessageBody(parsed, ctx.enableGroupRoutes);
   if (body === null) return errorResponse(400, "malformed_body", "Message body is invalid or unsupported.");
 
   const idempotencyKey = safeIdempotencyKey(request);
