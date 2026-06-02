@@ -1,6 +1,6 @@
 {
   "name": "@wats/internal-utils",
-  "version": "0.3.15",
+  "version": "0.3.16",
   "private": false,
   "license": "MIT",
   "type": "module",

@@ -84,7 +84,7 @@ describe("WATS-35 OpenAPI document generator", () => {
 
     expect(doc.openapi).toBe("3.1.0");
     expect(doc.info.title).toBe("WATS Service API");
-    expect(doc.info.version).toBe("0.3.15");
+    expect(doc.info.version).toBe("0.3.16");
     expect(doc.servers).toEqual([{ url: "https://service.test" }]);
 
     expect(Object.keys(doc.paths).sort()).toEqual([

@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.16] - 2026-06-02
+
+### Added
+
+- **Groups webhook normalization (WATS-135).** `@wats/core` `normalizeWebhookEnvelope` now emits typed group updates for `group_lifecycle_update`, `group_participants_update`, `group_settings_update`, and `group_status_update`, mapping Meta snake_case fields to camelCase public shapes and preserving `rawChange`. Inbound group `messages` surface `message.groupId`; group status webhooks preserve `recipientType: "group"` and `recipientParticipantId` (including group pricing categories such as `group_service`). Unknown future group fields still become `TypedUnknownUpdate`, and malformed group payloads with unsafe or missing `group_id` / `phone_number_id` are reported in `skipped[]` instead of throwing.
+
+### Release
+
+- Release metadata is aligned for 0.3.16: all publishable `@wats/*` packages, the service OpenAPI default version, README, and release-contract locks move together.
+
 ## [0.3.15] - 2026-06-02
 
 ### Added
