@@ -72,6 +72,34 @@ describe("WATS-87 SQLite outbox records", () => {
     }
   });
 
+  test("rejects malformed outbox ids, hashes, timestamps, and claim limits with typed errors", async () => {
+    const store = await createSqlitePersistence({ filename: tempDb() });
+    await store.migrate();
+    try {
+      await expect(store.enqueueOutboxItem({
+        id: "outbox\nmessage",
+        payloadHash: hash("c"),
+        createdAt: "2026-06-01T00:00:00.000Z"
+      })).rejects.toBeInstanceOf(PersistenceError);
+      await expect(store.enqueueOutboxItem({
+        id: "outbox-message-bad-hash",
+        payloadHash: "raw message text should not be stored",
+        createdAt: "2026-06-01T00:00:00.000Z"
+      })).rejects.toBeInstanceOf(PersistenceError);
+      await expect(store.enqueueOutboxItem({
+        id: "outbox-message-bad-time",
+        payloadHash: hash("d"),
+        createdAt: "2026-06-01"
+      })).rejects.toBeInstanceOf(PersistenceError);
+      await expect(store.claimOutboxItems({
+        now: "2026-06-01T00:00:00.000Z",
+        limit: 0
+      })).rejects.toBeInstanceOf(PersistenceError);
+    } finally {
+      await store.close();
+    }
+  });
+
   test("worker schedules retry without storing raw payloads or leaking handler errors", async () => {
     const store = await createSqlitePersistence({ filename: tempDb() });
     await store.migrate();

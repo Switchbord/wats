@@ -3,6 +3,12 @@ import {
   PersistenceError,
   REDACTED_SQLITE_LOCATION,
   type MigrationReport,
+  type OutboxClaimInput,
+  type OutboxEnqueueInput,
+  type OutboxEnqueueResult,
+  type OutboxFailedInput,
+  type OutboxItem,
+  type OutboxSucceededInput,
   type PersistenceHealth,
   type PersistenceStore,
   type ServiceRequestLookupInput,
@@ -208,6 +214,72 @@ function validateServiceRequestRecord(input: ServiceRequestRecordInput): Service
   });
 }
 
+function validatePayloadHash(value: unknown): string {
+  const raw = validateRecordString(value, "payloadHash");
+  if (!/^sha256:[a-f0-9]{64}$/u.test(raw)) {
+    throw new PersistenceError("invalid_record", "payloadHash must be a sha256 hex digest.");
+  }
+  return raw;
+}
+
+function validateOutboxEnqueue(input: OutboxEnqueueInput): Required<OutboxEnqueueInput> {
+  const record = validateRecordInput(input, "outbox item");
+  const createdAt = validateTimestamp(record.createdAt, "createdAt");
+  const nextAttemptAt = record.nextAttemptAt === undefined || record.nextAttemptAt === null
+    ? createdAt
+    : validateTimestamp(record.nextAttemptAt, "nextAttemptAt");
+  return Object.freeze({
+    id: validateRecordString(record.id, "id"),
+    payloadHash: validatePayloadHash(record.payloadHash),
+    createdAt,
+    nextAttemptAt
+  });
+}
+
+function validateOutboxClaim(input: OutboxClaimInput): OutboxClaimInput {
+  const record = validateRecordInput(input, "outbox claim");
+  if (typeof record.limit !== "number" || !Number.isInteger(record.limit) || record.limit < 1 || record.limit > 100) {
+    throw new PersistenceError("invalid_record", "limit must be an integer from 1 to 100.");
+  }
+  return Object.freeze({ now: validateTimestamp(record.now, "now"), limit: record.limit });
+}
+
+function validateOutboxFailed(input: OutboxFailedInput): OutboxFailedInput {
+  const record = validateRecordInput(input, "outbox failure");
+  return Object.freeze({
+    id: validateRecordString(record.id, "id"),
+    nextAttemptAt: validateTimestamp(record.nextAttemptAt, "nextAttemptAt"),
+    updatedAt: validateTimestamp(record.updatedAt, "updatedAt")
+  });
+}
+
+function validateOutboxSucceeded(input: OutboxSucceededInput): OutboxSucceededInput {
+  const record = validateRecordInput(input, "outbox success");
+  return Object.freeze({
+    id: validateRecordString(record.id, "id"),
+    updatedAt: validateTimestamp(record.updatedAt, "updatedAt")
+  });
+}
+
+function outboxRowToItem(row: {
+  id: string;
+  status: string;
+  attempts: number;
+  next_attempt_at: string | null;
+  payload_hash: string;
+  created_at: string;
+  updated_at: string;
+}): OutboxItem {
+  return Object.freeze({
+    id: row.id,
+    status: row.status as OutboxItem["status"],
+    attempts: row.attempts,
+    payloadHash: row.payload_hash,
+    nextAttemptAt: row.next_attempt_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  });
+}
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -342,6 +414,90 @@ class SqlitePersistenceStore implements PersistenceStore {
       record.requestHash,
       record.responseJson,
       record.createdAt
+    );
+  }
+
+  async enqueueOutboxItem(input: OutboxEnqueueInput): Promise<OutboxEnqueueResult> {
+    this.#assertOpen();
+    const item = validateOutboxEnqueue(input);
+    try {
+      this.#database.run(
+        "INSERT INTO wats_outbox (id, status, attempts, next_attempt_at, payload_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        item.id,
+        "pending",
+        0,
+        item.nextAttemptAt,
+        item.payloadHash,
+        item.createdAt,
+        item.createdAt
+      );
+      return "enqueued";
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      if (/UNIQUE|constraint/i.test(message)) return "duplicate";
+      throw new PersistenceError("outbox_failed", "SQLite outbox enqueue failed.", { cause });
+    }
+  }
+
+  async claimOutboxItems(input: OutboxClaimInput): Promise<readonly OutboxItem[]> {
+    this.#assertOpen();
+    const claim = validateOutboxClaim(input);
+    this.#database.exec("BEGIN IMMEDIATE");
+    try {
+      const rows = this.#database.query<{
+        id: string;
+        status: string;
+        attempts: number;
+        next_attempt_at: string | null;
+        payload_hash: string;
+        created_at: string;
+        updated_at: string;
+      }>(
+        `SELECT id, status, attempts, next_attempt_at, payload_hash, created_at, updated_at
+         FROM wats_outbox
+         WHERE status = 'pending' AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
+         ORDER BY created_at ASC, id ASC
+         LIMIT ?`
+      ).all(claim.now, claim.limit);
+      for (const row of rows) {
+        this.#database.run(
+          "UPDATE wats_outbox SET status = ?, attempts = attempts + 1, next_attempt_at = NULL, updated_at = ? WHERE id = ? AND status = ?",
+          "processing",
+          claim.now,
+          row.id,
+          "pending"
+        );
+      }
+      this.#database.exec("COMMIT");
+      return Object.freeze(rows.map((row) => outboxRowToItem({ ...row, status: "processing", attempts: row.attempts + 1, next_attempt_at: null, updated_at: claim.now })));
+    } catch (cause) {
+      this.#database.exec("ROLLBACK");
+      throw new PersistenceError("outbox_failed", "SQLite outbox claim failed.", { cause });
+    }
+  }
+
+  async markOutboxItemFailed(input: OutboxFailedInput): Promise<void> {
+    this.#assertOpen();
+    const failure = validateOutboxFailed(input);
+    this.#database.run(
+      "UPDATE wats_outbox SET status = ?, next_attempt_at = ?, updated_at = ? WHERE id = ? AND status = ?",
+      "pending",
+      failure.nextAttemptAt,
+      failure.updatedAt,
+      failure.id,
+      "processing"
+    );
+  }
+
+  async markOutboxItemSucceeded(input: OutboxSucceededInput): Promise<void> {
+    this.#assertOpen();
+    const success = validateOutboxSucceeded(input);
+    this.#database.run(
+      "UPDATE wats_outbox SET status = ?, next_attempt_at = NULL, updated_at = ? WHERE id = ? AND status = ?",
+      "succeeded",
+      success.updatedAt,
+      success.id,
+      "processing"
     );
   }
 
