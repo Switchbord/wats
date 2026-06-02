@@ -1,4 +1,4 @@
-export const CURRENT_SCHEMA_VERSION = 1 as const;
+export const CURRENT_SCHEMA_VERSION = 2 as const;
 export const REDACTED_SQLITE_LOCATION = "[REDACTED_SQLITE_DATABASE]" as const;
 
 export type PersistenceBackend = "sqlite" | "postgres";
