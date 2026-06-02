@@ -1,7 +1,7 @@
 # Webhook primitives reference
 
 - status: active
-- applies-to: `@wats/http`, `@wats/core` (`0.2.0-foundations-complete`), WATS-96
+- applies-to: `0.3.x-alpha-tooling` (`@wats/http`, `@wats/core`), WATS-96
 - lastReviewed: 2026-05-19
 
 ## Purpose

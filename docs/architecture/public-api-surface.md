@@ -1,7 +1,7 @@
 # WATS Public API Surface
 
 - status: active
-- applies-to: `0.2.0-foundations-complete` + WATS-31/32/33/34/35/WATS-37/38/39/40/41/42A/44/53/54/55 development line
+- applies-to: `0.3.x-alpha-tooling` + WATS-31/32/33/34/35/WATS-37/38/39/40/41/42A/44/53/54/55 development line
 - lastReviewed: 2026-05-02
 
 ## Purpose
