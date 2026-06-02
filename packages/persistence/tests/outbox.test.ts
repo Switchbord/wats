@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { Database } from "bun:sqlite";
 import {
   PersistenceError,
   createSqlitePersistence,
@@ -9,11 +10,66 @@ import {
 } from "../src/index";
 
 const tempDirs: string[] = [];
+const ORIGINAL_001_CHECKSUM = "sha256:wats-persistence-001-initial-v1";
+const ORIGINAL_001_STATEMENTS = Object.freeze([
+  `CREATE TABLE IF NOT EXISTS wats_schema_migrations (
+    id TEXT PRIMARY KEY,
+    version INTEGER NOT NULL,
+    checksum TEXT NOT NULL,
+    applied_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS wats_persistence_lock (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    holder TEXT NOT NULL,
+    acquired_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS wats_webhook_events (
+    event_key TEXT PRIMARY KEY,
+    event_hash TEXT NOT NULL,
+    received_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS wats_service_requests (
+    idempotency_key TEXT PRIMARY KEY,
+    request_hash TEXT NOT NULL,
+    response_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS wats_outbox (
+    id TEXT PRIMARY KEY,
+    status TEXT NOT NULL,
+    attempts INTEGER NOT NULL,
+    next_attempt_at TEXT,
+    payload_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )`
+]);
 
 function tempDb(): string {
   const dir = mkdtempSync(join(import.meta.dir, "tmp-wats87-outbox-"));
   tempDirs.push(dir);
   return join(dir, "wats.sqlite");
+}
+
+function applyOriginalV1Migration(filename: string): void {
+  const database = new Database(filename, { create: true });
+  try {
+    database.exec("BEGIN IMMEDIATE");
+    for (const statement of ORIGINAL_001_STATEMENTS) database.run(statement);
+    database.run(
+      "INSERT INTO wats_schema_migrations (id, version, checksum, applied_at) VALUES (?, ?, ?, ?)",
+      "001_initial",
+      1,
+      ORIGINAL_001_CHECKSUM,
+      "2026-05-24T00:00:00.000Z"
+    );
+    database.exec("COMMIT");
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
+  } finally {
+    database.close();
+  }
 }
 
 function hash(hex: string): string {
@@ -25,6 +81,33 @@ afterEach(() => {
 });
 
 describe("WATS-87 SQLite outbox records", () => {
+  test("claims and fences outbox rows after upgrading an originally shipped v1 database", async () => {
+    const filename = tempDb();
+    applyOriginalV1Migration(filename);
+    const store = await createSqlitePersistence({ filename });
+    await store.migrate();
+    try {
+      await store.enqueueOutboxItem({
+        id: "outbox-message-upgraded",
+        payloadHash: hash("1"),
+        createdAt: "2026-06-01T00:00:00.000Z"
+      });
+
+      const claimed = await store.claimOutboxItems({ now: "2026-06-01T00:00:00.000Z", limit: 10 });
+      expect(claimed).toHaveLength(1);
+      expect(claimed[0]?.leaseId).toBe(1);
+
+      await store.markOutboxItemSucceeded({
+        id: "outbox-message-upgraded",
+        leaseId: claimed[0]?.leaseId ?? 0,
+        updatedAt: "2026-06-01T00:00:01.000Z"
+      });
+      await expect(store.claimOutboxItems({ now: "2026-06-01T00:05:00.000Z", limit: 10 })).resolves.toEqual([]);
+    } finally {
+      await store.close();
+    }
+  });
+
   test("enqueues each outbox item once and claims only due retries", async () => {
     const store = await createSqlitePersistence({ filename: tempDb() });
     await store.migrate();
