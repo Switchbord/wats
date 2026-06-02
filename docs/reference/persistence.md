@@ -45,7 +45,7 @@ The migration runner creates:
 - `wats_service_requests`
 - `wats_outbox`
 
-Migrations are forward-only for alpha. Already-applied migration checksums must match the package migration definitions. Checksum drift fails closed with `PersistenceError`. A held migration lock fails closed with `PersistenceError` code `migration_lock_failed`.
+Migrations are forward-only for alpha. Already-applied migration checksums must match the package migration definitions. Checksum drift fails closed with `PersistenceError`. `001_initial` keeps its originally shipped checksum; `002_outbox_lease_id` upgrades existing v1 databases with the `leaseId` outbox column. A held migration lock fails closed with `PersistenceError` code `migration_lock_failed`.
 
 ## Runtime contract
 

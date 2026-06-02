@@ -8,7 +8,7 @@ import {
 import { createSqlitePersistence } from "@wats/persistence/sqlite";
 
 const checks = {
-  currentSchemaVersion: Number.isInteger(CURRENT_SCHEMA_VERSION) && CURRENT_SCHEMA_VERSION > 0,
+  currentSchemaVersion: CURRENT_SCHEMA_VERSION === 2,
   errorClass: new PersistenceError("invalid_options") instanceof Error,
   sqliteFactory: typeof createSqlitePersistence === "function",
   outboxWorker: typeof runOutboxWorkerOnce === "function"
