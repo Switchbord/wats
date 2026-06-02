@@ -52,6 +52,7 @@ export interface OutboxItem {
   readonly id: string;
   readonly status: OutboxStatus;
   readonly attempts: number;
+  readonly leaseId: number;
   readonly payloadHash: string;
   readonly nextAttemptAt: string | null;
   readonly createdAt: string;
@@ -74,12 +75,14 @@ export interface OutboxClaimInput {
 
 export interface OutboxFailedInput {
   readonly id: string;
+  readonly leaseId: number;
   readonly nextAttemptAt: string;
   readonly updatedAt: string;
 }
 
 export interface OutboxSucceededInput {
   readonly id: string;
+  readonly leaseId: number;
   readonly updatedAt: string;
 }
 

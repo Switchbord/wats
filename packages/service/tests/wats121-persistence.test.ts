@@ -13,8 +13,8 @@ type MemoryStore = {
   recordServiceRequest(input: { idempotencyKey: string; requestHash: string; responseJson: string; createdAt: string }): Promise<void>;
   enqueueOutboxItem(input: { id: string; payloadHash: string; createdAt: string; nextAttemptAt?: string | null }): Promise<"enqueued" | "duplicate">;
   claimOutboxItems(input: { now: string; limit: number }): Promise<readonly unknown[]>;
-  markOutboxItemFailed(input: { id: string; nextAttemptAt: string; updatedAt: string }): Promise<void>;
-  markOutboxItemSucceeded(input: { id: string; updatedAt: string }): Promise<void>;
+  markOutboxItemFailed(input: { id: string; leaseId: number; nextAttemptAt: string; updatedAt: string }): Promise<void>;
+  markOutboxItemSucceeded(input: { id: string; leaseId: number; updatedAt: string }): Promise<void>;
   close(): Promise<void>;
 };
 

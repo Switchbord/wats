@@ -18,8 +18,12 @@ import {
   type WebhookEventRecordResult
 } from "./index";
 
+interface BunSqliteRunResult {
+  readonly changes?: number;
+}
+
 interface BunSqliteDatabase {
-  run(sql: string, ...params: unknown[]): unknown;
+  run(sql: string, ...params: unknown[]): BunSqliteRunResult;
   exec(sql: string): unknown;
   close(): void;
   query<T = Record<string, unknown>>(sql: string): {
@@ -58,7 +62,7 @@ const MIGRATIONS: readonly MigrationDefinition[] = Object.freeze([
   {
     id: "001_initial",
     version: 1,
-    checksum: "sha256:wats-persistence-001-initial-v1",
+    checksum: "sha256:wats-persistence-001-initial-v2",
     statements: Object.freeze([
       `CREATE TABLE IF NOT EXISTS wats_schema_migrations (
         id TEXT PRIMARY KEY,
@@ -86,6 +90,7 @@ const MIGRATIONS: readonly MigrationDefinition[] = Object.freeze([
         id TEXT PRIMARY KEY,
         status TEXT NOT NULL,
         attempts INTEGER NOT NULL,
+        lease_id INTEGER NOT NULL DEFAULT 0,
         next_attempt_at TEXT,
         payload_hash TEXT NOT NULL,
         created_at TEXT NOT NULL,
@@ -245,10 +250,18 @@ function validateOutboxClaim(input: OutboxClaimInput): OutboxClaimInput {
   return Object.freeze({ now: validateTimestamp(record.now, "now"), limit: record.limit });
 }
 
+function validateLeaseId(value: unknown): number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > Number.MAX_SAFE_INTEGER) {
+    throw new PersistenceError("invalid_record", "leaseId must be a positive safe integer.");
+  }
+  return value;
+}
+
 function validateOutboxFailed(input: OutboxFailedInput): OutboxFailedInput {
   const record = validateRecordInput(input, "outbox failure");
   return Object.freeze({
     id: validateRecordString(record.id, "id"),
+    leaseId: validateLeaseId(record.leaseId),
     nextAttemptAt: validateTimestamp(record.nextAttemptAt, "nextAttemptAt"),
     updatedAt: validateTimestamp(record.updatedAt, "updatedAt")
   });
@@ -258,6 +271,7 @@ function validateOutboxSucceeded(input: OutboxSucceededInput): OutboxSucceededIn
   const record = validateRecordInput(input, "outbox success");
   return Object.freeze({
     id: validateRecordString(record.id, "id"),
+    leaseId: validateLeaseId(record.leaseId),
     updatedAt: validateTimestamp(record.updatedAt, "updatedAt")
   });
 }
@@ -266,6 +280,7 @@ function outboxRowToItem(row: {
   id: string;
   status: string;
   attempts: number;
+  lease_id: number;
   next_attempt_at: string | null;
   payload_hash: string;
   created_at: string;
@@ -275,6 +290,7 @@ function outboxRowToItem(row: {
     id: row.id,
     status: row.status as OutboxItem["status"],
     attempts: row.attempts,
+    leaseId: row.lease_id,
     payloadHash: row.payload_hash,
     nextAttemptAt: row.next_attempt_at,
     createdAt: row.created_at,
@@ -454,12 +470,13 @@ class SqlitePersistenceStore implements PersistenceStore {
         id: string;
         status: string;
         attempts: number;
+        lease_id: number;
         next_attempt_at: string | null;
         payload_hash: string;
         created_at: string;
         updated_at: string;
       }>(
-        `SELECT id, status, attempts, next_attempt_at, payload_hash, created_at, updated_at
+        `SELECT id, status, attempts, lease_id, next_attempt_at, payload_hash, created_at, updated_at
          FROM wats_outbox
          WHERE (status = 'pending' AND (next_attempt_at IS NULL OR next_attempt_at <= ?))
             OR (status = 'processing' AND updated_at <= ?)
@@ -467,17 +484,20 @@ class SqlitePersistenceStore implements PersistenceStore {
          LIMIT ?`
       ).all(claim.now, leaseExpiredAt, claim.limit);
       for (const row of rows) {
-        this.#database.run(
-          "UPDATE wats_outbox SET status = ?, attempts = attempts + 1, next_attempt_at = NULL, updated_at = ? WHERE id = ? AND (status = ? OR status = ?)",
+        const result = this.#database.run(
+          "UPDATE wats_outbox SET status = ?, attempts = attempts + 1, lease_id = lease_id + 1, next_attempt_at = NULL, updated_at = ? WHERE id = ? AND status = ? AND lease_id = ?",
           "processing",
           claim.now,
           row.id,
-          "pending",
-          "processing"
+          row.status,
+          row.lease_id
         );
+        if (result.changes !== 1) {
+          throw new PersistenceError("outbox_failed", "SQLite outbox claim lease changed during claim.");
+        }
       }
       this.#database.exec("COMMIT");
-      return Object.freeze(rows.map((row) => outboxRowToItem({ ...row, status: "processing", attempts: row.attempts + 1, next_attempt_at: null, updated_at: claim.now })));
+      return Object.freeze(rows.map((row) => outboxRowToItem({ ...row, status: "processing", attempts: row.attempts + 1, lease_id: row.lease_id + 1, next_attempt_at: null, updated_at: claim.now })));
     } catch (cause) {
       this.#database.exec("ROLLBACK");
       throw new PersistenceError("outbox_failed", "SQLite outbox claim failed.", { cause });
@@ -487,26 +507,34 @@ class SqlitePersistenceStore implements PersistenceStore {
   async markOutboxItemFailed(input: OutboxFailedInput): Promise<void> {
     this.#assertOpen();
     const failure = validateOutboxFailed(input);
-    this.#database.run(
-      "UPDATE wats_outbox SET status = ?, next_attempt_at = ?, updated_at = ? WHERE id = ? AND status = ?",
+    const result = this.#database.run(
+      "UPDATE wats_outbox SET status = ?, next_attempt_at = ?, updated_at = ? WHERE id = ? AND status = ? AND lease_id = ?",
       "pending",
       failure.nextAttemptAt,
       failure.updatedAt,
       failure.id,
-      "processing"
+      "processing",
+      failure.leaseId
     );
+    if (result.changes !== 1) {
+      throw new PersistenceError("outbox_failed", "SQLite outbox failure lease is stale.");
+    }
   }
 
   async markOutboxItemSucceeded(input: OutboxSucceededInput): Promise<void> {
     this.#assertOpen();
     const success = validateOutboxSucceeded(input);
-    this.#database.run(
-      "UPDATE wats_outbox SET status = ?, next_attempt_at = NULL, updated_at = ? WHERE id = ? AND status = ?",
+    const result = this.#database.run(
+      "UPDATE wats_outbox SET status = ?, next_attempt_at = NULL, updated_at = ? WHERE id = ? AND status = ? AND lease_id = ?",
       "succeeded",
       success.updatedAt,
       success.id,
-      "processing"
+      "processing",
+      success.leaseId
     );
+    if (result.changes !== 1) {
+      throw new PersistenceError("outbox_failed", "SQLite outbox success lease is stale.");
+    }
   }
 
   async close(): Promise<void> {

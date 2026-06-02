@@ -56,6 +56,7 @@ describe("WATS-87 SQLite outbox records", () => {
 
       await store.markOutboxItemFailed({
         id: "outbox-message-1",
+        leaseId: first[0]?.leaseId ?? 0,
         nextAttemptAt: "2026-06-01T00:05:00.000Z",
         updatedAt: "2026-06-01T00:00:02.000Z"
       });
@@ -65,7 +66,11 @@ describe("WATS-87 SQLite outbox records", () => {
       expect(retry).toHaveLength(1);
       expect(retry[0]?.attempts).toBe(2);
 
-      await store.markOutboxItemSucceeded({ id: "outbox-message-1", updatedAt: "2026-06-01T00:05:01.000Z" });
+      await store.markOutboxItemSucceeded({
+        id: "outbox-message-1",
+        leaseId: retry[0]?.leaseId ?? 0,
+        updatedAt: "2026-06-01T00:05:01.000Z"
+      });
       await expect(store.claimOutboxItems({ now: "2026-06-01T00:10:00.000Z", limit: 10 })).resolves.toEqual([]);
     } finally {
       await store.close();
