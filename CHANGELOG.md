@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.19] - 2026-06-02
+
+### Added
+
+- **Groups docs + runnable example (WATS-138).** Publishes `docs/reference/groups.md` and `docs/guides/groups-quickstart.md` covering endpoint contracts, exact method/path gotchas, business phone-number-id scoping, async `request_id`/webhook outcomes, invite-link-only joins, suspended-state semantics, and the `enableGroupRoutes` service opt-in. Adds `examples/groups` and `bun run examples:groups`: a credential-free MockTransport walkthrough that creates a group, consumes synthetic `value.groups[]` `group_lifecycle_update`/`group_participants_update` payloads, approves a join request, sends a group message, and builds a group pin payload. Updates the parity matrix and pywa migration guide to mark Groups as a beyond-pywa addition with credential-free implementation separated from WATS-139 live validation.
+
+### Fixed
+
+- Group webhook normalization reads Meta's `value.groups[]` array wire shape and preserves per-row change metadata, with `skipped[]` precedence locked for malformed entries.
+
+### Release
+
+- Release metadata is aligned for 0.3.19: all publishable `@wats/*` packages, the service OpenAPI default version, README, and release-contract locks move together.
+
 ## [0.3.18] - 2026-06-02
 
 ### Added

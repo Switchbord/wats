@@ -139,6 +139,19 @@ Migration notes:
 | register/deregister phone, callback overrides, public key, profile/settings/commerce updates | No first-class WATS helper yet | Deferred / credential-gated | Separate issue and explicit user authorization required. |
 | QR code CRUD, block/unblock users, token exchange | No first-class WATS helper yet | Deferred | Capture as Linear follow-ups if needed. |
 
+## Groups map
+
+Groups are a WATS addition, no pywa equivalent. Use them only when you intentionally target the official WhatsApp Business Platform Groups API.
+
+| Need | WATS usage | Status | Notes |
+| --- | --- | --- | --- |
+| Group entity/webhook types | `@wats/types/groups` | Implemented, credential-free | Types cover group entities and the four group webhook fields. |
+| Graph endpoint callables | `@wats/graph/endpoints/groups` (`createGroup`, `listGroups`, `resetGroupInviteLink`, `approveGroupJoinRequests`) | Implemented, credential-free | Groups hang off the business phone-number id, not WABA. |
+| Scoped clients | `PhoneNumberClient.createGroup`, `.listGroups`, `.group(groupId)`, `GroupClient` | Implemented, credential-free | Create returns `request_id`; group id and invite link arrive via `group_lifecycle_update`. |
+| Facade and filters | `WhatsApp.sendGroupMessage`, `WhatsApp.listen({ groupId })`, `filtersTyped.group` | Implemented, credential-free | Group messages carry `message.groupId`; group statuses carry `recipientType: "group"`. |
+| Service routes | `createWatsServiceApp({ enableGroupRoutes: true })` | Implemented, credential-free | Route opt-in; default service path is unchanged. |
+| Live validation | WATS-139 campaign | Live pending | Requires an OBA test asset, public HTTPS tunnel, and explicit authorization. |
+
 ## Webhook, handler, filter, and listener migration
 
 pywa decorators such as `@wa.on_message`, `@wa.on_callback_button`, `@wa.on_flow_completion`, and `@wa.on_call_status` map to WATS router/listener primitives:
@@ -204,7 +217,7 @@ Migration notes:
 | Service app / OpenAPI document | `@wats/service` |
 | CLI testable entry | `@wats/cli` |
 
-Use consumer fixtures as the source of truth for supported package-specifier imports. WATS-54 adds `bun run api:check` to keep package exports, target source files, graph-consumer package-specifier imports, docs/reference/index.md, public API surface docs, package map, this migration cheat sheet, and CHANGELOG mentions aligned for messages, media, message-template, Flow, calling, and business-management Graph endpoint subpaths.
+Use consumer fixtures as the source of truth for supported package-specifier imports. WATS-54 adds `bun run api:check` to keep package exports, target source files, graph-consumer package-specifier imports, docs/reference/index.md, public API surface docs, package map, this migration cheat sheet, and CHANGELOG mentions aligned for messages, media, message-template, Flow, calling, business-management, and Groups Graph endpoint subpaths.
 
 ## Known gaps to plan around
 

@@ -1,6 +1,6 @@
 {
   "name": "wats",
-  "version": "0.3.18",
+  "version": "0.3.19",
   "private": true,
   "license": "MIT",
   "scripts": {
@@ -17,7 +17,8 @@
     "docs:build": "bun run scripts/docs-build.ts",
     "docs:dev": "bun run docs:openapi && bun run docs:api && bunx vitepress dev docs",
     "publish:dry-run": "bun run scripts/npm-publish-dry-run.ts",
-    "examples:minimal-bot": "bun run --cwd examples/minimal-bot demo"
+    "examples:minimal-bot": "bun run --cwd examples/minimal-bot demo",
+    "examples:groups": "bun run --cwd examples/groups demo"
   },
   "devDependencies": {
     "@scalar/api-reference": "^1.55.1",
@@ -29,6 +30,7 @@
   "workspaces": [
     "packages/*",
     "packages/testing/fixtures/*",
-    "examples/minimal-bot"
+    "examples/minimal-bot",
+    "examples/groups"
   ]
 }
