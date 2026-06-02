@@ -53,6 +53,7 @@ interface MigrationRow {
 const SQLITE_MEMORY = ":memory:";
 const MAX_FILENAME_LENGTH = 4096;
 const MIGRATION_LOCK_ID = 1;
+const OUTBOX_PROCESSING_LEASE_MS = 5 * 60 * 1000;
 const MIGRATIONS: readonly MigrationDefinition[] = Object.freeze([
   {
     id: "001_initial",
@@ -281,6 +282,10 @@ function outboxRowToItem(row: {
   });
 }
 
+function subtractMillisecondsIso(timestamp: string, milliseconds: number): string {
+  return new Date(new Date(timestamp).getTime() - milliseconds).toISOString();
+}
+
 function nowIso(): string {
   return new Date().toISOString();
 }
@@ -444,6 +449,7 @@ class SqlitePersistenceStore implements PersistenceStore {
     const claim = validateOutboxClaim(input);
     this.#database.exec("BEGIN IMMEDIATE");
     try {
+      const leaseExpiredAt = subtractMillisecondsIso(claim.now, OUTBOX_PROCESSING_LEASE_MS);
       const rows = this.#database.query<{
         id: string;
         status: string;
@@ -455,17 +461,19 @@ class SqlitePersistenceStore implements PersistenceStore {
       }>(
         `SELECT id, status, attempts, next_attempt_at, payload_hash, created_at, updated_at
          FROM wats_outbox
-         WHERE status = 'pending' AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
+         WHERE (status = 'pending' AND (next_attempt_at IS NULL OR next_attempt_at <= ?))
+            OR (status = 'processing' AND updated_at <= ?)
          ORDER BY created_at ASC, id ASC
          LIMIT ?`
-      ).all(claim.now, claim.limit);
+      ).all(claim.now, leaseExpiredAt, claim.limit);
       for (const row of rows) {
         this.#database.run(
-          "UPDATE wats_outbox SET status = ?, attempts = attempts + 1, next_attempt_at = NULL, updated_at = ? WHERE id = ? AND status = ?",
+          "UPDATE wats_outbox SET status = ?, attempts = attempts + 1, next_attempt_at = NULL, updated_at = ? WHERE id = ? AND (status = ? OR status = ?)",
           "processing",
           claim.now,
           row.id,
-          "pending"
+          "pending",
+          "processing"
         );
       }
       this.#database.exec("COMMIT");

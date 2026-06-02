@@ -2,7 +2,13 @@
 
 ## [0.3.13] - 2026-06-01
 
-Patch alpha compatibility and local-operator release. Begins the WhatsApp Groups API — a WATS framework addition with no pywa equivalent — as composable, opt-in surfaces.
+Patch alpha compatibility and local-operator release. Begins the WhatsApp Groups API — a WATS framework addition with no pywa equivalent — and adds the WATS-87 persistence outbox first slice as composable, opt-in surfaces.
+
+### WATS-87 — persistence outbox first slice
+
+- Adds first-slice outbox record APIs to `@wats/persistence`: `enqueueOutboxItem`, `claimOutboxItems`, `markOutboxItemFailed`, and `markOutboxItemSucceeded`. SQLite stores only `payloadHash`, status, attempts, and retry timestamps; it does not persist raw webhook bodies, Graph request bodies, message text, or contact payloads by default.
+- Adds `runOutboxWorkerOnce(...)`, a one-tick at-least-once worker helper that claims due pending records, runs an application handler, marks successes, schedules failures by retry timestamp, and reclaims stale processing rows after a five-minute lease without leaking handler error text in its report.
+- Keeps this slice experimental and local/single-instance: no Postgres adapter, no automatic service send enqueueing, no production hosting claim, and no exactly-once delivery claim.
 
 ### WATS-131 — Groups type foundation
 
@@ -21,12 +27,6 @@ Patch alpha compatibility and local-operator release. Begins the WhatsApp Groups
 ## [0.3.12] - 2026-06-01
 
 Patch alpha compatibility and local-operator release. Adds an opt-in native PaaS serve mode so `wats serve` works on managed platforms without an external container entrypoint shim.
-
-### WATS-87 — persistence outbox first slice
-
-- Adds first-slice outbox record APIs to `@wats/persistence`: `enqueueOutboxItem`, `claimOutboxItems`, `markOutboxItemFailed`, and `markOutboxItemSucceeded`. SQLite stores only `payloadHash`, status, attempts, and retry timestamps; it does not persist raw webhook bodies, Graph request bodies, message text, or contact payloads by default.
-- Adds `runOutboxWorkerOnce(...)`, a one-tick at-least-once worker helper that claims due pending records, runs an application handler, marks successes, and schedules failures by retry timestamp without leaking handler error text in its report.
-- Keeps this slice experimental and local/single-instance: no Postgres adapter, no automatic service send enqueueing, no production hosting claim, and no exactly-once delivery claim.
 
 ### WATS-129 — native PaaS serve mode (`--paas`)
 

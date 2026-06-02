@@ -88,7 +88,7 @@ const report = await runOutboxWorkerOnce(store, {
 });
 ```
 
-The persistence table stores only payload hashes, status, attempt counts, and retry timestamps. It does not store raw webhook bodies, does not store message text, and does not store Graph request bodies, contacts, or other payload content. `runOutboxWorkerOnce(...)` claims due `pending` items, calls the handler, marks successes as `succeeded`, and reschedules failures with `nextAttemptAt = now + retryDelayMs`.
+The persistence table stores only payload hashes, status, attempt counts, and retry timestamps. It does not store raw webhook bodies, does not store message text, and does not store Graph request bodies, contacts, or other payload content. `runOutboxWorkerOnce(...)` claims due `pending` items, calls the handler, marks successes as `succeeded`, and reschedules failures with `nextAttemptAt = now + retryDelayMs`. Claimed items use a five-minute processing lease; stale `processing` rows become claimable again so a killed worker does not strand records forever.
 
 ## Redaction boundary
 
