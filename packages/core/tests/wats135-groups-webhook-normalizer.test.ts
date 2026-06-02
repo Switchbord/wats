@@ -35,30 +35,42 @@ function messagesChange(value: Record<string, unknown>): Record<string, unknown>
 }
 
 describe("WATS-135 group webhook normalization", () => {
-  test("normalizes lifecycle, participant, settings, and status group fields to camelCase typed updates", () => {
+  test("normalizes lifecycle, participant, settings, and status groups[] field entries to camelCase typed updates", () => {
     const result = normalizeWebhookEnvelope(makeEnvelope([
       groupChange("group_lifecycle_update", {
-        type: "group_create",
-        request_id: "req-create-1",
-        group_id: "group-1",
-        subject: "Launch group",
-        invite_link: "https://chat.whatsapp.com/invite-1",
-        join_approval_mode: "approval_required"
+        groups: [{
+          timestamp: "1780000001",
+          type: "group_create",
+          request_id: "req-create-1",
+          group_id: "group-1",
+          subject: "Launch group",
+          invite_link: "https://chat.whatsapp.com/invite-1",
+          join_approval_mode: "approval_required"
+        }]
       }),
       groupChange("group_participants_update", {
-        type: "group_participants_add",
-        group_id: "group-1",
-        reason: "invite_link",
-        added_participants: [{ wa_id: "15551230001" }, { wa_id: "15551230002" }]
+        groups: [{
+          timestamp: "1780000002",
+          type: "group_participants_add",
+          group_id: "group-1",
+          reason: "invite_link",
+          added_participants: [{ wa_id: "15551230001" }, { wa_id: "15551230002" }]
+        }]
       }),
       groupChange("group_settings_update", {
-        type: "group_subject",
-        group_id: "group-1",
-        group_subject: { text: "Launch group v2", update_successful: true }
+        groups: [{
+          timestamp: "1780000003",
+          type: "group_subject",
+          group_id: "group-1",
+          group_subject: { text: "Launch group v2", update_successful: true }
+        }]
       }),
       groupChange("group_status_update", {
-        type: "group_suspend",
-        group_id: "group-1"
+        groups: [{
+          timestamp: "1780000004",
+          type: "group_suspend",
+          group_id: "group-1"
+        }]
       })
     ]));
 

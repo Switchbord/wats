@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, extname, join, resolve } from "node:path";
+import { spawnSync } from "node:child_process";
 
 type PublicDocsManifest = { pages?: unknown; exclude?: unknown };
 
@@ -116,9 +117,6 @@ describe("WATS-138 public Groups documentation", () => {
       "max 8 participants",
       "subject <=128",
       "description <=2048",
-      "photo JPEG <=5MB",
-      "square",
-      ">=192px",
       "No direct participant add",
       "no admin promote/demote",
       "invite-link only",
@@ -137,8 +135,10 @@ describe("WATS-138 public Groups documentation", () => {
     expect(doc).toContain("create.request_id");
     expect(doc).toContain("approveJoinRequests({ joinRequestIds:");
     expect(doc).toContain("invite.invite_link");
+    expect(doc).toContain("groups[]");
     expect(doc).not.toContain("create.requestId");
     expect(doc).not.toContain("approveJoinRequests({ joinRequests:");
+    expect(doc).not.toMatch(/update[^\n|]*photo|photo JPEG|<=5MB|>=192px|square/iu);
   });
 
   test("groups quickstart documents the offline-to-live path without credential leakage", () => {
@@ -197,7 +197,7 @@ describe("WATS-138 Groups runnable example", () => {
     expect(examplesReadme).toContain("bun run examples:groups");
   });
 
-  test("groups example uses public package imports, MockTransport, and synthetic group webhook data", () => {
+  test("groups example uses public package imports, MockTransport, and synthetic groups[] webhook data", () => {
     const code = read("examples/groups/src/index.ts");
 
     expect(code).toContain("@wats/graph");
@@ -206,6 +206,7 @@ describe("WATS-138 Groups runnable example", () => {
     expect(code).toContain("createMockTransport");
     expect(code).toContain("group_lifecycle_update");
     expect(code).toContain("group_participants_update");
+    expect(code).toContain("groups: [");
     expect(code).toContain("recipient_type");
     expect(code).toContain("GROUP_ID_FROM_WEBHOOK");
     expect(code).not.toMatch(/from\s+["'][.]{1,2}\/.*packages\/[^"']*\/src[^"']*["']/u);
@@ -221,6 +222,22 @@ describe("WATS-138 Groups runnable example", () => {
         );
       }
     }
+  });
+
+  test("groups example smoke script executes offline and prints the expected route flow", () => {
+    const result = spawnSync("bun", ["run", "examples:groups"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      timeout: 30_000
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).not.toMatch(/error|failed|exception|traceback/iu);
+    expect(result.stdout).toContain("wats-groups-example:ready");
+    expect(result.stdout).toContain("syntheticGroupUpdates=2");
+    expect(result.stdout).toContain("graphRequests=5");
+    expect(result.stdout).toContain("POST /v25.0/15550000000/groups");
+    expect(result.stdout).toContain("POST /v25.0/15550000000/messages");
   });
 
   test("groups example docs and code avoid raw credentials and misleading localhost webhook curl", () => {

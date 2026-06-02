@@ -263,6 +263,27 @@ describe("WATS-132 Groups endpoint family", () => {
       ).rejects.toBeInstanceOf(GraphRequestValidationError);
     });
 
+    test("createGroup rejects description over the 2048-char limit", async () => {
+      const { client } = clientWith(ok());
+      await expect(
+        createGroup(client, { phoneNumberId: "555" }, { subject: "ok", description: "x".repeat(2049) })
+      ).rejects.toBeInstanceOf(GraphRequestValidationError);
+    });
+
+    test("updateGroup rejects description over the 2048-char limit", async () => {
+      const { client } = clientWith(ok());
+      await expect(
+        updateGroup(client, { groupId: "grp-1" }, { description: "x".repeat(2049) })
+      ).rejects.toBeInstanceOf(GraphRequestValidationError);
+    });
+
+    test("createGroup accepts description at the 2048-char limit", async () => {
+      const { client, handle } = clientWith(ok({ request_id: "req-max-desc" }));
+      const description = "x".repeat(2048);
+      await createGroup(client, { phoneNumberId: "555" }, { subject: "ok", description });
+      expect(parseBody(handle.requests[0]?.body).description).toBe(description);
+    });
+
     test("createGroup rejects an invalid joinApprovalMode", async () => {
       const { client } = clientWith(ok());
       await expect(
