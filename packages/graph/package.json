@@ -1,6 +1,6 @@
 {
   "name": "@wats/graph",
-  "version": "0.3.17",
+  "version": "0.3.18",
   "private": false,
   "license": "MIT",
   "type": "module",
