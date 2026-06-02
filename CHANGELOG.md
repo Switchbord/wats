@@ -42,6 +42,12 @@ Patch alpha compatibility and local-operator release. Begins the WhatsApp Groups
 - Extends `POST /messages` to accept Groups pin/unpin composer bodies through the service layer, while preserving the WATS-130 sanitized Graph error envelope and never forwarding the service bearer token to Graph.
 - Updates the generated OpenAPI document, service reference, and parity matrix for WATS-137. No live Meta calls are added to CI.
 
+### WATS-138 — Groups docs and runnable example
+
+- Publishes `docs/reference/groups.md` plus `docs/guides/groups-quickstart.md`, documenting endpoint contracts, exact method/path gotchas, business phone-number-id scoping, async `request_id`/webhook outcomes, invite-link-only joins, suspended-state semantics, service route opt-in, and placeholder-only credential/tunnel caveats.
+- Updates the parity matrix and pywa migration guide to mark Groups as a WATS beyond-pywa addition with credential-free implementation separated from WATS-139 live validation.
+- Adds `examples/groups` and `bun run examples:groups`, a credential-free MockTransport example that creates a group, consumes synthetic `group_lifecycle_update`/`group_participants_update` payloads, approves a join request, sends a group message, and builds a group pin payload.
+
 ### Release metadata
 
 - Release metadata is aligned for 0.3.13 across the root manifest and the publishable `@wats/*` packages, preserving the canonical `@wats/*` package scope and credential-gated live `wats serve` flow.

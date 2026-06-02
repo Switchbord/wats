@@ -1,0 +1,13 @@
+{
+  "name": "@wats/example-groups",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "demo": "bun run src/index.ts"
+  },
+  "dependencies": {
+    "@wats/graph": "workspace:*",
+    "@wats/core": "workspace:*"
+  },
+  "devDependencies": {}
+}
