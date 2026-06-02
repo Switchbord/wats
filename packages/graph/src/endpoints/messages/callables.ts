@@ -12,7 +12,11 @@ import type {
   GraphMessagesTextPayload
 } from "./types.js";
 import { buildSendMarketingTemplatePayload } from "./builders-template.js";
-import { rejectGroupRecipient } from "./validation.js";
+import {
+  assertNonEmptyControlFreeString,
+  assertValidGroupId,
+  rejectGroupRecipient
+} from "./validation.js";
 
 interface GraphRequestExecutor {
   request<TResponse>(options: GraphRequestOptions): Promise<TResponse>;
@@ -105,9 +109,21 @@ export const sendMessage = defineEndpoint<
       if (record.type === "interactive") {
         rejectGroupRecipient({ recipientType: "group" }, "sendMessage", "interactive messages");
       }
-      const to = record.to;
-      if (typeof to !== "string" || /^\+?\d{1,15}$/.test(to)) {
-        throw new GraphRequestValidationError("Invalid sendMessage input: recipient_type group requires a group-id-shaped to, not a phone number.");
+      assertValidGroupId(record.to, "sendMessage");
+      if (record.type === "pin") {
+        const pin = record.pin;
+        if (typeof pin !== "object" || pin === null || Array.isArray(pin)) {
+          throw new GraphRequestValidationError("Invalid sendMessage input: group pin body must be an object.");
+        }
+        const pinRecord = pin as Record<string, unknown>;
+        if (pinRecord.type !== "pin" && pinRecord.type !== "unpin") {
+          throw new GraphRequestValidationError("Invalid sendMessage input: group pin.type must be pin or unpin.");
+        }
+        assertNonEmptyControlFreeString(pinRecord.message_id, "pin.message_id", 256, "sendMessage");
+        const expirationDays = pinRecord.expiration_days;
+        if (typeof expirationDays !== "number" || !Number.isInteger(expirationDays) || expirationDays < 1 || expirationDays > 30) {
+          throw new GraphRequestValidationError("Invalid sendMessage input: group pin.expiration_days must be an integer between 1 and 30.");
+        }
       }
     }
     return body;

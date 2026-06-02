@@ -201,4 +201,32 @@ describe("WATS-134 group message sends", () => {
       })).toThrow(GraphRequestValidationError);
     }
   });
+
+  test("raw sendMessage validates group pin bodies before transport", async () => {
+    const { client, handle } = clientWithMock();
+    await sendMessage(client, { phoneNumberId: "555" }, {
+      messaging_product: "whatsapp",
+      recipient_type: "group",
+      to: "grp-release-1",
+      type: "pin",
+      pin: { type: "pin", message_id: "wamid.TARGET", expiration_days: 1 }
+    } as GraphMessagesSendBody);
+    expect(parsedBody(handle)).toEqual({
+      messaging_product: "whatsapp",
+      recipient_type: "group",
+      to: "grp-release-1",
+      type: "pin",
+      pin: { type: "pin", message_id: "wamid.TARGET", expiration_days: 1 }
+    });
+
+    const { client: badClient, handle: badHandle } = clientWithMock();
+    await expect(sendMessage(badClient, { phoneNumberId: "555" }, {
+      messaging_product: "whatsapp",
+      recipient_type: "group",
+      to: "grp-release-1",
+      type: "pin",
+      pin: { type: "pin", message_id: "wamid.TARGET", expiration_days: 31 }
+    } as GraphMessagesSendBody)).rejects.toThrow(GraphRequestValidationError);
+    expect(badHandle.requests.length).toBe(0);
+  });
 });
