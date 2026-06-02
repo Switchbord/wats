@@ -155,6 +155,14 @@ describe("WATS-134 group message sends", () => {
       languageCode: "en_US"
     } as never)).toThrow("Invalid sendTemplate input: auth templates are not supported for group recipients.");
 
+    expect(() => buildSendTemplatePayload({
+      to: "grp-release-1",
+      recipientType: "group",
+      templateCategory: "UNSPECIFIED",
+      name: "login_code",
+      languageCode: "en_US"
+    } as never)).toThrow("Invalid sendTemplate input: templateCategory must be UTILITY or MARKETING for group recipients.");
+
     expect(() => buildSendMarketingTemplatePayload({
       to: "grp-release-1",
       recipientType: "group",
