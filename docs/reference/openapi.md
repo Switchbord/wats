@@ -1,14 +1,14 @@
 # OpenAPI Reference (`@wats/service`)
 
 - status: experimental
-- applies-to: WATS-35/WATS-73/WATS-96
-- lastReviewed: 2026-05-19
+- applies-to: WATS-35/WATS-73/WATS-96/WATS-137
+- lastReviewed: 2026-06-02
 
 ## Purpose
 
 `@wats/service` can generate and serve an OpenAPI 3.1 document for the standalone WATS service API that exists today.
 
-This is not a Meta Graph API OpenAPI document. It describes only WATS service routes: status checks, configured webhook ingress, the current text, media, location, reaction, contacts, and interactive service APIs, and `/openapi.json`.
+This is not a Meta Graph API OpenAPI document. It describes only WATS service routes: status checks, configured webhook ingress, the current text, media, location, reaction, contacts, group pin, interactive service APIs, opt-in Groups routes, and `/openapi.json`.
 
 ## WATS-96 Graph v25 metadata compatibility
 
@@ -48,6 +48,7 @@ interface WatsServiceOpenApiOptions {
   serverUrl?: string;
   title?: string;
   version?: string;
+  enableGroupRoutes?: boolean;
 }
 ```
 
@@ -91,6 +92,11 @@ The generated document includes only current WATS service routes:
 | `profile.webhook.path` (for example `/webhooks/whatsapp` or `/webhook`) | GET, POST | none; Meta verify token/signature is documented as query/header inputs, not as service bearer auth |
 | `{profile.service.apiPrefix}/messages/text` | POST | `serviceBearerAuth` |
 | `{profile.service.apiPrefix}/messages` | POST | `serviceBearerAuth` |
+| `{profile.service.apiPrefix}/groups` | GET, POST when `enableGroupRoutes` is true | `serviceBearerAuth` |
+| `{profile.service.apiPrefix}/groups/{groupId}` | GET, POST, DELETE when `enableGroupRoutes` is true | `serviceBearerAuth` |
+| `{profile.service.apiPrefix}/groups/{groupId}/invite-link` | GET, POST when `enableGroupRoutes` is true | `serviceBearerAuth` |
+| `{profile.service.apiPrefix}/groups/{groupId}/participants` | DELETE when `enableGroupRoutes` is true | `serviceBearerAuth` |
+| `{profile.service.apiPrefix}/groups/{groupId}/join-requests` | GET, POST, DELETE when `enableGroupRoutes` is true | `serviceBearerAuth` |
 | `/openapi.json` | GET | none |
 
 ## Security scheme
@@ -121,9 +127,11 @@ The document includes JSON schemas for:
 - `LocationMessageBody`: WATS location composer body for `POST {apiPrefix}/messages`
 - `ContactsMessageBody`: WATS contacts composer body for `POST {apiPrefix}/messages`
 - `ReactionMessageBody`: WATS reaction/remove-reaction composer bodies for `POST {apiPrefix}/messages`
+- `GroupPinMessageBody`: WATS Groups pin/unpin body for `POST {apiPrefix}/messages` when `enableGroupRoutes` is true
+- `CreateGroupBody`, `UpdateGroupBody`, `RemoveGroupParticipantsBody`, and `ManageGroupJoinRequestsBody`: opt-in WATS-137 Groups route bodies when `enableGroupRoutes` is true
 - `BasicInteractiveMessageBody`: WATS button, list, and CTA URL interactive composer bodies for `POST {apiPrefix}/messages`
 - `CommerceInteractiveMessageBody`: WATS product, product-list, catalog, and location-request interactive composer bodies for `POST {apiPrefix}/messages`
-- `SupportedMessageBody`: `oneOf` wrapper for text, media, location, contacts, reaction, or interactive bodies on `POST {apiPrefix}/messages`
+- `SupportedMessageBody`: `oneOf` wrapper for text, media, location, contacts, reaction, optional group pin, or interactive bodies on `POST {apiPrefix}/messages`
 - `GraphResponsePassthrough`: open object for unmodified Graph JSON responses
 - webhook response helpers for the verify challenge and accepted dispatch envelope
 
@@ -132,7 +140,8 @@ The document includes JSON schemas for:
 | Route | Accepted body | Rejected body classes | Size limit |
 | --- | --- | --- | --- |
 | `POST {apiPrefix}/messages/text` | JSON object with non-empty `to`, non-empty `text`, optional boolean `previewUrl` | malformed JSON, arrays, primitives, missing fields, blank/control-character `to` or `text`, non-boolean `previewUrl` | no service-layer byte cap yet |
-| `POST {apiPrefix}/messages` | Generic Graph-native text, media composer body, location composer body, contacts composer body, reaction/remove-reaction composer body, or interactive body | malformed JSON, arrays, primitives, unsupported message types, missing fields, blank/control-character strings, both/missing media references, caption on audio/sticker, filename outside document, invalid links, out-of-range/non-finite coordinates, invalid reaction message ids or emoji | no service-layer byte cap yet |
+| `POST {apiPrefix}/messages` | Generic Graph-native text, media composer body, location composer body, contacts composer body, reaction/remove-reaction composer body, optional group text/pin body when `enableGroupRoutes` is true, or interactive body | malformed JSON, arrays, primitives, unsupported message types, group bodies while disabled, missing fields, blank/control-character strings, both/missing media references, caption on audio/sticker, filename outside document, invalid links, out-of-range/non-finite coordinates, invalid reaction message ids or emoji, invalid pin range | no service-layer byte cap yet |
+| Opt-in `GET|POST|DELETE {apiPrefix}/groups...` | Groups management bodies: `subject`/`description`/`joinApprovalMode`, `waIds`, or `joinRequestIds` depending on route | malformed JSON, arrays, primitives, unsafe route params, missing fields, blank/control-character strings, >8 participants, empty join-request ids | no service-layer byte cap yet |
 | `POST profile.webhook.path` | Signed Meta webhook JSON delegated to `@wats/http` | malformed JSON/signature/envelope per WebhookAdapter taxonomy | `profile.webhook.maxBodyBytes`, default `1_048_576` |
 
 This is still a WATS service OpenAPI document, not a full Meta Graph API OpenAPI document.
@@ -158,7 +167,7 @@ Common OpenAPI-related HTTP statuses:
 The WATS service OpenAPI surface still does not add:
 
 - a full Meta Graph API OpenAPI document
-- future service route families outside the current WATS-73 text/media/location/contacts/reaction/interactive message body set
+- future service route families outside the current WATS-73 text/media/location/contacts/reaction/interactive message body set plus WATS-137 opt-in Groups routes
 - live Meta credential checks or WABA mutations
 
 WATS-36A adds a separate static Scalar UI page at [`reference/openapi-ui.md`](./openapi-ui.md) that renders this local service OpenAPI document; it does not change the generated OpenAPI scope.

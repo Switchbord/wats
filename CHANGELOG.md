@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.18] - 2026-06-02
+
+### Added
+
+- **Groups service routes + OpenAPI (WATS-137).** `@wats/service` gains an explicit `enableGroupRoutes` opt-in (default `false`, so non-group deployments keep the pre-Groups route set). When enabled it exposes bearer-protected `GET|POST /groups`, `GET|POST|DELETE /groups/{groupId}`, invite-link, participants, and join-request routes under `profile.service.apiPrefix`, and accepts Groups text and pin/unpin composer bodies on `POST /messages`. The generated OpenAPI document only includes group paths/schemas when `enableGroupRoutes` is set; the default document is unchanged. The WATS-130 sanitized Graph error envelope is preserved and the service bearer token is never forwarded to Graph.
+
+### Release
+
+- Release metadata is aligned for 0.3.18: all publishable `@wats/*` packages, the service OpenAPI default version, README, and release-contract locks move together.
+
 ## [0.3.17] - 2026-06-02
 
 ### Added
