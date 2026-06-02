@@ -1410,20 +1410,54 @@ function normalizeGroupFieldChange(
   rawChange: WhatsAppWebhookChange,
   acc: NormalizerAccumulator
 ): void {
-  const payload = readOwnDataField(change, "value");
-  if (!isRecord(payload)) {
+  const value = readOwnDataField(change, "value");
+  if (!isRecord(value)) {
     pushSkip(acc, "malformed_change", `${path}.value`, "value-not-an-object");
     return;
   }
-  const phoneNumberId = readMetadataPhoneNumberId(payload);
+  const phoneNumberId = readMetadataPhoneNumberId(value);
   if (phoneNumberId === undefined) {
     pushSkip(acc, "malformed_field", `${path}.value.metadata.phone_number_id`, "missing-or-unsafe-phone-number-id");
     return;
   }
+
+  const groups = readOwnDataField(value, "groups");
+  if (Array.isArray(groups)) {
+    for (let i = 0; i < groups.length; i += 1) {
+      if (acc.limitHit) {
+        acc.overflow += 1;
+        continue;
+      }
+      const groupPath = `${path}.value.groups[${i}]`;
+      const item = readArrayDataItem(groups, i);
+      if (!item.ok || !isRecord(item.value)) {
+        pushSkip(acc, "malformed_field", groupPath, "group-not-an-object");
+        continue;
+      }
+      normalizeGroupPayload(kind, item.value, value, groupPath, wabaId, entryTimeMs, phoneNumberId, rawChange, acc);
+    }
+    return;
+  }
+
+  normalizeGroupPayload(kind, value, value, `${path}.value`, wabaId, entryTimeMs, phoneNumberId, rawChange, acc);
+}
+
+function normalizeGroupPayload(
+  kind: "groupLifecycle" | "groupParticipants" | "groupSettings" | "groupStatus",
+  group: Record<string, unknown>,
+  value: Record<string, unknown>,
+  path: string,
+  wabaId: string,
+  entryTimeMs: number,
+  phoneNumberId: string,
+  rawChange: WhatsAppWebhookChange,
+  acc: NormalizerAccumulator
+): void {
+  const payload = withGroupChangeMetadata(group, value);
   const type = readStringField(payload, "type") ?? "unknown";
   const groupId = readSafeIdField(payload, "group_id");
-  if (kind !== "groupLifecycle" && groupId === undefined) {
-    pushSkip(acc, "malformed_field", `${path}.value.group_id`, "missing-or-unsafe-group-id");
+  if (groupId === undefined && !allowsLifecycleWithoutGroupId(kind, payload, type)) {
+    pushSkip(acc, "malformed_field", `${path}.group_id`, "missing-or-unsafe-group-id");
     return;
   }
   const requestId = readSafeIdField(payload, "request_id");
@@ -1474,6 +1508,30 @@ function normalizeGroupFieldChange(
     group: normalizeGroupStatusPayload(payload, effectiveGroupId),
     rawChange
   }, path);
+}
+
+function withGroupChangeMetadata(group: Record<string, unknown>, value: Record<string, unknown>): Record<string, unknown> {
+  const payload: Record<string, unknown> = {};
+  const messagingProduct = readOwnDataField(value, "messaging_product");
+  const metadata = readOwnDataField(value, "metadata");
+  if (messagingProduct !== undefined) payload.messaging_product = messagingProduct;
+  if (metadata !== undefined) payload.metadata = metadata;
+  for (const key of Object.keys(group)) {
+    if (isUnsafePrototypeKey(key)) continue;
+    const field = readOwnDataField(group, key);
+    if (field !== undefined) payload[key] = field;
+  }
+  return payload;
+}
+
+function allowsLifecycleWithoutGroupId(
+  kind: "groupLifecycle" | "groupParticipants" | "groupSettings" | "groupStatus",
+  payload: Record<string, unknown>,
+  type: string
+): boolean {
+  if (kind !== "groupLifecycle") return false;
+  const errors = normalizeGroupErrors(readOwnDataField(payload, "errors"));
+  return type === "group_create" && errors !== undefined;
 }
 
 function normalizeMessagesChange(
