@@ -10,7 +10,7 @@ This document summarizes the roadmap shape. Linear is the source of truth for is
 
 ## Current state
 
-`0.2.0-foundations-complete` ships the substrate:
+The `0.3.x-alpha-tooling` line ships the substrate:
 
 - Graph client, transport seam, endpoint registry, pagination, scoped clients
 - pywa-seeded Graph error registry

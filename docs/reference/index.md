@@ -1,7 +1,7 @@
 # Reference Index
 
 - status: canonical
-- applies-to: `[0.2.0-foundations-complete]` + WATS-31/32/33/34/35/WATS-37/38/39/40/41/42A/44/48/49/WATS-53/WATS-54/WATS-56 consistency line
+- applies-to: `0.3.x-alpha-tooling` + WATS-31/32/33/34/35/WATS-37/38/39/40/41/42A/44/48/49/WATS-53/WATS-54/WATS-56 consistency line
 - lastReviewed: 2026-05-02
 
 Curated index of every WATS reference doc. Use the "When to use it" column to find the right entry point — the detailed surface lives in the linked doc.

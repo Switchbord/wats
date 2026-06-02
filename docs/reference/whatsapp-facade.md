@@ -1,7 +1,7 @@
 # WhatsApp facade reference (`WhatsApp`)
 
 - status: active
-- applies-to: `@wats/core` (`0.2.0-foundations-complete`)
+- applies-to: `0.3.x-alpha-tooling` (`@wats/core`)
 - lastReviewed: 2026-04-28
 
 ## WhatsApp
