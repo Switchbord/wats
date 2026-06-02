@@ -27,7 +27,7 @@ Patch alpha compatibility and local-operator release. Begins the WhatsApp Groups
 
 ### WATS-135 — Groups webhook normalization
 
-- `@wats/core` `normalizeWebhookEnvelope` now emits typed group updates for `group_lifecycle_update`, `group_participants_update`, `group_settings_update`, and `group_status_update`, mapping Meta snake_case fields to camelCase public shapes and preserving `rawChange`.
+- `@wats/core` `normalizeWebhookEnvelope` now emits typed group updates for `group_lifecycle_update`, `group_participants_update`, `group_settings_update`, and `group_status_update`, reading Meta's `value.groups[]` wire entries, mapping snake_case fields to camelCase public shapes, and preserving `rawChange`.
 - Inbound group `messages` now surface `message.groupId`; group status webhooks preserve `recipientType: "group"` and `recipientParticipantId`, including group pricing categories such as `group_service`.
 - Unknown future group fields still become `TypedUnknownUpdate`; malformed group payloads with unsafe or missing `group_id` / `phone_number_id` are reported in `skipped[]` instead of throwing.
 
@@ -46,7 +46,7 @@ Patch alpha compatibility and local-operator release. Begins the WhatsApp Groups
 
 - Publishes `docs/reference/groups.md` plus `docs/guides/groups-quickstart.md`, documenting endpoint contracts, exact method/path gotchas, business phone-number-id scoping, async `request_id`/webhook outcomes, invite-link-only joins, suspended-state semantics, service route opt-in, and placeholder-only credential/tunnel caveats.
 - Updates the parity matrix and pywa migration guide to mark Groups as a WATS beyond-pywa addition with credential-free implementation separated from WATS-139 live validation.
-- Adds `examples/groups` and `bun run examples:groups`, a credential-free MockTransport example that creates a group, consumes synthetic `group_lifecycle_update`/`group_participants_update` payloads, approves a join request, sends a group message, and builds a group pin payload.
+- Adds `examples/groups` and `bun run examples:groups`, a credential-free MockTransport example that creates a group, consumes synthetic `value.groups[]` `group_lifecycle_update`/`group_participants_update` payloads, approves a join request, sends a group message, and builds a group pin payload.
 
 ### Release metadata
 

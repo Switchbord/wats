@@ -53,12 +53,15 @@ const result = normalizeWebhookEnvelope({
           display_phone_number: "15550000000",
           phone_number_id: "15550000000"
         },
-        type: "group_create",
-        request_id: "req-example",
-        group_id: "GROUP_ID_FROM_WEBHOOK",
-        subject: "Launch operators",
-        invite_link: "https://chat.whatsapp.com/EXAMPLE_INVITE",
-        join_approval_mode: "approval_required"
+        groups: [{
+          timestamp: "1780000000",
+          type: "group_create",
+          request_id: "req-example",
+          group_id: "GROUP_ID_FROM_WEBHOOK",
+          subject: "Launch operators",
+          invite_link: "https://chat.whatsapp.com/EXAMPLE_INVITE",
+          join_approval_mode: "approval_required"
+        }]
       }
     }]
   }]
@@ -141,4 +144,4 @@ Run the credential-free example:
 bun run examples:groups
 ```
 
-It uses MockTransport plus a synthetic group webhook and prints the generated request paths. It does not call Meta Graph or require live credentials.
+It uses MockTransport plus a synthetic `value.groups[]` group webhook and prints the generated request paths. It does not call Meta Graph or require live credentials.

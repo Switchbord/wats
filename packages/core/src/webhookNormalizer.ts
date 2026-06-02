@@ -1110,6 +1110,24 @@ function normalizeGroupStatusPayload(payload: Record<string, unknown>, groupId: 
   } as unknown as WhatsAppGroupStatusUpdateValue;
 }
 
+function makeGroupItemPayload(
+  valuePayload: Record<string, unknown>,
+  groupPayload: Record<string, unknown>
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  const messagingProduct = readOwnDataField(valuePayload, "messaging_product");
+  const metadata = readOwnDataField(valuePayload, "metadata");
+  if (messagingProduct !== undefined) out.messaging_product = messagingProduct;
+  if (metadata !== undefined) out.metadata = metadata;
+
+  const descriptors = Object.getOwnPropertyDescriptors(groupPayload);
+  for (const [key, descriptor] of Object.entries(descriptors)) {
+    if (typeof descriptor.get === "function" || typeof descriptor.set === "function") continue;
+    out[key] = descriptor.value;
+  }
+  return out;
+}
+
 function normalizeTemplateAccountPayload(
   eventName: string,
   payload: Record<string, unknown>
@@ -1420,10 +1438,53 @@ function normalizeGroupFieldChange(
     pushSkip(acc, "malformed_field", `${path}.value.metadata.phone_number_id`, "missing-or-unsafe-phone-number-id");
     return;
   }
+  const groups = readOwnDataField(payload, "groups");
+  if (Array.isArray(groups)) {
+    for (let groupIndex = 0; groupIndex < groups.length; groupIndex += 1) {
+      if (acc.limitHit) {
+        acc.overflow += 1;
+        continue;
+      }
+      const groupPath = `${path}.value.groups[${groupIndex}]`;
+      const groupResult = readArrayDataItem(groups, groupIndex);
+      if (!groupResult.ok || !isRecord(groupResult.value)) {
+        pushSkip(acc, "malformed_field", groupPath, "not-an-object");
+        continue;
+      }
+      pushGroupFieldUpdate(
+        kind,
+        makeGroupItemPayload(payload, groupResult.value),
+        groupPath,
+        wabaId,
+        parseTimestampMs(readOwnDataField(groupResult.value, "timestamp"), () => entryTimeMs),
+        rawChange,
+        acc
+      );
+    }
+    return;
+  }
+
+  pushGroupFieldUpdate(kind, payload, `${path}.value`, wabaId, entryTimeMs, rawChange, acc);
+}
+
+function pushGroupFieldUpdate(
+  kind: "groupLifecycle" | "groupParticipants" | "groupSettings" | "groupStatus",
+  payload: Record<string, unknown>,
+  path: string,
+  wabaId: string,
+  receivedAt: number,
+  rawChange: WhatsAppWebhookChange,
+  acc: NormalizerAccumulator
+): void {
+  const phoneNumberId = readMetadataPhoneNumberId(payload);
+  if (phoneNumberId === undefined) {
+    pushSkip(acc, "malformed_field", `${path}.metadata.phone_number_id`, "missing-or-unsafe-phone-number-id");
+    return;
+  }
   const type = readStringField(payload, "type") ?? "unknown";
   const groupId = readSafeIdField(payload, "group_id");
   if (kind !== "groupLifecycle" && groupId === undefined) {
-    pushSkip(acc, "malformed_field", `${path}.value.group_id`, "missing-or-unsafe-group-id");
+    pushSkip(acc, "malformed_field", `${path}.group_id`, "missing-or-unsafe-group-id");
     return;
   }
   const requestId = readSafeIdField(payload, "request_id");
@@ -1435,7 +1496,7 @@ function normalizeGroupFieldChange(
       updateId,
       phoneNumberId,
       wabaId,
-      receivedAt: entryTimeMs,
+      receivedAt,
       group: normalizeGroupLifecyclePayload(payload),
       rawChange
     }, path);
@@ -1447,7 +1508,7 @@ function normalizeGroupFieldChange(
       updateId,
       phoneNumberId,
       wabaId,
-      receivedAt: entryTimeMs,
+      receivedAt,
       group: normalizeGroupParticipantsPayload(payload, effectiveGroupId),
       rawChange
     }, path);
@@ -1459,7 +1520,7 @@ function normalizeGroupFieldChange(
       updateId,
       phoneNumberId,
       wabaId,
-      receivedAt: entryTimeMs,
+      receivedAt,
       group: normalizeGroupSettingsPayload(payload, effectiveGroupId),
       rawChange
     }, path);
@@ -1470,7 +1531,7 @@ function normalizeGroupFieldChange(
     updateId,
     phoneNumberId,
     wabaId,
-    receivedAt: entryTimeMs,
+    receivedAt,
     group: normalizeGroupStatusPayload(payload, effectiveGroupId),
     rawChange
   }, path);

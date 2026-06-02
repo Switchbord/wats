@@ -52,12 +52,15 @@ const syntheticGroupWebhook = {
             display_phone_number: "15550000000",
             phone_number_id: "15550000000"
           },
-          type: "group_create",
-          request_id: createAck.request_id ?? "req-create-group",
-          group_id: GROUP_ID_FROM_WEBHOOK,
-          subject: "Launch operators",
-          invite_link: "https://chat.whatsapp.com/EXAMPLE_INVITE",
-          join_approval_mode: "approval_required"
+          groups: [{
+            timestamp: "1780000000",
+            type: "group_create",
+            request_id: createAck.request_id ?? "req-create-group",
+            group_id: GROUP_ID_FROM_WEBHOOK,
+            subject: "Launch operators",
+            invite_link: "https://chat.whatsapp.com/EXAMPLE_INVITE",
+            join_approval_mode: "approval_required"
+          }]
         }
       },
       {
@@ -68,11 +71,14 @@ const syntheticGroupWebhook = {
             display_phone_number: "15550000000",
             phone_number_id: "15550000000"
           },
-          type: "group_join_request_created",
-          group_id: GROUP_ID_FROM_WEBHOOK,
-          join_request_id: JOIN_REQUEST_ID_FROM_WEBHOOK,
-          wa_id: "15551234567",
-          reason: "invite_link"
+          groups: [{
+            timestamp: "1780000001",
+            type: "group_join_request_created",
+            group_id: GROUP_ID_FROM_WEBHOOK,
+            join_request_id: JOIN_REQUEST_ID_FROM_WEBHOOK,
+            wa_id: "15551234567",
+            reason: "invite_link"
+          }]
         }
       }
     ]

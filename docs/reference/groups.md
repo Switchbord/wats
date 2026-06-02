@@ -15,7 +15,7 @@ Groups hang off the business phone-number id, not the WABA id. Public WATS names
 | Create group | `createGroup`, `PhoneNumberClient.createGroup`, `WhatsApp.createGroup` | `POST /{phoneNumberId}/groups` | Async mutation; response is a `request_id`, not the new group id. |
 | List groups | `listGroups`, `PhoneNumberClient.listGroups` | `GET /{phoneNumberId}/groups` | Supports `limit`, `after`, and `before`. |
 | Get group | `getGroup`, `GroupClient.getInfo` | `GET /{groupId}` | Optional `fields` query. |
-| Update group | `updateGroup`, `GroupClient.update` | `POST /{groupId}` | Subject, description, photo, or join-approval settings. |
+| Update group | `updateGroup`, `GroupClient.update` | `POST /{groupId}` | Subject, description, or join-approval settings. |
 | Delete group | `deleteGroup`, `GroupClient.delete` | `DELETE /{groupId}` | Async mutation. |
 | Get invite link | `getGroupInviteLink`, `GroupClient.getInviteLink` | `GET /{groupId}/invite_link` | Returns current invite URL. |
 | Reset invite link | `resetGroupInviteLink`, `GroupClient.resetInviteLink` | `POST /{groupId}/invite_link` | reset invalidates the previous invite link. It is not a DELETE. |
@@ -32,7 +32,6 @@ Groups hang off the business phone-number id, not the WABA id. Public WATS names
 - Joining is invite-link only. With approval required, approve or reject join requests from the join-request queue.
 - max 8 participants, excluding the business. Max 10,000 groups per business phone number.
 - `subject <=128`; `description <=2048`.
-- Group photo updates require a photo JPEG <=5MB, square, and >=192px.
 - Create/update/delete/remove/approve/reject are asynchronous. The HTTP response carries `request_id`; terminal success or failure arrives later via a group webhook.
 - The group id and first invite link for a newly created group arrive in `group_lifecycle_update`, not in the create HTTP response.
 - A suspended group is reported through `group_status_update` (`group_suspend` / `group_suspend_cleared`). Treat suspended groups as not usable until Meta clears the suspension.
@@ -73,7 +72,9 @@ Direct callables remain available from `@wats/graph/endpoints/groups` when you d
 
 ## Webhooks
 
-WATS normalizes the four group webhook fields through `normalizeWebhookEnvelope`:
+WATS normalizes the four group webhook fields through `normalizeWebhookEnvelope`.
+Meta sends each lifecycle/settings/status/participant entry under `value.groups[]`;
+WATS emits one typed update per group item:
 
 - `group_lifecycle_update` -> `kind: "groupLifecycle"`
 - `group_participants_update` -> `kind: "groupParticipants"`
