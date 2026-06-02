@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.14] - 2026-06-02
+
+### Added
+
+- **Groups scoped clients (WATS-133).** `@wats/graph` now ships a scoped `GroupClient` exposing `getInfo`, `update`, `delete`, `getInviteLink`, `resetInviteLink`, `removeParticipants`, `getJoinRequests`, `approveJoinRequests`, and `rejectJoinRequests`, plus `PhoneNumberClient.createGroup`, `PhoneNumberClient.listGroups`, and a `PhoneNumberClient.group(groupId)` factory. These delegate to the WATS-132 `@wats/graph/endpoints/groups` endpoint family with no new wire surface.
+
+### Release
+
+- Release metadata is aligned for 0.3.14: all publishable `@wats/*` packages, the service OpenAPI default version, README, and release-contract locks move together.
+
 ## [0.3.13] - 2026-06-01
 
 Patch alpha compatibility and local-operator release. Begins the WhatsApp Groups API — a WATS framework addition with no pywa equivalent — as composable, opt-in surfaces.
