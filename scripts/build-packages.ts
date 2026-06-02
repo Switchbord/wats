@@ -47,6 +47,7 @@ const packageEntrypoints: Record<PackageName, readonly string[]> = {
     "endpoints/flows",
     "endpoints/calling",
     "endpoints/businessManagement",
+    "endpoints/groups",
     "transport",
     "createMockTransport"
   ],

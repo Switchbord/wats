@@ -196,6 +196,7 @@ Migration notes:
 | Flow management helpers | `@wats/graph/endpoints/flows` |
 | Calling endpoint helpers | `@wats/graph/endpoints/calling` |
 | Business-management read/admin helpers (`getPhoneNumberInfo`, `blockUsers`, `submitDisplayNameForReview`) | `@wats/graph/endpoints/business-management` |
+| Groups API helpers (`createGroup`, `listGroups`, `resetGroupInviteLink`, `approveGroupJoinRequests`) — WATS addition, no pywa equivalent | `@wats/graph/endpoints/groups` |
 | Facade/router/filters/listeners | `@wats/core` |
 | Typed filter subpath | `@wats/core/filtersTyped` |
 | Webhook adapters | `@wats/http` or `@wats/http/adapters/fetch` / `bun` / `node` |

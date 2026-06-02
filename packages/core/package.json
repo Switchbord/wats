@@ -1,6 +1,6 @@
 {
   "name": "@wats/core",
-  "version": "0.3.12",
+  "version": "0.3.13",
   "private": false,
   "license": "MIT",
   "type": "module",
@@ -69,6 +69,6 @@
     "wats"
   ],
   "dependencies": {
-    "@wats/graph": "^0.3.12"
+    "@wats/graph": "^0.3.13"
   }
 }

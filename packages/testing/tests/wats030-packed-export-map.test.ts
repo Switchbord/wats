@@ -41,7 +41,8 @@ describe("WATS 0.3.0 packed export-map smoke contract", () => {
       const exportsMap = manifest.exports as JsonRecord;
       return count + Object.keys(exportsMap).length;
     }, 0);
-    // 46 + 1 for the WATS-131 @wats/types/groups subpath.
-    expect(specifierCount).toBe(47);
+    // 46 + 1 for the WATS-131 @wats/types/groups subpath
+    // + 1 for the WATS-132 @wats/graph/endpoints/groups subpath.
+    expect(specifierCount).toBe(48);
   });
 });

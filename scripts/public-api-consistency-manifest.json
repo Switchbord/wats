@@ -123,6 +123,26 @@
         "CHANGELOG.md"
       ],
       "dist": "./dist/endpoints/businessManagement.js"
+    },
+    {
+      "packageName": "@wats/graph",
+      "specifier": "@wats/graph/endpoints/groups",
+      "exportKey": "./endpoints/groups",
+      "source": "./src/endpoints/groups.ts",
+      "fixture": "packages/testing/fixtures/graph-consumer/verify-imports.ts",
+      "fixtureChecks": [
+        "from \"@wats/graph/endpoints/groups\"",
+        "WATS-132 groups subpath exports runtime surface",
+        "\"@wats/graph/endpoints/groups\""
+      ],
+      "docs": [
+        "docs/reference/index.md",
+        "docs/architecture/public-api-surface.md",
+        "docs/architecture/package-map.md",
+        "docs/migration/pywa-to-wats.md",
+        "CHANGELOG.md"
+      ],
+      "dist": "./dist/endpoints/groups.js"
     }
   ]
 }

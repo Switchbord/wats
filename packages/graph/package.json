@@ -1,6 +1,6 @@
 {
   "name": "@wats/graph",
-  "version": "0.3.12",
+  "version": "0.3.13",
   "private": false,
   "license": "MIT",
   "type": "module",
@@ -42,6 +42,10 @@
     "./endpoints/business-management": {
       "types": "./dist/endpoints/businessManagement.d.ts",
       "import": "./dist/endpoints/businessManagement.js"
+    },
+    "./endpoints/groups": {
+      "types": "./dist/endpoints/groups.d.ts",
+      "import": "./dist/endpoints/groups.js"
     },
     "./transport": {
       "types": "./dist/transport.d.ts",
