@@ -12,6 +12,13 @@
         "vitepress": "^1.6.4",
       },
     },
+    "examples/groups": {
+      "name": "@wats/example-groups",
+      "dependencies": {
+        "@wats/core": "workspace:*",
+        "@wats/graph": "workspace:*",
+      },
+    },
     "examples/minimal-bot": {
       "name": "@wats/example-minimal-bot",
       "dependencies": {
@@ -22,7 +29,7 @@
     },
     "packages/cli": {
       "name": "@wats/cli",
-      "version": "0.3.6",
+      "version": "0.3.13",
       "bin": {
         "wats": "./src/bin.ts",
       },
@@ -33,29 +40,29 @@
     },
     "packages/config": {
       "name": "@wats/config",
-      "version": "0.3.6",
+      "version": "0.3.13",
       "dependencies": {
         "@wats/internal-utils": "^0.3.6",
       },
     },
     "packages/core": {
       "name": "@wats/core",
-      "version": "0.3.6",
+      "version": "0.3.13",
       "dependencies": {
-        "@wats/graph": "^0.3.6",
+        "@wats/graph": "^0.3.13",
       },
     },
     "packages/crypto": {
       "name": "@wats/crypto",
-      "version": "0.3.6",
+      "version": "0.3.13",
     },
     "packages/graph": {
       "name": "@wats/graph",
-      "version": "0.3.6",
+      "version": "0.3.13",
     },
     "packages/http": {
       "name": "@wats/http",
-      "version": "0.3.6",
+      "version": "0.3.13",
       "dependencies": {
         "@wats/core": "^0.3.6",
         "@wats/crypto": "^0.3.6",
@@ -64,15 +71,15 @@
     },
     "packages/internal-utils": {
       "name": "@wats/internal-utils",
-      "version": "0.3.6",
+      "version": "0.3.13",
     },
     "packages/persistence": {
       "name": "@wats/persistence",
-      "version": "0.3.6",
+      "version": "0.3.13",
     },
     "packages/service": {
       "name": "@wats/service",
-      "version": "0.3.6",
+      "version": "0.3.13",
       "dependencies": {
         "@wats/config": "^0.3.6",
         "@wats/core": "^0.3.6",
@@ -160,7 +167,7 @@
     },
     "packages/types": {
       "name": "@wats/types",
-      "version": "0.3.6",
+      "version": "0.3.13",
     },
   },
   "packages": {
@@ -545,6 +552,8 @@
     "@wats/core": ["@wats/core@workspace:packages/core"],
 
     "@wats/crypto": ["@wats/crypto@workspace:packages/crypto"],
+
+    "@wats/example-groups": ["@wats/example-groups@workspace:examples/groups"],
 
     "@wats/example-minimal-bot": ["@wats/example-minimal-bot@workspace:examples/minimal-bot"],
 

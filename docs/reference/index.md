@@ -13,6 +13,7 @@ Curated index of every WATS reference doc. Use the "When to use it" column to fi
 | [`reference/client.md`](./client.md) | Constructing a `GraphClient`; construction-time validation taxonomy; request lifecycle. |
 | [`reference/endpoints.md`](./endpoints.md) | Defining a new endpoint with `defineEndpoint`; path templates, param kinds, body passthrough. |
 | [`reference/scoped-clients.md`](./scoped-clients.md) | Binding a `phoneNumberId` or `wabaId` into a `PhoneNumberClient` / `WABAClient`. |
+| [`reference/groups.md`](./groups.md) | WhatsApp Groups endpoint contracts, limits, webhook outcomes, service opt-in routes, and beyond-pywa status. |
 | [`reference/errors.md`](./errors.md) | The F-5 error registry; every pywa error code → WATS subclass; classification axis. |
 | [`reference/pagination.md`](./pagination.md) | `paginate` / `paginateAll`; cursor extraction; `AbortSignal`; `PaginationError` taxonomy. |
 | [`reference/media.md`](./media.md) | Media runtime: upload, metadata, binary download, delete, encrypted decrypt, upload sessions, validation, and integrity checks. Public Graph endpoint subpaths cover messages at `@wats/graph/endpoints/messages`, media at `@wats/graph/endpoints/media`, templates at `@wats/graph/endpoints/templates`, Flows at `@wats/graph/endpoints/flows`, calling at `@wats/graph/endpoints/calling`, and business management at `@wats/graph/endpoints/business-management`, plus the WATS-132 Groups API at `@wats/graph/endpoints/groups`; WATS-54 keeps these aligned with `bun run api:check`. |
@@ -62,6 +63,7 @@ Curated index of every WATS reference doc. Use the "When to use it" column to fi
 | --- | --- |
 | [`../getting-started.md`](../getting-started.md) | Start here for the foundations walkthrough. |
 | [`../guides/transport-and-testing.md`](../guides/transport-and-testing.md) | Injecting `MockTransport`; consumer-fixture pattern; adversarial test hooks. |
+| [`../guides/groups-quickstart.md`](../guides/groups-quickstart.md) | Credential-free Groups flow from create through invite, approval, and group messaging. |
 | [`../guides/deploy-docker.md`](../guides/deploy-docker.md) | WATS-49 Docker/container deployment design scaffold, not a supported runnable image yet. |
 | [`../guides/deploy-bun.md`](../guides/deploy-bun.md) | Deploying a webhook on Bun. |
 | [`../guides/deploy-node.md`](../guides/deploy-node.md) | Deploying a webhook on Node `http.createServer`. |

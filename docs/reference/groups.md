@@ -1,0 +1,100 @@
+# Groups API
+
+- status: implemented credential-free; live validation pending WATS-139
+- applies-to: WATS-131/WATS-132/WATS-133/WATS-134/WATS-135/WATS-136/WATS-137/WATS-138
+- packages: `@wats/types/groups`, `@wats/graph/endpoints/groups`, `@wats/graph`, `@wats/core`, `@wats/service`
+
+WATS Groups is an official WhatsApp Cloud API v25 surface and a WATS beyond-pywa addition. pywa has no Groups API equivalent. WATS exposes it as an opt-in, composable family: import the Groups subpath, construct a scoped client, or pass `enableGroupRoutes: true` to the service. Non-group users do not get new default service routes.
+
+Groups hang off the business phone-number id, not the WABA id. Public WATS names stay camelCase; Meta snake_case is emitted only at the Graph wire boundary.
+
+## Endpoint contracts
+
+| Operation | WATS helper | Wire method/path | Notes |
+| --- | --- | --- | --- |
+| Create group | `createGroup`, `PhoneNumberClient.createGroup`, `WhatsApp.createGroup` | `POST /{phoneNumberId}/groups` | Async mutation; response is a `request_id`, not the new group id. |
+| List groups | `listGroups`, `PhoneNumberClient.listGroups` | `GET /{phoneNumberId}/groups` | Supports `limit`, `after`, and `before`. |
+| Get group | `getGroup`, `GroupClient.getInfo` | `GET /{groupId}` | Optional `fields` query. |
+| Update group | `updateGroup`, `GroupClient.update` | `POST /{groupId}` | Subject, description, photo, or join-approval settings. |
+| Delete group | `deleteGroup`, `GroupClient.delete` | `DELETE /{groupId}` | Async mutation. |
+| Get invite link | `getGroupInviteLink`, `GroupClient.getInviteLink` | `GET /{groupId}/invite_link` | Returns current invite URL. |
+| Reset invite link | `resetGroupInviteLink`, `GroupClient.resetInviteLink` | `POST /{groupId}/invite_link` | reset invalidates the previous invite link. It is not a DELETE. |
+| Remove participants | `removeGroupParticipants`, `GroupClient.removeParticipants` | `DELETE /{groupId}/participants` | Body carries up to 8 participants. It is not a POST. |
+| List join requests | `listGroupJoinRequests`, `GroupClient.getJoinRequests` | `GET /{groupId}/join_requests` | Pending invite-link join requests. |
+| Approve join requests | `approveGroupJoinRequests`, `GroupClient.approveJoinRequests` | `POST /{groupId}/join_requests` | Bulk approve. |
+| Reject join requests | `rejectGroupJoinRequests`, `GroupClient.rejectJoinRequests` | `DELETE /{groupId}/join_requests` | Reject is DELETE, not POST. |
+| Send to group | `PhoneNumberClient.sendText`, `WhatsApp.sendGroupMessage`, message builders | `POST /{phoneNumberId}/messages` | Emits `recipient_type: "group"` and `to: groupId`. |
+| Pin/unpin | `buildSendPinPayload` | `POST /{phoneNumberId}/messages` | Groups pin/unpin body; Meta allows up to 3 pinned messages. |
+
+## Limits and gotchas
+
+- The business is the sole admin. No direct participant add endpoint exists and there is no admin promote/demote endpoint.
+- Joining is invite-link only. With approval required, approve or reject join requests from the join-request queue.
+- max 8 participants, excluding the business. Max 10,000 groups per business phone number.
+- `subject <=128`; `description <=2048`.
+- Group photo updates require a photo JPEG <=5MB, square, and >=192px.
+- Create/update/delete/remove/approve/reject are asynchronous. The HTTP response carries `request_id`; terminal success or failure arrives later via a group webhook.
+- The group id and first invite link for a newly created group arrive in `group_lifecycle_update`, not in the create HTTP response.
+- A suspended group is reported through `group_status_update` (`group_suspend` / `group_suspend_cleared`). Treat suspended groups as not usable until Meta clears the suspension.
+
+## SDK usage
+
+```ts
+import { GraphClient, PhoneNumberClient } from "@wats/graph";
+import { createFetchTransport } from "@wats/graph";
+
+const graphClient = new GraphClient({
+  accessToken: process.env.WATS_ACCESS_TOKEN!,
+  apiVersion: "v25.0",
+  transport: createFetchTransport()
+});
+
+const phone = new PhoneNumberClient({
+  graphClient,
+  phoneNumberId: process.env.WATS_PHONE_NUMBER_ID!
+});
+
+const create = await phone.createGroup({
+  subject: "Operators",
+  description: "Launch coordination",
+  joinApprovalMode: "approval_required"
+});
+console.log(create.requestId);
+
+// Wait for group_lifecycle_update to learn the group id.
+const group = phone.group("GROUP_ID_FROM_WEBHOOK");
+const invite = await group.getInviteLink();
+await group.approveJoinRequests({ joinRequests: ["JOIN_REQUEST_ID"] });
+await phone.sendText({ to: "GROUP_ID_FROM_WEBHOOK", recipientType: "group", text: "Welcome" });
+```
+
+Direct callables remain available from `@wats/graph/endpoints/groups` when you do not want a scoped client.
+
+## Webhooks
+
+WATS normalizes the four group webhook fields through `normalizeWebhookEnvelope`:
+
+- `group_lifecycle_update` -> `kind: "groupLifecycle"`
+- `group_participants_update` -> `kind: "groupParticipants"`
+- `group_settings_update` -> `kind: "groupSettings"`
+- `group_status_update` -> `kind: "groupStatus"`
+
+Inbound group messages carry `message.groupId`. Group message statuses keep `recipientType: "group"` and `recipientParticipantId` when Meta sends participant aggregation details. `filtersTyped.group` matches group messages, group status aggregation, and the four group update kinds. `WhatsApp.listen({ groupId })` narrows message/status listeners to one group.
+
+## Service routes
+
+`@wats/service` exposes Groups routes only when `enableGroupRoutes: true` is passed to `createWatsServiceApp` / OpenAPI generation:
+
+- `GET|POST /groups`
+- `GET|POST|DELETE /groups/{groupId}`
+- `GET|POST /groups/{groupId}/invite-link`
+- `DELETE /groups/{groupId}/participants`
+- `GET|POST|DELETE /groups/{groupId}/join-requests`
+
+These routes use the configured business phone-number id. They require service bearer auth, forward only the Graph access token to Graph, and use the same sanitized `graph_request_failed` envelope as message routes for Meta errors.
+
+## Error semantics
+
+WATS validation failures reject before transport with `GraphRequestValidationError`; examples include empty ids, unsafe path segments, over-limit subjects/descriptions, too many participants, bad join-request arrays, unsupported group message types, and attempts to use phone-number-shaped ids as group recipients. Meta errors remain `GraphApiError` subclasses in SDK code and `graph_request_failed` service envelopes at the service boundary.
+
+The public API is camelCase: `phoneNumberId`, `groupId`, `joinApprovalMode`, `inviteLink`, `requestId`, `addedParticipants`, `recipientType`. Wire snapshots and raw webhook fields preserve Meta snake_case only inside `raw`/`rawChange` evidence.
