@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { Database } from "bun:sqlite";
 import {
   CURRENT_SCHEMA_VERSION,
   PersistenceError,
@@ -94,6 +95,48 @@ describe("WATS-120 SQLite persistence", () => {
       }
     } finally {
       await store.close();
+    }
+  });
+
+  test("held migration locks fail closed with a typed migration_lock_failed error", async () => {
+    const filename = tempDb();
+    const database = new Database(filename, { create: true });
+    const heldLock = "held_lock";
+    database.run(`CREATE TABLE IF NOT EXISTS wats_persistence_lock (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      holder TEXT NOT NULL,
+      acquired_at TEXT NOT NULL
+    )`);
+    database.run(
+      "INSERT INTO wats_persistence_lock (id, holder, acquired_at) VALUES (?, ?, ?)",
+      1,
+      heldLock,
+      "2026-06-01T00:00:00.000Z"
+    );
+    database.close();
+
+    const store = await createSqlitePersistence({ filename });
+    try {
+      try {
+        await store.migrate();
+        throw new Error("expected held migration lock to fail");
+      } catch (error) {
+        expect(error).toBeInstanceOf(PersistenceError);
+        expect((error as PersistenceError).code).toBe("migration_lock_failed");
+        expect(error instanceof Error ? error.message : String(error)).toContain("SQLite migration lock is already held.");
+      }
+    } finally {
+      await store.close();
+    }
+
+    const afterFailure = await createSqlitePersistence({ filename });
+    try {
+      const lockRow = new Database(filename, { readonly: true })
+        .query<{ holder: string }>("SELECT holder FROM wats_persistence_lock WHERE id = 1")
+        .get();
+      expect(lockRow?.holder).toBe(heldLock);
+    } finally {
+      await afterFailure.close();
     }
   });
 
