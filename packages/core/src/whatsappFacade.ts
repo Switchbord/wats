@@ -81,6 +81,10 @@ import {
   type TypedAccountUpdate,
   type TypedCallStatusUpdate,
   type TypedCallUpdate,
+  type TypedGroupLifecycleUpdate,
+  type TypedGroupParticipantsUpdate,
+  type TypedGroupSettingsUpdate,
+  type TypedGroupStatusUpdate,
   type TypedMessageUpdate,
   type TypedStatusUpdate,
   type TypedUnknownUpdate,
@@ -199,6 +203,23 @@ function hasRequestMethod(
 
 // ---- kind → base filter dispatch ----------------------------------
 
+const groupLifecycleFilter = createTypedFilter<TypedGroupLifecycleUpdate>(
+  (u): u is TypedGroupLifecycleUpdate => u.kind === "groupLifecycle",
+  () => "groupLifecycle"
+);
+const groupParticipantsFilter = createTypedFilter<TypedGroupParticipantsUpdate>(
+  (u): u is TypedGroupParticipantsUpdate => u.kind === "groupParticipants",
+  () => "groupParticipants"
+);
+const groupSettingsFilter = createTypedFilter<TypedGroupSettingsUpdate>(
+  (u): u is TypedGroupSettingsUpdate => u.kind === "groupSettings",
+  () => "groupSettings"
+);
+const groupStatusFilter = createTypedFilter<TypedGroupStatusUpdate>(
+  (u): u is TypedGroupStatusUpdate => u.kind === "groupStatus",
+  () => "groupStatus"
+);
+
 const KIND_FILTERS: {
   readonly message: TypedFilter<TypedMessageUpdate>;
   readonly status: TypedFilter<TypedStatusUpdate>;
@@ -207,6 +228,10 @@ const KIND_FILTERS: {
   readonly callConnect: TypedFilter<TypedCallUpdate>;
   readonly callTerminate: TypedFilter<TypedCallUpdate>;
   readonly callStatus: TypedFilter<TypedCallStatusUpdate>;
+  readonly groupLifecycle: TypedFilter<TypedGroupLifecycleUpdate>;
+  readonly groupParticipants: TypedFilter<TypedGroupParticipantsUpdate>;
+  readonly groupSettings: TypedFilter<TypedGroupSettingsUpdate>;
+  readonly groupStatus: TypedFilter<TypedGroupStatusUpdate>;
 } = {
   message: messageFilter,
   status: statusFilter,
@@ -214,7 +239,11 @@ const KIND_FILTERS: {
   unknown: unknownFilter,
   callConnect: callFilter.connect(),
   callTerminate: callFilter.terminate(),
-  callStatus: callFilter.status()
+  callStatus: callFilter.status(),
+  groupLifecycle: groupLifecycleFilter,
+  groupParticipants: groupParticipantsFilter,
+  groupSettings: groupSettingsFilter,
+  groupStatus: groupStatusFilter
 };
 
 const VALID_KINDS: readonly TypedUpdate["kind"][] = [
@@ -224,7 +253,11 @@ const VALID_KINDS: readonly TypedUpdate["kind"][] = [
   "unknown",
   "callConnect",
   "callTerminate",
-  "callStatus"
+  "callStatus",
+  "groupLifecycle",
+  "groupParticipants",
+  "groupSettings",
+  "groupStatus"
 ];
 
 function buildListenFilter<TKind extends TypedUpdate["kind"]>(
