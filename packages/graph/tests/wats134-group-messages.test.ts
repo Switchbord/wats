@@ -67,6 +67,7 @@ describe("WATS-134 group message sends", () => {
     expect(buildSendTemplatePayload({
       to: "grp-release-1",
       recipientType: "group",
+      templateCategory: "UTILITY",
       name: "weekly_update",
       languageCode: "en_US"
     })).toEqual({
