@@ -2,6 +2,7 @@ import * as rootEntrypoint from "@wats/types";
 import * as configEntrypoint from "@wats/types/config";
 import * as webhookEntrypoint from "@wats/types/webhook";
 import * as entitiesEntrypoint from "@wats/types/entities";
+import * as groupsEntrypoint from "@wats/types/groups";
 import * as messagesEntrypoint from "@wats/types/messages";
 import * as statusesEntrypoint from "@wats/types/statuses";
 import * as contactsEntrypoint from "@wats/types/contacts";
@@ -9,6 +10,11 @@ import * as errorsEntrypoint from "@wats/types/errors";
 
 import type {
   WhatsAppMessage,
+  GroupLifecycleUpdateType,
+  GroupLifecycleUpdateWireValue,
+  GroupSettingsUpdateWireValue,
+  GroupWebhookField,
+  WhatsAppMessageRecipient,
   WhatsAppMessageStatus,
   WhatsAppMessageStatusKind,
   TextMessage,
@@ -37,6 +43,7 @@ const REQUIRED_EXPORT_SYMBOLS = {
     "WATS_TYPES_CONFIG_EXPORTS",
     "WATS_TYPES_WEBHOOK_EXPORTS",
     "WATS_TYPES_ENTITIES_EXPORTS",
+    "WATS_TYPES_GROUPS_EXPORTS",
     "WATS_TYPES_MESSAGES_EXPORTS",
     "WATS_TYPES_STATUSES_EXPORTS",
     "WATS_TYPES_CONTACTS_EXPORTS",
@@ -45,6 +52,7 @@ const REQUIRED_EXPORT_SYMBOLS = {
   "@wats/types/config": ["WATS_TYPES_CONFIG_EXPORTS"],
   "@wats/types/webhook": ["WATS_TYPES_WEBHOOK_EXPORTS"],
   "@wats/types/entities": ["WATS_TYPES_ENTITIES_EXPORTS"],
+  "@wats/types/groups": ["WATS_TYPES_GROUPS_EXPORTS"],
   "@wats/types/messages": ["WATS_TYPES_MESSAGES_EXPORTS"],
   "@wats/types/statuses": ["WATS_TYPES_STATUSES_EXPORTS"],
   "@wats/types/contacts": ["WATS_TYPES_CONTACTS_EXPORTS"],
@@ -56,6 +64,7 @@ const ENTRYPOINT_MODULES = {
   "@wats/types/config": configEntrypoint,
   "@wats/types/webhook": webhookEntrypoint,
   "@wats/types/entities": entitiesEntrypoint,
+  "@wats/types/groups": groupsEntrypoint,
   "@wats/types/messages": messagesEntrypoint,
   "@wats/types/statuses": statusesEntrypoint,
   "@wats/types/contacts": contactsEntrypoint,
@@ -170,6 +179,41 @@ const sampleDoc: DocumentReference = {
 };
 const sampleContext: MessageContext = { messageId: "ctx-1" };
 void sampleContext;
+
+const groupWebhookField: GroupWebhookField = "group_lifecycle_update";
+const groupLifecycleType: GroupLifecycleUpdateType = "group_create";
+const groupRecipient: WhatsAppMessageRecipient = { recipientType: "group", to: "GROUP_ID" };
+const groupLifecycleWire: GroupLifecycleUpdateWireValue = {
+  messaging_product: "whatsapp",
+  metadata: { display_phone_number: "15551234567", phone_number_id: "PNID" },
+  groups: [
+    {
+      timestamp: "1780357732",
+      group_id: "GROUP_ID",
+      type: groupLifecycleType,
+      description: "Small invite-only test group",
+      invite_link: "https://chat.whatsapp.com/example"
+    }
+  ]
+};
+const groupSettingsWire: GroupSettingsUpdateWireValue = {
+  messaging_product: "whatsapp",
+  metadata: { display_phone_number: "15551234567", phone_number_id: "PNID" },
+  groups: [
+    {
+      timestamp: "1780357732",
+      group_id: "GROUP_ID",
+      type: "group_settings_update",
+      profile_picture: { update_successful: true, mime_type: "image/jpeg", sha256: "abc123" },
+      group_subject: { update_successful: true, text: "Release testers" }
+    }
+  ]
+};
+void groupWebhookField;
+void groupRecipient;
+void groupLifecycleWire;
+void groupSettingsWire;
+
 
 const messages: WhatsAppMessage[] = [
   { type: "text", id: "1", from: "1", timestamp: "1", text: { body: "hi" } } satisfies TextMessage,

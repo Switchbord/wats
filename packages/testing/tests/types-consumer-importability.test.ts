@@ -151,6 +151,7 @@ describe("B1 external consumer importability", () => {
         "@wats/types/contacts",
         "@wats/types/entities",
         "@wats/types/errors",
+        "@wats/types/groups",
         "@wats/types/messages",
         "@wats/types/statuses",
         "@wats/types/webhook"

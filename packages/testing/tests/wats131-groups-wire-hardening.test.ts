@@ -128,9 +128,15 @@ void statusType;
 // @ts-expect-error lifecycle type does not accept participant events.
 const invalidLifecycleType: GroupLifecycleUpdateType = "group_participants_add";
 void invalidLifecycleType;
+// @ts-expect-error participant update type does not accept status events.
+const invalidParticipantsType: GroupParticipantsUpdateType = "group_suspend";
+void invalidParticipantsType;
 // @ts-expect-error settings update is a single literal.
 const invalidSettingsType: GroupSettingsUpdateType = "group_subject";
 void invalidSettingsType;
+// @ts-expect-error status update type does not accept lifecycle events.
+const invalidStatusType: GroupStatusUpdateType = "group_create";
+void invalidStatusType;
 
 const lifecycleRaw: GroupLifecycleUpdateWireValue = {
   messaging_product: "whatsapp",
