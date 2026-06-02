@@ -201,9 +201,12 @@ export interface GraphMessagesTemplateComponentInput {
   readonly index?: string;
 }
 
+export type GraphMessagesTemplateCategory = "MARKETING" | "UTILITY" | "AUTHENTICATION";
+
 export interface GraphMessagesSendTemplateInput extends GraphMessagesRecipientInput {
   readonly name: string;
   readonly languageCode: string;
+  readonly templateCategory?: GraphMessagesTemplateCategory;
   readonly components?: readonly GraphMessagesTemplateComponentInput[];
   readonly replyToMessageId?: string;
 }
