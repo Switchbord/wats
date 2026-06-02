@@ -146,14 +146,14 @@ The facade binds a `GraphClient`, optional `PhoneNumberClient` / `WABAClient`, a
 
 ### `@wats/persistence`
 
-- Purpose: experimental persistence contracts plus the WATS-120 SQLite local adapter and migration runner.
-- Runtime targets: Bun for `@wats/persistence/sqlite`; root contracts are TypeScript-only.
+- Purpose: experimental persistence contracts plus the WATS-120 SQLite local adapter, migration runner, webhook/service idempotency records, and WATS-87 outbox record APIs.
+- Runtime targets: Bun for `@wats/persistence/sqlite`; root contracts and `runOutboxWorkerOnce` are TypeScript-only.
 - Public: yes, experimental.
 - Published subpaths: `@wats/persistence`, `@wats/persistence/sqlite`.
 - Future subpaths: `@wats/persistence/postgres`, `@wats/persistence/testing`.
 - Dependencies out: none.
-- Dependency direction: `@wats/service` may later consume `@wats/persistence` through injected stores, not direct env reads; `@wats/cli` may later compose config/service/persistence for doctor and serve lifecycle checks.
-- Stability: experimental until WATS-121 service integration and WATS-125 Postgres semantics settle.
+- Dependency direction: `@wats/service` consumes `@wats/persistence` through injected stores, not direct env reads; `@wats/cli` may later compose config/service/persistence for doctor and serve lifecycle checks.
+- Stability: experimental until outbox/service enqueueing and WATS-125 Postgres semantics settle.
 
 ### `@wats/internal-utils`
 

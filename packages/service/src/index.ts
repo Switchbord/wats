@@ -146,7 +146,7 @@ const JSON_CONTENT_TYPE = "application/json; charset=utf-8";
 const SERVICE_NAME = "wats";
 const OPENAPI_PATH = "/openapi.json";
 const DEFAULT_OPENAPI_TITLE = "WATS Service API";
-const DEFAULT_OPENAPI_VERSION = "0.3.19";
+const DEFAULT_OPENAPI_VERSION = "0.3.20";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -244,6 +244,10 @@ function validatePersistence(value: unknown): PersistenceStore | undefined {
     typeof value.recordWebhookEvent !== "function" ||
     typeof value.getServiceRequest !== "function" ||
     typeof value.recordServiceRequest !== "function" ||
+    typeof value.enqueueOutboxItem !== "function" ||
+    typeof value.claimOutboxItems !== "function" ||
+    typeof value.markOutboxItemFailed !== "function" ||
+    typeof value.markOutboxItemSucceeded !== "function" ||
     typeof value.close !== "function"
   ) {
     throw new WatsServiceError("invalid_persistence", "persistence must be a PersistenceStore.");

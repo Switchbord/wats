@@ -3,6 +3,12 @@ import {
   PersistenceError,
   REDACTED_SQLITE_LOCATION,
   type MigrationReport,
+  type OutboxClaimInput,
+  type OutboxEnqueueInput,
+  type OutboxEnqueueResult,
+  type OutboxFailedInput,
+  type OutboxItem,
+  type OutboxSucceededInput,
   type PersistenceHealth,
   type PersistenceStore,
   type ServiceRequestLookupInput,
@@ -12,8 +18,12 @@ import {
   type WebhookEventRecordResult
 } from "./index";
 
+interface BunSqliteRunResult {
+  readonly changes?: number;
+}
+
 interface BunSqliteDatabase {
-  run(sql: string, ...params: unknown[]): unknown;
+  run(sql: string, ...params: unknown[]): BunSqliteRunResult;
   exec(sql: string): unknown;
   close(): void;
   query<T = Record<string, unknown>>(sql: string): {
@@ -47,6 +57,7 @@ interface MigrationRow {
 const SQLITE_MEMORY = ":memory:";
 const MAX_FILENAME_LENGTH = 4096;
 const MIGRATION_LOCK_ID = 1;
+const OUTBOX_PROCESSING_LEASE_MS = 5 * 60 * 1000;
 const MIGRATIONS: readonly MigrationDefinition[] = Object.freeze([
   {
     id: "001_initial",
@@ -84,6 +95,14 @@ const MIGRATIONS: readonly MigrationDefinition[] = Object.freeze([
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       )`
+    ])
+  },
+  {
+    id: "002_outbox_lease_id",
+    version: 2,
+    checksum: "sha256:wats-persistence-002-outbox-lease-id-v1",
+    statements: Object.freeze([
+      "ALTER TABLE wats_outbox ADD COLUMN lease_id INTEGER NOT NULL DEFAULT 0"
     ])
   }
 ]);
@@ -208,6 +227,87 @@ function validateServiceRequestRecord(input: ServiceRequestRecordInput): Service
   });
 }
 
+function validatePayloadHash(value: unknown): string {
+  const raw = validateRecordString(value, "payloadHash");
+  if (!/^sha256:[a-f0-9]{64}$/u.test(raw)) {
+    throw new PersistenceError("invalid_record", "payloadHash must be a sha256 hex digest.");
+  }
+  return raw;
+}
+
+function validateOutboxEnqueue(input: OutboxEnqueueInput): Required<OutboxEnqueueInput> {
+  const record = validateRecordInput(input, "outbox item");
+  const createdAt = validateTimestamp(record.createdAt, "createdAt");
+  const nextAttemptAt = record.nextAttemptAt === undefined || record.nextAttemptAt === null
+    ? createdAt
+    : validateTimestamp(record.nextAttemptAt, "nextAttemptAt");
+  return Object.freeze({
+    id: validateRecordString(record.id, "id"),
+    payloadHash: validatePayloadHash(record.payloadHash),
+    createdAt,
+    nextAttemptAt
+  });
+}
+
+function validateOutboxClaim(input: OutboxClaimInput): OutboxClaimInput {
+  const record = validateRecordInput(input, "outbox claim");
+  if (typeof record.limit !== "number" || !Number.isInteger(record.limit) || record.limit < 1 || record.limit > 100) {
+    throw new PersistenceError("invalid_record", "limit must be an integer from 1 to 100.");
+  }
+  return Object.freeze({ now: validateTimestamp(record.now, "now"), limit: record.limit });
+}
+
+function validateLeaseId(value: unknown): number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > Number.MAX_SAFE_INTEGER) {
+    throw new PersistenceError("invalid_record", "leaseId must be a positive safe integer.");
+  }
+  return value;
+}
+
+function validateOutboxFailed(input: OutboxFailedInput): OutboxFailedInput {
+  const record = validateRecordInput(input, "outbox failure");
+  return Object.freeze({
+    id: validateRecordString(record.id, "id"),
+    leaseId: validateLeaseId(record.leaseId),
+    nextAttemptAt: validateTimestamp(record.nextAttemptAt, "nextAttemptAt"),
+    updatedAt: validateTimestamp(record.updatedAt, "updatedAt")
+  });
+}
+
+function validateOutboxSucceeded(input: OutboxSucceededInput): OutboxSucceededInput {
+  const record = validateRecordInput(input, "outbox success");
+  return Object.freeze({
+    id: validateRecordString(record.id, "id"),
+    leaseId: validateLeaseId(record.leaseId),
+    updatedAt: validateTimestamp(record.updatedAt, "updatedAt")
+  });
+}
+
+function outboxRowToItem(row: {
+  id: string;
+  status: string;
+  attempts: number;
+  lease_id: number;
+  next_attempt_at: string | null;
+  payload_hash: string;
+  created_at: string;
+  updated_at: string;
+}): OutboxItem {
+  return Object.freeze({
+    id: row.id,
+    status: row.status as OutboxItem["status"],
+    attempts: row.attempts,
+    leaseId: row.lease_id,
+    payloadHash: row.payload_hash,
+    nextAttemptAt: row.next_attempt_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  });
+}
+
+function subtractMillisecondsIso(timestamp: string, milliseconds: number): string {
+  return new Date(new Date(timestamp).getTime() - milliseconds).toISOString();
+}
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -343,6 +443,105 @@ class SqlitePersistenceStore implements PersistenceStore {
       record.responseJson,
       record.createdAt
     );
+  }
+
+  async enqueueOutboxItem(input: OutboxEnqueueInput): Promise<OutboxEnqueueResult> {
+    this.#assertOpen();
+    const item = validateOutboxEnqueue(input);
+    try {
+      this.#database.run(
+        "INSERT INTO wats_outbox (id, status, attempts, next_attempt_at, payload_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        item.id,
+        "pending",
+        0,
+        item.nextAttemptAt,
+        item.payloadHash,
+        item.createdAt,
+        item.createdAt
+      );
+      return "enqueued";
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      if (/UNIQUE|constraint/i.test(message)) return "duplicate";
+      throw new PersistenceError("outbox_failed", "SQLite outbox enqueue failed.", { cause });
+    }
+  }
+
+  async claimOutboxItems(input: OutboxClaimInput): Promise<readonly OutboxItem[]> {
+    this.#assertOpen();
+    const claim = validateOutboxClaim(input);
+    this.#database.exec("BEGIN IMMEDIATE");
+    try {
+      const leaseExpiredAt = subtractMillisecondsIso(claim.now, OUTBOX_PROCESSING_LEASE_MS);
+      const rows = this.#database.query<{
+        id: string;
+        status: string;
+        attempts: number;
+        lease_id: number;
+        next_attempt_at: string | null;
+        payload_hash: string;
+        created_at: string;
+        updated_at: string;
+      }>(
+        `SELECT id, status, attempts, lease_id, next_attempt_at, payload_hash, created_at, updated_at
+         FROM wats_outbox
+         WHERE (status = 'pending' AND (next_attempt_at IS NULL OR next_attempt_at <= ?))
+            OR (status = 'processing' AND updated_at <= ?)
+         ORDER BY created_at ASC, id ASC
+         LIMIT ?`
+      ).all(claim.now, leaseExpiredAt, claim.limit);
+      for (const row of rows) {
+        const result = this.#database.run(
+          "UPDATE wats_outbox SET status = ?, attempts = attempts + 1, lease_id = lease_id + 1, next_attempt_at = NULL, updated_at = ? WHERE id = ? AND status = ? AND lease_id = ?",
+          "processing",
+          claim.now,
+          row.id,
+          row.status,
+          row.lease_id
+        );
+        if (result.changes !== 1) {
+          throw new PersistenceError("outbox_failed", "SQLite outbox claim lease changed during claim.");
+        }
+      }
+      this.#database.exec("COMMIT");
+      return Object.freeze(rows.map((row) => outboxRowToItem({ ...row, status: "processing", attempts: row.attempts + 1, lease_id: row.lease_id + 1, next_attempt_at: null, updated_at: claim.now })));
+    } catch (cause) {
+      this.#database.exec("ROLLBACK");
+      throw new PersistenceError("outbox_failed", "SQLite outbox claim failed.", { cause });
+    }
+  }
+
+  async markOutboxItemFailed(input: OutboxFailedInput): Promise<void> {
+    this.#assertOpen();
+    const failure = validateOutboxFailed(input);
+    const result = this.#database.run(
+      "UPDATE wats_outbox SET status = ?, next_attempt_at = ?, updated_at = ? WHERE id = ? AND status = ? AND lease_id = ?",
+      "pending",
+      failure.nextAttemptAt,
+      failure.updatedAt,
+      failure.id,
+      "processing",
+      failure.leaseId
+    );
+    if (result.changes !== 1) {
+      throw new PersistenceError("outbox_failed", "SQLite outbox failure lease is stale.");
+    }
+  }
+
+  async markOutboxItemSucceeded(input: OutboxSucceededInput): Promise<void> {
+    this.#assertOpen();
+    const success = validateOutboxSucceeded(input);
+    const result = this.#database.run(
+      "UPDATE wats_outbox SET status = ?, next_attempt_at = NULL, updated_at = ? WHERE id = ? AND status = ? AND lease_id = ?",
+      "succeeded",
+      success.updatedAt,
+      success.id,
+      "processing",
+      success.leaseId
+    );
+    if (result.changes !== 1) {
+      throw new PersistenceError("outbox_failed", "SQLite outbox success lease is stale.");
+    }
   }
 
   async close(): Promise<void> {

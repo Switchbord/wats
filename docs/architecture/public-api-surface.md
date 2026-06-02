@@ -191,9 +191,11 @@ Implemented WATS-120 surfaces:
 - `PersistenceHealth`
 - `PersistenceError`
 - `CURRENT_SCHEMA_VERSION`
+- outbox record APIs on `PersistenceStore`
+- `runOutboxWorkerOnce`
 - `createSqlitePersistence` from `@wats/persistence/sqlite`
 
-Status: experimental local persistence foundation. SQLite migrations, schema metadata, migration locks, webhook-event/request-idempotency/outbox tables, redacted health diagnostics, and optional `@wats/service` injection exist. Conversation APIs, CLI navigation, status UI wiring, Postgres, and production hosting remain later work.
+Status: experimental local persistence foundation. SQLite migrations, schema metadata, migration locks, webhook-event/request-idempotency/outbox tables, outbox record APIs, a one-tick at-least-once worker helper, redacted health diagnostics, and optional `@wats/service` injection exist. Conversation APIs, CLI navigation, status UI wiring, automatic service send enqueueing, Postgres, and production hosting remain later work.
 
 ### Internal support and workspace packages
 
@@ -210,7 +212,7 @@ These are not implemented as runtime APIs yet:
 - mutating WABA/phone-number/business-management/admin APIs beyond WATS-42A read-only inventory and the bounded WATS-95 request-shape helpers; no automatic user-block decisions or policy/appeal automation are implemented
 - catalog/product management APIs beyond WATS-42A read-only getCommerceSettings
 - full Meta Graph API OpenAPI generation
-- Postgres persistence adapter, config persistence schema, CLI database navigation, conversation APIs, background outbox workers, and observed status UI are not implemented yet.
+- Postgres persistence adapter, config persistence schema, CLI database navigation, conversation APIs, automatic service send enqueueing, and observed status UI are not implemented yet.
 - no supported Dockerfile, Compose file, container image, or container-registry publication yet. WATS-49 keeps Docker/deployment as a design scaffold until live/deploy packaging is explicitly authorized.
 
 Track these through Linear roadmap issues and `docs/architecture/roadmap-to-whatsapp-pywa-parity.md`.

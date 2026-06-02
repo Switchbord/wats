@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.20] - 2026-06-02
+
+### Added
+
+- **Persistence outbox first slice (WATS-87).** `@wats/persistence` gains outbox record APIs — `enqueueOutboxItem`, `claimOutboxItems`, `markOutboxItemSucceeded`, `markOutboxItemFailed` — plus a `runOutboxWorkerOnce` worker step. SQLite persists only `payloadHash`, status, attempts, `leaseId`, and retry timestamps (no raw webhook/Graph bodies, message text, or contact payloads). Claims use monotonic `leaseId` fencing so a worker whose lease was reclaimed after a timeout cannot mark rows it no longer owns; stale `processing` rows are reclaimed by `updated_at` cutoff. Existing v1 databases migrate forward via `002_outbox_lease_id`, preserving the `001_initial` checksum.
+
+### Release
+
+- Release metadata is aligned for 0.3.20: all publishable `@wats/*` packages, the service OpenAPI default version, README, and release-contract locks move together.
+
 ## [0.3.19] - 2026-06-02
 
 ### Added
@@ -70,7 +80,14 @@
 
 ## [0.3.13] - 2026-06-01
 
-Patch alpha compatibility and local-operator release. Begins the WhatsApp Groups API — a WATS framework addition with no pywa equivalent — as composable, opt-in surfaces.
+Patch alpha compatibility and local-operator release. Begins the WhatsApp Groups API — a WATS framework addition with no pywa equivalent — and adds the WATS-87 persistence outbox first slice as composable, opt-in surfaces.
+
+### WATS-87 — persistence outbox first slice
+
+- Adds first-slice outbox record APIs to `@wats/persistence`: `enqueueOutboxItem`, `claimOutboxItems`, `markOutboxItemFailed`, and `markOutboxItemSucceeded`. SQLite stores only `payloadHash`, status, attempts, `leaseId`, and retry timestamps; it does not persist raw webhook bodies, Graph request bodies, message text, or contact payloads by default.
+- Adds `runOutboxWorkerOnce(...)`, a one-tick at-least-once worker helper that claims due pending records, runs an application handler, marks successes, schedules failures by retry timestamp, and reclaims stale processing rows after a five-minute lease without leaking handler error text in its report. Stale workers cannot mark a newer reclaimed lease as succeeded or failed.
+- Migrates existing v1 SQLite databases forward with `002_outbox_lease_id`, preserving the original `001_initial` checksum while adding the outbox lease column.
+- Keeps this slice experimental and local/single-instance: no Postgres adapter, no automatic service send enqueueing, no production hosting claim, and no exactly-once delivery claim.
 
 ### WATS-131 — Groups type foundation
 

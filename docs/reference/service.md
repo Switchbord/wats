@@ -1,14 +1,14 @@
 # Service Reference (`@wats/service`)
 
 - status: experimental
-- applies-to: WATS-34/WATS-35/WATS-73/WATS-137
+- applies-to: WATS-34/WATS-35/WATS-73/WATS-87/WATS-121/WATS-137
 - lastReviewed: 2026-06-02
 
 ## Purpose
 
 `@wats/service` is the first standalone WATS application boundary. It exposes a runtime-neutral `Request -> Response` app that composes the existing Graph client, webhook adapter, config profile shape, and WhatsApp facade.
 
-It is not a production server by itself. WATS-71 adds a CLI-owned Bun dry-run process wrapper around this app for local smoke checks. WATS-101 adds credential-gated live `wats serve` execution for local testing behind an HTTPS tunnel. Node/Docker packaging, persistence, metrics, and production hosting remain separate roadmap items. WATS-35 adds a generated OpenAPI 3.1 document for the routes listed below.
+It is not a production server by itself. WATS-71 adds a CLI-owned Bun dry-run process wrapper around this app for local smoke checks. WATS-101 adds credential-gated live `wats serve` execution for local testing behind an HTTPS tunnel. WATS-121 adds optional caller-owned `PersistenceStore` injection for webhook dedupe and route idempotency; WATS-87 expands that store shape with outbox methods. Node/Docker packaging, metrics, and production hosting remain separate roadmap items. WATS-35 adds a generated OpenAPI 3.1 document for the routes listed below.
 
 ## Public API
 
@@ -187,6 +187,7 @@ Construction errors throw `WatsServiceError` with codes:
 - `invalid_transport`
 - `invalid_crypto_provider`
 - `invalid_whatsapp`
+- `invalid_persistence`
 
 HTTP errors use JSON bodies:
 
@@ -220,10 +221,26 @@ Example:
 
 WATS-121 adds optional `PersistenceStore` injection to `createWatsServiceApp(...)`. The service does not read database environment variables directly; callers pass an already-created store.
 
+Injected persistence must be the expanded WATS-87 outbox-capable `PersistenceStore` shape. Construction validates that the store exposes:
+
+- `migrate()` and `health()`
+- `recordWebhookEvent(...)`
+- `getServiceRequest(...)`
+- `recordServiceRequest(...)`
+- `enqueueOutboxItem(...)`
+- `claimOutboxItems(...)`
+- `markOutboxItemFailed(...)`
+- `markOutboxItemSucceeded(...)`
+- `close()`
+
+Missing any method fails construction with `WatsServiceError` code `invalid_persistence`.
+
 When persistence is injected:
 
 - signed webhook POSTs are recorded by event key/hash and duplicate deliveries are acknowledged without redispatching the same update;
 - message send routes honor `Idempotency-Key`: matching key/body hash replays the stored response, while the same key with a different body returns `409 idempotency_conflict`.
+
+The outbox APIs are part of the accepted service persistence contract even though current service message routes still send synchronously. `claimOutboxItems(...)` returns `OutboxItem` records with `leaseId`; callers must pass that same `leaseId` to `markOutboxItemFailed(...)` or `markOutboxItemSucceeded(...)` so stale workers cannot complete a newer reclaimed lease.
 
 The service must not log secrets or raw webhook bodies through persistence diagnostics, and persistence failures must not expose database URLs, access tokens, app secrets, webhook verify tokens, service bearer tokens, message text, or raw webhook envelopes.
 

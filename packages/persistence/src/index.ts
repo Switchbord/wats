@@ -1,4 +1,4 @@
-export const CURRENT_SCHEMA_VERSION = 1 as const;
+export const CURRENT_SCHEMA_VERSION = 2 as const;
 export const REDACTED_SQLITE_LOCATION = "[REDACTED_SQLITE_DATABASE]" as const;
 
 export type PersistenceBackend = "sqlite" | "postgres";
@@ -10,6 +10,7 @@ export type PersistenceErrorCode =
   | "migration_failed"
   | "migration_checksum_mismatch"
   | "migration_lock_failed"
+  | "outbox_failed"
   | "store_closed";
 
 export interface MigrationReport {
@@ -45,6 +46,46 @@ export interface ServiceRequestRecordInput extends ServiceRequestLookupInput {
 
 export type ServiceRequestLookupResult = null | "conflict" | { readonly responseJson: string };
 
+export type OutboxStatus = "pending" | "processing" | "succeeded";
+
+export interface OutboxItem {
+  readonly id: string;
+  readonly status: OutboxStatus;
+  readonly attempts: number;
+  readonly leaseId: number;
+  readonly payloadHash: string;
+  readonly nextAttemptAt: string | null;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export interface OutboxEnqueueInput {
+  readonly id: string;
+  readonly payloadHash: string;
+  readonly createdAt: string;
+  readonly nextAttemptAt?: string | null;
+}
+
+export type OutboxEnqueueResult = "enqueued" | "duplicate";
+
+export interface OutboxClaimInput {
+  readonly now: string;
+  readonly limit: number;
+}
+
+export interface OutboxFailedInput {
+  readonly id: string;
+  readonly leaseId: number;
+  readonly nextAttemptAt: string;
+  readonly updatedAt: string;
+}
+
+export interface OutboxSucceededInput {
+  readonly id: string;
+  readonly leaseId: number;
+  readonly updatedAt: string;
+}
+
 export interface PersistenceStore {
   readonly backend: PersistenceBackend;
   migrate(): Promise<MigrationReport>;
@@ -52,6 +93,10 @@ export interface PersistenceStore {
   recordWebhookEvent(input: WebhookEventRecordInput): Promise<WebhookEventRecordResult>;
   getServiceRequest(input: ServiceRequestLookupInput): Promise<ServiceRequestLookupResult>;
   recordServiceRequest(input: ServiceRequestRecordInput): Promise<void>;
+  enqueueOutboxItem(input: OutboxEnqueueInput): Promise<OutboxEnqueueResult>;
+  claimOutboxItems(input: OutboxClaimInput): Promise<readonly OutboxItem[]>;
+  markOutboxItemFailed(input: OutboxFailedInput): Promise<void>;
+  markOutboxItemSucceeded(input: OutboxSucceededInput): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -67,3 +112,5 @@ export class PersistenceError extends Error {
 
 export { createSqlitePersistence } from "./sqlite";
 export type { SqlitePersistenceOptions } from "./sqlite";
+export { runOutboxWorkerOnce } from "./outbox";
+export type { OutboxWorkerOptions, OutboxWorkerReport } from "./outbox";

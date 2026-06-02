@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { Database } from "bun:sqlite";
 import {
   CURRENT_SCHEMA_VERSION,
   PersistenceError,
@@ -8,11 +9,75 @@ import {
 } from "../src/index";
 
 const tempDirs: string[] = [];
+const ORIGINAL_001_CHECKSUM = "sha256:wats-persistence-001-initial-v1";
+const ORIGINAL_001_STATEMENTS = Object.freeze([
+  `CREATE TABLE IF NOT EXISTS wats_schema_migrations (
+    id TEXT PRIMARY KEY,
+    version INTEGER NOT NULL,
+    checksum TEXT NOT NULL,
+    applied_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS wats_persistence_lock (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    holder TEXT NOT NULL,
+    acquired_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS wats_webhook_events (
+    event_key TEXT PRIMARY KEY,
+    event_hash TEXT NOT NULL,
+    received_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS wats_service_requests (
+    idempotency_key TEXT PRIMARY KEY,
+    request_hash TEXT NOT NULL,
+    response_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS wats_outbox (
+    id TEXT PRIMARY KEY,
+    status TEXT NOT NULL,
+    attempts INTEGER NOT NULL,
+    next_attempt_at TEXT,
+    payload_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )`
+]);
 
 function tempDb(name = "wats.sqlite"): string {
   const dir = mkdtempSync(join(import.meta.dir, "tmp-wats120-"));
   tempDirs.push(dir);
   return join(dir, name);
+}
+
+function applyOriginalV1Migration(filename: string): void {
+  const database = new Database(filename, { create: true });
+  try {
+    database.exec("BEGIN IMMEDIATE");
+    for (const statement of ORIGINAL_001_STATEMENTS) database.run(statement);
+    database.run(
+      "INSERT INTO wats_schema_migrations (id, version, checksum, applied_at) VALUES (?, ?, ?, ?)",
+      "001_initial",
+      1,
+      ORIGINAL_001_CHECKSUM,
+      "2026-05-24T00:00:00.000Z"
+    );
+    database.exec("COMMIT");
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
+  } finally {
+    database.close();
+  }
+}
+
+function outboxColumns(filename: string): string[] {
+  const database = new Database(filename, { readonly: true });
+  try {
+    return database.query<{ name: string }>("PRAGMA table_info(wats_outbox)").all().map((column) => column.name);
+  } finally {
+    database.close();
+  }
 }
 
 afterEach(async () => {
@@ -94,6 +159,86 @@ describe("WATS-120 SQLite persistence", () => {
       }
     } finally {
       await store.close();
+    }
+  });
+
+  test("keeps migration 001 compatible with the originally shipped v1 checksum", async () => {
+    const filename = tempDb();
+    applyOriginalV1Migration(filename);
+    const store = await createSqlitePersistence({ filename });
+    try {
+      const report = await store.migrate();
+      expect(report.currentVersion).toBe(2);
+      expect(report.appliedMigrations).toEqual(["002_outbox_lease_id"]);
+      expect(report.alreadyCurrent).toBe(false);
+      expect(outboxColumns(filename)).toContain("lease_id");
+      const health = await store.health();
+      expect(health.currentVersion).toBe(2);
+    } finally {
+      await store.close();
+    }
+  });
+
+  test("pins migration 001 checksum and table shape", async () => {
+    const filename = tempDb();
+    const store = await createSqlitePersistence({ filename });
+    try {
+      const report = await store.migrate();
+      expect(report.currentVersion).toBe(2);
+      expect(report.appliedMigrations).toEqual(["001_initial", "002_outbox_lease_id"]);
+      const database = new Database(filename, { readonly: true });
+      try {
+        const first = database.query<{ checksum: string; version: number }>(
+          "SELECT version, checksum FROM wats_schema_migrations WHERE id = ?"
+        ).get("001_initial");
+        expect(first).toEqual({ version: 1, checksum: ORIGINAL_001_CHECKSUM });
+      } finally {
+        database.close();
+      }
+    } finally {
+      await store.close();
+    }
+  });
+
+  test("held migration locks fail closed with a typed migration_lock_failed error", async () => {
+    const filename = tempDb();
+    const database = new Database(filename, { create: true });
+    const heldLock = "held_lock";
+    database.run(`CREATE TABLE IF NOT EXISTS wats_persistence_lock (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      holder TEXT NOT NULL,
+      acquired_at TEXT NOT NULL
+    )`);
+    database.run(
+      "INSERT INTO wats_persistence_lock (id, holder, acquired_at) VALUES (?, ?, ?)",
+      1,
+      heldLock,
+      "2026-06-01T00:00:00.000Z"
+    );
+    database.close();
+
+    const store = await createSqlitePersistence({ filename });
+    try {
+      try {
+        await store.migrate();
+        throw new Error("expected held migration lock to fail");
+      } catch (error) {
+        expect(error).toBeInstanceOf(PersistenceError);
+        expect((error as PersistenceError).code).toBe("migration_lock_failed");
+        expect(error instanceof Error ? error.message : String(error)).toContain("SQLite migration lock is already held.");
+      }
+    } finally {
+      await store.close();
+    }
+
+    const afterFailure = await createSqlitePersistence({ filename });
+    try {
+      const lockRow = new Database(filename, { readonly: true })
+        .query<{ holder: string }>("SELECT holder FROM wats_persistence_lock WHERE id = 1")
+        .get();
+      expect(lockRow?.holder).toBe(heldLock);
+    } finally {
+      await afterFailure.close();
     }
   });
 
