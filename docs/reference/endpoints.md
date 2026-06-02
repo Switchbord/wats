@@ -248,10 +248,10 @@ to the `sendMessage` endpoint-registry callable.
 ### Groups send-to-group (WATS-134)
 
 Message helpers accept `recipientType: "group"` for text, media, and standard
-template sends. Set `templateCategory: "UTILITY"` or `"MARKETING"` on group
-template helper inputs; `"AUTHENTICATION"` rejects before transport. The Graph
-body uses `recipient_type: "group"`; `to` must be an opaque group id, not a
-phone number.
+template sends. Group template helper inputs require `templateCategory: "UTILITY"`
+or `"MARKETING"`; missing categories and `"AUTHENTICATION"` reject before
+transport. The Graph body uses `recipient_type: "group"`; `to` must be an opaque
+group id, not a phone number.
 
 ```ts
 const body = buildSendTextPayload({

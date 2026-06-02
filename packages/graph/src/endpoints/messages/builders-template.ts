@@ -26,6 +26,18 @@ import {
   sanitizeTemplateParameter
 } from "./validation.js";
 
+function assertGroupTemplateCategory(value: unknown): void {
+  if (value === undefined) {
+    throw new GraphRequestValidationError("Invalid sendTemplate input: templateCategory is required for group recipients.");
+  }
+  if (value === "AUTHENTICATION") {
+    throw new GraphRequestValidationError("Invalid sendTemplate input: auth templates are not supported for group recipients.");
+  }
+  if (value !== "UTILITY" && value !== "MARKETING") {
+    throw new GraphRequestValidationError("Invalid sendTemplate input: templateCategory must be UTILITY or MARKETING for group recipients.");
+  }
+}
+
 function normalizeTemplateComponent(value: unknown, helperName: string): Record<string, unknown> {
   const cloned = sanitizeTemplateParameter(value, helperName, "component", new WeakSet<object>());
   if (!isPlainOptionsObject(cloned)) throw new GraphRequestValidationError(`Invalid ${helperName} input: component entries must be objects.`);
@@ -46,8 +58,8 @@ function normalizeTemplateComponent(value: unknown, helperName: string): Record<
 export function buildSendTemplatePayload(input: GraphMessagesSendTemplateInput): GraphMessagesTemplatePayload {
   const record = asRecordInput(input, "sendTemplate");
   const recipient = assertMessageRecipient(record, "sendTemplate");
-  if (recipient.recipientType === "group" && record.templateCategory === "AUTHENTICATION") {
-    throw new GraphRequestValidationError("Invalid sendTemplate input: auth templates are not supported for group recipients.");
+  if (recipient.recipientType === "group") {
+    assertGroupTemplateCategory(record.templateCategory);
   }
   const template: Record<string, unknown> = { name: assertNonEmptyControlFreeString(record.name, "name", GRAPH_MESSAGES_MEDIA_ID_MAX_LENGTH, "sendTemplate"), language: { code: assertNonEmptyControlFreeString(record.languageCode, "languageCode", GRAPH_MESSAGES_SHORT_LABEL_MAX_LENGTH, "sendTemplate") } };
   if (record.components !== undefined) template.components = mapValidatedArray(assertBoundedArray(record.components, "components", 0, 100, "sendTemplate"), (c) => normalizeTemplateComponent(c, "sendTemplate"));
