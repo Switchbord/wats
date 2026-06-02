@@ -152,6 +152,45 @@ describe("WATS-135 group webhook normalization", () => {
     expect((result.updates[0] as TypedGroupParticipantsUpdate).group.groupId).toBe("group-safe");
   });
 
+  test("skips malformed groups property instead of treating it as flattened payload", () => {
+    const result = normalizeWebhookEnvelope(makeEnvelope([
+      groupChange("group_participants_update", {
+        groups: "not-an-array",
+        type: "group_participants_add",
+        group_id: "group-ignored"
+      })
+    ]));
+
+    expect(result.updates).toEqual([]);
+    expect(result.skipped).toEqual([
+      {
+        reason: "malformed_field",
+        path: "entry[0].changes[0].value.groups",
+        detail: "groups-not-array"
+      }
+    ]);
+  });
+
+  test("skips unsafe lifecycle group ids even when create failure has errors", () => {
+    const result = normalizeWebhookEnvelope(makeEnvelope([
+      groupArrayChange("group_lifecycle_update", [{
+        type: "group_create",
+        request_id: "req-create-failed",
+        group_id: "bad\r\ngroup",
+        errors: [{ code: 131000, title: "Create failed" }]
+      }])
+    ]));
+
+    expect(result.updates).toEqual([]);
+    expect(result.skipped).toEqual([
+      {
+        reason: "malformed_field",
+        path: "entry[0].changes[0].value.groups[0].group_id",
+        detail: "missing-or-unsafe-group-id"
+      }
+    ]);
+  });
+
   test("normalizes lifecycle, participant, settings, and status group fields to camelCase typed updates", () => {
     const result = normalizeWebhookEnvelope(makeEnvelope([
       groupChange("group_lifecycle_update", {
