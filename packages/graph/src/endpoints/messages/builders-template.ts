@@ -10,17 +10,33 @@ import type {
 import {
   GRAPH_MESSAGES_MEDIA_ID_MAX_LENGTH,
   GRAPH_MESSAGES_SHORT_LABEL_MAX_LENGTH,
+  applyRecipientType,
   assertBoundedArray,
+  assertMessageRecipient,
   assertNonEmptyControlFreeString,
   assertOnlyKnownKeys,
+  assertRecipientType,
   assertValidRecipient,
   asRecordInput,
+  rejectGroupRecipient,
   inspectTemplateValue,
   isPlainOptionsObject,
   withReplyContext,
   mapValidatedArray,
   sanitizeTemplateParameter
 } from "./validation.js";
+
+function assertGroupTemplateCategory(value: unknown): void {
+  if (value === undefined) {
+    throw new GraphRequestValidationError("Invalid sendTemplate input: templateCategory is required for group recipients.");
+  }
+  if (value === "AUTHENTICATION") {
+    throw new GraphRequestValidationError("Invalid sendTemplate input: auth templates are not supported for group recipients.");
+  }
+  if (value !== "UTILITY" && value !== "MARKETING") {
+    throw new GraphRequestValidationError("Invalid sendTemplate input: templateCategory must be UTILITY or MARKETING for group recipients.");
+  }
+}
 
 function normalizeTemplateComponent(value: unknown, helperName: string): Record<string, unknown> {
   const cloned = sanitizeTemplateParameter(value, helperName, "component", new WeakSet<object>());
@@ -41,9 +57,13 @@ function normalizeTemplateComponent(value: unknown, helperName: string): Record<
 
 export function buildSendTemplatePayload(input: GraphMessagesSendTemplateInput): GraphMessagesTemplatePayload {
   const record = asRecordInput(input, "sendTemplate");
+  const recipient = assertMessageRecipient(record, "sendTemplate");
+  if (recipient.recipientType === "group") {
+    assertGroupTemplateCategory(record.templateCategory);
+  }
   const template: Record<string, unknown> = { name: assertNonEmptyControlFreeString(record.name, "name", GRAPH_MESSAGES_MEDIA_ID_MAX_LENGTH, "sendTemplate"), language: { code: assertNonEmptyControlFreeString(record.languageCode, "languageCode", GRAPH_MESSAGES_SHORT_LABEL_MAX_LENGTH, "sendTemplate") } };
   if (record.components !== undefined) template.components = mapValidatedArray(assertBoundedArray(record.components, "components", 0, 100, "sendTemplate"), (c) => normalizeTemplateComponent(c, "sendTemplate"));
-  return withReplyContext({ messaging_product: "whatsapp", to: assertValidRecipient(record.to, "sendTemplate"), type: "template", template }, record);
+  return withReplyContext(applyRecipientType({ messaging_product: "whatsapp", to: recipient.to, type: "template", template }, recipient.recipientType), record);
 }
 
 function assertMarketingRecipient(value: unknown): string | undefined {
@@ -89,12 +109,14 @@ function copySendMarketingTemplateInput(input: GraphMessagesSendMarketingTemplat
     }
     if (descriptor.value !== undefined) out[key] = descriptor.value;
   }
-  assertOnlyKnownKeys(out, ["to", "recipient", "name", "languageCode", "components", "productPolicy", "messageActivitySharing"], "sendMarketingTemplate");
+  assertOnlyKnownKeys(out, ["to", "recipient", "recipientType", "name", "languageCode", "components", "productPolicy", "messageActivitySharing"], "sendMarketingTemplate");
   return out;
 }
 
 export function buildSendMarketingTemplatePayload(input: GraphMessagesSendMarketingTemplateInput): GraphMessagesMarketingTemplatePayload {
   const record = copySendMarketingTemplateInput(input);
+  rejectGroupRecipient(record, "sendMarketingTemplate", "marketing templates");
+  assertRecipientType(record.recipientType, "sendMarketingTemplate");
   const to = record.to === undefined ? undefined : assertValidRecipient(record.to, "sendMarketingTemplate");
   const recipient = assertMarketingRecipient(record.recipient);
   if (to === undefined && recipient === undefined) {

@@ -12,6 +12,10 @@ import type {
   GraphMessagesTextPayload
 } from "./types.js";
 import { buildSendMarketingTemplatePayload } from "./builders-template.js";
+import {
+  assertNonEmptyControlFreeString,
+  assertValidGroupId
+} from "./validation.js";
 
 interface GraphRequestExecutor {
   request<TResponse>(options: GraphRequestOptions): Promise<TResponse>;
@@ -94,7 +98,44 @@ export const sendMessage = defineEndpoint<
   method: "POST",
   pathTemplate: "/{phoneNumberId}/messages",
   params: { phoneNumberId: { in: "path", required: true } },
-  bodyContentType: "application/json"
+  bodyContentType: "application/json",
+  buildBody: (body) => {
+    if (typeof body !== "object" || body === null || Array.isArray(body)) {
+      throw new GraphRequestValidationError("Invalid sendMessage input: body must be an object.");
+    }
+    const record = body as unknown as Record<string, unknown>;
+    if (record.recipient_type === "group") {
+      if (
+        record.type !== "text" &&
+        record.type !== "image" &&
+        record.type !== "video" &&
+        record.type !== "audio" &&
+        record.type !== "document" &&
+        record.type !== "sticker" &&
+        record.type !== "template" &&
+        record.type !== "pin"
+      ) {
+        throw new GraphRequestValidationError("Invalid sendMessage input: group recipients support text, media, template, and pin message bodies only.");
+      }
+      assertValidGroupId(record.to, "sendMessage");
+      if (record.type === "pin") {
+        const pin = record.pin;
+        if (typeof pin !== "object" || pin === null || Array.isArray(pin)) {
+          throw new GraphRequestValidationError("Invalid sendMessage input: group pin body must be an object.");
+        }
+        const pinRecord = pin as Record<string, unknown>;
+        if (pinRecord.type !== "pin" && pinRecord.type !== "unpin") {
+          throw new GraphRequestValidationError("Invalid sendMessage input: group pin.type must be pin or unpin.");
+        }
+        assertNonEmptyControlFreeString(pinRecord.message_id, "pin.message_id", 256, "sendMessage");
+        const expirationDays = pinRecord.expiration_days;
+        if (typeof expirationDays !== "number" || !Number.isInteger(expirationDays) || expirationDays < 1 || expirationDays > 30) {
+          throw new GraphRequestValidationError("Invalid sendMessage input: group pin.expiration_days must be an integer between 1 and 30.");
+        }
+      }
+    }
+    return body;
+  }
 });
 
 // --- legacy class-based endpoint (backward-compat) ---------------------

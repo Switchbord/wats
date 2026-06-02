@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.15] - 2026-06-02
+
+### Added
+
+- **Groups send-to-group + pin/unpin (WATS-134).** Message builders and `sendMessage` now accept `recipientType: "group"`, emitting Graph `recipient_type: "group"` with an opaque group id in `to` for text, media, and standard template sends. Adds `buildSendPinPayload({ to, pinType, messageId, expirationDays })` for group pin/unpin (`type: "pin"`, `expiration_days` 1..30). Group-context interactive, commerce, marketing/auth templates (including missing/auth `templateCategory`), and phone-number-shaped group recipients are rejected before transport; calling, edit, delete, disappearing, and view-once remain unsupported for Groups.
+
+### Release
+
+- Release metadata is aligned for 0.3.15: all publishable `@wats/*` packages, the service OpenAPI default version, README, and release-contract locks move together.
+
 ## [0.3.14] - 2026-06-02
 
 ### Added
