@@ -109,6 +109,27 @@ describe("WATS-135 group webhook normalization", () => {
     expect(status.group.type).toBe("group_suspend");
   });
 
+  test("uses change-level metadata for groups[] rows even when row payloads contain metadata-like keys", () => {
+    const result = normalizeWebhookEnvelope(makeEnvelope([
+      groupChange("group_lifecycle_update", {
+        groups: [{
+          timestamp: "1780000005",
+          metadata: { phone_number_id: "bad\r\nid", display_phone_number: "bad" },
+          type: "group_create",
+          request_id: "req-create-metadata",
+          group_id: "group-metadata",
+          invite_link: "https://chat.whatsapp.com/metadata"
+        }]
+      })
+    ]));
+
+    expect(result.skipped).toEqual([]);
+    const lifecycle = result.updates[0] as TypedGroupLifecycleUpdate;
+    expect(lifecycle.phoneNumberId).toBe("1234567890");
+    expect(lifecycle.group.metadata.phoneNumberId).toBe("1234567890");
+    expect(lifecycle.group.groupId).toBe("group-metadata");
+  });
+
   test("normalizes join-request revoked, participant removal failures, settings errors, and lifecycle errors", () => {
     const result = normalizeWebhookEnvelope(makeEnvelope([
       groupChange("group_lifecycle_update", {
