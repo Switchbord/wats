@@ -30,11 +30,128 @@ function groupChange(field: string, value: Record<string, unknown>): Record<stri
   };
 }
 
+function groupArrayChange(field: string, groups: readonly Record<string, unknown>[]): Record<string, unknown> {
+  return groupChange(field, { groups: [...groups] });
+}
+
 function messagesChange(value: Record<string, unknown>): Record<string, unknown> {
   return groupChange("messages", value);
 }
 
 describe("WATS-135 group webhook normalization", () => {
+  test("normalizes real groups[] payloads for every group field", () => {
+    const result = normalizeWebhookEnvelope(makeEnvelope([
+      groupArrayChange("group_lifecycle_update", [{
+        type: "group_create",
+        request_id: "req-create-1",
+        group_id: "group-1",
+        subject: "Launch group",
+        invite_link: "https://chat.whatsapp.com/invite-1",
+        join_approval_mode: "approval_required"
+      }]),
+      groupArrayChange("group_participants_update", [{
+        type: "group_participants_add",
+        group_id: "group-1",
+        reason: "invite_link",
+        added_participants: [{ wa_id: "15551230001" }]
+      }]),
+      groupArrayChange("group_settings_update", [{
+        type: "group_description",
+        group_id: "group-1",
+        group_description: { text: "Launch group docs", update_successful: true }
+      }]),
+      groupArrayChange("group_status_update", [{
+        type: "group_suspend_cleared",
+        group_id: "group-1"
+      }])
+    ]));
+
+    expect(result.skipped).toEqual([]);
+    expect(result.updates.map((u) => u.kind)).toEqual([
+      "groupLifecycle",
+      "groupParticipants",
+      "groupSettings",
+      "groupStatus"
+    ]);
+    expect((result.updates[0] as TypedGroupLifecycleUpdate).group.groupId).toBe("group-1");
+    expect((result.updates[1] as TypedGroupParticipantsUpdate).group.addedParticipants).toEqual([
+      { waId: "15551230001" }
+    ]);
+    expect((result.updates[2] as TypedGroupSettingsUpdate).group.groupDescription).toEqual({
+      text: "Launch group docs",
+      updateSuccessful: true
+    });
+    expect((result.updates[3] as TypedGroupStatusUpdate).group.type).toBe("group_suspend_cleared");
+  });
+
+  test("skips unsafe lifecycle group ids inside groups[] payloads", () => {
+    const result = normalizeWebhookEnvelope(makeEnvelope([
+      groupArrayChange("group_lifecycle_update", [{
+        type: "group_delete",
+        request_id: "req-delete-bad",
+        group_id: "bad\r\ngroup"
+      }])
+    ]));
+
+    expect(result.updates).toEqual([]);
+    expect(result.skipped).toEqual([
+      {
+        reason: "malformed_field",
+        path: "entry[0].changes[0].value.groups[0].group_id",
+        detail: "missing-or-unsafe-group-id"
+      }
+    ]);
+  });
+
+  test("skips unsafe flattened lifecycle group ids", () => {
+    const result = normalizeWebhookEnvelope(makeEnvelope([
+      groupChange("group_lifecycle_update", {
+        type: "group_delete",
+        request_id: "req-delete-flat-bad",
+        group_id: "bad\r\ngroup"
+      })
+    ]));
+
+    expect(result.updates).toEqual([]);
+    expect(result.skipped).toEqual([
+      {
+        reason: "malformed_field",
+        path: "entry[0].changes[0].value.group_id",
+        detail: "missing-or-unsafe-group-id"
+      }
+    ]);
+  });
+
+  test("skips malformed groups[] entries without throwing", () => {
+    const accessorGroup = {} as Record<string, unknown>;
+    Object.defineProperty(accessorGroup, "type", {
+      get() {
+        throw new Error("group getter must not run");
+      }
+    });
+
+    const result = normalizeWebhookEnvelope(makeEnvelope([
+      groupChange("group_participants_update", {
+        groups: [null, accessorGroup, { type: "group_participants_add", group_id: "group-safe" }]
+      })
+    ]));
+
+    expect(result.updates.length).toBe(1);
+    expect(result.skipped).toEqual([
+      {
+        reason: "malformed_field",
+        path: "entry[0].changes[0].value.groups[0]",
+        detail: "group-not-an-object"
+      },
+      {
+        reason: "malformed_field",
+        path: "entry[0].changes[0].value.groups[1].group_id",
+        detail: "missing-or-unsafe-group-id"
+      }
+    ]);
+    expect((result.updates[0] as TypedGroupParticipantsUpdate).group.groupId).toBe("group-safe");
+  });
+
   test("normalizes lifecycle, participant, settings, and status group fields to camelCase typed updates", () => {
     const result = normalizeWebhookEnvelope(makeEnvelope([
       groupChange("group_lifecycle_update", {

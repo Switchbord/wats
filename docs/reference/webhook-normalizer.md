@@ -150,7 +150,7 @@ All of these remain credential-free synthetic-envelope checks in CI; live Meta v
 
 ## WATS-135 Groups webhook normalization
 
-WATS-135 adds credential-free normalization for the official Groups webhook fields:
+WATS-135 adds credential-free normalization for the official Groups webhook fields. Meta sends these updates in `value.groups[]`; WATS normalizes each group object and also tolerates the older flattened synthetic shape used by local fixtures.
 
 - `group_lifecycle_update`: `group_create` (success or `errors[]`) and `group_delete`; successful creates surface `groupId`, `subject`, `inviteLink`, `joinApprovalMode`, and `requestId`.
 - `group_participants_update`: `group_participants_add`, `group_join_request_created`, `group_join_request_revoked`, and `group_participants_remove`; participant arrays are camelCased (`waId`, `addedParticipants`, `removedParticipants`, `failedParticipants`, `initiatedBy`).

@@ -128,6 +128,16 @@ describe("F-8 webhook-normalizer.md reference guide", () => {
     expect(doc).toMatch(/architecture notes/);
     expect(doc).toMatch(/F-8/);
   });
+
+  test("documents WATS-135 groups[] webhook shape and group field taxonomy", () => {
+    expect(doc).toContain("value.groups[]");
+    expect(doc).toContain("group_lifecycle_update");
+    expect(doc).toContain("group_participants_update");
+    expect(doc).toContain("group_settings_update");
+    expect(doc).toContain("group_status_update");
+    expect(doc).toContain("group_suspend_cleared");
+    expect(doc).toContain("recipient_participant_id");
+  });
 });
 
 describe("F-8 core-consumer fixture", () => {
