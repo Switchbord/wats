@@ -18,7 +18,7 @@ Patch alpha compatibility and local-operator release. Begins the WhatsApp Groups
 
 - Extends message builders and `sendMessage` to accept `recipientType: "group"`, emitting Graph `recipient_type: "group"` with an opaque group id in `to` for text, media, and standard template sends.
 - Adds `buildSendPinPayload({ to, pinType, messageId, expirationDays })` for group pin/unpin messages (`type: "pin"`, `expiration_days` 1..30). Pinning is admin-only on Meta; Graph keeps at most three pinned messages and auto-unpins the oldest.
-- Rejects group-context interactive, commerce, marketing/auth-template, and phone-number-shaped group recipients before transport. Calling/edit/delete/disappearing/view-once remain unsupported for Groups.
+- Rejects group-context interactive, commerce, marketing templates, auth templates (including missing or authentication `templateCategory` in standard template helpers), and phone-number-shaped group recipients before transport. Calling/edit/delete/disappearing/view-once remain unsupported for Groups.
 
 ### Release metadata
 
