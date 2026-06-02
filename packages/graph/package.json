@@ -43,6 +43,10 @@
       "types": "./dist/endpoints/businessManagement.d.ts",
       "import": "./dist/endpoints/businessManagement.js"
     },
+    "./endpoints/groups": {
+      "types": "./dist/endpoints/groups.d.ts",
+      "import": "./dist/endpoints/groups.js"
+    },
     "./transport": {
       "types": "./dist/transport.d.ts",
       "import": "./dist/transport.js"
