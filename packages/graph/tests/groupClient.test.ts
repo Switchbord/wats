@@ -87,7 +87,7 @@ describe("WATS-133 scoped Groups clients", () => {
       after: "CUR"
     } as unknown as Parameters<PhoneNumberClient["listGroups"]>[0]);
 
-    expect(created.request_id).toBe("req-create");
+    expect(created.requestId).toBe("req-create");
     const data = listed.data as { groups?: { id?: string }[] };
     expect(data.groups?.[0]?.id).toBe("grp-1");
     expect(handle.requests[0]?.method).toBe("POST");
@@ -152,8 +152,8 @@ describe("WATS-133 scoped Groups clients", () => {
       after: "CUR"
     } as unknown as Parameters<GroupClient["getJoinRequests"]>[0]);
 
-    expect(link.invite_link).toBe("https://chat.whatsapp.com/ABC123");
-    expect(requests.data?.[0]?.join_request_id).toBe("jr-1");
+    expect(link.inviteLink).toBe("https://chat.whatsapp.com/ABC123");
+    expect(requests.data?.[0]?.joinRequestId).toBe("jr-1");
     expect(handle.requests[0]?.method).toBe("GET");
     expect(handle.requests[0]?.url).toBe(
       "https://graph.facebook.com/v25.0/grp-bound?fields=id%2Csubject"

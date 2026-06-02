@@ -16,21 +16,21 @@ import type { GraphPaging } from "../waba/types.js";
  */
 export type GroupJoinApprovalMode = "auto_approve" | "approval_required";
 
-/** Wire-shaped participant as returned by Graph (`wa_id`). */
+/** Public participant response. Graph wire `wa_id` is normalized to `waId`. */
 export interface GroupParticipantWire {
-  readonly wa_id?: string;
+  readonly waId?: string;
   readonly [key: string]: unknown;
 }
 
-/** Group metadata response from `GET /<group-id>` (raw Graph wire). */
+/** Group metadata response from `GET /<group-id>` (camelCase public shape). */
 export interface GroupDetails {
   readonly id?: string;
   readonly subject?: string;
   readonly description?: string;
-  readonly join_approval_mode?: GroupJoinApprovalMode;
+  readonly joinApprovalMode?: GroupJoinApprovalMode;
   readonly suspended?: boolean;
-  readonly creation_timestamp?: number;
-  readonly total_participant_count?: number;
+  readonly creationTimestamp?: number;
+  readonly totalParticipantCount?: number;
   readonly participants?: readonly GroupParticipantWire[];
   readonly [key: string]: unknown;
 }
@@ -42,14 +42,14 @@ export interface GroupDetails {
  * `group_*_update` webhook.
  */
 export interface GroupMutationResponse {
-  readonly request_id?: string;
+  readonly requestId?: string;
   readonly success?: boolean;
   readonly [key: string]: unknown;
 }
 
 /** Invite-link response from `GET /<group-id>/invite_link`. */
 export interface GroupInviteLinkResponse {
-  readonly invite_link?: string;
+  readonly inviteLink?: string;
   readonly [key: string]: unknown;
 }
 
@@ -57,7 +57,7 @@ export interface GroupInviteLinkResponse {
 export interface GroupSummaryWire {
   readonly id?: string;
   readonly subject?: string;
-  readonly created_at?: string;
+  readonly createdAt?: string;
   readonly [key: string]: unknown;
 }
 
@@ -70,9 +70,9 @@ export interface ListGroupsResponse {
 
 /** A single pending join request (raw Graph wire). */
 export interface GroupJoinRequestWire {
-  readonly join_request_id?: string;
-  readonly wa_id?: string;
-  readonly creation_timestamp?: number;
+  readonly joinRequestId?: string;
+  readonly waId?: string;
+  readonly creationTimestamp?: number;
   readonly [key: string]: unknown;
 }
 
