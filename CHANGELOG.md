@@ -14,6 +14,11 @@ Patch alpha compatibility and local-operator release. Begins the WhatsApp Groups
 - camelCase public input mapped to the snake_case Graph wire only at the transport boundary; enforces Groups limits (subject ≤128, description ≤2048, ≤8 participants) and the shared path-segment / prototype-poison guards. Group mutations are asynchronous: callables return the `request_id` correlator and the terminal outcome arrives via the matching `group_*_update` webhook.
 - Exported at the root barrel and tracked by `bun run api:check`.
 
+### WATS-133 — Groups scoped clients
+
+- Adds `PhoneNumberClient.createGroup(...)`, `PhoneNumberClient.listGroups(...)`, and `PhoneNumberClient.group(groupId)` over the WATS-132 Groups endpoint family. The phone-number client binds the constructor `phoneNumberId`; caller params cannot override that scope.
+- Adds `GroupClient` with construction-time `groupId` validation and scoped methods for `getInfo`, `update`, `delete`, `getInviteLink`, `resetInviteLink`, `removeParticipants`, `getJoinRequests`, `approveJoinRequests`, and `rejectJoinRequests`. Each method injects the bound group id and preserves the WATS-132 wire methods and snake_case bodies.
+
 ### Release metadata
 
 - Release metadata is aligned for 0.3.13 across the root manifest and the publishable `@wats/*` packages, preserving the canonical `@wats/*` package scope and credential-gated live `wats serve` flow.

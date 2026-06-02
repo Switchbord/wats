@@ -15,6 +15,11 @@ export {
 } from "./subclients/phoneNumberClient.js";
 export type { PhoneNumberClientConfig } from "./subclients/phoneNumberClient.js";
 export {
+  GroupClient,
+  validateGroupClientConfig
+} from "./subclients/groupClient.js";
+export type { GroupClientConfig } from "./subclients/groupClient.js";
+export {
   WABAClient,
   validateWABAClientConfig
 } from "./subclients/wabaClient.js";

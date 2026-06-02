@@ -16,6 +16,7 @@ import type { EndpointInvokeOptions } from "../endpoint.js";
 import { assertSafePathParamValue } from "../endpoint.js";
 import { GraphRequestValidationError } from "../errors.js";
 import { copyOptionalParamsObject } from "../internal/validation/options.js";
+import { GroupClient } from "./groupClient.js";
 import {
   getBusinessProfile as getBusinessProfileEndpoint,
   getCommerceSettings as getCommerceSettingsEndpoint,
@@ -64,6 +65,14 @@ import {
   type RejectCallRequest,
   type TerminateCallRequest
 } from "../endpoints/calling.js";
+import {
+  createGroup as createGroupEndpoint,
+  listGroups as listGroupsEndpoint,
+  type CreateGroupBody,
+  type GroupMutationResponse,
+  type ListGroupsParams,
+  type ListGroupsResponse
+} from "../endpoints/groups.js";
 import {
   buildMarkMessageAsReadPayload,
   buildRemoveReactionPayload,
@@ -210,6 +219,42 @@ export class PhoneNumberClient {
 
   get graphClient(): GraphClient {
     return this.#graphClient;
+  }
+
+  /** Return a group-scoped client bound to a validated WhatsApp group id. */
+  group(groupId: string): GroupClient {
+    return new GroupClient({ graphClient: this.#graphClient, groupId });
+  }
+
+  /** Graph `POST /{phoneNumberId}/groups` — create an invite-only business group. */
+  async createGroup(
+    body: CreateGroupBody,
+    opts?: EndpointInvokeOptions
+  ): Promise<GroupMutationResponse> {
+    return createGroupEndpoint(
+      this.#graphClient,
+      { phoneNumberId: this.#phoneNumberId },
+      body,
+      opts
+    );
+  }
+
+  /** Graph `GET /{phoneNumberId}/groups` — list groups owned by this business number. */
+  async listGroups(
+    params?: Omit<ListGroupsParams, "phoneNumberId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<ListGroupsResponse> {
+    const scopedParams: Record<string, unknown> = copyOptionalParamsObject(
+      params,
+      "PhoneNumberClient.listGroups"
+    );
+    scopedParams.phoneNumberId = this.#phoneNumberId;
+    return listGroupsEndpoint(
+      this.#graphClient,
+      scopedParams as unknown as ListGroupsParams,
+      undefined,
+      opts
+    );
   }
 
   /** Graph `GET /{phoneNumberId}` — returns phone-number inventory/profile fields. */
