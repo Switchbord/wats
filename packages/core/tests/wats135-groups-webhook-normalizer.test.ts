@@ -104,6 +104,11 @@ describe("WATS-135 group webhook normalization", () => {
         request_id: "req-create-failed",
         errors: [{ code: 131000, title: "Create failed" }]
       }),
+      groupChange("group_lifecycle_update", {
+        type: "group_delete",
+        request_id: "req-delete-1",
+        group_id: "group-2"
+      }),
       groupChange("group_participants_update", {
         type: "group_join_request_revoked",
         group_id: "group-2",
@@ -117,7 +122,11 @@ describe("WATS-135 group webhook normalization", () => {
         initiated_by: "15551239999",
         removed_participants: [{ input: "15551230001", wa_id: "15551230001" }],
         failed_participants: [
-          { input: "15551230002", errors: [{ code: 131051, title: "not in group" }] }
+          {
+            input: "15551230002",
+            wa_id: "15551230002",
+            errors: [{ code: 131051, title: "not in group" }]
+          }
         ]
       }),
       groupChange("group_settings_update", {
@@ -133,24 +142,29 @@ describe("WATS-135 group webhook normalization", () => {
     ]));
 
     expect(result.skipped).toEqual([]);
-    expect(result.updates.length).toBe(4);
+    expect(result.updates.length).toBe(5);
 
     const lifecycle = result.updates[0] as TypedGroupLifecycleUpdate;
     expect(lifecycle.group.errors?.[0]).toEqual({ code: 131000, title: "Create failed" });
     expect(lifecycle.group.groupId).toBeUndefined();
 
-    const revoked = result.updates[1] as TypedGroupParticipantsUpdate;
+    const deleted = result.updates[1] as TypedGroupLifecycleUpdate;
+    expect(deleted.group.type).toBe("group_delete");
+    expect(deleted.group.groupId).toBe("group-2");
+
+    const revoked = result.updates[2] as TypedGroupParticipantsUpdate;
     expect(revoked.group.joinRequestId).toBe("join-1");
     expect(revoked.group.waId).toBe("15551239999");
     expect(revoked.group.reason).toBe("request_expired");
 
-    const remove = result.updates[2] as TypedGroupParticipantsUpdate;
+    const remove = result.updates[3] as TypedGroupParticipantsUpdate;
     expect(remove.group.initiatedBy).toBe("15551239999");
     expect(remove.group.removedParticipants).toEqual([{ input: "15551230001", waId: "15551230001" }]);
     expect(remove.group.failedParticipants?.[0]?.input).toBe("15551230002");
+    expect(remove.group.failedParticipants?.[0]?.waId).toBe("15551230002");
     expect(remove.group.failedParticipants?.[0]?.errors?.[0]).toEqual({ code: 131051, title: "not in group" });
 
-    const settings = result.updates[3] as TypedGroupSettingsUpdate;
+    const settings = result.updates[4] as TypedGroupSettingsUpdate;
     expect(settings.group.profilePicture).toEqual({
       mimeType: "image/jpeg",
       sha256: "sha-photo",

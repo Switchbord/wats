@@ -117,7 +117,7 @@ export interface WhatsAppGroupParticipantsUpdateValue {
   waId?: string;
   addedParticipants?: GroupParticipant[];
   removedParticipants?: { input?: string; waId?: string }[];
-  failedParticipants?: { input?: string; errors?: unknown[] }[];
+  failedParticipants?: { input?: string; waId?: string; errors?: unknown[] }[];
   errors?: unknown[];
   raw?: unknown;
 }
@@ -136,7 +136,7 @@ export interface WhatsAppGroupSettingsUpdateValue {
   type: string;
   groupSubject?: { text?: string; updateSuccessful: boolean; errors?: unknown[] };
   groupDescription?: { text?: string; updateSuccessful: boolean; errors?: unknown[] };
-  profilePicture?: { mimeType?: string; sha256?: string; updateSuccessful: boolean };
+  profilePicture?: { mimeType?: string; sha256?: string; updateSuccessful: boolean; errors?: unknown[] };
   errors?: unknown[];
   raw?: unknown;
 }
