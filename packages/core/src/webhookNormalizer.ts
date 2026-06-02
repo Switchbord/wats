@@ -1438,6 +1438,10 @@ function normalizeGroupFieldChange(
     }
     return;
   }
+  if (Object.getOwnPropertyDescriptor(value, "groups") !== undefined) {
+    pushSkip(acc, "malformed_field", `${path}.value.groups`, "groups-not-array");
+    return;
+  }
 
   normalizeGroupPayload(kind, value, value, `${path}.value`, wabaId, entryTimeMs, phoneNumberId, rawChange, acc);
 }
@@ -1455,8 +1459,9 @@ function normalizeGroupPayload(
 ): void {
   const payload = withGroupChangeMetadata(group, value);
   const type = readStringField(payload, "type") ?? "unknown";
+  const rawGroupId = readOwnDataField(payload, "group_id");
   const groupId = readSafeIdField(payload, "group_id");
-  if (groupId === undefined && !allowsLifecycleWithoutGroupId(kind, payload, type)) {
+  if (groupId === undefined && (rawGroupId !== undefined || !allowsLifecycleWithoutGroupId(kind, payload, type))) {
     pushSkip(acc, "malformed_field", `${path}.group_id`, "missing-or-unsafe-group-id");
     return;
   }
