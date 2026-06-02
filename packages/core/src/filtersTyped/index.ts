@@ -31,3 +31,4 @@ export { message, type MessageFilterNamespace } from "./message.js";
 export { status, type StatusFilterNamespace } from "./status.js";
 export { call, type CallFilterNamespace } from "./call.js";
 export { template, type TemplateFilterNamespace } from "./template.js";
+export { group, type GroupFilterNamespace } from "./group.js";

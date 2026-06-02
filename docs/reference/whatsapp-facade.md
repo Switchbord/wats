@@ -66,6 +66,21 @@ await wa.phoneNumberClient?.sendMessage({
 });
 ```
 
+## Group helpers (WATS-136)
+
+When constructed with `phoneNumberId`, the facade exposes thin Groups helpers over
+the phone-number scoped client:
+
+```ts
+await wa.createGroup({ subject: "Launch team" });
+await wa.sendGroupMessage({ groupId: "120363...", text: "Hello group" });
+const groupClient = wa.group("120363...");
+```
+
+`sendGroupMessage` sends a text payload to `POST /{phoneNumberId}/messages` with
+`recipient_type: "group"` and `to` set to the group id. Missing `phoneNumberId`
+or malformed group/text input rejects before transport with `GraphRequestValidationError`.
+
 ## Handlers
 
 `wa.on(filter, handler)` delegates directly to the underlying `TypedRouter` and returns the same `RegistrationHandle`.
@@ -112,8 +127,9 @@ const update = await nextReply.promise;
 
 Options:
 
-- `type: "message" | "status" | "account" | "unknown"`
+- `type: "message" | "status" | "account" | "unknown" | "callConnect" | "callTerminate" | "callStatus" | "groupLifecycle" | "groupParticipants" | "groupSettings" | "groupStatus"`
 - `from?: string` — currently narrows message sender or status recipient.
+- `groupId?: string` — WATS-136 group narrower for group messages/statuses and `group_*_update` webhooks.
 - `filter?: TypedFilter<...>` — additional typed constraint.
 - `timeoutMs?: number`
 - `signal?: AbortSignal`

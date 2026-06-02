@@ -25,6 +25,11 @@ Patch alpha compatibility and local-operator release. Begins the WhatsApp Groups
 - Inbound group `messages` now surface `message.groupId`; group status webhooks preserve `recipientType: "group"` and `recipientParticipantId`, including group pricing categories such as `group_service`.
 - Unknown future group fields still become `TypedUnknownUpdate`; malformed group payloads with unsafe or missing `group_id` / `phone_number_id` are reported in `skipped[]` instead of throwing.
 
+### WATS-136 — Groups filters and facade ergonomics
+
+- Adds `filtersTyped.group` with helpers for group messages, participants/lifecycle/settings/status updates, and `fromGroup(groupId)` composition over normalized group updates.
+- Extends the `WhatsApp` facade with `createGroup`, `sendGroupMessage`, `group(groupId)`, and `listen({ groupId })` ergonomics over the existing typed router/listener substrate.
+
 ### Release metadata
 
 - Release metadata is aligned for 0.3.13 across the root manifest and the publishable `@wats/*` packages, preserving the canonical `@wats/*` package scope and credential-gated live `wats serve` flow.
