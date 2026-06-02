@@ -134,6 +134,11 @@ describe("WATS-138 public Groups documentation", () => {
     expect(doc).toMatch(/validation.*GraphRequestValidationError|GraphRequestValidationError.*validation/isu);
     expect(doc).toMatch(/Meta errors.*graph_request_failed|graph_request_failed.*Meta errors/isu);
     expect(doc).toMatch(/camelCase.*snake_case|snake_case.*camelCase/isu);
+    expect(doc).toContain("create.request_id");
+    expect(doc).toContain("approveJoinRequests({ joinRequestIds:");
+    expect(doc).toContain("invite.invite_link");
+    expect(doc).not.toContain("create.requestId");
+    expect(doc).not.toContain("approveJoinRequests({ joinRequests:");
   });
 
   test("groups quickstart documents the offline-to-live path without credential leakage", () => {
