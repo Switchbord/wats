@@ -3,7 +3,7 @@
 - status: WATS-138 runnable offline Groups example
 - safety default: offline by default
 
-This example exercises the Groups flow without live Meta credentials. It uses `@wats/graph`, `@wats/core`, MockTransport, and synthetic group webhook data.
+This example exercises the Groups flow without live Meta credentials. It uses `@wats/graph`, `@wats/core`, MockTransport, and synthetic `value.groups[]` group webhook data.
 
 ## Run
 
