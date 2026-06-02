@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.17] - 2026-06-02
+
+### Added
+
+- **Groups filters + facade ergonomics (WATS-136).** `@wats/core` adds `filtersTyped.group` with `participantsUpdate()`, `lifecycleUpdate()`, `settingsUpdate()`, `statusUpdate()`, and `fromGroup(groupId)` composition over the WATS-135 normalized group updates. The `WhatsApp` facade gains `createGroup`, `sendGroupMessage`, `group(groupId)`, and `listen({ groupId })` ergonomics over the existing typed router/listener substrate.
+
+### Changed
+
+- Groups public responses now stay camelCase (`requestId`, `inviteLink`, `joinApprovalMode`, `creationTimestamp`, `totalParticipantCount`, `joinRequestId`, `waId`); snake_case remains only at the Graph wire boundary. The `@wats/graph/endpoints/groups` subpath is unchanged for consumers (internally reorganized into `callables`/`responses`/`types` modules).
+
+### Release
+
+- Release metadata is aligned for 0.3.17: all publishable `@wats/*` packages, the service OpenAPI default version, README, and release-contract locks move together.
+
 ## [0.3.16] - 2026-06-02
 
 ### Added
