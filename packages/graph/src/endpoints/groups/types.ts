@@ -53,6 +53,21 @@ export interface GroupInviteLinkResponse {
   readonly [key: string]: unknown;
 }
 
+/** A single group summary as returned by `GET /<phone-number-id>/groups`. */
+export interface GroupSummaryWire {
+  readonly id?: string;
+  readonly subject?: string;
+  readonly created_at?: string;
+  readonly [key: string]: unknown;
+}
+
+/** Active-groups listing from `GET /<phone-number-id>/groups`. */
+export interface ListGroupsResponse {
+  readonly data?: { readonly groups?: readonly GroupSummaryWire[] } | readonly GroupSummaryWire[];
+  readonly paging?: GraphPaging;
+  readonly [key: string]: unknown;
+}
+
 /** A single pending join request (raw Graph wire). */
 export interface GroupJoinRequestWire {
   readonly join_request_id?: string;
@@ -72,6 +87,13 @@ export interface GroupJoinRequestsResponse {
 
 export interface CreateGroupParams {
   readonly phoneNumberId: string;
+}
+
+export interface ListGroupsParams {
+  readonly phoneNumberId: string;
+  readonly limit?: string;
+  readonly after?: string;
+  readonly before?: string;
 }
 
 export interface CreateGroupBody {

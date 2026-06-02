@@ -82,6 +82,7 @@ Current endpoint subpaths:
 - `@wats/graph/endpoints/flows`
 - `@wats/graph/endpoints/calling`
 - `@wats/graph/endpoints/business-management`
+- `@wats/graph/endpoints/groups`
 
 Run `bun run api:check` after changing this list. WATS-54 checks package exports, target source files, graph-consumer package-specifier imports, `docs/reference/index.md`, `docs/architecture/public-api-surface.md`, this package map, `docs/migration/pywa-to-wats.md`, and `CHANGELOG.md` for the same Graph endpoint subpaths.
 

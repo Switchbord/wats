@@ -7,9 +7,10 @@ export {
   getGroup,
   getGroupInviteLink,
   listGroupJoinRequests,
+  listGroups,
   rejectGroupJoinRequests,
   removeGroupParticipants,
-  revokeGroupInviteLink,
+  resetGroupInviteLink,
   updateGroup
 } from "./callables.js";
 
@@ -34,7 +35,10 @@ export type {
   GroupJoinRequestsResponse,
   GroupMutationResponse,
   GroupParticipantWire,
+  GroupSummaryWire,
   ListGroupJoinRequestsParams,
+  ListGroupsParams,
+  ListGroupsResponse,
   ManageGroupJoinRequestsBody,
   RemoveGroupParticipantsBody,
   UpdateGroupBody

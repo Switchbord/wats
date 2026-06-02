@@ -58,7 +58,8 @@ const expectedGraphEndpointSpecifiers = [
   "@wats/graph/endpoints/templates",
   "@wats/graph/endpoints/flows",
   "@wats/graph/endpoints/calling",
-  "@wats/graph/endpoints/business-management"
+  "@wats/graph/endpoints/business-management",
+  "@wats/graph/endpoints/groups"
 ] as const;
 
 describe("WATS-54 public API consistency check", () => {
@@ -100,8 +101,8 @@ describe("WATS-54 public API consistency check", () => {
       `api:check failed:\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
     );
     expect(result.stdout).toContain("public-api-consistency:ok");
-    expect(result.stdout).toContain("checked 6 graph endpoint subpaths");
-    expect(result.stdout).toContain("docs=30");
+    expect(result.stdout).toContain("checked 7 graph endpoint subpaths");
+    expect(result.stdout).toContain("docs=35");
     const combined = `${result.stdout}\n${result.stderr}`;
     expect(combined).not.toMatch(/https?:\/\//u);
     expect(combined).not.toMatch(/ACCESS_TOKEN|APP_SECRET|META|WHATSAPP|Bearer/u);

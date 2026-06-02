@@ -15,7 +15,7 @@ Curated index of every WATS reference doc. Use the "When to use it" column to fi
 | [`reference/scoped-clients.md`](./scoped-clients.md) | Binding a `phoneNumberId` or `wabaId` into a `PhoneNumberClient` / `WABAClient`. |
 | [`reference/errors.md`](./errors.md) | The F-5 error registry; every pywa error code → WATS subclass; classification axis. |
 | [`reference/pagination.md`](./pagination.md) | `paginate` / `paginateAll`; cursor extraction; `AbortSignal`; `PaginationError` taxonomy. |
-| [`reference/media.md`](./media.md) | Media runtime: upload, metadata, binary download, delete, encrypted decrypt, upload sessions, validation, and integrity checks. Public Graph endpoint subpaths cover messages at `@wats/graph/endpoints/messages`, media at `@wats/graph/endpoints/media`, templates at `@wats/graph/endpoints/templates`, Flows at `@wats/graph/endpoints/flows`, calling at `@wats/graph/endpoints/calling`, and business management at `@wats/graph/endpoints/business-management`; WATS-54 keeps these aligned with `bun run api:check`. |
+| [`reference/media.md`](./media.md) | Media runtime: upload, metadata, binary download, delete, encrypted decrypt, upload sessions, validation, and integrity checks. Public Graph endpoint subpaths cover messages at `@wats/graph/endpoints/messages`, media at `@wats/graph/endpoints/media`, templates at `@wats/graph/endpoints/templates`, Flows at `@wats/graph/endpoints/flows`, calling at `@wats/graph/endpoints/calling`, and business management at `@wats/graph/endpoints/business-management`, plus the WATS-132 Groups API at `@wats/graph/endpoints/groups`; WATS-54 keeps these aligned with `bun run api:check`. |
 
 ## Core primitives (`@wats/core`)
 

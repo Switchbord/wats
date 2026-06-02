@@ -18,6 +18,8 @@ import type {
   GroupJoinRequestsResponse,
   GroupMutationResponse,
   ListGroupJoinRequestsParams,
+  ListGroupsParams,
+  ListGroupsResponse,
   ManageGroupJoinRequestsBody,
   RemoveGroupParticipantsBody,
   UpdateGroupBody
@@ -120,6 +122,46 @@ export const createGroup = Object.assign(
   { definition: createGroupRaw.definition }
 );
 
+const listGroupsRaw = defineEndpoint<
+  { phoneNumberId: string; limit?: string; after?: string; before?: string },
+  never,
+  ListGroupsResponse
+>({
+  method: "GET",
+  pathTemplate: "/{phoneNumberId}/groups",
+  params: {
+    phoneNumberId: { in: "path", required: true },
+    limit: { in: "query" },
+    after: { in: "query" },
+    before: { in: "query" }
+  }
+});
+
+export const listGroups = Object.assign(
+  async function listGroups(
+    client: GraphClient,
+    params: ListGroupsParams,
+    body?: never,
+    opts?: EndpointInvokeOptions
+  ): Promise<ListGroupsResponse> {
+    const record = groupAssertPlainRecord(params, "listGroups", "params");
+    const query: { phoneNumberId: string; limit?: string; after?: string; before?: string } = {
+      phoneNumberId: groupPathParam(params, "listGroups", "phoneNumberId")
+    };
+    if (record.limit !== undefined) {
+      query.limit = groupString(record.limit, "limit", "listGroups", 32);
+    }
+    if (record.after !== undefined) {
+      query.after = groupString(record.after, "after", "listGroups", 4096);
+    }
+    if (record.before !== undefined) {
+      query.before = groupString(record.before, "before", "listGroups", 4096);
+    }
+    return listGroupsRaw(client, query, body, opts);
+  },
+  { definition: listGroupsRaw.definition }
+);
+
 const getGroupRaw = defineEndpoint<{ groupId: string; fields?: string }, never, GroupDetails>({
   method: "GET",
   pathTemplate: "/{groupId}",
@@ -215,27 +257,28 @@ export const getGroupInviteLink = Object.assign(
   { definition: getGroupInviteLinkRaw.definition }
 );
 
-const revokeGroupInviteLinkRaw = defineEndpoint<{ groupId: string }, never, GroupMutationResponse>({
-  method: "DELETE",
+const resetGroupInviteLinkRaw = defineEndpoint<{ groupId: string }, WireBody, GroupInviteLinkResponse>({
+  method: "POST",
   pathTemplate: "/{groupId}/invite_link",
-  params: { groupId: { in: "path", required: true } }
+  params: { groupId: { in: "path", required: true } },
+  bodyContentType: "application/json"
 });
 
-export const revokeGroupInviteLink = Object.assign(
-  async function revokeGroupInviteLink(
+export const resetGroupInviteLink = Object.assign(
+  async function resetGroupInviteLink(
     client: GraphClient,
     params: GroupIdParams,
     body?: never,
     opts?: EndpointInvokeOptions
-  ): Promise<GroupMutationResponse> {
-    return revokeGroupInviteLinkRaw(
+  ): Promise<GroupInviteLinkResponse> {
+    return resetGroupInviteLinkRaw(
       client,
-      { groupId: groupPathParam(params, "revokeGroupInviteLink", "groupId") },
-      body,
+      { groupId: groupPathParam(params, "resetGroupInviteLink", "groupId") },
+      { messaging_product: "whatsapp" },
       opts
     );
   },
-  { definition: revokeGroupInviteLinkRaw.definition }
+  { definition: resetGroupInviteLinkRaw.definition }
 );
 
 const listGroupJoinRequestsRaw = defineEndpoint<
@@ -274,8 +317,15 @@ export const listGroupJoinRequests = Object.assign(
   { definition: listGroupJoinRequestsRaw.definition }
 );
 
-const manageGroupJoinRequestsRaw = defineEndpoint<{ groupId: string }, WireBody, GroupMutationResponse>({
+const approveGroupJoinRequestsRaw = defineEndpoint<{ groupId: string }, WireBody, GroupMutationResponse>({
   method: "POST",
+  pathTemplate: "/{groupId}/join_requests",
+  params: { groupId: { in: "path", required: true } },
+  bodyContentType: "application/json"
+});
+
+const rejectGroupJoinRequestsRaw = defineEndpoint<{ groupId: string }, WireBody, GroupMutationResponse>({
+  method: "DELETE",
   pathTemplate: "/{groupId}/join_requests",
   params: { groupId: { in: "path", required: true } },
   bodyContentType: "application/json"
@@ -288,14 +338,14 @@ export const approveGroupJoinRequests = Object.assign(
     body: ManageGroupJoinRequestsBody,
     opts?: EndpointInvokeOptions
   ): Promise<GroupMutationResponse> {
-    return manageGroupJoinRequestsRaw(
+    return approveGroupJoinRequestsRaw(
       client,
       { groupId: groupPathParam(params, "approveGroupJoinRequests", "groupId") },
       buildManageJoinRequestsBody(body, "approve", "approveGroupJoinRequests"),
       opts
     );
   },
-  { definition: manageGroupJoinRequestsRaw.definition }
+  { definition: approveGroupJoinRequestsRaw.definition }
 );
 
 export const rejectGroupJoinRequests = Object.assign(
@@ -305,18 +355,18 @@ export const rejectGroupJoinRequests = Object.assign(
     body: ManageGroupJoinRequestsBody,
     opts?: EndpointInvokeOptions
   ): Promise<GroupMutationResponse> {
-    return manageGroupJoinRequestsRaw(
+    return rejectGroupJoinRequestsRaw(
       client,
       { groupId: groupPathParam(params, "rejectGroupJoinRequests", "groupId") },
       buildManageJoinRequestsBody(body, "reject", "rejectGroupJoinRequests"),
       opts
     );
   },
-  { definition: manageGroupJoinRequestsRaw.definition }
+  { definition: rejectGroupJoinRequestsRaw.definition }
 );
 
 const removeGroupParticipantsRaw = defineEndpoint<{ groupId: string }, WireBody, GroupMutationResponse>({
-  method: "POST",
+  method: "DELETE",
   pathTemplate: "/{groupId}/participants",
   params: { groupId: { in: "path", required: true } },
   bodyContentType: "application/json"

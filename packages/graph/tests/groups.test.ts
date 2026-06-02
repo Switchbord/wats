@@ -16,14 +16,16 @@ import {
   getGroup,
   getGroupInviteLink,
   listGroupJoinRequests,
+  listGroups,
   rejectGroupJoinRequests,
   removeGroupParticipants,
-  revokeGroupInviteLink,
+  resetGroupInviteLink,
   updateGroup,
   type GroupDetails,
   type GroupInviteLinkResponse,
   type GroupJoinRequestsResponse,
-  type GroupMutationResponse
+  type GroupMutationResponse,
+  type ListGroupsResponse
 } from "../src";
 import {
   createMockTransport,
@@ -63,7 +65,8 @@ describe("WATS-132 Groups endpoint family", () => {
     expect(groups.updateGroup).toBe(root.updateGroup);
     expect(groups.deleteGroup).toBe(root.deleteGroup);
     expect(groups.getGroupInviteLink).toBe(root.getGroupInviteLink);
-    expect(groups.revokeGroupInviteLink).toBe(root.revokeGroupInviteLink);
+    expect(groups.resetGroupInviteLink).toBe(root.resetGroupInviteLink);
+    expect(groups.listGroups).toBe(root.listGroups);
     expect(groups.listGroupJoinRequests).toBe(root.listGroupJoinRequests);
     expect(groups.approveGroupJoinRequests).toBe(root.approveGroupJoinRequests);
     expect(groups.rejectGroupJoinRequests).toBe(root.rejectGroupJoinRequests);
@@ -155,11 +158,33 @@ describe("WATS-132 Groups endpoint family", () => {
     expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v25.0/grp-1/invite_link");
   });
 
-  test("revokeGroupInviteLink DELETEs /{groupId}/invite_link", async () => {
-    const { client, handle } = clientWith(ok());
-    await revokeGroupInviteLink(client, { groupId: "grp-1" });
-    expect(handle.requests[0]?.method).toBe("DELETE");
+  test("resetGroupInviteLink POSTs /{groupId}/invite_link", async () => {
+    const { client, handle } = clientWith(ok({ invite_link: "https://chat.whatsapp.com/NEW999" }));
+    const res: GroupInviteLinkResponse = await resetGroupInviteLink(client, { groupId: "grp-1" });
+    expect(res.invite_link).toBe("https://chat.whatsapp.com/NEW999");
+    expect(handle.requests[0]?.method).toBe("POST");
     expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v25.0/grp-1/invite_link");
+    expect(parseBody(handle.requests[0]?.body)).toEqual({ messaging_product: "whatsapp" });
+  });
+
+  test("listGroups GETs /{phoneNumberId}/groups with paging query", async () => {
+    const { client, handle } = clientWith(
+      ok({
+        data: { groups: [{ id: "grp-1", subject: "Team", created_at: "1700000000" }] },
+        paging: { cursors: { after: "CUR2" } }
+      })
+    );
+    const res: ListGroupsResponse = await listGroups(client, {
+      phoneNumberId: "555",
+      limit: "25",
+      after: "CUR"
+    });
+    const data = res.data as { groups?: { id?: string }[] };
+    expect(data.groups?.[0]?.id).toBe("grp-1");
+    expect(handle.requests[0]?.method).toBe("GET");
+    expect(handle.requests[0]?.url).toBe(
+      "https://graph.facebook.com/v25.0/555/groups?limit=25&after=CUR"
+    );
   });
 
   test("listGroupJoinRequests GETs /{groupId}/join_requests with paging query", async () => {
@@ -195,11 +220,13 @@ describe("WATS-132 Groups endpoint family", () => {
     });
   });
 
-  test("rejectGroupJoinRequests POSTs /{groupId}/join_requests with reject action", async () => {
+  test("rejectGroupJoinRequests DELETEs /{groupId}/join_requests with reject action", async () => {
     const { client, handle } = clientWith(ok());
     await rejectGroupJoinRequests(client, { groupId: "grp-1" }, {
       joinRequestIds: ["jr-9"]
     });
+    expect(handle.requests[0]?.method).toBe("DELETE");
+    expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v25.0/grp-1/join_requests");
     expect(parseBody(handle.requests[0]?.body)).toEqual({
       messaging_product: "whatsapp",
       action: "reject",
@@ -207,12 +234,12 @@ describe("WATS-132 Groups endpoint family", () => {
     });
   });
 
-  test("removeGroupParticipants POSTs /{groupId}/participants with remove action", async () => {
+  test("removeGroupParticipants DELETEs /{groupId}/participants with remove action", async () => {
     const { client, handle } = clientWith(ok());
     await removeGroupParticipants(client, { groupId: "grp-1" }, {
       waIds: ["15551110000", "15551110001"]
     });
-    expect(handle.requests[0]?.method).toBe("POST");
+    expect(handle.requests[0]?.method).toBe("DELETE");
     expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v25.0/grp-1/participants");
     expect(parseBody(handle.requests[0]?.body)).toEqual({
       messaging_product: "whatsapp",

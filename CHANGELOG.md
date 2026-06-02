@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.3.13] - 2026-06-01
+
+Patch alpha compatibility and local-operator release. Begins the WhatsApp Groups API — a WATS framework addition with no pywa equivalent — as composable, opt-in surfaces.
+
+### WATS-131 — Groups type foundation
+
+- Adds the `@wats/types/groups` subpath: group entity types (`WatsGroup`, `GroupParticipant`, `GroupJoinRequest`, `GroupInviteLink`), `GroupJoinApprovalMode`/`GroupRecipientType` unions, and the four group webhook field-value types (`group_lifecycle_update`, `group_participants_update`, `group_settings_update`, `group_status_update`), with the `WATS_TYPES_GROUPS_EXPORTS` documentation manifest. camelCase over Meta's snake_case wire; no runtime behavior beyond the manifest.
+
+### WATS-132 — Groups Graph endpoint family
+
+- Adds the `@wats/graph/endpoints/groups` subpath with `defineEndpoint` callables: `createGroup` and `listGroups` (`POST`/`GET /<phoneNumberId>/groups`), `getGroup`/`updateGroup`/`deleteGroup` (`GET`/`POST`/`DELETE /<groupId>`), `getGroupInviteLink`/`resetGroupInviteLink` (`GET`/`POST /<groupId>/invite_link`), `removeGroupParticipants` (`DELETE /<groupId>/participants`), and `listGroupJoinRequests`/`approveGroupJoinRequests`/`rejectGroupJoinRequests` (`GET`/`POST`/`DELETE /<groupId>/join_requests`).
+- camelCase public input mapped to the snake_case Graph wire only at the transport boundary; enforces Groups limits (subject ≤128, description ≤2048, ≤8 participants) and the shared path-segment / prototype-poison guards. Group mutations are asynchronous: callables return the `request_id` correlator and the terminal outcome arrives via the matching `group_*_update` webhook.
+- Exported at the root barrel and tracked by `bun run api:check`.
+
+### Release metadata
+
+- Release metadata is aligned for 0.3.13 across the root manifest and the publishable `@wats/*` packages, preserving the canonical `@wats/*` package scope and credential-gated live `wats serve` flow.
+
 ## [0.3.12] - 2026-06-01
 
 Patch alpha compatibility and local-operator release. Adds an opt-in native PaaS serve mode so `wats serve` works on managed platforms without an external container entrypoint shim.

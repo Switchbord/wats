@@ -14,6 +14,7 @@ import * as templatesSubpath from "@wats/graph/endpoints/templates";
 import * as flowsSubpath from "@wats/graph/endpoints/flows";
 import * as callingSubpath from "@wats/graph/endpoints/calling";
 import * as businessManagementSubpath from "@wats/graph/endpoints/business-management";
+import * as groupsSubpath from "@wats/graph/endpoints/groups";
 import * as transportSubpath from "@wats/graph/transport";
 import {
   GraphApiError,
@@ -1276,6 +1277,20 @@ async function verify(): Promise<VerifyReportOk> {
     }
   }
 
+  checks["WATS-132 groups subpath exports runtime surface"] =
+    typeof groupsSubpath.createGroup === "function" &&
+    typeof groupsSubpath.listGroups === "function" &&
+    typeof groupsSubpath.getGroup === "function" &&
+    typeof groupsSubpath.updateGroup === "function" &&
+    typeof groupsSubpath.deleteGroup === "function" &&
+    typeof groupsSubpath.getGroupInviteLink === "function" &&
+    typeof groupsSubpath.resetGroupInviteLink === "function" &&
+    typeof groupsSubpath.removeGroupParticipants === "function" &&
+    typeof groupsSubpath.listGroupJoinRequests === "function" &&
+    typeof groupsSubpath.approveGroupJoinRequests === "function" &&
+    typeof groupsSubpath.rejectGroupJoinRequests === "function" &&
+    typeof groupsSubpath.GROUP_MAX_PARTICIPANTS === "number";
+
   return {
     ok: true,
     checks,
@@ -1287,7 +1302,8 @@ async function verify(): Promise<VerifyReportOk> {
       "@wats/graph/endpoints/templates": Object.keys(templatesSubpath).sort(),
       "@wats/graph/endpoints/flows": Object.keys(flowsSubpath).sort(),
       "@wats/graph/endpoints/calling": Object.keys(callingSubpath).sort(),
-      "@wats/graph/endpoints/business-management": Object.keys(businessManagementSubpath).sort()
+      "@wats/graph/endpoints/business-management": Object.keys(businessManagementSubpath).sort(),
+      "@wats/graph/endpoints/groups": Object.keys(groupsSubpath).sort()
     }
   };
 }
