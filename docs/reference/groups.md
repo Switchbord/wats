@@ -59,12 +59,13 @@ const create = await phone.createGroup({
   description: "Launch coordination",
   joinApprovalMode: "approval_required"
 });
-console.log(create.requestId);
+console.log(create.request_id);
 
 // Wait for group_lifecycle_update to learn the group id.
 const group = phone.group("GROUP_ID_FROM_WEBHOOK");
 const invite = await group.getInviteLink();
-await group.approveJoinRequests({ joinRequests: ["JOIN_REQUEST_ID"] });
+console.log(invite.invite_link);
+await group.approveJoinRequests({ joinRequestIds: ["JOIN_REQUEST_ID"] });
 await phone.sendText({ to: "GROUP_ID_FROM_WEBHOOK", recipientType: "group", text: "Welcome" });
 ```
 
@@ -97,4 +98,4 @@ These routes use the configured business phone-number id. They require service b
 
 WATS validation failures reject before transport with `GraphRequestValidationError`; examples include empty ids, unsafe path segments, over-limit subjects/descriptions, too many participants, bad join-request arrays, unsupported group message types, and attempts to use phone-number-shaped ids as group recipients. Meta errors remain `GraphApiError` subclasses in SDK code and `graph_request_failed` service envelopes at the service boundary.
 
-The public API is camelCase: `phoneNumberId`, `groupId`, `joinApprovalMode`, `inviteLink`, `requestId`, `addedParticipants`, `recipientType`. Wire snapshots and raw webhook fields preserve Meta snake_case only inside `raw`/`rawChange` evidence.
+The public API is camelCase for WATS-authored inputs and normalized updates: `phoneNumberId`, `groupId`, `joinApprovalMode`, `joinRequestIds`, `addedParticipants`, `recipientType`. Raw Graph response envelopes still expose Meta fields such as `request_id` and `invite_link`; use `normalizeWebhookEnvelope(...)` for camelCase webhook evidence. Wire snapshots and raw webhook fields preserve Meta snake_case only inside `raw`/`rawChange` evidence.
