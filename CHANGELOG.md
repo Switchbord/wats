@@ -95,6 +95,12 @@ Patch alpha compatibility and local-operator release. Begins the WhatsApp Groups
 
 Patch alpha compatibility and local-operator release. Adds an opt-in native PaaS serve mode so `wats serve` works on managed platforms without an external container entrypoint shim.
 
+### WATS-87 — persistence outbox first slice
+
+- Adds first-slice outbox record APIs to `@wats/persistence`: `enqueueOutboxItem`, `claimOutboxItems`, `markOutboxItemFailed`, and `markOutboxItemSucceeded`. SQLite stores only `payloadHash`, status, attempts, and retry timestamps; it does not persist raw webhook bodies, Graph request bodies, message text, or contact payloads by default.
+- Adds `runOutboxWorkerOnce(...)`, a one-tick at-least-once worker helper that claims due pending records, runs an application handler, marks successes, and schedules failures by retry timestamp without leaking handler error text in its report.
+- Keeps this slice experimental and local/single-instance: no Postgres adapter, no automatic service send enqueueing, no production hosting claim, and no exactly-once delivery claim.
+
 ### WATS-129 — native PaaS serve mode (`--paas`)
 
 - Adds an opt-in `wats serve --paas` flag. In PaaS mode the CLI reads the platform-injected `$PORT` and binds `0.0.0.0` by default, so managed platforms (Railway, Fly, Render, Cloud Run) no longer need an external entrypoint shim to map `$PORT`/`0.0.0.0` onto the static `--host`/`--port` flags.

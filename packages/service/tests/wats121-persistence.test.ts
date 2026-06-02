@@ -11,6 +11,10 @@ type MemoryStore = {
   recordWebhookEvent(input: { eventKey: string; eventHash: string; receivedAt: string }): Promise<"recorded" | "duplicate">;
   getServiceRequest(input: { idempotencyKey: string; requestHash: string }): Promise<null | "conflict" | { responseJson: string }>;
   recordServiceRequest(input: { idempotencyKey: string; requestHash: string; responseJson: string; createdAt: string }): Promise<void>;
+  enqueueOutboxItem(input: { id: string; payloadHash: string; createdAt: string; nextAttemptAt?: string | null }): Promise<"enqueued" | "duplicate">;
+  claimOutboxItems(input: { now: string; limit: number }): Promise<readonly unknown[]>;
+  markOutboxItemFailed(input: { id: string; nextAttemptAt: string; updatedAt: string }): Promise<void>;
+  markOutboxItemSucceeded(input: { id: string; updatedAt: string }): Promise<void>;
   close(): Promise<void>;
 };
 
@@ -37,6 +41,10 @@ function memoryStore(): MemoryStore {
         this.requests.set(input.idempotencyKey, { requestHash: input.requestHash, responseJson: input.responseJson });
       }
     },
+    async enqueueOutboxItem() { return "enqueued"; },
+    async claimOutboxItems() { return []; },
+    async markOutboxItemFailed() {},
+    async markOutboxItemSucceeded() {},
     async close() {}
   };
 }
