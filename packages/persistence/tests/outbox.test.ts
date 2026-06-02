@@ -134,6 +134,13 @@ describe("WATS-87 SQLite outbox records", () => {
         updatedAt: "2026-06-01T03:05:01.000Z"
       })).rejects.toBeInstanceOf(PersistenceError);
 
+      await expect(store.markOutboxItemFailed({
+        id: "outbox-message-fenced",
+        leaseId: workerA[0]?.leaseId ?? 0,
+        nextAttemptAt: "2026-06-01T03:05:30.000Z",
+        updatedAt: "2026-06-01T03:05:01.500Z"
+      })).rejects.toBeInstanceOf(PersistenceError);
+
       await store.markOutboxItemFailed({
         id: "outbox-message-fenced",
         leaseId: workerB[0]?.leaseId ?? 0,

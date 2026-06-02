@@ -62,7 +62,7 @@ const MIGRATIONS: readonly MigrationDefinition[] = Object.freeze([
   {
     id: "001_initial",
     version: 1,
-    checksum: "sha256:wats-persistence-001-initial-v2",
+    checksum: "sha256:wats-persistence-001-initial-v1",
     statements: Object.freeze([
       `CREATE TABLE IF NOT EXISTS wats_schema_migrations (
         id TEXT PRIMARY KEY,
@@ -90,12 +90,19 @@ const MIGRATIONS: readonly MigrationDefinition[] = Object.freeze([
         id TEXT PRIMARY KEY,
         status TEXT NOT NULL,
         attempts INTEGER NOT NULL,
-        lease_id INTEGER NOT NULL DEFAULT 0,
         next_attempt_at TEXT,
         payload_hash TEXT NOT NULL,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       )`
+    ])
+  },
+  {
+    id: "002_outbox_lease_id",
+    version: 2,
+    checksum: "sha256:wats-persistence-002-outbox-lease-id-v1",
+    statements: Object.freeze([
+      "ALTER TABLE wats_outbox ADD COLUMN lease_id INTEGER NOT NULL DEFAULT 0"
     ])
   }
 ]);
