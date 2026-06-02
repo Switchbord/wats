@@ -57,7 +57,7 @@ function parseBody(body: unknown): Record<string, unknown> {
 }
 
 describe("WATS-132 Groups endpoint family", () => {
-  test("root and groups subpath exports keep identical callables", async () => {
+  test("root and groups subpath exports keep identical callables without unsupported participant/admin helpers", async () => {
     const root = await import("../src");
     const groups = await import("../src/endpoints/groups");
     expect(groups.createGroup).toBe(root.createGroup);
@@ -71,6 +71,10 @@ describe("WATS-132 Groups endpoint family", () => {
     expect(groups.approveGroupJoinRequests).toBe(root.approveGroupJoinRequests);
     expect(groups.rejectGroupJoinRequests).toBe(root.rejectGroupJoinRequests);
     expect(groups.removeGroupParticipants).toBe(root.removeGroupParticipants);
+    for (const unsupported of ["addGroupParticipants", "promoteGroupParticipants", "demoteGroupParticipants"]) {
+      expect(unsupported in groups, unsupported).toBe(false);
+      expect(unsupported in root, unsupported).toBe(false);
+    }
   });
 
   test("createGroup POSTs /{phoneNumberId}/groups with snake_case boundary body", async () => {
@@ -260,6 +264,20 @@ describe("WATS-132 Groups endpoint family", () => {
       const { client } = clientWith(ok());
       await expect(
         createGroup(client, { phoneNumberId: "555" }, { subject: "x".repeat(129) })
+      ).rejects.toBeInstanceOf(GraphRequestValidationError);
+    });
+
+    test("createGroup rejects description over the 2048-char limit", async () => {
+      const { client } = clientWith(ok());
+      await expect(
+        createGroup(client, { phoneNumberId: "555" }, { subject: "ok", description: "x".repeat(2049) })
+      ).rejects.toBeInstanceOf(GraphRequestValidationError);
+    });
+
+    test("updateGroup rejects description over the 2048-char limit", async () => {
+      const { client } = clientWith(ok());
+      await expect(
+        updateGroup(client, { groupId: "grp-1" }, { description: "x".repeat(2049) })
       ).rejects.toBeInstanceOf(GraphRequestValidationError);
     });
 
