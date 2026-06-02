@@ -32,7 +32,12 @@ describe("WATS-87 persistence outbox docs", () => {
     expect(persistence).toContain("does not store raw webhook bodies");
     expect(persistence).toContain("does not store message text");
     expect(persistence).toContain("leaseId");
+    expect(persistence).toContain("002_outbox_lease_id");
+    expect(persistence).toContain("originally shipped checksum");
+    expect(changelog).toContain("002_outbox_lease_id");
+    expect(changelog).toContain("preserving the original `001_initial` checksum");
     expect(persistence).toContain("stale workers cannot mark a newer reclaimed lease as succeeded or failed");
+    expect(changelog).toContain("Stale workers cannot mark a newer reclaimed lease as succeeded or failed");
     expect(persistence).toContain("migration_lock_failed");
     expect(publicApi).toContain("outbox record APIs");
     expect(publicApi).toContain("runOutboxWorkerOnce");

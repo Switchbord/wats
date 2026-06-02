@@ -55,6 +55,7 @@ ${result.stderr}`).toBe(0);
     expect(lines.at(-1)).toBe("persistence-consumer:ok");
     const report = JSON.parse(lines.at(-2) ?? "{}") as { ok: boolean; checks: Record<string, boolean> };
     expect(report.ok).toBe(true);
+    expect(report.checks.currentSchemaVersion).toBe(true);
     for (const [name, ok] of Object.entries(report.checks)) {
       expect(ok, `fixture check ${name} must be true`).toBe(true);
     }
