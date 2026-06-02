@@ -209,8 +209,8 @@ describe("WATS-136 WhatsApp facade group helpers and listeners", () => {
     const wa = new WhatsApp({ graphClient });
     const seen: string[] = [];
 
-    wa.on(group.message(), (update) => {
-      seen.push(update.message.groupId ?? "missing");
+    wa.on(group.message(), (ctx) => {
+      seen.push(ctx.update.message.groupId ?? "missing");
     });
     const h = wa.listen({ type: "message", groupId: "group-1" });
 
@@ -229,4 +229,28 @@ describe("WATS-136 WhatsApp facade group helpers and listeners", () => {
     expect(() => wa.listen({ type: "message", groupId: "" })).toThrow(WhatsAppListenOptionsError);
     expect(() => wa.listen({ type: "status", groupId: 42 as unknown as string })).toThrow(WhatsAppListenOptionsError);
   });
+});
+
+test("sendGroupMessage validates malformed input with GraphRequestValidationError", async () => {
+  const { graphClient, handle } = makeGraphClientWithHandle();
+  const wa = new WhatsApp({ graphClient, phoneNumberId: "1234567890" });
+
+  for (const input of [
+    undefined,
+    null,
+    { groupId: "", text: "hello" },
+    { groupId: "   ", text: "hello" },
+    { groupId: "group-1", text: "" },
+    { groupId: "group-1", text: "hi", previewUrl: "yes" }
+  ]) {
+    let thrown: unknown;
+    try {
+      await wa.sendGroupMessage(input as never);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(GraphRequestValidationError);
+    expect(thrown).not.toBeInstanceOf(TypeError);
+  }
+  expect(handle.requests.length).toBe(0);
 });
