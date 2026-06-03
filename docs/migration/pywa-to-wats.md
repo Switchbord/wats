@@ -168,7 +168,7 @@ Migration differences:
 
 - WATS `TypedRouter.on(...)` returns a registration handle with `unregister()` instead of pywa decorator registration.
 - WATS handlers receive `TypedUpdate` variants rather than pywa Python classes.
-- WATS `wa.listen(...)` replaces some conversational one-shot waits, but pywa sent-update waiters such as `SentMessage.wait_for_reply`, `wait_until_read`, `wait_for_click`, and `wait_for_completion` do not yet have object-method equivalents.
+- WATS-78 sent-result waiters are Implemented, credential-free for text starts: `WhatsApp.startChat(...)` returns a waitable result with `waitForReply`, `waitUntilDelivered`, `waitUntilRead`, and `waitUntilFailed`, all backed by observed webhook updates through the listener registry. pywa waits for clicks/completions and broader send helpers remain later slices.
 - WATS filters use function composition (`and`, `or`, `not`, `custom`) rather than Python `&`, `|`, and `~` operators.
 - WATS-43A deep-normalizes common inbound message body families and adds typed filters for media, location, reaction, interactive button/list/nfm Flow-completion replies, and quick-reply buttons. This covers the most common `@wa.on_callback_button`, `@wa.on_callback_selection`, and `@wa.on_flow_completion` migration paths while keeping the update kind as `"message"`.
 - WATS-79 first-slice webhook families are Implemented, credential-free: `user_preferences` maps to `TypedUserPreferencesUpdate` plus `filtersTyped.userPreferences`, `system` maps phone/identity changes to `TypedSystemUpdate` plus `filtersTyped.system`, and `chat_opened` maps `REQUEST_WELCOME` to `TypedChatOpenedUpdate` plus `filtersTyped.chatOpened`.
@@ -225,7 +225,7 @@ Use consumer fixtures as the source of truth for supported package-specifier imp
 Do not migrate code assuming WATS already has pywa parity for:
 
 - pywa's full decorator and handler taxonomy for callback selections/buttons, Flow request sub-actions, user marketing preferences, phone-number changes, and identity changes.
-- pywa sent-update waiters (`wait_for_reply`, `wait_until_read`, `wait_for_selection`, `wait_for_completion`, call permission waits).
+- pywa sent-update waiters beyond WATS-78 (`wait_for_selection`, `wait_for_completion`, call permission waits, and broader composer helpers).
 - pywa's broad filter catalog: commands, MIME/extension filters, location radius, per-error-code status filters, user marketing filters, call permission filters.
 - one-call local-file/bytes media send polymorphism.
 - pywa's complete template component DSL, compare/migrate/unpause, library/authentication helper breadth.
@@ -242,7 +242,7 @@ Do not migrate code assuming WATS already has pywa parity for:
 4. Move raw secrets to env vars or `@wats/config` env-secret refs.
 5. Replace pywa send methods with WATS scoped-client methods and root builders.
 6. Replace decorators with `TypedRouter.on(...)` / `WhatsApp.on(...)` and `filtersTyped`.
-7. Replace conversational waits with `wa.listen(...)` where possible; flag sent-update waiter gaps.
+7. Replace conversational waits with `wa.listen(...)` or WATS-78 `startChat(...).waitForReply()` / status waiters where applicable; flag remaining click/completion waiter gaps.
 8. Keep live operations behind the WATS-44 campaign gates.
 9. Add MockTransport tests before using real credentials.
 10. Track missing pywa surfaces in Linear.

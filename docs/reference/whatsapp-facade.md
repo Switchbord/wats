@@ -151,6 +151,26 @@ Options:
 
 Listener evaluation runs before normal handler dispatch when `wa.dispatch(update)` is called. Listeners are additive; a matched listener does not prevent normal handlers from running.
 
+## Sent-result waiters (WATS-78)
+
+`wa.startChat(...)` returns a `WhatsAppWaitableSentResult`: the normal Graph send response plus pywa-like helper methods:
+
+```ts
+const sent = await wa.startChat({ to: "15551230000", text: "Need help?" });
+
+const reply = await sent.waitForReply({ timeoutMs: 30_000 });
+const read = await sent.waitUntilRead({ timeoutMs: 60_000 });
+```
+
+Helpers:
+
+- `waitForReply({ timeoutMs?, signal? })` resolves on an observed inbound `message` whose `context.messageId` equals the sent message id and, when known, whose `from` matches the sent recipient.
+- `waitUntilDelivered({ timeoutMs?, signal? })` resolves on an observed `status` update for the sent message id with `status === "delivered"`.
+- `waitUntilRead({ timeoutMs?, signal? })` resolves on an observed `status` update for the sent message id with `status === "read"`.
+- `waitUntilFailed({ timeoutMs?, signal? })` resolves on an observed `status` update for the sent message id with `status === "failed"`.
+
+All waiters use the existing in-memory listener registry, so timeout and `AbortSignal` cleanup behave like `wa.listen(...)`. No delivered/read inference is made from Graph send success: these methods require an observed webhook dispatched through `wa.dispatch(...)`. There is no persistence-backed replay, cross-process wait, webhook delivery guarantee, or retry scheduler.
+
 ## Dispatch
 
 ```ts
