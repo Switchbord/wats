@@ -177,6 +177,18 @@ export type WhatsAppSendTemplateInput = GraphMessagesSendTemplateInput;
 export type WhatsAppSendMarketingTemplateInput = GraphMessagesSendMarketingTemplateInput;
 export type WhatsAppMarketingTemplateResponse = GraphMessagesMarketingTemplateResponse;
 
+export interface WhatsAppSentWaitOptions {
+  readonly timeoutMs?: number;
+  readonly signal?: AbortSignal;
+}
+
+export interface WhatsAppWaitableSentResult extends GraphMessagesSendResponse {
+  waitForReply(options?: WhatsAppSentWaitOptions): Promise<TypedMessageUpdate>;
+  waitUntilDelivered(options?: WhatsAppSentWaitOptions): Promise<TypedStatusUpdate>;
+  waitUntilRead(options?: WhatsAppSentWaitOptions): Promise<TypedStatusUpdate>;
+  waitUntilFailed(options?: WhatsAppSentWaitOptions): Promise<TypedStatusUpdate>;
+}
+
 export type WhatsAppListenErrorCode =
   | "invalid_listen_options"
   | "invalid_listen_type"
@@ -322,6 +334,23 @@ function buildListenFilter<TKind extends TypedUpdate["kind"]>(
   }
   if (parts.length === 1) return parts[0]!;
   return and(...parts) as TypedFilter<Extract<TypedUpdate, { kind: TKind }>>;
+}
+
+function firstSentMessageId(response: GraphMessagesSendResponse): string | undefined {
+  const first = response.messages?.[0];
+  return typeof first?.id === "string" && first.id.length > 0 ? first.id : undefined;
+}
+
+function firstRecipientId(response: GraphMessagesSendResponse): string | undefined {
+  const first = response.contacts?.[0];
+  return typeof first?.wa_id === "string" && first.wa_id.length > 0 ? first.wa_id : undefined;
+}
+
+function listenerOptionsFromSentWaitOptions(options: WhatsAppSentWaitOptions | undefined): ListenerOptions {
+  const out: ListenerOptions = {};
+  if (options?.timeoutMs !== undefined) (out as { timeoutMs?: number }).timeoutMs = options.timeoutMs;
+  if (options?.signal !== undefined) (out as { signal?: AbortSignal }).signal = options.signal;
+  return out;
 }
 
 // ---- WhatsApp facade ----------------------------------------------
@@ -477,6 +506,67 @@ export class WhatsApp {
     return this.#router.on(filter, handler);
   }
 
+  #toWaitableSentResult(
+    response: GraphMessagesSendResponse,
+    sentRecipientId?: string
+  ): WhatsAppWaitableSentResult {
+    const sentMessageId = firstSentMessageId(response);
+    const recipientId = firstRecipientId(response) ?? sentRecipientId;
+    const waitForReply = (options?: WhatsAppSentWaitOptions): Promise<TypedMessageUpdate> => {
+      const filter = createTypedFilter<TypedMessageUpdate>(
+        (u): u is TypedMessageUpdate => {
+          if (u.kind !== "message") return false;
+          if (sentMessageId === undefined) return false;
+          const contextValue = (u.message as unknown as { context?: { messageId?: unknown } }).context;
+          const contextMessageId = contextValue?.messageId;
+          if (contextMessageId !== sentMessageId) return false;
+          if (recipientId !== undefined && u.message.from !== recipientId) return false;
+          return true;
+        },
+        () => `sent.waitForReply(${sentMessageId ?? "missing"})`
+      );
+      return this.#registerSentWaiter("message", filter, options).promise;
+    };
+    const waitForStatus = (
+      expected: "delivered" | "read" | "failed",
+      options?: WhatsAppSentWaitOptions
+    ): Promise<TypedStatusUpdate> => {
+      const filter = createTypedFilter<TypedStatusUpdate>(
+        (u): u is TypedStatusUpdate => {
+          if (u.kind !== "status") return false;
+          if (sentMessageId === undefined) return false;
+          if (u.status.id !== sentMessageId) return false;
+          if (u.status.status !== expected) return false;
+          const statusRecipientId = (u.status as { recipientId?: unknown; recipient_id?: unknown }).recipientId ??
+            (u.status as { recipientId?: unknown; recipient_id?: unknown }).recipient_id;
+          if (recipientId !== undefined && statusRecipientId !== recipientId) return false;
+          return true;
+        },
+        () => `sent.waitUntil${expected[0]?.toUpperCase() ?? ""}${expected.slice(1)}(${sentMessageId ?? "missing"})`
+      );
+      return this.#registerSentWaiter("status", filter, options).promise;
+    };
+    return Object.assign({}, response, {
+      waitForReply,
+      waitUntilDelivered: (options?: WhatsAppSentWaitOptions): Promise<TypedStatusUpdate> => waitForStatus("delivered", options),
+      waitUntilRead: (options?: WhatsAppSentWaitOptions): Promise<TypedStatusUpdate> => waitForStatus("read", options),
+      waitUntilFailed: (options?: WhatsAppSentWaitOptions): Promise<TypedStatusUpdate> => waitForStatus("failed", options)
+    });
+  }
+
+  #registerSentWaiter<TKind extends "message" | "status">(
+    type: TKind,
+    filter: TypedFilter<Extract<TypedUpdate, { kind: TKind }>>,
+    options: WhatsAppSentWaitOptions | undefined
+  ): ListenerHandle<Extract<TypedUpdate, { kind: TKind }>> {
+    if (this.#listenerRegistry === undefined) {
+      this.#listenerRegistry = createListenerRegistry(
+        this.#listenerRegistryOptions
+      );
+    }
+    return this.#listenerRegistry.register(filter, listenerOptionsFromSentWaitOptions(options));
+  }
+
   /**
    * WATS-30 ergonomic text conversation starter. The facade must be
    * constructed with a `phoneNumberId`; recipient `to` is intentionally
@@ -485,13 +575,14 @@ export class WhatsApp {
    */
   async startChat(
     input: WhatsAppStartChatInput
-  ): Promise<GraphMessagesSendResponse> {
+  ): Promise<WhatsAppWaitableSentResult> {
     if (this.#phoneNumberClient === undefined) {
       throw new GraphRequestValidationError(
         "WhatsApp.startChat requires a phoneNumberId-bound facade."
       );
     }
-    return this.#phoneNumberClient.sendText(input);
+    const response = await this.#phoneNumberClient.sendText(input);
+    return this.#toWaitableSentResult(response, input.to);
   }
 
   group(groupId: string): GroupClient {
