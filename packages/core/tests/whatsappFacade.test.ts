@@ -34,6 +34,7 @@ import {
 import { GraphRequestValidationError } from "../../graph/src/errors";
 import type {
   TypedMessageUpdate,
+  TypedStatusUpdate,
   TypedUpdate
 } from "../src/webhookNormalizer";
 
@@ -88,6 +89,56 @@ function makeMessageUpdate(): TypedMessageUpdate {
       value: {}
     } as TypedMessageUpdate["rawChange"]
   };
+}
+
+function makeReplyToSentMessage(sentMessageId = "wamid.START", from = "15551230000"): TypedMessageUpdate {
+  return {
+    kind: "message",
+    updateId: "wamid.REPLY",
+    phoneNumberId: "1234567890",
+    wabaId: "WABA-Z",
+    receivedAt: 2,
+    message: {
+      from,
+      id: "wamid.REPLY",
+      timestamp: "2",
+      type: "text",
+      text: { body: "reply" },
+      context: { messageId: sentMessageId, from: "1234567890" }
+    } as TypedMessageUpdate["message"],
+    rawChange: { field: "messages", value: {} } as TypedMessageUpdate["rawChange"]
+  };
+}
+
+function makeSentStatus(status: "sent" | "delivered" | "read" | "failed", id = "wamid.START", recipientId = "15551230000"): TypedStatusUpdate {
+  return {
+    kind: "status",
+    updateId: id,
+    phoneNumberId: "1234567890",
+    wabaId: "WABA-Z",
+    receivedAt: 3,
+    status: {
+      id,
+      status,
+      timestamp: "3",
+      recipientId
+    } as TypedStatusUpdate["status"],
+    rawChange: { field: "messages", value: {} } as TypedStatusUpdate["rawChange"]
+  };
+}
+
+interface WaitableSentResultForTest {
+  readonly messages?: Array<{ readonly id: string }>;
+  readonly contacts?: Array<{ readonly wa_id?: string }>;
+  waitForReply(options?: { timeoutMs?: number; signal?: AbortSignal }): Promise<TypedMessageUpdate>;
+  waitUntilDelivered(options?: { timeoutMs?: number; signal?: AbortSignal }): Promise<TypedStatusUpdate>;
+  waitUntilRead(options?: { timeoutMs?: number; signal?: AbortSignal }): Promise<TypedStatusUpdate>;
+  waitUntilFailed(options?: { timeoutMs?: number; signal?: AbortSignal }): Promise<TypedStatusUpdate>;
+}
+
+function startChatOf(wa: WhatsApp): (input: unknown) => Promise<unknown> {
+  return (wa as unknown as { startChat: (input: unknown) => Promise<unknown> })
+    .startChat.bind(wa);
 }
 
 // =====================================================================
@@ -220,11 +271,6 @@ describe("WhatsApp facade scoped clients", () => {
 // =====================================================================
 
 describe("WATS-30 WhatsApp.startChat", () => {
-  function startChatOf(wa: WhatsApp): (input: unknown) => Promise<unknown> {
-    return (wa as unknown as { startChat: (input: unknown) => Promise<unknown> })
-      .startChat.bind(wa);
-  }
-
   test("delegates to the bound PhoneNumberClient.sendText for arbitrary non-contact recipients", async () => {
     const { graphClient, handle } = makeGraphClientWithHandle();
     const wa = new WhatsApp({ graphClient, phoneNumberId: "1234567890" });
@@ -300,6 +346,92 @@ describe("WATS-30 WhatsApp.startChat", () => {
       expect(thrown).not.toBeInstanceOf(TypeError);
     }
     expect(handle.requests.length).toBe(0);
+  });
+});
+
+// =====================================================================
+// WATS-78 sent-update waiter ergonomics
+// =====================================================================
+
+describe("WATS-78 WhatsApp sent-result waiters", () => {
+  test("startChat returns a waitable sent result that preserves Graph response fields", async () => {
+    const { graphClient } = makeGraphClientWithHandle();
+    const wa = new WhatsApp({ graphClient, phoneNumberId: "1234567890" });
+
+    const sent = await startChatOf(wa)({ to: "15551230000", text: "hello" }) as WaitableSentResultForTest;
+
+    expect(sent.messages?.[0]?.id).toBe("wamid.START");
+    expect(typeof sent.waitForReply).toBe("function");
+    expect(typeof sent.waitUntilDelivered).toBe("function");
+    expect(typeof sent.waitUntilRead).toBe("function");
+    expect(typeof sent.waitUntilFailed).toBe("function");
+  });
+
+  test("waitForReply resolves only when an inbound message replies to the sent message from the observed recipient", async () => {
+    const { graphClient } = makeGraphClientWithHandle();
+    const wa = new WhatsApp({ graphClient, phoneNumberId: "1234567890" });
+    const sent = await startChatOf(wa)({ to: "15551230000", text: "hello" }) as WaitableSentResultForTest;
+
+    const promise = sent.waitForReply({ timeoutMs: 100 });
+    await wa.dispatch(makeReplyToSentMessage("other-message", "15551230000"));
+    expect(wa.activeListenerCount).toBe(1);
+    await wa.dispatch(makeReplyToSentMessage("wamid.START", "15559990000"));
+    expect(wa.activeListenerCount).toBe(1);
+    await wa.dispatch(makeReplyToSentMessage("wamid.START", "15551230000"));
+
+    const reply = await promise;
+    expect(reply.kind).toBe("message");
+    expect(reply.message.from).toBe("15551230000");
+    expect(reply.message.context?.messageId).toBe("wamid.START");
+    expect(wa.activeListenerCount).toBe(0);
+  });
+
+  test("status waiters resolve only on observed status events for the sent message", async () => {
+    const { graphClient } = makeGraphClientWithHandle();
+    const wa = new WhatsApp({ graphClient, phoneNumberId: "1234567890" });
+    const sent = await startChatOf(wa)({ to: "15551230000", text: "hello" }) as WaitableSentResultForTest;
+
+    const delivered = sent.waitUntilDelivered({ timeoutMs: 100 });
+    const read = sent.waitUntilRead({ timeoutMs: 100 });
+    const failed = sent.waitUntilFailed({ timeoutMs: 100 });
+    await wa.dispatch(makeSentStatus("delivered", "other-message", "15551230000"));
+    expect(wa.activeListenerCount).toBe(3);
+    await wa.dispatch(makeSentStatus("delivered", "wamid.START", "15551230000"));
+    await wa.dispatch(makeSentStatus("read", "wamid.START", "15551230000"));
+    await wa.dispatch(makeSentStatus("failed", "wamid.START", "15551230000"));
+
+    expect((await delivered).status.status).toBe("delivered");
+    expect((await read).status.status).toBe("read");
+    expect((await failed).status.status).toBe("failed");
+    expect(wa.activeListenerCount).toBe(0);
+  });
+
+  test("waiters support timeout and abort cleanup", async () => {
+    const { graphClient } = makeGraphClientWithHandle();
+    const wa = new WhatsApp({ graphClient, phoneNumberId: "1234567890" });
+    const sent = await startChatOf(wa)({ to: "15551230000", text: "hello" }) as WaitableSentResultForTest;
+
+    let timeoutErr: unknown;
+    try {
+      await sent.waitUntilRead({ timeoutMs: 20 });
+    } catch (error) {
+      timeoutErr = error;
+    }
+    expect(timeoutErr).toBeInstanceOf(ListenerTimeoutError);
+    expect(wa.activeListenerCount).toBe(0);
+
+    const ctl = new AbortController();
+    const aborted = sent.waitForReply({ signal: ctl.signal });
+    expect(wa.activeListenerCount).toBe(1);
+    ctl.abort();
+    let abortErr: unknown;
+    try {
+      await aborted;
+    } catch (error) {
+      abortErr = error;
+    }
+    expect(abortErr).toBeInstanceOf(ListenerAbortError);
+    expect(wa.activeListenerCount).toBe(0);
   });
 });
 
