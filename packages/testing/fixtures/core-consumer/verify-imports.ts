@@ -25,6 +25,7 @@ import {
   type WhatsAppSendImageInput,
   type WhatsAppSendLocationInput,
   type WhatsAppStartChatInput,
+  type WhatsAppWaitableSentResult,
   type DispatchReport,
   type ListenerHandle,
   type NormalizedWebhookResult,
@@ -656,6 +657,48 @@ async function verify(): Promise<VerifyReportOk> {
     startChatBody.type === "text" &&
     startChatBody.text?.body === "fixture start chat" &&
     startChatBody.text?.preview_url === false;
+
+  const waitableStartChat: WhatsAppWaitableSentResult = startChatRes;
+  checks["WATS-78 startChat returns waitable sent-result helpers"] =
+    typeof waitableStartChat.waitForReply === "function" &&
+    typeof waitableStartChat.waitUntilDelivered === "function" &&
+    typeof waitableStartChat.waitUntilRead === "function" &&
+    typeof waitableStartChat.waitUntilFailed === "function";
+  const sentReplyWait = waitableStartChat.waitForReply({ timeoutMs: 100 });
+  const sentDeliveredWait = waitableStartChat.waitUntilDelivered({ timeoutMs: 100 });
+  const sentReply: TypedMessageUpdate = {
+    kind: "message",
+    updateId: "wamid.CORE-REPLY",
+    phoneNumberId: "1234567890",
+    wabaId: "WABA-FIX",
+    receivedAt: 1_713_700_001_000,
+    message: {
+      from: "15551230002",
+      id: "wamid.CORE-REPLY",
+      timestamp: "1713700001",
+      type: "text",
+      text: { body: "reply" },
+      context: { messageId: "wamid.CORE", from: "1234567890" }
+    } as TypedMessageUpdate["message"],
+    rawChange: { field: "messages", value: {} } as TypedMessageUpdate["rawChange"]
+  };
+  const sentDelivered: TypedStatusUpdate = {
+    kind: "status",
+    updateId: "wamid.CORE",
+    phoneNumberId: "1234567890",
+    wabaId: "WABA-FIX",
+    receivedAt: 1_713_700_002_000,
+    status: { id: "wamid.CORE", status: "delivered", timestamp: "1713700002", recipientId: "15551230002" } as TypedStatusUpdate["status"],
+    rawChange: { field: "messages", value: {} } as TypedStatusUpdate["rawChange"]
+  };
+  await facade.dispatch(sentReply);
+  await facade.dispatch(sentDelivered);
+  const waitedReply = await sentReplyWait;
+  const waitedDelivered = await sentDeliveredWait;
+  checks["WATS-78 waitable reply/status helpers resolve through wa.dispatch"] =
+    waitedReply.updateId === "wamid.CORE-REPLY" &&
+    waitedDelivered.status.status === "delivered" &&
+    facade.activeListenerCount === 0;
 
   mockHandle.reset();
   const sendImageInput: WhatsAppSendImageInput = {

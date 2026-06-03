@@ -22,6 +22,7 @@ WATS-22 (Arch-H listener substrate) per the foundations-pivot plan.
 - TypedRouter integration via an optional `listenerRegistry` hook.
 - WhatsApp facade delegation: `wa.listen({ type, from?, filter?,
   timeoutMs?, signal? })`.
+- WATS-78 sent-result waiters (`waitForReply`, `waitUntilRead`, etc.) built on the same registry.
 - Observer seam: `onListenerMatch(dispatchId, listenerId, update)`.
 
 ## Listener substrate overview
@@ -193,6 +194,22 @@ const u = await lh.promise; // resolves
 
 This shape mirrors pywa's `listeners.py` / handler interplay and
 keeps normal routing unaffected by the listener substrate.
+
+## Sent-result waiters (WATS-78)
+
+WATS-78 layers facade sent-result waiters on this same listener registry.
+`WhatsApp.startChat(...)` returns a waitable send result whose helpers register
+one-shot listeners under the hood:
+
+- `waitForReply({ timeoutMs?, signal? })`
+- `waitUntilDelivered({ timeoutMs?, signal? })`
+- `waitUntilRead({ timeoutMs?, signal? })`
+- `waitUntilFailed({ timeoutMs?, signal? })`
+
+These helpers have the same timeoutMs and AbortSignal cleanup guarantees as
+`wa.listen(...)`. They are convenience filters over observed future webhooks;
+they do not add persistence, replay, delivery guarantees, or read/delivered
+inference.
 
 ## TypedRouter integration
 
