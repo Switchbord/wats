@@ -32,3 +32,11 @@ export { status, type StatusFilterNamespace } from "./status.js";
 export { call, type CallFilterNamespace } from "./call.js";
 export { template, type TemplateFilterNamespace } from "./template.js";
 export { group, type GroupFilterNamespace } from "./group.js";
+export {
+  chatOpened,
+  system,
+  userPreferences,
+  type ChatOpenedFilterNamespace,
+  type SystemFilterNamespace,
+  type UserPreferencesFilterNamespace
+} from "./wats79.js";

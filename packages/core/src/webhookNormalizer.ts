@@ -62,7 +62,10 @@ export type TypedUpdateKind =
   | "groupLifecycle"
   | "groupParticipants"
   | "groupSettings"
-  | "groupStatus";
+  | "groupStatus"
+  | "userPreferences"
+  | "system"
+  | "chatOpened";
 
 export type GroupMessage = WhatsAppMessage & { readonly groupId?: string };
 export type GroupMessageStatus = WhatsAppMessageStatus & {
@@ -243,6 +246,81 @@ export type TypedGroupUpdate =
   | TypedGroupSettingsUpdate
   | TypedGroupStatusUpdate;
 
+export interface NormalizedUserPreferencePayload {
+  readonly waId: string;
+  readonly category: string;
+  readonly preference: "opt_in" | "opt_out";
+  readonly timestamp: string;
+  readonly raw: Record<string, unknown>;
+}
+
+export interface TypedUserPreferencesUpdate {
+  readonly kind: "userPreferences";
+  readonly updateId: string;
+  readonly phoneNumberId: string;
+  readonly wabaId: string;
+  readonly receivedAt: number;
+  readonly preference: NormalizedUserPreferencePayload;
+  readonly rawChange: WhatsAppWebhookChange;
+}
+
+export interface NormalizedPhoneNumberChangePayload {
+  readonly mobileDisplayName?: string;
+  readonly oldPhoneNumber?: string;
+  readonly newPhoneNumber: string;
+  readonly raw: Record<string, unknown>;
+}
+
+export interface NormalizedIdentityChangePayload {
+  readonly waId: string;
+  readonly acknowledged: boolean;
+  readonly createdTimestamp: string;
+  readonly hash?: string;
+  readonly raw: Record<string, unknown>;
+}
+
+export type NormalizedSystemPayload =
+  | {
+      readonly type: "phoneNumberChange";
+      readonly timestamp?: string;
+      readonly phoneNumberChange: NormalizedPhoneNumberChangePayload;
+      readonly raw: Record<string, unknown>;
+    }
+  | {
+      readonly type: "identityChange";
+      readonly timestamp?: string;
+      readonly identityChange: NormalizedIdentityChangePayload;
+      readonly raw: Record<string, unknown>;
+    };
+
+export interface TypedSystemUpdate {
+  readonly kind: "system";
+  readonly updateId: string;
+  readonly phoneNumberId: string;
+  readonly wabaId: string;
+  readonly receivedAt: number;
+  readonly system: NormalizedSystemPayload;
+  readonly rawChange: WhatsAppWebhookChange;
+}
+
+export interface NormalizedChatOpenedPayload {
+  readonly type: "REQUEST_WELCOME" | string;
+  readonly from: string;
+  readonly timestamp?: string;
+  readonly contact?: { readonly waId?: string; readonly profile?: { readonly name?: string }; readonly raw?: unknown };
+  readonly raw: Record<string, unknown>;
+}
+
+export interface TypedChatOpenedUpdate {
+  readonly kind: "chatOpened";
+  readonly updateId: string;
+  readonly phoneNumberId: string;
+  readonly wabaId: string;
+  readonly receivedAt: number;
+  readonly chatOpened: NormalizedChatOpenedPayload;
+  readonly rawChange: WhatsAppWebhookChange;
+}
+
 export type TypedUpdate =
   | TypedMessageUpdate
   | TypedStatusUpdate
@@ -250,7 +328,10 @@ export type TypedUpdate =
   | TypedCallStatusUpdate
   | TypedAccountUpdate
   | TypedUnknownUpdate
-  | TypedGroupUpdate;
+  | TypedGroupUpdate
+  | TypedUserPreferencesUpdate
+  | TypedSystemUpdate
+  | TypedChatOpenedUpdate;
 
 export type SkippedReason =
   | "malformed_entry"
@@ -1370,6 +1451,21 @@ function normalizeChange(
     return;
   }
 
+  if (field === "user_preferences") {
+    normalizeUserPreferencesChange(change, path, wabaId, entryTimeMs, rawChange, acc);
+    return;
+  }
+
+  if (field === "system") {
+    normalizeSystemChange(change, path, wabaId, entryTimeMs, rawChange, acc);
+    return;
+  }
+
+  if (field === "chat_opened") {
+    normalizeChatOpenedChange(change, path, wabaId, entryTimeMs, rawChange, acc);
+    return;
+  }
+
   if (field === "group_lifecycle_update") {
     normalizeGroupFieldChange("groupLifecycle", change, path, wabaId, entryTimeMs, rawChange, acc);
     return;
@@ -1417,6 +1513,251 @@ function normalizeChange(
     rawChange
   };
   pushUpdate(acc, unknownUpdate, path);
+}
+
+function normalizeUserPreferencesChange(
+  change: Record<string, unknown>,
+  path: string,
+  wabaId: string,
+  entryTimeMs: number,
+  rawChange: WhatsAppWebhookChange,
+  acc: NormalizerAccumulator
+): void {
+  const payload = readOwnDataField(change, "value");
+  if (!isRecord(payload)) {
+    pushSkip(acc, "malformed_change", `${path}.value`, "value-not-an-object");
+    return;
+  }
+  const phoneNumberId = readMetadataPhoneNumberId(payload);
+  if (phoneNumberId === undefined) {
+    pushSkip(acc, "malformed_field", `${path}.value.metadata.phone_number_id`, "missing-or-unsafe-phone-number-id");
+    return;
+  }
+  const preferences = readOwnDataField(payload, "user_preferences");
+  if (!Array.isArray(preferences)) {
+    pushSkip(acc, "malformed_field", `${path}.value.user_preferences`, "missing-or-invalid-user-preferences");
+    return;
+  }
+  for (let i = 0; i < preferences.length; i += 1) {
+    if (acc.limitHit) {
+      acc.overflow += 1;
+      continue;
+    }
+    const itemPath = `${path}.value.user_preferences[${i}]`;
+    const itemResult = readArrayDataItem(preferences, i);
+    if (!itemResult.ok || !isRecord(itemResult.value)) {
+      pushSkip(acc, "malformed_field", itemPath, "not-an-object");
+      continue;
+    }
+    const preference = normalizeUserPreferencePayload(itemResult.value);
+    if (preference === undefined) {
+      pushSkip(acc, "malformed_field", itemPath, "invalid-user-preference");
+      continue;
+    }
+    pushUpdate(acc, {
+      kind: "userPreferences",
+      updateId: deriveUserPreferenceSyntheticId(wabaId, phoneNumberId, preference),
+      phoneNumberId,
+      wabaId,
+      receivedAt: parseTimestampMs(preference.timestamp, () => entryTimeMs),
+      preference,
+      rawChange
+    }, itemPath);
+  }
+}
+
+function normalizeUserPreferencePayload(item: Record<string, unknown>): NormalizedUserPreferencePayload | undefined {
+  const waId = readSafeIdField(item, "wa_id");
+  const category = readStringField(item, "category");
+  const preference = readStringField(item, "preference");
+  const timestamp = readStringField(item, "timestamp");
+  if (waId === undefined || category === undefined || timestamp === undefined) return undefined;
+  if (preference !== "opt_in" && preference !== "opt_out") return undefined;
+  return { waId, category, preference, timestamp, raw: item };
+}
+
+function normalizeSystemChange(
+  change: Record<string, unknown>,
+  path: string,
+  wabaId: string,
+  entryTimeMs: number,
+  rawChange: WhatsAppWebhookChange,
+  acc: NormalizerAccumulator
+): void {
+  const payload = readOwnDataField(change, "value");
+  if (!isRecord(payload)) {
+    pushSkip(acc, "malformed_change", `${path}.value`, "value-not-an-object");
+    return;
+  }
+  const phoneNumberId = readMetadataPhoneNumberId(payload);
+  if (phoneNumberId === undefined) {
+    pushSkip(acc, "malformed_field", `${path}.value.metadata.phone_number_id`, "missing-or-unsafe-phone-number-id");
+    return;
+  }
+  const items = readOwnDataField(payload, "system");
+  if (!Array.isArray(items)) {
+    pushSkip(acc, "malformed_field", `${path}.value.system`, "missing-or-invalid-system");
+    return;
+  }
+  for (let i = 0; i < items.length; i += 1) {
+    if (acc.limitHit) {
+      acc.overflow += 1;
+      continue;
+    }
+    const itemPath = `${path}.value.system[${i}]`;
+    const itemResult = readArrayDataItem(items, i);
+    if (!itemResult.ok || !isRecord(itemResult.value)) {
+      pushSkip(acc, "malformed_field", itemPath, "not-an-object");
+      continue;
+    }
+    const system = normalizeSystemPayload(itemResult.value);
+    if (system === undefined) {
+      pushSkip(acc, "malformed_field", itemPath, "invalid-system-event");
+      continue;
+    }
+    pushUpdate(acc, {
+      kind: "system",
+      updateId: deriveSystemSyntheticId(wabaId, phoneNumberId, system, itemPath),
+      phoneNumberId,
+      wabaId,
+      receivedAt: parseTimestampMs(system.timestamp, () => entryTimeMs),
+      system,
+      rawChange
+    }, itemPath);
+  }
+}
+
+function normalizeSystemPayload(item: Record<string, unknown>): NormalizedSystemPayload | undefined {
+  const wireType = readStringField(item, "type");
+  const timestamp = readStringField(item, "timestamp");
+  if (wireType === "phone_number_change") {
+    const newPhoneNumber = readSafeIdField(item, "new_phone_number");
+    if (newPhoneNumber === undefined) return undefined;
+    const phoneNumberChange: { mobileDisplayName?: string; oldPhoneNumber?: string; newPhoneNumber: string; raw: Record<string, unknown> } = { newPhoneNumber, raw: item };
+    const mobileDisplayName = readStringField(item, "mobile_display_name");
+    const oldPhoneNumber = readStringField(item, "old_phone_number");
+    if (mobileDisplayName !== undefined) phoneNumberChange.mobileDisplayName = mobileDisplayName;
+    if (oldPhoneNumber !== undefined) phoneNumberChange.oldPhoneNumber = oldPhoneNumber;
+    return { type: "phoneNumberChange", ...(timestamp !== undefined ? { timestamp } : {}), phoneNumberChange, raw: item };
+  }
+  if (wireType === "identity_change") {
+    const waId = readSafeIdField(item, "wa_id");
+    const acknowledged = readBooleanField(item, "acknowledged");
+    const createdTimestamp = readStringField(item, "created_timestamp");
+    if (waId === undefined || acknowledged === undefined || createdTimestamp === undefined) return undefined;
+    const identityChange: { waId: string; acknowledged: boolean; createdTimestamp: string; hash?: string; raw: Record<string, unknown> } = { waId, acknowledged, createdTimestamp, raw: item };
+    const hash = readStringField(item, "hash");
+    if (hash !== undefined) identityChange.hash = hash;
+    return { type: "identityChange", ...(timestamp !== undefined ? { timestamp } : {}), identityChange, raw: item };
+  }
+  return undefined;
+}
+
+function normalizeChatOpenedChange(
+  change: Record<string, unknown>,
+  path: string,
+  wabaId: string,
+  entryTimeMs: number,
+  rawChange: WhatsAppWebhookChange,
+  acc: NormalizerAccumulator
+): void {
+  const payload = readOwnDataField(change, "value");
+  if (!isRecord(payload)) {
+    pushSkip(acc, "malformed_change", `${path}.value`, "value-not-an-object");
+    return;
+  }
+  const phoneNumberId = readMetadataPhoneNumberId(payload);
+  if (phoneNumberId === undefined) {
+    pushSkip(acc, "malformed_field", `${path}.value.metadata.phone_number_id`, "missing-or-unsafe-phone-number-id");
+    return;
+  }
+  const value = readOwnDataField(payload, "chat_opened");
+  if (!isRecord(value)) {
+    pushSkip(acc, "malformed_field", `${path}.value.chat_opened`, "missing-or-invalid-chat-opened");
+    return;
+  }
+  const chatOpened = normalizeChatOpenedPayload(value, payload);
+  if (chatOpened === undefined) {
+    pushSkip(acc, "malformed_field", `${path}.value.chat_opened`, "invalid-chat-opened");
+    return;
+  }
+  pushUpdate(acc, {
+    kind: "chatOpened",
+    updateId: deriveChatOpenedSyntheticId(wabaId, phoneNumberId, chatOpened, path),
+    phoneNumberId,
+    wabaId,
+    receivedAt: parseTimestampMs(chatOpened.timestamp, () => entryTimeMs),
+    chatOpened,
+    rawChange
+  }, `${path}.value.chat_opened`);
+}
+
+function normalizeChatOpenedPayload(value: Record<string, unknown>, payload: Record<string, unknown>): NormalizedChatOpenedPayload | undefined {
+  const type = readStringField(value, "type");
+  const from = readSafeIdField(value, "from");
+  if (type === undefined || from === undefined) return undefined;
+  const timestamp = readStringField(value, "timestamp");
+  const out: { type: string; from: string; timestamp?: string; contact?: NormalizedChatOpenedPayload["contact"]; raw: Record<string, unknown> } = { type, from, ...(timestamp !== undefined ? { timestamp } : {}), raw: value };
+  const contact = findContactByWaId(readOwnDataField(payload, "contacts"), from);
+  if (contact !== undefined) out.contact = contact;
+  return out;
+}
+
+function findContactByWaId(value: unknown, waId: string): NormalizedChatOpenedPayload["contact"] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  for (let i = 0; i < value.length; i += 1) {
+    const itemResult = readArrayDataItem(value, i);
+    if (!itemResult.ok || !isRecord(itemResult.value)) continue;
+    const itemWaId = readSafeIdField(itemResult.value, "wa_id");
+    if (itemWaId !== waId) continue;
+    const contact: { waId?: string; profile?: { name?: string }; raw?: unknown } = { waId: itemWaId, raw: safeCloneMessageJsonValue(itemResult.value) };
+    const profile = readOwnDataField(itemResult.value, "profile");
+    if (isRecord(profile)) {
+      const name = readStringField(profile, "name");
+      if (name !== undefined) contact.profile = { name };
+    }
+    return contact;
+  }
+  return undefined;
+}
+
+function sanitizeSyntheticPart(value: string): string {
+  return value.replace(/[^A-Za-z0-9_-]/g, "_");
+}
+
+function deriveUserPreferenceSyntheticId(
+  wabaId: string,
+  phoneNumberId: string,
+  preference: NormalizedUserPreferencePayload
+): string {
+  return ["userPreferences", wabaId, phoneNumberId, preference.waId, preference.category, preference.timestamp]
+    .map(sanitizeSyntheticPart)
+    .join(":");
+}
+
+function deriveSystemSyntheticId(
+  wabaId: string,
+  phoneNumberId: string,
+  system: NormalizedSystemPayload,
+  path: string
+): string {
+  const stable = system.type === "phoneNumberChange"
+    ? system.phoneNumberChange.newPhoneNumber
+    : `${system.identityChange.waId}:${system.identityChange.createdTimestamp}`;
+  return ["system", wabaId, phoneNumberId, system.type, stable || path]
+    .map(sanitizeSyntheticPart)
+    .join(":");
+}
+
+function deriveChatOpenedSyntheticId(
+  wabaId: string,
+  phoneNumberId: string,
+  chatOpened: NormalizedChatOpenedPayload,
+  path: string
+): string {
+  return ["chatOpened", wabaId, phoneNumberId, chatOpened.from, chatOpened.timestamp ?? path]
+    .map(sanitizeSyntheticPart)
+    .join(":");
 }
 
 function normalizeGroupFieldChange(

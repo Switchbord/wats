@@ -26,6 +26,9 @@ import {
   account,
   call,
   group,
+  userPreferences,
+  system,
+  chatOpened,
   unknown as unknownUpdate,
 
   // Combinators
@@ -154,6 +157,9 @@ as the base for `and(...)` / `or(...)` composition.
 - `template` — WATS-39 template account-event namespace and kind-like filter. Matches `TypedAccountUpdate` values whose normalizer output carries `update.template`.
 - `call` — WATS-41 calling namespace and kind-like filter. Matches `callConnect`, `callTerminate`, and `callStatus` updates, with helpers for connect/terminate/status/ringing/answered/rejected/incoming/outgoing.
 - `group` — WATS-136 Groups namespace and kind-like filter. Matches normalized group messages, group status receipts, and the four group webhook update kinds, with `group.message()`, `group.participantsUpdate()`, `group.lifecycleUpdate()`, `group.settingsUpdate()`, `group.statusUpdate()`, and `group.fromGroup(groupId)` helpers.
+- `userPreferences` — WATS-79 namespace and kind filter for normalized `user_preferences` webhook rows, with `userPreferences.preference(value)` and `userPreferences.category(value)` helpers.
+- `system` — WATS-79 namespace and kind filter for normalized `system` webhook rows, with `system.phoneNumberChange()` and `system.identityChange()` helpers.
+- `chatOpened` — WATS-79 namespace and kind filter for normalized `chat_opened` hooks, with `chatOpened.requestWelcome()` for `REQUEST_WELCOME`.
 - `unknown` — matches `TypedUnknownUpdate` only (re-exported as
   `unknown` on the barrel; rename on import if it collides).
 
@@ -232,6 +238,39 @@ Helpers:
 `group.fromGroup(groupId)` rejects non-string or empty/whitespace-only ids with
 `FilterValidationError`; predicates return `false` for non-group siblings. The
 root `filtersTyped.group` namespace mirrors the `@wats/core/filtersTyped` subpath.
+
+## WATS-79 webhook-family filters
+
+WATS-79 adds typed filters for the first pywa webhook-family parity slice:
+
+```ts
+import { chatOpened, system, userPreferences } from "@wats/core/filtersTyped";
+
+if (userPreferences.preference("opt_out").predicate(update)) {
+  console.log(update.preference.waId, update.preference.category);
+}
+
+if (system.phoneNumberChange().predicate(update)) {
+  console.log(update.system.phoneNumberChange.newPhoneNumber);
+}
+
+if (chatOpened.requestWelcome().predicate(update)) {
+  console.log(update.chatOpened.from);
+}
+```
+
+Helpers:
+
+- `userPreferences` — any normalized `user_preferences` row.
+- `userPreferences.preference("opt_in" | "opt_out")` — exact preference match.
+- `userPreferences.category(category)` — exact category match.
+- `system` — any normalized system phone/identity event.
+- `system.phoneNumberChange()` — `system.type === "phoneNumberChange"`.
+- `system.identityChange()` — `system.type === "identityChange"`.
+- `chatOpened` — any normalized `chat_opened` event.
+- `chatOpened.requestWelcome()` — `chatOpened.type === "REQUEST_WELCOME"`.
+
+All WATS-79 helpers are sibling-kind safe: off-kind updates return `false`.
 
 ## Combinators
 

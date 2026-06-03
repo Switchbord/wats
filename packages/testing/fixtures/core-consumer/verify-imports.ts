@@ -32,9 +32,15 @@ import {
   type TypedAccountUpdate,
   type TypedCallStatusUpdate,
   type TypedCallUpdate,
+  type TypedGroupParticipantsUpdate,
+  type TypedGroupSettingsUpdate,
+  type TypedGroupStatusUpdate,
+  type TypedChatOpenedUpdate,
   type TypedMessageUpdate,
   type TypedStatusUpdate,
+  type TypedSystemUpdate,
   type TypedUnknownUpdate,
+  type TypedUserPreferencesUpdate,
   type TypedUpdate
 } from "@wats/core";
 import {
@@ -42,7 +48,10 @@ import {
   FilterValidationError,
   account,
   call,
+  chatOpened,
+  system,
   template,
+  userPreferences,
   and,
   createTypedFilter,
   custom,
@@ -361,12 +370,15 @@ async function verify(): Promise<VerifyReportOk> {
   checks["FILTER_BRAND is interned via Symbol.for"] =
     FILTER_BRAND === Symbol.for("@wats/core/filter-brand");
 
-  checks["message / status / account / template / unknown are typed filters"] =
+  checks["message / status / account / template / WATS-79 / unknown are typed filters"] =
     isTypedFilter(message) &&
     isTypedFilter(status) &&
     isTypedFilter(account) &&
     isTypedFilter(template) &&
     isTypedFilter(call) &&
+    isTypedFilter(userPreferences) &&
+    isTypedFilter(system) &&
+    isTypedFilter(chatOpened) &&
     isTypedFilter(unknownKind);
 
   // Compound filter: ANY message whose body matches /hello/i.
@@ -494,6 +506,57 @@ async function verify(): Promise<VerifyReportOk> {
     template.status("APPROVED").predicate(templateUpdate) === true;
   checks["template.status('REJECTED') does not match approved update"] =
     template.status("REJECTED").predicate(templateUpdate) === false;
+
+  const wats79Envelope = {
+    object: "whatsapp_business_account",
+    entry: [
+      {
+        id: "WABA-WATS79",
+        changes: [
+          {
+            field: "user_preferences",
+            value: {
+              messaging_product: "whatsapp",
+              metadata: { phone_number_id: "PN-WATS79" },
+              user_preferences: [{ wa_id: "15551234567", category: "marketing_messages", preference: "opt_out", timestamp: "1713697000" }]
+            }
+          },
+          {
+            field: "system",
+            value: {
+              messaging_product: "whatsapp",
+              metadata: { phone_number_id: "PN-WATS79" },
+              system: [{ type: "identity_change", wa_id: "15551234567", acknowledged: true, created_timestamp: "1713697200" }]
+            }
+          },
+          {
+            field: "chat_opened",
+            value: {
+              messaging_product: "whatsapp",
+              metadata: { phone_number_id: "PN-WATS79" },
+              chat_opened: { type: "REQUEST_WELCOME", from: "15551234567", timestamp: "1713697300" }
+            }
+          }
+        ]
+      }
+    ]
+  };
+  const [wats79Preference, wats79System, wats79Chat] = normalizeWebhookEnvelope(wats79Envelope).updates as [TypedUserPreferencesUpdate, TypedSystemUpdate, TypedChatOpenedUpdate];
+  checks["WATS-79 user_preferences normalizes through @wats/core"] =
+    wats79Preference.kind === "userPreferences" &&
+    wats79Preference.preference.preference === "opt_out" &&
+    userPreferences.preference("opt_out").predicate(wats79Preference) === true &&
+    userPreferences.category("marketing_messages").predicate(wats79Preference) === true;
+  checks["WATS-79 system identity filter matches through @wats/core/filtersTyped"] =
+    wats79System.kind === "system" &&
+    wats79System.system.type === "identityChange" &&
+    system.identityChange().predicate(wats79System) === true &&
+    system.phoneNumberChange().predicate(wats79System) === false;
+  checks["WATS-79 chat_opened request welcome filter matches"] =
+    wats79Chat.kind === "chatOpened" &&
+    wats79Chat.chatOpened.type === "REQUEST_WELCOME" &&
+    chatOpened.requestWelcome().predicate(wats79Chat) === true &&
+    chatOpened.requestWelcome().predicate(wats79Preference) === false;
 
   const callEnvelope = {
     object: "whatsapp_business_account",

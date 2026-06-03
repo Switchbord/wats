@@ -96,6 +96,16 @@ Contract at a glance:
 - `TypedGroupStatusUpdate` — `kind: "groupStatus"`. Produced by
   `group_status_update`; carries `group_suspend` and
   `group_suspend_cleared` moderation lifecycle events.
+- `TypedUserPreferencesUpdate` — `kind: "userPreferences"`. Produced by
+  WATS-79 `user_preferences`; normalizes marketing opt-in/opt-out entries
+  into `preference.waId`, `category`, `preference`, and `timestamp`.
+- `TypedSystemUpdate` — `kind: "system"`. Produced by WATS-79 `system`;
+  normalizes `phone_number_change` as `system.phoneNumberChange` and
+  `identity_change` as `system.identityChange`.
+- `TypedChatOpenedUpdate` — `kind: "chatOpened"`. Produced by WATS-79
+  `chat_opened`; normalizes `REQUEST_WELCOME` first-contact hooks into
+  `chatOpened.type`, `from`, `timestamp`, and matching contact details when
+  Meta includes them.
 - `TypedUnknownUpdate` — `kind: "unknown"`. Catch-all for webhook
   field names Meta has not yet published a typed shape for.
   Preserves `field` + `rawChange` so the consumer can inspect.
@@ -128,6 +138,15 @@ for (const u of updates) {
     case "groupStatus":
       console.log("group", u.kind, u.group.groupId);
       break;
+    case "userPreferences":
+      console.log("preference", u.preference.waId, u.preference.preference);
+      break;
+    case "system":
+      console.log("system", u.system.type);
+      break;
+    case "chatOpened":
+      console.log("chat opened", u.chatOpened.from, u.chatOpened.type);
+      break;
     case "unknown":
       console.log("unknown field", u.field);
       break;
@@ -159,6 +178,30 @@ WATS-135 adds credential-free normalization for the official Groups webhook fiel
 - Group inbound `messages` carry `message.groupId`. Group status webhooks carry `status.recipientType === "group"` and `status.recipientParticipantId` when Meta includes `recipient_participant_id`.
 
 Unknown future group fields still become `TypedUnknownUpdate`. Missing or unsafe `metadata.phone_number_id` / `group_id` values are reported through `skipped[]`; they do not throw.
+
+## WATS-79 user preferences, system, and chat-opened updates
+
+WATS-79 promotes three pywa-relevant webhook families out of the `unknown`
+bucket. These remain credential-free synthetic-envelope checks in CI; live
+webhook delivery still belongs to the gated campaign.
+
+- `user_preferences` emits one `TypedUserPreferencesUpdate` per
+  `value.user_preferences[]` row. Public fields are camelCase:
+  `preference.waId`, `preference.category`, `preference.preference`
+  (`"opt_in" | "opt_out"`), and `preference.timestamp`.
+- `system` emits one `TypedSystemUpdate` per `value.system[]` row. WATS
+  normalizes `phone_number_change` to `system.type === "phoneNumberChange"`
+  with `system.phoneNumberChange.newPhoneNumber`, `oldPhoneNumber`, and
+  `mobileDisplayName`; it normalizes `identity_change` to
+  `system.type === "identityChange"` with `waId`, `acknowledged`,
+  `createdTimestamp`, and optional `hash`.
+- `chat_opened` emits `TypedChatOpenedUpdate` for first-contact hooks such as
+  `REQUEST_WELCOME`, exposing `chatOpened.from`, `chatOpened.type`, optional
+  `timestamp`, and the matching contact when present.
+
+Malformed WATS-79 rows are reported through `skipped[]` with
+`malformed_field`; they do not fall back to `TypedUnknownUpdate` and should not
+throw host errors for accessor-backed fields.
 
 ## Input contract
 
@@ -385,9 +428,10 @@ From `@wats/core` (and mirrored at `@wats/core/webhookNormalizer`):
 - `MAX_ID_LENGTH` (number constant; currently `256`)
 - Types: `TypedUpdate`, `TypedUpdateKind`, `TypedMessageUpdate`,
   `TypedStatusUpdate`, `TypedAccountUpdate`, `TypedUnknownUpdate`,
-  `SkippedUpdate`, `SkippedReason`, `LimitExceededDetail`,
-  `NormalizeWebhookOptions`, `NormalizedWebhookResult`,
-  `WebhookNormalizationErrorCode`
+  `TypedUserPreferencesUpdate`, `TypedSystemUpdate`,
+  `TypedChatOpenedUpdate`, `SkippedUpdate`, `SkippedReason`,
+  `LimitExceededDetail`, `NormalizeWebhookOptions`,
+  `NormalizedWebhookResult`, `WebhookNormalizationErrorCode`
 
 ## End-to-end usage sample
 

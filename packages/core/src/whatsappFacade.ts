@@ -76,7 +76,10 @@ import {
   account as accountFilter,
   unknown as unknownFilter,
   call as callFilter,
-  group as groupFilter
+  group as groupFilter,
+  chatOpened as chatOpenedFilter,
+  system as systemFilter,
+  userPreferences as userPreferencesFilter
 } from "./filtersTyped/index.js";
 import type { TypedFilter } from "./filtersTyped/typedFilter.js";
 import {
@@ -89,9 +92,12 @@ import {
   type TypedGroupParticipantsUpdate,
   type TypedGroupSettingsUpdate,
   type TypedGroupStatusUpdate,
+  type TypedChatOpenedUpdate,
   type TypedMessageUpdate,
   type TypedStatusUpdate,
+  type TypedSystemUpdate,
   type TypedUnknownUpdate,
+  type TypedUserPreferencesUpdate,
   type TypedUpdate
 } from "./webhookNormalizer.js";
 import type {
@@ -244,6 +250,9 @@ const KIND_FILTERS: {
   readonly groupParticipants: TypedFilter<TypedGroupParticipantsUpdate>;
   readonly groupSettings: TypedFilter<TypedGroupSettingsUpdate>;
   readonly groupStatus: TypedFilter<TypedGroupStatusUpdate>;
+  readonly userPreferences: TypedFilter<TypedUserPreferencesUpdate>;
+  readonly system: TypedFilter<TypedSystemUpdate>;
+  readonly chatOpened: TypedFilter<TypedChatOpenedUpdate>;
 } = {
   message: messageFilter,
   status: statusFilter,
@@ -255,7 +264,10 @@ const KIND_FILTERS: {
   groupLifecycle: groupLifecycleFilter,
   groupParticipants: groupParticipantsFilter,
   groupSettings: groupSettingsFilter,
-  groupStatus: groupStatusFilter
+  groupStatus: groupStatusFilter,
+  userPreferences: userPreferencesFilter,
+  system: systemFilter,
+  chatOpened: chatOpenedFilter
 };
 
 const VALID_KINDS: readonly TypedUpdate["kind"][] = [
@@ -269,7 +281,10 @@ const VALID_KINDS: readonly TypedUpdate["kind"][] = [
   "groupLifecycle",
   "groupParticipants",
   "groupSettings",
-  "groupStatus"
+  "groupStatus",
+  "userPreferences",
+  "system",
+  "chatOpened"
 ];
 
 function buildListenFilter<TKind extends TypedUpdate["kind"]>(

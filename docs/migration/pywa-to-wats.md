@@ -171,7 +171,8 @@ Migration differences:
 - WATS `wa.listen(...)` replaces some conversational one-shot waits, but pywa sent-update waiters such as `SentMessage.wait_for_reply`, `wait_until_read`, `wait_for_click`, and `wait_for_completion` do not yet have object-method equivalents.
 - WATS filters use function composition (`and`, `or`, `not`, `custom`) rather than Python `&`, `|`, and `~` operators.
 - WATS-43A deep-normalizes common inbound message body families and adds typed filters for media, location, reaction, interactive button/list/nfm Flow-completion replies, and quick-reply buttons. This covers the most common `@wa.on_callback_button`, `@wa.on_callback_selection`, and `@wa.on_flow_completion` migration paths while keeping the update kind as `"message"`.
-- WATS still has fewer first-class typed update families than pywa for user preferences, phone/identity system events, call permission updates, and several status/account details.
+- WATS-79 first-slice webhook families are Implemented, credential-free: `user_preferences` maps to `TypedUserPreferencesUpdate` plus `filtersTyped.userPreferences`, `system` maps phone/identity changes to `TypedSystemUpdate` plus `filtersTyped.system`, and `chat_opened` maps `REQUEST_WELCOME` to `TypedChatOpenedUpdate` plus `filtersTyped.chatOpened`.
+- WATS still has fewer first-class typed update families than pywa for call permission updates and several status/account details.
 
 ## Error handling migration
 

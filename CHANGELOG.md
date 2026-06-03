@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.21] - 2026-06-03
+
+### Added
+
+- **Webhook-family parity first slice (WATS-79).** `@wats/core` now promotes `user_preferences`, `system`, and `chat_opened` webhook fields out of the unknown bucket. The normalizer emits `TypedUserPreferencesUpdate` for marketing opt-in/out rows, `TypedSystemUpdate` for `phone_number_change` / `identity_change`, and `TypedChatOpenedUpdate` for `REQUEST_WELCOME`; `filtersTyped.userPreferences`, `filtersTyped.system`, and `filtersTyped.chatOpened` add sibling-safe helpers for the new families. All coverage is credential-free synthetic webhook validation; live Meta delivery stays gated.
+
+### Fixed
+
+- **CI policy lock drift.** Updated the WATS-31 release-policy test to match the current `actions/checkout@v6` workflow after the dependency bump merged.
+
+### Release
+
+- Release metadata is aligned for 0.3.21: all publishable `@wats/*` packages, the service OpenAPI default version, README, and release-contract locks move together.
+
 ## [0.3.20] - 2026-06-02
 
 ### Added
