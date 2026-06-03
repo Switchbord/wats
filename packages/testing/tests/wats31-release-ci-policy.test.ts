@@ -127,7 +127,7 @@ describe("WATS-31 release and CI publishability scaffold", () => {
     expect(workflow).toContain("bun run typecheck");
     expect(workflow).toContain("bun run check-publish");
     expect(workflow).toContain("oven-sh/setup-bun");
-    expect(workflow).toContain("uses: actions/checkout@v5");
+    expect(workflow).toContain("uses: actions/checkout@v6");
     expect(workflow).not.toMatch(/uses:\s+actions\/checkout@v[0-4]\b/u);
     expect(workflow).not.toMatch(/META|WHATSAPP|ACCESS_TOKEN|APP_SECRET|REGISTRY_TOKEN|REMOTE_TOKEN/);
   });
