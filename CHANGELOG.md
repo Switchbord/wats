@@ -4,6 +4,7 @@
 
 ### Added
 
+- **Webhook-family parity first slice (WATS-79).** `@wats/core` now promotes `user_preferences`, `system`, and `chat_opened` webhook fields out of the unknown bucket. The normalizer emits `TypedUserPreferencesUpdate` for marketing opt-in/out rows, `TypedSystemUpdate` for `phone_number_change` / `identity_change`, and `TypedChatOpenedUpdate` for `REQUEST_WELCOME`; `filtersTyped.userPreferences`, `filtersTyped.system`, and `filtersTyped.chatOpened` add sibling-safe helpers for the new families. All coverage is credential-free synthetic webhook validation; live Meta delivery stays gated.
 - **Persistence outbox first slice (WATS-87).** `@wats/persistence` gains outbox record APIs — `enqueueOutboxItem`, `claimOutboxItems`, `markOutboxItemSucceeded`, `markOutboxItemFailed` — plus a `runOutboxWorkerOnce` worker step. SQLite persists only `payloadHash`, status, attempts, `leaseId`, and retry timestamps (no raw webhook/Graph bodies, message text, or contact payloads). Claims use monotonic `leaseId` fencing so a worker whose lease was reclaimed after a timeout cannot mark rows it no longer owns; stale `processing` rows are reclaimed by `updated_at` cutoff. Existing v1 databases migrate forward via `002_outbox_lease_id`, preserving the `001_initial` checksum.
 
 ### Release
