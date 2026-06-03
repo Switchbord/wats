@@ -1,10 +1,19 @@
 # Changelog
 
-## [0.3.21] - 2026-06-03
+## [0.3.22] - 2026-06-03
 
 ### Added
 
 - **Sent-result waiter ergonomics (WATS-78).** `WhatsApp.startChat(...)` now returns a waitable sent-result that preserves the Graph send response and adds `waitForReply`, `waitUntilDelivered`, `waitUntilRead`, and `waitUntilFailed`. Waiters are backed by the existing listener registry, support `timeoutMs` / `AbortSignal`, clean up listeners on resolve/reject/abort, and require observed webhook updates instead of inferring delivered/read from send success.
+
+### Release
+
+- Release metadata is aligned for 0.3.22: all publishable `@wats/*` packages, the service OpenAPI default version, README, and release-contract locks move together.
+
+## [0.3.21] - 2026-06-03
+
+### Added
+
 - **Webhook-family parity first slice (WATS-79).** `@wats/core` now promotes `user_preferences`, `system`, and `chat_opened` webhook fields out of the unknown bucket. The normalizer emits `TypedUserPreferencesUpdate` for marketing opt-in/out rows, `TypedSystemUpdate` for `phone_number_change` / `identity_change`, and `TypedChatOpenedUpdate` for `REQUEST_WELCOME`; `filtersTyped.userPreferences`, `filtersTyped.system`, and `filtersTyped.chatOpened` add sibling-safe helpers for the new families. All coverage is credential-free synthetic webhook validation; live Meta delivery stays gated.
 
 ### Fixed
