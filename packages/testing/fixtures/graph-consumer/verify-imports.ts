@@ -36,6 +36,8 @@ import {
   getPhoneNumberSettings,
   getBusinessProfile,
   getCommerceSettings,
+  updateBusinessProfile,
+  updateCommerceSettings,
   listBlockedUsers,
   blockUsers,
   unblockUsers,
@@ -1173,6 +1175,9 @@ async function verify(): Promise<VerifyReportOk> {
     typeof getPhoneNumberSettings === "function" &&
     typeof getBusinessProfile === "function" &&
     typeof getCommerceSettings === "function";
+  checks["WATS-74 business profile/commerce mutation exports are functions"] =
+    typeof updateBusinessProfile === "function" &&
+    typeof updateCommerceSettings === "function";
   checks["wats42-business-management subpath exports are functions"] =
     typeof businessManagementSubpath.getWabaInfo === "function" &&
     typeof businessManagementSubpath.listSubscribedApps === "function" &&
@@ -1180,6 +1185,9 @@ async function verify(): Promise<VerifyReportOk> {
     typeof businessManagementSubpath.getPhoneNumberSettings === "function" &&
     typeof businessManagementSubpath.getBusinessProfile === "function" &&
     typeof businessManagementSubpath.getCommerceSettings === "function";
+  checks["WATS-74 business-management subpath mutation exports are functions"] =
+    typeof businessManagementSubpath.updateBusinessProfile === "function" &&
+    typeof businessManagementSubpath.updateCommerceSettings === "function";
 
   const businessHandle = createMockTransport({
     responses: [
@@ -1189,7 +1197,9 @@ async function verify(): Promise<VerifyReportOk> {
       { status: 200, headers: { "content-type": "application/json" }, body: { id: "pn-1", display_phone_number: "+1555" } },
       { status: 200, headers: { "content-type": "application/json" }, body: { data: [{ calling: { status: "ENABLED" } }] } },
       { status: 200, headers: { "content-type": "application/json" }, body: { data: [{ about: "Fixture" }] } },
-      { status: 200, headers: { "content-type": "application/json" }, body: { data: [{ is_cart_enabled: true }] } }
+      { status: 200, headers: { "content-type": "application/json" }, body: { data: [{ is_cart_enabled: true }] } },
+      { status: 200, headers: { "content-type": "application/json" }, body: { success: true } },
+      { status: 200, headers: { "content-type": "application/json" }, body: { success: true } }
     ]
   });
   const businessClient = new GraphClient({
@@ -1207,6 +1217,17 @@ async function verify(): Promise<VerifyReportOk> {
   const phoneSettings: PhoneNumberSettingsResponse = await businessPhone.getSettings({ includeSipCredentials: false });
   const businessProfile: BusinessProfileResponse = await businessPhone.getBusinessProfile({ fields: ["about"] });
   const commerceSettings: CommerceSettingsResponse = await businessPhone.getCommerceSettings({ fields: ["is_cart_enabled"] });
+  await businessPhone.updateBusinessProfile({ about: "Fixture updated", profilePictureHandle: "pic-handle" });
+  await businessPhone.updateCommerceSettings({ isCartEnabled: true, isCatalogVisible: false });
+  const profileUpdateBody = JSON.parse(String(businessHandle.requests[7]?.body)) as {
+    readonly messaging_product?: string;
+    readonly about?: string;
+    readonly profile_picture_handle?: string;
+  };
+  const commerceUpdateBody = JSON.parse(String(businessHandle.requests[8]?.body)) as {
+    readonly is_cart_enabled?: boolean;
+    readonly is_catalog_visible?: boolean;
+  };
   checks["wats42-business-management round trips through scoped clients"] =
     wabaInfo.id === "waba-1" &&
     subscribedApps.data?.[0]?.app_id === "app-1" &&
@@ -1215,7 +1236,15 @@ async function verify(): Promise<VerifyReportOk> {
     businessProfile.data?.[0]?.about === "Fixture" &&
     commerceSettings.data?.[0]?.is_cart_enabled === true &&
     businessHandle.requests.map((request) => request.url).join("|") ===
-      "https://graph.facebook.com/v25.0/waba-1?fields=id%2Cname|https://graph.facebook.com/v25.0/waba-1/subscribed_apps|https://graph.facebook.com/v25.0/waba-1/phone_numbers?fields=id&limit=5|https://graph.facebook.com/v25.0/pn-1?fields=id%2Cdisplay_phone_number|https://graph.facebook.com/v25.0/pn-1/settings?include_sip_credentials=false|https://graph.facebook.com/v25.0/pn-1/whatsapp_business_profile?fields=about|https://graph.facebook.com/v25.0/pn-1/whatsapp_commerce_settings?fields=is_cart_enabled";
+      "https://graph.facebook.com/v25.0/waba-1?fields=id%2Cname|https://graph.facebook.com/v25.0/waba-1/subscribed_apps|https://graph.facebook.com/v25.0/waba-1/phone_numbers?fields=id&limit=5|https://graph.facebook.com/v25.0/pn-1?fields=id%2Cdisplay_phone_number|https://graph.facebook.com/v25.0/pn-1/settings?include_sip_credentials=false|https://graph.facebook.com/v25.0/pn-1/whatsapp_business_profile?fields=about|https://graph.facebook.com/v25.0/pn-1/whatsapp_commerce_settings?fields=is_cart_enabled|https://graph.facebook.com/v25.0/pn-1/whatsapp_business_profile|https://graph.facebook.com/v25.0/pn-1/whatsapp_commerce_settings";
+  checks["WATS-74 scoped business mutations map bodies"] =
+    businessHandle.requests[7]?.method === "POST" &&
+    businessHandle.requests[8]?.method === "POST" &&
+    profileUpdateBody.messaging_product === "whatsapp" &&
+    profileUpdateBody.about === "Fixture updated" &&
+    profileUpdateBody.profile_picture_handle === "pic-handle" &&
+    commerceUpdateBody.is_cart_enabled === true &&
+    commerceUpdateBody.is_catalog_visible === false;
 
   checks["wats95-business-management root exports are functions"] =
     typeof listBlockedUsers === "function" &&
