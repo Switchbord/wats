@@ -4,6 +4,7 @@
 
 ### Added
 
+- **Business profile/commerce mutation first tranche (WATS-74).** `@wats/graph` now exports `updateBusinessProfile` and `updateCommerceSettings` from the root package and `@wats/graph/endpoints/business-management`, with matching `PhoneNumberClient.updateBusinessProfile(...)` and `.updateCommerceSettings(...)` methods. Inputs stay camelCase while Graph bodies use `profile_picture_handle`, `is_cart_enabled`, and `is_catalog_visible`; tests use MockTransport only and live admin mutation remains credential-gated.
 - **Sent-result waiter ergonomics (WATS-78).** `WhatsApp.startChat(...)` now returns a waitable sent-result that preserves the Graph send response and adds `waitForReply`, `waitUntilDelivered`, `waitUntilRead`, and `waitUntilFailed`. Waiters are backed by the existing listener registry, support `timeoutMs` / `AbortSignal`, clean up listeners on resolve/reject/abort, and require observed webhook updates instead of inferring delivered/read from send success.
 
 ### Release
