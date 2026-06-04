@@ -20,6 +20,8 @@ import { GroupClient } from "./groupClient.js";
 import {
   getBusinessProfile as getBusinessProfileEndpoint,
   getCommerceSettings as getCommerceSettingsEndpoint,
+  updateBusinessProfile as updateBusinessProfileEndpoint,
+  updateCommerceSettings as updateCommerceSettingsEndpoint,
   getPhoneNumberInfo as getPhoneNumberInfoEndpoint,
   getPhoneNumberSettings as getPhoneNumberSettingsEndpoint,
   updatePhoneNumberSettings as updatePhoneNumberSettingsEndpoint,
@@ -39,6 +41,10 @@ import {
   type GetOfficialBusinessAccountStatusInput,
   type GetPhoneNumberInfoInput,
   type GetPhoneNumberSettingsInput,
+  type UpdateBusinessProfileInput,
+  type UpdateCommerceSettingsInput,
+  type BusinessProfileUpdateResponse,
+  type CommerceSettingsUpdateResponse,
   type ListBlockedUsersInput,
   type OfficialBusinessAccountReviewResponse,
   type OfficialBusinessAccountStatusResponse,
@@ -347,6 +353,42 @@ export class PhoneNumberClient {
     return getCommerceSettingsEndpoint(
       this.#graphClient,
       scopedParams as unknown as GetCommerceSettingsInput,
+      undefined,
+      opts
+    );
+  }
+
+  /** Graph `POST /{phoneNumberId}/whatsapp_business_profile`. */
+  async updateBusinessProfile(
+    params: Omit<UpdateBusinessProfileInput, "phoneNumberId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<BusinessProfileUpdateResponse> {
+    const scopedParams: Record<string, unknown> = copyOptionalParamsObject(
+      params,
+      "PhoneNumberClient.updateBusinessProfile"
+    );
+    scopedParams.phoneNumberId = this.#phoneNumberId;
+    return updateBusinessProfileEndpoint(
+      this.#graphClient,
+      scopedParams as unknown as UpdateBusinessProfileInput,
+      undefined,
+      opts
+    );
+  }
+
+  /** Graph `POST /{phoneNumberId}/whatsapp_commerce_settings`. */
+  async updateCommerceSettings(
+    params: Omit<UpdateCommerceSettingsInput, "phoneNumberId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<CommerceSettingsUpdateResponse> {
+    const scopedParams: Record<string, unknown> = copyOptionalParamsObject(
+      params,
+      "PhoneNumberClient.updateCommerceSettings"
+    );
+    scopedParams.phoneNumberId = this.#phoneNumberId;
+    return updateCommerceSettingsEndpoint(
+      this.#graphClient,
+      scopedParams as unknown as UpdateCommerceSettingsInput,
       undefined,
       opts
     );
