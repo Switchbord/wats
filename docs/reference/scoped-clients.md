@@ -193,8 +193,10 @@ POSTs local-storage settings to `/{phoneNumberId}/settings`. Pass camelCase
 `storageConfiguration`; WATS emits Graph `storage_configuration` (the same
 local-storage settings surface used alongside authentication templates whose
 OTP buttons use `supported_apps` records with `package_name` and
-`signature_hash`). The removed registration field `data_localization_region` is
-rejected/documented as not emitted by WATS.
+`signature_hash`). WATS-75 also maps authentication template `autofillText` and
+`zeroTapTermsAccepted` to Graph `autofill_text` and
+`zero_tap_terms_accepted`. The removed registration field
+`data_localization_region` is rejected/documented as not emitted by WATS.
 
 ```ts
 await phone.updateSettings({

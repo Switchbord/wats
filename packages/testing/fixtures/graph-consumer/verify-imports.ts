@@ -520,6 +520,26 @@ async function verify(): Promise<VerifyReportOk> {
   checks["buildTemplateFooterComponent emits Graph FOOTER component"] =
     JSON.stringify(buildTemplateFooterComponent({ text: "Footer" })) ===
     JSON.stringify({ type: "FOOTER", text: "Footer" });
+  checks["WATS-75 auth template OTP maps zero-tap fields"] =
+    JSON.stringify(buildTemplateButtonComponent({
+      buttons: [{
+        type: "OTP",
+        otpType: "ZERO_TAP",
+        autofillText: "Autofill",
+        zeroTapTermsAccepted: true,
+        supportedApps: [{ packageName: "com.example.app", signatureHash: "abc123sig" }]
+      }]
+    })) ===
+    JSON.stringify({
+      type: "BUTTONS",
+      buttons: [{
+        type: "OTP",
+        otp_type: "ZERO_TAP",
+        autofill_text: "Autofill",
+        zero_tap_terms_accepted: true,
+        supported_apps: [{ package_name: "com.example.app", signature_hash: "abc123sig" }]
+      }]
+    });
   checks["validateTemplateParameterCounts passes matching positional sends"] = (() => {
     try {
       validateTemplateParameterCounts(

@@ -4,6 +4,7 @@
 
 ### Added
 
+- **Authentication template DSL breadth first tranche (WATS-75).** `buildTemplateButtonComponent` now maps public `autofillText` and `zeroTapTermsAccepted` on OTP buttons to Graph `autofill_text` and `zero_tap_terms_accepted`, alongside the existing `supportedApps` -> `supported_apps` mapping. Coverage is credential-free MockTransport/request-shape only; live template mutation remains credential-gated.
 - **Business profile/commerce mutation first tranche (WATS-74).** `@wats/graph` now exports `updateBusinessProfile` and `updateCommerceSettings` from the root package and `@wats/graph/endpoints/business-management`, with matching `PhoneNumberClient.updateBusinessProfile(...)` and `.updateCommerceSettings(...)` methods. Inputs stay camelCase while Graph bodies use `profile_picture_handle`, `is_cart_enabled`, and `is_catalog_visible`; tests use MockTransport only and live admin mutation remains credential-gated.
 
 ### Release
