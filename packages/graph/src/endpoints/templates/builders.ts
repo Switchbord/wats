@@ -77,6 +77,13 @@ function normalizeSupportedApps(value: unknown): readonly Record<string, string>
   });
 }
 
+function assertBoolean(value: unknown, fieldName: string, helperName: string): boolean {
+  if (typeof value !== "boolean") {
+    throw validationError(`Invalid ${helperName} input: ${fieldName} must be a boolean.`);
+  }
+  return value;
+}
+
 function normalizeButton(input: unknown, index: number): Record<string, unknown> {
   const record = assertPlainRecord(input, "buildTemplateButtonComponent", `buttons[${index}]`);
   const type = assertString(record.type, "button.type", "buildTemplateButtonComponent", 32).toUpperCase();
@@ -112,6 +119,8 @@ function normalizeButton(input: unknown, index: number): Record<string, unknown>
       }
       out.otp_type = assertString(record.otpType, "button.otpType", "buildTemplateButtonComponent", 32).toUpperCase();
       if (record.text !== undefined) out.text = assertString(record.text, "button.text", "buildTemplateButtonComponent", TEMPLATE_SHORT_TEXT_MAX_LENGTH);
+      if (record.autofillText !== undefined) out.autofill_text = assertString(record.autofillText, "button.autofillText", "buildTemplateButtonComponent", TEMPLATE_SHORT_TEXT_MAX_LENGTH);
+      if (record.zeroTapTermsAccepted !== undefined) out.zero_tap_terms_accepted = assertBoolean(record.zeroTapTermsAccepted, "button.zeroTapTermsAccepted", "buildTemplateButtonComponent");
       if (out.otp_type === "ONE_TAP" || out.otp_type === "ZERO_TAP") {
         out.supported_apps = normalizeSupportedApps(record.supportedApps);
       } else if (record.supportedApps !== undefined) {

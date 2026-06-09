@@ -132,7 +132,7 @@ export type TemplateButtonInput =
   | { readonly type: "COPY_CODE"; readonly example: string; readonly [key: string]: unknown }
   | { readonly type: "CATALOG"; readonly text?: string; readonly [key: string]: unknown }
   | { readonly type: "FLOW"; readonly text: string; readonly flowId?: string; readonly flowName?: string; readonly flowAction?: string; readonly navigateScreen?: string; readonly [key: string]: unknown }
-  | { readonly type: "OTP"; readonly otpType: TemplateOtpType; readonly text?: string; readonly supportedApps?: readonly TemplateSupportedAppInput[]; readonly [key: string]: unknown };
+  | { readonly type: "OTP"; readonly otpType: TemplateOtpType; readonly text?: string; readonly autofillText?: string; readonly zeroTapTermsAccepted?: boolean; readonly supportedApps?: readonly TemplateSupportedAppInput[]; readonly [key: string]: unknown };
 
 export interface TemplateButtonsComponentInput {
   readonly buttons: readonly TemplateButtonInput[];

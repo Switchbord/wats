@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.24] - 2026-06-09
+
+### Added
+
+- **Authentication template DSL breadth first tranche (WATS-75).** `buildTemplateButtonComponent` now maps public `autofillText` and `zeroTapTermsAccepted` on OTP buttons to Graph `autofill_text` and `zero_tap_terms_accepted`, alongside the existing `supportedApps` -> `supported_apps` mapping. Coverage is credential-free MockTransport/request-shape only; live template mutation remains credential-gated.
+
+### Release
+
+- Release metadata is aligned for 0.3.24: all publishable `@wats/*` packages, the service OpenAPI default version, README, and release-contract locks move together.
+
 ## [0.3.23] - 2026-06-04
 
 ### Added

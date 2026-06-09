@@ -422,6 +422,9 @@ WATS-93 models two v21+ compatibility deltas without making live Meta calls:
   `supportedApps: [{ packageName, signatureHash }]`; the Graph body emits
   `supported_apps: [{ package_name, signature_hash }]`. Legacy flat
   `packageName` / `signatureHash` on the OTP button are rejected.
+- WATS-75 extends the authentication template DSL for zero-tap apps: pass
+  `autofillText` and `zeroTapTermsAccepted`; WATS emits Graph
+  `autofill_text` and `zero_tap_terms_accepted` on the OTP button.
 - Local-storage enablement is expressed through
   `updatePhoneNumberSettings(..., { storageConfiguration })`, which POSTs
   `storage_configuration` to `/{phoneNumberId}/settings`.
@@ -434,10 +437,12 @@ buildTemplateButtonComponent({
   buttons: [{
     type: "OTP",
     otpType: "ZERO_TAP",
+    autofillText: "Autofill",
+    zeroTapTermsAccepted: true,
     supportedApps: [{ packageName: "com.example.app", signatureHash: "abc123" }]
   }]
 });
-// => supported_apps: [{ package_name: "com.example.app", signature_hash: "abc123" }]
+// => autofill_text + zero_tap_terms_accepted + supported_apps
 
 await updatePhoneNumberSettings(client, {
   phoneNumberId,
