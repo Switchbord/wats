@@ -145,6 +145,8 @@ endpoint callable.
 | `updateSettings({ storageConfiguration })` | implemented (WATS-93) | `POST /{phoneNumberId}/settings`; emits `storage_configuration` and never `data_localization_region` |
 | `getBusinessProfile({ fields? })` | implemented (WATS-42A) | `GET /{phoneNumberId}/whatsapp_business_profile` |
 | `getCommerceSettings({ fields? })` | implemented (WATS-42A) | `GET /{phoneNumberId}/whatsapp_commerce_settings` |
+| `updateBusinessProfile({ about?, address?, description?, email?, vertical?, websites?, profilePictureHandle? })` | implemented (WATS-74) | `POST /{phoneNumberId}/whatsapp_business_profile`; emits `messaging_product: "whatsapp"` plus Graph `profile_picture_handle` |
+| `updateCommerceSettings({ isCartEnabled?, isCatalogVisible? })` | implemented (WATS-74) | `POST /{phoneNumberId}/whatsapp_commerce_settings`; emits `is_cart_enabled` / `is_catalog_visible` |
 | `initiateCall` | implemented (WATS-41) | `POST /{phoneNumberId}/calls` action `connect` |
 | `preAcceptCall` | implemented (WATS-41) | `POST /{phoneNumberId}/calls` action `pre_accept` |
 | `acceptCall` | implemented (WATS-41) | `POST /{phoneNumberId}/calls` action `accept` |
@@ -504,9 +506,9 @@ await phone.getCommerceSettings({ fields: ["is_cart_enabled", "is_catalog_visibl
 await phone.getSettings({ fields: "calling", includeSipCredentials: false });
 ```
 
-Direct callables mirror those methods: `getWabaInfo`, `listSubscribedApps`, enhanced `listPhoneNumbers`, `getPhoneNumberInfo`, `getPhoneNumberSettings`, `getBusinessProfile`, and `getCommerceSettings`. They are exported from root `@wats/graph` and from `@wats/graph/endpoints/business-management`.
+Direct callables mirror those methods: `getWabaInfo`, `listSubscribedApps`, enhanced `listPhoneNumbers`, `getPhoneNumberInfo`, `getPhoneNumberSettings`, `getBusinessProfile`, `getCommerceSettings`, WATS-74 `updateBusinessProfile`, and WATS-74 `updateCommerceSettings`. They are exported from root `@wats/graph` and from `@wats/graph/endpoints/business-management`.
 
-Validation is fail-closed before transport: path ids reject raw/encoded/double-encoded traversal and control characters; `fields` accepts a string or dense readonly string array and is joined with commas through URLSearchParams; `includeSipCredentials` must be boolean when provided and maps to Graph `include_sip_credentials=true|false`. `getPhoneNumberSettings({ includeSipCredentials: true })` may return SIP credentials, so treat that response as sensitive and avoid logging it. Mutating admin endpoints and live Meta verification remain credential-gated.
+Validation is fail-closed before transport: path ids reject raw/encoded/double-encoded traversal and control characters; `fields` accepts a string or dense readonly string array and is joined with commas through URLSearchParams; `includeSipCredentials` must be boolean when provided and maps to Graph `include_sip_credentials=true|false`. `getPhoneNumberSettings({ includeSipCredentials: true })` may return SIP credentials, so treat that response as sensitive and avoid logging it. WATS-74 profile mutations require at least one profile field and map camelCase `profilePictureHandle` to Graph `profile_picture_handle`; WATS-74 commerce mutations require at least one boolean setting and map `isCartEnabled` / `isCatalogVisible` to Graph `is_cart_enabled` / `is_catalog_visible`. Broader admin mutations remain deferred beyond the WATS-93 local-storage settings update and WATS-74 profile/commerce first tranche.
 
 ### Block API, OBA, and display-name review helpers (WATS-95)
 

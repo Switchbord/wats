@@ -15,6 +15,8 @@ import {
   WABAClient,
   getBusinessProfile,
   getCommerceSettings,
+  updateBusinessProfile,
+  updateCommerceSettings,
   getPhoneNumberInfo,
   getPhoneNumberSettings,
   getWabaInfo,
@@ -148,6 +150,48 @@ describe("WATS-42A read-only business/admin endpoint callables", () => {
       "https://graph.facebook.com/v25.0/pn-1/settings?include_sip_credentials=false"
     ]);
   });
+
+  test("WATS-74 direct profile and commerce mutations map camelCase inputs to Graph snake_case bodies", async () => {
+    const { client, handle } = clientWith([
+      ok({ success: true }),
+      ok({ success: true })
+    ]);
+
+    await updateBusinessProfile(client, {
+      phoneNumberId: "pn-1",
+      about: "About WATS",
+      address: "1 Framework Way",
+      description: "Composable WhatsApp framework",
+      email: "ops@example.test",
+      vertical: "PROF_SERVICES",
+      websites: ["https://example.test", "https://docs.example.test"],
+      profilePictureHandle: "pic-handle"
+    });
+    await updateCommerceSettings(client, {
+      phoneNumberId: "pn-1",
+      isCartEnabled: true,
+      isCatalogVisible: false
+    });
+
+    expect(handle.requests.map((r) => `${r.method} ${r.url}`)).toEqual([
+      "POST https://graph.facebook.com/v25.0/pn-1/whatsapp_business_profile",
+      "POST https://graph.facebook.com/v25.0/pn-1/whatsapp_commerce_settings"
+    ]);
+    expect(JSON.parse(String(handle.requests[0]?.body))).toEqual({
+      messaging_product: "whatsapp",
+      about: "About WATS",
+      address: "1 Framework Way",
+      description: "Composable WhatsApp framework",
+      email: "ops@example.test",
+      vertical: "PROF_SERVICES",
+      websites: ["https://example.test", "https://docs.example.test"],
+      profile_picture_handle: "pic-handle"
+    });
+    expect(JSON.parse(String(handle.requests[1]?.body))).toEqual({
+      is_cart_enabled: true,
+      is_catalog_visible: false
+    });
+  });
 });
 
 describe("WATS-42A scoped WABAClient and PhoneNumberClient methods", () => {
@@ -159,7 +203,9 @@ describe("WATS-42A scoped WABAClient and PhoneNumberClient methods", () => {
       ok({ id: "BOUND-PHONE" }),
       ok({ data: [] }),
       ok({ data: [] }),
-      ok({ data: [] })
+      ok({ data: [] }),
+      ok({ success: true }),
+      ok({ success: true })
     ]);
     const waba = new WABAClient({ graphClient: client, wabaId: "BOUND-WABA" });
     const phone = new PhoneNumberClient({ graphClient: client, phoneNumberId: "BOUND-PHONE" });
@@ -171,16 +217,27 @@ describe("WATS-42A scoped WABAClient and PhoneNumberClient methods", () => {
     await phone.getSettings({ phoneNumberId: "OVERRIDE", includeSipCredentials: true } as never);
     await phone.getBusinessProfile({ phoneNumberId: "OVERRIDE", fields: ["about"] } as never);
     await phone.getCommerceSettings({ phoneNumberId: "OVERRIDE", fields: ["is_cart_enabled"] } as never);
+    await phone.updateBusinessProfile({ phoneNumberId: "OVERRIDE", about: "Bound about" } as never);
+    await phone.updateCommerceSettings({ phoneNumberId: "OVERRIDE", isCartEnabled: false } as never);
 
-    expect(handle.requests.map((r) => r.url)).toEqual([
-      "https://graph.facebook.com/v25.0/BOUND-WABA?fields=id",
-      "https://graph.facebook.com/v25.0/BOUND-WABA/subscribed_apps",
-      "https://graph.facebook.com/v25.0/BOUND-WABA/phone_numbers?limit=5",
-      "https://graph.facebook.com/v25.0/BOUND-PHONE?fields=id",
-      "https://graph.facebook.com/v25.0/BOUND-PHONE/settings?include_sip_credentials=true",
-      "https://graph.facebook.com/v25.0/BOUND-PHONE/whatsapp_business_profile?fields=about",
-      "https://graph.facebook.com/v25.0/BOUND-PHONE/whatsapp_commerce_settings?fields=is_cart_enabled"
+    expect(handle.requests.map((r) => `${r.method} ${r.url}`)).toEqual([
+      "GET https://graph.facebook.com/v25.0/BOUND-WABA?fields=id",
+      "GET https://graph.facebook.com/v25.0/BOUND-WABA/subscribed_apps",
+      "GET https://graph.facebook.com/v25.0/BOUND-WABA/phone_numbers?limit=5",
+      "GET https://graph.facebook.com/v25.0/BOUND-PHONE?fields=id",
+      "GET https://graph.facebook.com/v25.0/BOUND-PHONE/settings?include_sip_credentials=true",
+      "GET https://graph.facebook.com/v25.0/BOUND-PHONE/whatsapp_business_profile?fields=about",
+      "GET https://graph.facebook.com/v25.0/BOUND-PHONE/whatsapp_commerce_settings?fields=is_cart_enabled",
+      "POST https://graph.facebook.com/v25.0/BOUND-PHONE/whatsapp_business_profile",
+      "POST https://graph.facebook.com/v25.0/BOUND-PHONE/whatsapp_commerce_settings"
     ]);
+    expect(JSON.parse(String(handle.requests[7]?.body))).toEqual({
+      messaging_product: "whatsapp",
+      about: "Bound about"
+    });
+    expect(JSON.parse(String(handle.requests[8]?.body))).toEqual({
+      is_cart_enabled: false
+    });
   });
 
   test("constructor-bound WABA ids reject encoded traversal and excessive percent encoding", () => {
@@ -590,6 +647,35 @@ describe("WATS-42A request-shape validation and fail-closed sanitization", () =>
     await expect(
       getPhoneNumberInfo(client, { phoneNumberId: "pn-1" }, undefined, { headers: { "x-bad-value": "bad\u0000value" } })
     ).rejects.toThrow(GraphRequestValidationError);
+    expect(handle.requests.length).toBe(0);
+  });
+
+  test("WATS-74 profile and commerce mutation bodies reject missing writes, malformed fields, accessors, and symbols before transport", async () => {
+    const { client, handle } = clientWith(ok({ success: true }));
+    await expect(updateBusinessProfile(client, { phoneNumberId: "pn-1" } as never)).rejects.toThrow(GraphRequestValidationError);
+    await expect(updateCommerceSettings(client, { phoneNumberId: "pn-1" } as never)).rejects.toThrow(GraphRequestValidationError);
+
+    const accessorProfile = { phoneNumberId: "pn-1" } as Record<string, unknown>;
+    Object.defineProperty(accessorProfile, "about", {
+      enumerable: true,
+      get() { throw new Error("about getter should not run"); }
+    });
+    await expect(updateBusinessProfile(client, accessorProfile as never)).rejects.toThrow(GraphRequestValidationError);
+
+    const symbolProfile = { phoneNumberId: "pn-1", about: "ok", [Symbol("hidden")]: "bad" };
+    await expect(updateBusinessProfile(client, symbolProfile as never)).rejects.toThrow(GraphRequestValidationError);
+
+    for (const bad of ["", "   ", 123, null, {}, [], "bad\n", "x".repeat(1025)]) {
+      await expect(updateBusinessProfile(client, { phoneNumberId: "pn-1", about: bad as never })).rejects.toThrow(GraphRequestValidationError);
+    }
+    await expect(updateBusinessProfile(client, { phoneNumberId: "pn-1", websites: [] })).rejects.toThrow(GraphRequestValidationError);
+    await expect(updateBusinessProfile(client, { phoneNumberId: "pn-1", websites: ["https://ok.example", "bad\nurl"] })).rejects.toThrow(GraphRequestValidationError);
+    await expect(updateBusinessProfile(client, { phoneNumberId: "pn-1", profilePictureHandle: "bad\u0000handle" })).rejects.toThrow(GraphRequestValidationError);
+
+    for (const bad of ["true", 1, null, {}, []]) {
+      await expect(updateCommerceSettings(client, { phoneNumberId: "pn-1", isCartEnabled: bad as never })).rejects.toThrow(GraphRequestValidationError);
+    }
+
     expect(handle.requests.length).toBe(0);
   });
 });

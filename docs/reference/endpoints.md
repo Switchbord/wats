@@ -51,7 +51,7 @@ Current first-class Graph endpoint family subpaths are:
 - `@wats/graph/endpoints/calling`
 - `@wats/graph/endpoints/business-management`
 
-The business-management subpath includes read/admin helpers such as `getPhoneNumberInfo`, WATS-95 `listBlockedUsers`, `blockUsers`, `unblockUsers`, `getOfficialBusinessAccountStatus`, `requestOfficialBusinessAccountReview`, and `submitDisplayNameForReview`. Those helpers map Meta `block_users`, `official_business_account`, and `new_display_name` wire surfaces while remaining credential-free in tests.
+The business-management subpath includes read/admin helpers such as `getPhoneNumberInfo`, WATS-74 `updateBusinessProfile`, WATS-74 `updateCommerceSettings`, WATS-95 `listBlockedUsers`, `blockUsers`, `unblockUsers`, `getOfficialBusinessAccountStatus`, `requestOfficialBusinessAccountReview`, and `submitDisplayNameForReview`. Those helpers map Meta `whatsapp_business_profile`, `whatsapp_commerce_settings`, `block_users`, `official_business_account`, and `new_display_name` wire surfaces while remaining credential-free in tests. WATS-74 profile updates emit Graph `profile_picture_handle`; commerce updates emit `is_cart_enabled` and `is_catalog_visible`.
 
 WATS-54 keeps package exports, target source files, graph-consumer
 package-specifier imports, reference docs, architecture docs, migration

@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.23] - 2026-06-04
+
+### Added
+
+- **Business profile/commerce mutation first tranche (WATS-74).** `@wats/graph` now exports `updateBusinessProfile` and `updateCommerceSettings` from the root package and `@wats/graph/endpoints/business-management`, with matching `PhoneNumberClient.updateBusinessProfile(...)` and `.updateCommerceSettings(...)` methods. Inputs stay camelCase while Graph bodies use `profile_picture_handle`, `is_cart_enabled`, and `is_catalog_visible`; tests use MockTransport only and live admin mutation remains credential-gated.
+
+### Release
+
+- Release metadata is aligned for 0.3.23: all publishable `@wats/*` packages, the service OpenAPI default version, README, and release-contract locks move together.
+
 ## [0.3.22] - 2026-06-03
 
 ### Added

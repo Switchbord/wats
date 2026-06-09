@@ -118,6 +118,33 @@ export interface CommerceSettingsResponse {
   readonly [key: string]: unknown;
 }
 
+export interface BusinessProfileUpdateResponse {
+  readonly success?: boolean;
+  readonly [key: string]: unknown;
+}
+
+export interface CommerceSettingsUpdateResponse {
+  readonly success?: boolean;
+  readonly [key: string]: unknown;
+}
+
+export interface UpdateBusinessProfileInput {
+  readonly phoneNumberId: string;
+  readonly about?: string;
+  readonly address?: string;
+  readonly description?: string;
+  readonly email?: string;
+  readonly vertical?: string;
+  readonly websites?: readonly string[];
+  readonly profilePictureHandle?: string;
+}
+
+export interface UpdateCommerceSettingsInput {
+  readonly phoneNumberId: string;
+  readonly isCartEnabled?: boolean;
+  readonly isCatalogVisible?: boolean;
+}
+
 export interface GetWabaInfoInput {
   readonly wabaId: string;
   readonly fields?: BusinessManagementFields;
@@ -277,6 +304,11 @@ const MAX_OBA_TEXT_LENGTH = 2048;
 const MAX_OBA_URL_LENGTH = 2048;
 const MAX_OBA_SUPPORTING_LINKS = 10;
 const MIN_OBA_SUPPORTING_LINKS = 5;
+const MAX_BUSINESS_PROFILE_TEXT_LENGTH = 1024;
+const MAX_BUSINESS_PROFILE_EMAIL_LENGTH = 320;
+const MAX_BUSINESS_PROFILE_WEBSITES = 2;
+const MAX_BUSINESS_PROFILE_WEBSITE_LENGTH = 2048;
+const MAX_PROFILE_PICTURE_HANDLE_LENGTH = 1024;
 
 function validationError(message: string, cause?: unknown): GraphRequestValidationError {
   return new GraphRequestValidationError(message, cause);
@@ -646,6 +678,93 @@ export function normalizeCommerceSettingsParams(input: GetCommerceSettingsInput)
   return out;
 }
 
+function optionalBusinessProfileString(
+  record: Record<string, unknown>,
+  key: keyof UpdateBusinessProfileInput,
+  helperName: string,
+  maxLength = MAX_BUSINESS_PROFILE_TEXT_LENGTH
+): string | undefined {
+  const value = ownDataValue(record, key as string, helperName, false);
+  if (value === undefined) return undefined;
+  return assertBoundedPlainString(value, key as string, helperName, maxLength);
+}
+
+function optionalBusinessProfileWebsites(record: Record<string, unknown>, helperName: string): readonly string[] | undefined {
+  const value = ownDataValue(record, "websites", helperName, false);
+  if (value === undefined) return undefined;
+  const items = assertDenseDataArray(value, {
+    helperName,
+    path: "websites",
+    minLength: 1,
+    maxLength: MAX_BUSINESS_PROFILE_WEBSITES,
+    invalidTypeMessage: `Invalid ${helperName} input: websites must be an array of http(s) URLs.`,
+    invalidLengthMessage: `Invalid ${helperName} input: websites length must be between 1 and ${MAX_BUSINESS_PROFILE_WEBSITES}.`,
+    sparseArrayMessage: `Invalid ${helperName} input: websites must not contain sparse array holes.`,
+    unsafePrototypeKeyMessage: `Invalid ${helperName} input: websites contains an unsafe prototype key.`,
+    unsupportedPropertyMessage: `Invalid ${helperName} input: websites contains unsupported properties.`
+  });
+  return items.map((item, index) => assertHttpUrl(item, `websites[${index}]`, helperName));
+}
+
+function optionalBoolean(record: Record<string, unknown>, key: keyof UpdateCommerceSettingsInput, helperName: string): boolean | undefined {
+  const value = ownDataValue(record, key as string, helperName, false);
+  if (value === undefined) return undefined;
+  if (typeof value !== "boolean") {
+    throw validationError(`Invalid ${helperName} input: ${String(key)} must be boolean when provided.`);
+  }
+  return value;
+}
+
+export function buildUpdateBusinessProfileBody(input: UpdateBusinessProfileInput): Record<string, unknown> {
+  const helperName = "updateBusinessProfile";
+  const record = assertPlainRecord(input, helperName);
+  const out: Record<string, unknown> = { messaging_product: "whatsapp" };
+  const about = optionalBusinessProfileString(record, "about", helperName);
+  const address = optionalBusinessProfileString(record, "address", helperName);
+  const description = optionalBusinessProfileString(record, "description", helperName);
+  const email = optionalBusinessProfileString(record, "email", helperName, MAX_BUSINESS_PROFILE_EMAIL_LENGTH);
+  const vertical = optionalBusinessProfileString(record, "vertical", helperName, 128);
+  const websites = optionalBusinessProfileWebsites(record, helperName);
+  const profilePictureHandle = optionalBusinessProfileString(record, "profilePictureHandle", helperName, MAX_PROFILE_PICTURE_HANDLE_LENGTH);
+  if (about !== undefined) out.about = about;
+  if (address !== undefined) out.address = address;
+  if (description !== undefined) out.description = description;
+  if (email !== undefined) out.email = email;
+  if (vertical !== undefined) out.vertical = vertical;
+  if (websites !== undefined) out.websites = websites;
+  if (profilePictureHandle !== undefined) out.profile_picture_handle = profilePictureHandle;
+  if (Object.keys(out).length === 1) {
+    throw validationError(`Invalid ${helperName} input: at least one profile field is required.`);
+  }
+  return out;
+}
+
+export function normalizeUpdateBusinessProfileParams(input: UpdateBusinessProfileInput): WireParams {
+  const helperName = "updateBusinessProfile";
+  const record = assertPlainRecord(input, helperName);
+  return { phoneNumberId: assertPathId(ownDataValue(record, "phoneNumberId", helperName, true), "phoneNumberId", helperName) };
+}
+
+export function buildUpdateCommerceSettingsBody(input: UpdateCommerceSettingsInput): Record<string, unknown> {
+  const helperName = "updateCommerceSettings";
+  const record = assertPlainRecord(input, helperName);
+  const out: Record<string, unknown> = {};
+  const isCartEnabled = optionalBoolean(record, "isCartEnabled", helperName);
+  const isCatalogVisible = optionalBoolean(record, "isCatalogVisible", helperName);
+  if (isCartEnabled !== undefined) out.is_cart_enabled = isCartEnabled;
+  if (isCatalogVisible !== undefined) out.is_catalog_visible = isCatalogVisible;
+  if (Object.keys(out).length === 0) {
+    throw validationError(`Invalid ${helperName} input: at least one commerce setting is required.`);
+  }
+  return out;
+}
+
+export function normalizeUpdateCommerceSettingsParams(input: UpdateCommerceSettingsInput): WireParams {
+  const helperName = "updateCommerceSettings";
+  const record = assertPlainRecord(input, helperName);
+  return { phoneNumberId: assertPathId(ownDataValue(record, "phoneNumberId", helperName, true), "phoneNumberId", helperName) };
+}
+
 function sanitizeHeaders(headers: unknown, helperName: string): Headers | Record<string, string> {
   return sanitizeHeaderInit(headers, {
     helperName,
@@ -792,6 +911,30 @@ const getCommerceSettingsRaw = defineEndpoint<{ phoneNumberId: string; fields?: 
   params: { phoneNumberId: { in: "path", required: true }, fields: { in: "query" } }
 });
 
+const updateBusinessProfileRaw = defineEndpoint<
+  { phoneNumberId: string },
+  UpdateBusinessProfileInput,
+  BusinessProfileUpdateResponse
+>({
+  method: "POST",
+  pathTemplate: "/{phoneNumberId}/whatsapp_business_profile",
+  params: { phoneNumberId: { in: "path", required: true } },
+  bodyContentType: "application/json",
+  buildBody: buildUpdateBusinessProfileBody
+});
+
+const updateCommerceSettingsRaw = defineEndpoint<
+  { phoneNumberId: string },
+  UpdateCommerceSettingsInput,
+  CommerceSettingsUpdateResponse
+>({
+  method: "POST",
+  pathTemplate: "/{phoneNumberId}/whatsapp_commerce_settings",
+  params: { phoneNumberId: { in: "path", required: true } },
+  bodyContentType: "application/json",
+  buildBody: buildUpdateCommerceSettingsBody
+});
+
 export const getWabaInfo = Object.assign(
   async function getWabaInfo(client: GraphClient, params: GetWabaInfoInput, body?: never, opts?: EndpointInvokeOptions): Promise<WabaInfo> {
     assertNoBody(body, "getWabaInfo");
@@ -894,4 +1037,20 @@ export const getCommerceSettings = Object.assign(
     return getCommerceSettingsRaw(client, normalizeCommerceSettingsParams(params) as Parameters<typeof getCommerceSettingsRaw>[1], undefined, sanitizeBusinessManagementOptions(opts, "getCommerceSettings"));
   },
   { definition: getCommerceSettingsRaw.definition }
+);
+
+export const updateBusinessProfile = Object.assign(
+  async function updateBusinessProfile(client: GraphClient, params: UpdateBusinessProfileInput, body?: never, opts?: EndpointInvokeOptions): Promise<BusinessProfileUpdateResponse> {
+    assertNoBody(body, "updateBusinessProfile");
+    return updateBusinessProfileRaw(client, normalizeUpdateBusinessProfileParams(params) as Parameters<typeof updateBusinessProfileRaw>[1], params, sanitizeBusinessManagementOptions(opts, "updateBusinessProfile"));
+  },
+  { definition: updateBusinessProfileRaw.definition }
+);
+
+export const updateCommerceSettings = Object.assign(
+  async function updateCommerceSettings(client: GraphClient, params: UpdateCommerceSettingsInput, body?: never, opts?: EndpointInvokeOptions): Promise<CommerceSettingsUpdateResponse> {
+    assertNoBody(body, "updateCommerceSettings");
+    return updateCommerceSettingsRaw(client, normalizeUpdateCommerceSettingsParams(params) as Parameters<typeof updateCommerceSettingsRaw>[1], params, sanitizeBusinessManagementOptions(opts, "updateCommerceSettings"));
+  },
+  { definition: updateCommerceSettingsRaw.definition }
 );

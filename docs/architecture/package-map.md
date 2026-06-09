@@ -71,6 +71,7 @@ Current runtime endpoints and helpers:
 - `PhoneNumberClient.sendText(...)` convenience helper for arbitrary-recipient text starts (WATS-30)
 - WATS-38 `PhoneNumberClient` composer helpers for media, location, contacts, reaction, interactive variants, template send, mark-as-read, and typing indicators
 - WATS-94 Template Group helpers for Graph `template_groups` and `template_group_analytics` (`listTemplateGroups`, `getTemplateGroupAnalytics`)
+- WATS-74 profile/commerce mutation helpers for Graph `whatsapp_business_profile` and `whatsapp_commerce_settings` (`updateBusinessProfile`, `updateCommerceSettings`) via root `@wats/graph` and `@wats/graph/endpoints/business-management`; WATS maps `profilePictureHandle` to Graph `profile_picture_handle` and `isCartEnabled` / `isCatalogVisible` to `is_cart_enabled` / `is_catalog_visible`
 - WATS-95 business-management helpers for Graph `block_users`, `official_business_account`, and `new_display_name` (`listBlockedUsers`, `blockUsers`, `unblockUsers`, `getOfficialBusinessAccountStatus`, `requestOfficialBusinessAccountReview`, `submitDisplayNameForReview`)
 - WATS-132/WATS-133 Groups helpers for Graph `groups`, `invite_link`, `participants`, and `join_requests`, including `PhoneNumberClient.createGroup`, `PhoneNumberClient.listGroups`, `PhoneNumberClient.group(groupId)`, and `GroupClient`
 - `GET /{wabaId}/phone_numbers`

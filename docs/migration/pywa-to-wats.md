@@ -135,8 +135,9 @@ Migration notes:
 | pywa `get_business_phone_numbers` | `WABAClient.listPhoneNumbers` | Read-only only | Supports `fields`, `limit`, `after`, `before`. |
 | pywa `get_business_phone_number_settings` | `PhoneNumberClient.getSettings` | Implemented, read-only | `includeSipCredentials` is sensitive. |
 | pywa phone local-storage settings update | `PhoneNumberClient.updateSettings({ storageConfiguration })` / `updatePhoneNumberSettings` | Implemented, live pending | WATS-93 emits `storage_configuration`; WATS does not emit removed register field `data_localization_region`. |
-| pywa `get_business_profile` / `get_commerce_settings` | WATS `PhoneNumberClient.getBusinessProfile` / `.getCommerceSettings` | Read-only only | Mutations are deferred. |
-| register/deregister phone, callback overrides, public key, profile/settings/commerce updates | No first-class WATS helper yet | Deferred / credential-gated | Separate issue and explicit user authorization required. |
+| pywa `get_business_profile` / `get_commerce_settings` | WATS `PhoneNumberClient.getBusinessProfile` / `.getCommerceSettings` | Read-only | Reads are credential-free MockTransport-covered. |
+| pywa profile/commerce updates | WATS `PhoneNumberClient.updateBusinessProfile` / `.updateCommerceSettings`, also direct `updateBusinessProfile` / `updateCommerceSettings` from `@wats/graph/endpoints/business-management` | WATS-74 first tranche | Profile updates map camelCase `profilePictureHandle` to Graph `profile_picture_handle`; commerce updates map `isCartEnabled` / `isCatalogVisible` to `is_cart_enabled` / `is_catalog_visible`. Live mutation requires explicit credentialed authorization. |
+| register/deregister phone, callback overrides, public key, remaining profile/commerce updates | No first-class WATS helper yet | Deferred / credential-gated | Separate issue and explicit user authorization required. |
 | QR code CRUD, block/unblock users, token exchange | No first-class WATS helper yet | Deferred | Capture as Linear follow-ups if needed. |
 
 ## Groups map
@@ -231,7 +232,7 @@ Do not migrate code assuming WATS already has pywa parity for:
 - pywa's complete template component DSL, compare/migrate/unpause, library/authentication helper breadth.
 - pywa's full Flow JSON DSL, encrypted Flow request decrypt/encrypt, Flow hosting, metrics, migration.
 - calling permissions, calling settings/SIP mutations, and real call orchestration.
-- mutating admin APIs, token flows, callback overrides, QR codes, block/unblock users, and phone registration/deregistration.
+- mutating admin APIs beyond WATS-74 profile/commerce updates, token flows, callback overrides, QR codes, block/unblock users, and phone registration/deregistration.
 - full Meta Graph OpenAPI generation and production operator modes beyond the current credential-free `wats init`, `wats doctor`, dry-run `wats serve`, and credential-gated local live `wats serve` tooling.
 
 ## Migration checklist
