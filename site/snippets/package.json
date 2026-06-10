@@ -1,0 +1,15 @@
+{
+  "name": "@wats/site-snippets",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@wats/core": "0.3.26",
+    "@wats/graph": "0.3.26"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}

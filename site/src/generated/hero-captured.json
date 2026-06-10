@@ -1,0 +1,16 @@
+{
+  "method": "POST",
+  "url": "https://graph.facebook.com/v25.0/1234567890/messages",
+  "headers": {
+    "content-type": "application/json",
+    "authorization": "Bearer demo-token"
+  },
+  "body": {
+    "messaging_product": "whatsapp",
+    "to": "15550001111",
+    "type": "text",
+    "text": {
+      "body": "hello from WATS"
+    }
+  }
+}
