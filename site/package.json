@@ -6,7 +6,8 @@
     "dev": "vite dev",
     "build": "vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check": "bun run typecheck && bun run build && bun scripts/check-canaries.ts && bun scripts/check-pages.ts && bun scripts/check-banned-phrases.ts"
   },
   "dependencies": {
     "@tanstack/react-router": "1.170.15",

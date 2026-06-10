@@ -1,0 +1,6 @@
+{
+  "pages": ["/", "/docs", "/dev-components"],
+  "notes": {
+    "/dev-components": "devOnly: internal component gallery, removed from the public build by T24"
+  }
+}
