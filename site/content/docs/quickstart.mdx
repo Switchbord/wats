@@ -3,6 +3,40 @@ title: Quickstart
 description: Run a WATS bot with zero credentials.
 ---
 
-## Quickstart
+You get a bot that answers an inbound WhatsApp message — with zero
+credentials. The Graph client runs against a mock transport, so the demo is
+fully offline: no Meta app, no token, no webhook tunnel.
 
-Content migrates in Phase C.
+## Install
+
+```sh
+bun add @wats/core @wats/graph @wats/http
+```
+
+## The bot
+
+{/* Canonical source: site/snippets/quickstart.ts — typechecked against the
+    published @wats packages and executed in CI; do not edit the code here. */}
+
+<include>../../snippets/quickstart.ts</include>
+
+## Run it
+
+```sh
+bun run quickstart.ts
+```
+
+Expected output:
+
+```
+replied to 15550001111 with wamid.DEMO_REPLY
+graph requests captured by mock: 1
+```
+
+## Go deeper
+
+- [Guide](/docs/guide) — the full getting-started walkthrough.
+- [Playground](/playground) — explore the API in the browser, offline.
+- Live credentials: swap the mock transport for the default fetch transport
+  and a real access token. The [guide](/docs/guide) covers the credential
+  setup; this site never asks for or handles tokens.

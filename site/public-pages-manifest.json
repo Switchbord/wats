@@ -3,6 +3,7 @@
     "/",
     "/docs",
     "/docs/quickstart",
+    "/docs/guide",
     "/docs/parity",
     "/docs/reference/errors",
     "/docs/reference/webhook-normalizer",
