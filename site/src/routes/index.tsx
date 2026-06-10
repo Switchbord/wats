@@ -5,5 +5,11 @@ export const Route = createFileRoute('/')({
 })
 
 function Home() {
-  return <p>wats.sh — coming soon</p>
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-bg">
+      <h1 className="mono text-5xl font-semibold text-text">
+        wats<span className="text-accent">_</span>
+      </h1>
+    </main>
+  )
 }
