@@ -87,7 +87,7 @@ const file = await downloadMediaBytes(client, {
 console.log(file.bytes, file.contentType);
 ```
 
-`downloadMedia` parses Graph snake_case metadata into camelCase. `downloadMediaBytes` accepts only `http:` / `https:` URLs, fetches through the injected transport with the client's authorization header, enforces `DEFAULT_MAX_MEDIA_DOWNLOAD_BYTES` / `MAX_MEDIA_DOWNLOAD_BYTES`, and verifies `expectedSha256` when provided.
+`downloadMedia` parses Graph snake_case metadata into camelCase; its `sha256` field is Meta's 64-character hex digest. `downloadMediaBytes` accepts only `http:` / `https:` URLs, fetches through the injected transport with the client's authorization header, enforces `DEFAULT_MAX_MEDIA_DOWNLOAD_BYTES` / `MAX_MEDIA_DOWNLOAD_BYTES`, and verifies `expectedSha256` when provided. `expectedSha256` accepts either Meta's 64-character hex digest (so `metadata.sha256` can be passed straight through, as shown above) or a base64-encoded 32-byte digest.
 
 ### `deleteMedia(client, params)`
 

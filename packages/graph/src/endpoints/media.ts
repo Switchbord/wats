@@ -905,6 +905,33 @@ function validateBase64Digest(
   }
 }
 
+function validateSha256Digest(
+  value: unknown,
+  label: string
+): Uint8Array {
+  // WATS-149: a SHA-256 digest may arrive as a 64-char hex string (Meta's
+  // downloadMedia metadata format) OR as base64 (32 decoded bytes, the
+  // historical input format). Accept both so the natural
+  // downloadMedia -> downloadMediaBytes pipeline round-trips. Anything else is
+  // a typed validation error, never a host throw.
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new MediaValidationError(
+      "invalid_options",
+      `Invalid ${label}: expected a non-empty hex or base64 SHA-256 digest string.`
+    );
+  }
+  const trimmed = value.trim();
+  if (/^[0-9a-fA-F]{64}$/u.test(trimmed)) {
+    const out = new Uint8Array(32);
+    for (let i = 0; i < 32; i += 1) {
+      out[i] = Number.parseInt(trimmed.slice(i * 2, i * 2 + 2), 16);
+    }
+    return out;
+  }
+  // Fall back to base64 (enforces 32 decoded bytes).
+  return validateBase64Digest(trimmed, label, "invalid_options", 32);
+}
+
 function validateDownloadBytesOptions(options: unknown): { url: string; expectedSha256?: Uint8Array; maxBytes: number; signal?: AbortSignal } {
   if (!isRecord(options)) {
     throw new MediaValidationError(
@@ -917,7 +944,7 @@ function validateDownloadBytesOptions(options: unknown): { url: string; expected
   const signal = validateSignal(options.signal);
   const expectedSha256 = options.expectedSha256 === undefined
     ? undefined
-    : validateBase64Digest(options.expectedSha256, "expectedSha256", "invalid_options", 32);
+    : validateSha256Digest(options.expectedSha256, "expectedSha256");
   return {
     url,
     maxBytes,

@@ -158,6 +158,13 @@ async function sha256Base64(bytes: Uint8Array): Promise<string> {
   return bytesToBase64(new Uint8Array(await testSubtle.digest("SHA-256", asBufferSource(bytes))));
 }
 
+async function sha256Hex(bytes: Uint8Array): Promise<string> {
+  const digest = new Uint8Array(await testSubtle.digest("SHA-256", asBufferSource(bytes)));
+  let hex = "";
+  for (const b of digest) hex += b.toString(16).padStart(2, "0");
+  return hex;
+}
+
 function concatBytes(parts: readonly Uint8Array[]): Uint8Array {
   const out = new Uint8Array(parts.reduce((sum, part) => sum + part.byteLength, 0));
   let offset = 0;
@@ -888,6 +895,103 @@ describe("WATS-37 downloadMediaBytes runtime", () => {
 
     expectMediaValidationError(thrown, "invalid_client");
     expect(called).toBe(0);
+  });
+
+  // WATS-149: live campaign (2026-06-10) found downloadMedia returns Meta's
+  // sha256 as a 64-char HEX string, but downloadMediaBytes' expectedSha256
+  // validator only accepted base64 — so the natural
+  // downloadMedia -> downloadMediaBytes({ expectedSha256: meta.sha256 })
+  // pipeline threw "malformed base64" against the real Meta digest. These
+  // tests pin the hex-accepting contract using Meta's actual hex format.
+  test("accepts a 64-char hex expectedSha256 (Meta's real metadata format) and verifies integrity", async () => {
+    const payload = bytesFromText("hex-digest-media");
+    const expectedHex = await sha256Hex(payload);
+    expect(expectedHex).toMatch(/^[0-9a-f]{64}$/u);
+    const handle = createMockTransport({
+      defaultResponse: {
+        status: 200,
+        headers: { "content-type": "image/png" },
+        body: payload
+      }
+    });
+    const client = buildClient(handle);
+
+    const result = await downloadMediaBytes(client, {
+      url: "https://lookaside.example.test/media/hex",
+      expectedSha256: expectedHex,
+      maxBytes: payload.byteLength
+    });
+
+    expect(Array.from(result.bytes)).toEqual(Array.from(payload));
+  });
+
+  test("still rejects a genuine hex mismatch with MediaIntegrityError (no silent pass)", async () => {
+    const payload = bytesFromText("hex-digest-media");
+    const wrongHex = "0".repeat(64);
+    const handle = createMockTransport({
+      defaultResponse: { status: 200, headers: { "content-type": "image/png" }, body: payload }
+    });
+    const client = buildClient(handle);
+
+    const thrown = await captureError(() =>
+      downloadMediaBytes(client, {
+        url: "https://lookaside.example.test/media/hex-mismatch",
+        expectedSha256: wrongHex,
+        maxBytes: payload.byteLength
+      })
+    );
+
+    expectMediaIntegrityError(thrown, "sha256_mismatch");
+  });
+
+  test("still accepts base64 expectedSha256 (backward compatibility)", async () => {
+    const payload = bytesFromText("base64-still-works");
+    const expectedBase64 = await sha256Base64(payload);
+    const handle = createMockTransport({
+      defaultResponse: { status: 200, headers: { "content-type": "image/png" }, body: payload }
+    });
+    const client = buildClient(handle);
+
+    const result = await downloadMediaBytes(client, {
+      url: "https://lookaside.example.test/media/b64",
+      expectedSha256: expectedBase64,
+      maxBytes: payload.byteLength
+    });
+
+    expect(Array.from(result.bytes)).toEqual(Array.from(payload));
+  });
+
+  test("round-trips downloadMedia(metadata).sha256 directly into downloadMediaBytes (the broken pipeline)", async () => {
+    const payload = bytesFromText("round-trip-media");
+    const expectedHex = await sha256Hex(payload);
+    // Simulate Meta: metadata endpoint returns hex sha256, CDN returns bytes.
+    const metaHandle = createMockTransport({
+      defaultResponse: {
+        status: 200,
+        headers: { "content-type": "application/json" },
+        body: {
+          url: "https://lookaside.example.test/media/rt?token=opaque",
+          mime_type: "image/png",
+          sha256: expectedHex,
+          file_size: payload.byteLength,
+          messaging_product: "whatsapp",
+          id: "media-rt"
+        }
+      }
+    });
+    const meta = await downloadMedia(buildClient(metaHandle), { mediaId: "media-rt" });
+    expect(meta.sha256).toBe(expectedHex);
+
+    const bytesHandle = createMockTransport({
+      defaultResponse: { status: 200, headers: { "content-type": "image/png" }, body: payload }
+    });
+    // The exact call the live campaign found broken — must not throw.
+    const result = await downloadMediaBytes(buildClient(bytesHandle), {
+      url: meta.url,
+      expectedSha256: meta.sha256,
+      maxBytes: payload.byteLength
+    });
+    expect(Array.from(result.bytes)).toEqual(Array.from(payload));
   });
 });
 
