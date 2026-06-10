@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://wats.sh/</loc></url>
+  <url><loc>https://wats.sh/docs</loc></url>
+  <url><loc>https://wats.sh/docs/guide</loc></url>
+  <url><loc>https://wats.sh/docs/parity</loc></url>
+  <url><loc>https://wats.sh/docs/quickstart</loc></url>
+  <url><loc>https://wats.sh/docs/reference/errors</loc></url>
+  <url><loc>https://wats.sh/docs/reference/groups</loc></url>
+  <url><loc>https://wats.sh/docs/reference/webhook-normalizer</loc></url>
+  <url><loc>https://wats.sh/playground</loc></url>
+</urlset>

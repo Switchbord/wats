@@ -16,8 +16,11 @@ const linkClass =
 
 export function SiteNav() {
   return (
-    <nav className="border-b border-border bg-bg">
-      <div className="mx-auto flex h-14 max-w-[1152px] items-center justify-between px-4">
+    <header className="border-b border-border bg-bg">
+      <nav
+        aria-label="Site"
+        className="mx-auto flex h-14 max-w-[1152px] items-center justify-between px-4"
+      >
         <a href="/" className="mono text-lg font-semibold text-text focus-visible:outline-2 focus-visible:outline-accent">
           wats<span className="text-accent">_</span>
         </a>
@@ -44,7 +47,7 @@ export function SiteNav() {
             v{meta.version}
           </a>
         </div>
-      </div>
-    </nav>
+      </nav>
+    </header>
   )
 }

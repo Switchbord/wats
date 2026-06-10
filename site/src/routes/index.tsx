@@ -13,6 +13,9 @@ import heroCaptured from "../generated/hero-captured.json"
 // Copy verbatim from 04-content.md §2 / §5 / §6 / §7 (footer §8 lives in SiteFooter).
 
 export const Route = createFileRoute("/")({
+  head: () => ({
+    links: [{ rel: "canonical", href: "https://wats.sh" }],
+  }),
   component: Home,
 })
 
@@ -175,17 +178,17 @@ function HonestStatusSection() {
 
 function Home() {
   return (
-    <main className="min-h-screen bg-bg text-text">
+    <div className="min-h-screen bg-bg text-text">
       <SiteNav />
       {/* Vertical rhythm per 03-design.md §4: 96px desktop / 56px mobile. */}
-      <div className="mx-auto max-w-[1152px] space-y-14 px-6 py-14 md:space-y-24 md:py-24">
+      <main className="mx-auto max-w-[1152px] space-y-14 px-6 py-14 md:space-y-24 md:py-24">
         <Hero />
         <TrustStrip items={TRUST_ITEMS} />
         <FeatureCards />
         <WireSection />
         <HonestStatusSection />
-      </div>
+      </main>
       <SiteFooter />
-    </main>
+    </div>
   )
 }
