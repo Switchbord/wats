@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.26] - 2026-06-10
+
+### Fixed
+
+- **Media download integrity verification accepts Meta's hex SHA-256 (WATS-149).** The 2026-06-10 live Meta validation campaign found that `downloadMedia(...)` returns Meta's `sha256` as a 64-character hex digest, but `downloadMediaBytes(...)`'s `expectedSha256` validator only accepted base64 — so the documented `downloadMedia` → `downloadMediaBytes({ expectedSha256: metadata.sha256 })` pipeline threw `MediaValidationError` against real Meta data, making the integrity-verify path unusable with Meta's own digest. `expectedSha256` now accepts either a 64-character hex digest (so `metadata.sha256` passes straight through) or a base64-encoded 32-byte digest; base64 input stays backward-compatible and a genuine mismatch still throws `MediaIntegrityError`. This was a MockTransport blind spot (fixtures used base64, never Meta's hex), the kind of wire-contract gap only live validation surfaces.
+
+### Added
+
+- **Live-testing harness and 2026-06-10 campaign evidence (WATS-80 / WATS-81).** A new env-gated probe harness under the private `@wats/testing` package (`packages/testing/live/`) validates WATS against live Meta assets. It is never shipped, never part of `bun test` or CI, and fail-closed: probes refuse to call Meta unless `WATS_LIVE_ENABLE=1` and `WATS_YES_LIVE=1` are both set (mutations require an additional per-domain flag), printing `PASS_SHAPE_ENV_BLOCKED` otherwise. Redacted evidence ledgers are written outside the repository. `docs/parity/live-testing-campaign.md` records the dated execution log (status: executed) and `docs/parity/pywa-parity-matrix.md` carries per-surface live-validation evidence. Campaign result: read-only discovery 8/8; approved-template send produced the full `sent`/`delivered`/`read` chain plus an inbound reaction (webhook runtime end to end); media upload/metadata/send/delete passed; Groups create was blocked by Meta `#131215` (test phone not Groups-eligible — an asset limitation, not a WATS defect).
+
+### Release
+
+- Release metadata is aligned for 0.3.26: all publishable `@wats/*` packages, the service OpenAPI default version, README, and release-contract locks move together. No new dependencies are added to any publishable `@wats/*` package.
+
 ## [0.3.25] - 2026-06-10
 
 ### Changed
