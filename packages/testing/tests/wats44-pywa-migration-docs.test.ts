@@ -78,8 +78,8 @@ describe("WATS-44 pywa migration docs", () => {
 
     expectAll(campaign, [
       "# WATS credentialed live-testing campaign",
-      "status: planned",
-      "lastReviewed: 2026-05-01",
+      "status: executed (2026-06-10; see execution log)",
+      "lastReviewed: 2026-06-10",
       "## Scope and non-goals",
       "## Credential inventory",
       "## Safe ordering",
@@ -113,7 +113,7 @@ describe("WATS-44 pywa migration docs", () => {
 
   test("parity and roadmap docs point to WATS-44 live-validation plan", () => {
     const matrix = read("docs/parity/pywa-parity-matrix.md");
-    expect(matrix).toContain("lastReviewed: 2026-05-01");
+    expect(matrix).toContain("lastReviewed: 2026-06-10");
     expect(matrix).toContain("pywa migration and parity audit (WATS-44)");
     expect(matrix).toContain("docs/parity/live-testing-campaign.md");
     expect(matrix).toContain("Live validation status");
