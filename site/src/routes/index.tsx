@@ -82,26 +82,30 @@ function Hero() {
           </a>
         </p>
       </div>
-      <TerminalPanel
-        tabs={[
-          {
-            label: "bot.ts",
-            content: (
-              <pre className="mono overflow-x-auto text-sm leading-relaxed text-text-muted">
-                <code>{HERO_SNIPPET}</code>
-              </pre>
-            ),
-          },
-          {
-            label: "captured request",
-            content: (
-              <pre className="mono overflow-x-auto text-sm leading-relaxed text-text-muted">
-                <code>{CAPTURED_REQUEST}</code>
-              </pre>
-            ),
-          },
-        ]}
-      />
+      {/* min-w-0 lets the code panel's horizontal scroll work inside the grid
+          track instead of overflowing the rounded panel edge. */}
+      <div className="min-w-0">
+        <TerminalPanel
+          tabs={[
+            {
+              label: "bot.ts",
+              content: (
+                <pre className="mono overflow-x-auto text-sm leading-relaxed text-text-muted">
+                  <code>{HERO_SNIPPET}</code>
+                </pre>
+              ),
+            },
+            {
+              label: "captured request",
+              content: (
+                <pre className="mono overflow-x-auto text-sm leading-relaxed text-text-muted">
+                  <code>{CAPTURED_REQUEST}</code>
+                </pre>
+              ),
+            },
+          ]}
+        />
+      </div>
     </section>
   )
 }

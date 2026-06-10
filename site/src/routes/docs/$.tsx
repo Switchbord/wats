@@ -1,5 +1,4 @@
 import { createFileRoute, notFound } from '@tanstack/react-router'
-import { createServerFn } from '@tanstack/react-start'
 import { lazy, Suspense } from 'react'
 import { source } from '../../lib/source'
 
@@ -9,30 +8,28 @@ const DocsRoutePage = lazy(() =>
   import('./-docs-page').then((m) => ({ default: m.DocsRoutePage })),
 )
 
+// Isomorphic loader — NO createServerFn. This is a fully static deploy with no
+// server runtime, so a server function would 404 on client-side navigation
+// (it only "worked" on direct loads because the data was baked in at
+// prerender). `source` is built from the eagerly-bundled collection, so
+// getPage / serializePageTree run identically at build time and in the browser.
 export const Route = createFileRoute('/docs/$')({
   component: Page,
   loader: async ({ params }) => {
     const slugs = params._splat?.split('/') ?? []
-    const data = await serverLoader({ data: slugs })
+    const page = source.getPage(slugs)
+    if (!page) throw notFound()
+
+    const data = {
+      path: page.path,
+      pageTree: await source.serializePageTree(source.getPageTree()),
+    }
+
     const mod = await import('./-docs-page')
     await mod.clientLoader.preload(data.path)
     return data
   },
 })
-
-const serverLoader = createServerFn({
-  method: 'GET',
-})
-  .inputValidator((slugs: string[]) => slugs)
-  .handler(async ({ data: slugs }) => {
-    const page = source.getPage(slugs)
-    if (!page) throw notFound()
-
-    return {
-      path: page.path,
-      pageTree: await source.serializePageTree(source.getPageTree()),
-    }
-  })
 
 function Page() {
   const data = Route.useLoaderData()
