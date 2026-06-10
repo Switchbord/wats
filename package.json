@@ -33,6 +33,7 @@
     "packages/*",
     "packages/testing/fixtures/*",
     "examples/minimal-bot",
-    "examples/groups"
+    "examples/groups",
+    "site"
   ]
 }
