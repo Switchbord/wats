@@ -25,6 +25,7 @@ import {
   getGroup,
   getGroupInviteLink,
   GraphApiError,
+  GraphRateLimitError,
   GraphClient,
   GraphRequestValidationError,
   listGroupJoinRequests,
@@ -266,16 +267,100 @@ function errorResponse(status: number, code: string, message?: string, headers?:
   return jsonResponse(status, { error: { code, ...(message ? { message } : {}) } }, headers);
 }
 
+/**
+ * Read a numeric diagnostic field from a (possibly hostile) error object,
+ * failing closed: a throwing getter, wrong type, or non-finite value yields
+ * undefined rather than crashing or forwarding junk. WATS-130 A1.2.
+ */
+function safeFiniteNumber(source: unknown, key: string): number | undefined {
+  try {
+    const value = (source as Record<string, unknown>)[key];
+    return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Read a short string diagnostic field from a (possibly hostile) error object,
+ * failing closed and capping length so an oversize/poisoned value cannot bloat
+ * the response or log line. WATS-130 A1.2 / R1.4.
+ */
+function safeShortString(source: unknown, key: string, maxLen = 256): string | undefined {
+  try {
+    const value = (source as Record<string, unknown>)[key];
+    if (typeof value !== "string") return undefined;
+    const trimmed = value.trim();
+    if (trimmed.length === 0 || trimmed.length > maxLen) return undefined;
+    return trimmed;
+  } catch {
+    return undefined;
+  }
+}
+
+interface SanitizedGraphDiagnostics {
+  metaCode?: number;
+  metaSubcode?: number;
+  metaType?: string;
+  fbtraceId?: string;
+}
+
+/**
+ * Extract the sanitized, structured Meta diagnostics from a Graph failure.
+ * Only safe structured identifiers (code/subcode/type/fbtraceId) are surfaced;
+ * Meta's free-form `message` text is intentionally NOT forwarded — it is the
+ * primary vector for tokens/PII/phone numbers, so the redaction contract
+ * (R1.4) is satisfied by omission rather than by scrubbing arbitrary text.
+ */
+function sanitizeGraphDiagnostics(error: unknown): SanitizedGraphDiagnostics {
+  if (!(error instanceof GraphApiError)) {
+    return {};
+  }
+  const out: SanitizedGraphDiagnostics = {};
+  const code = safeFiniteNumber(error, "code");
+  if (code !== undefined) out.metaCode = code;
+  const subcode = safeFiniteNumber(error, "errorSubcode");
+  if (subcode !== undefined) out.metaSubcode = subcode;
+  const type = safeShortString(error, "type");
+  if (type !== undefined) out.metaType = type;
+  const fbtraceId = safeShortString(error, "fbtraceId");
+  if (fbtraceId !== undefined) out.fbtraceId = fbtraceId;
+  return out;
+}
+
 function graphFailureResponse(error: unknown): Response {
+  const diagnostics = sanitizeGraphDiagnostics(error);
+
+  // Emit one warn-level JSON log line carrying only sanitized structured
+  // diagnostics so container logs are diagnosable on their own (R1.3).
+  // Logging must never throw, so the whole block is guarded.
+  try {
+    // eslint-disable-next-line no-console
+    console.warn(JSON.stringify({
+      event: "wats.graph.failure",
+      metaCode: diagnostics.metaCode ?? null,
+      metaSubcode: diagnostics.metaSubcode ?? null,
+      metaType: diagnostics.metaType ?? null,
+      fbtraceId: diagnostics.fbtraceId ?? null,
+      at: new Date().toISOString()
+    }));
+  } catch {
+    // Never let logging affect the error path.
+  }
+
   const payload: Record<string, unknown> = {
     code: "graph_request_failed",
-    message: "Graph request failed."
+    message: "Graph request failed.",
+    ...diagnostics
   };
-  if (error instanceof GraphApiError) {
-    if (error.code !== undefined) payload.metaCode = error.code;
-    if (error.errorSubcode !== undefined) payload.metaSubcode = error.errorSubcode;
-    if (error.type !== undefined) payload.metaType = error.type;
-    if (error.fbtraceId !== undefined) payload.fbtraceId = error.fbtraceId;
+
+  // R1.2 status mapping: keep the 5xx boundary (the service did not receive a
+  // bad request from its caller). Rate-limit class -> 503, echoing Meta's
+  // Retry-After verbatim when present; auth class and everything else -> 502.
+  if (error instanceof GraphRateLimitError) {
+    const retryAfter = safeShortString(error, "retryAfter", 64);
+    const headers = retryAfter !== undefined ? { "retry-after": retryAfter } : undefined;
+    return jsonResponse(503, { error: payload }, headers);
   }
   return jsonResponse(502, { error: payload });
 }
@@ -473,7 +558,8 @@ function messageOperation(summary: string, schemaName: string): Record<string, u
       "401": errorResponseSpec("Missing or invalid service bearer token."),
       "405": errorResponseSpec("Method not allowed."),
       "409": errorResponseSpec("Idempotency-Key conflicts with a different request body."),
-      "502": errorResponseSpec("Graph request failed.")
+      "502": errorResponseSpec("Graph request failed (auth-class or uncategorized Meta error)."),
+      "503": errorResponseSpec("Graph rate-limit failure; Retry-After echoed from Meta when supplied.")
     }
   };
 }
@@ -494,7 +580,8 @@ function groupOperation(summary: string, schemaName?: string): Record<string, un
       "400": errorResponseSpec("Malformed JSON, unsupported body, or invalid route parameter."),
       "401": errorResponseSpec("Missing or invalid service bearer token."),
       "405": errorResponseSpec("Method not allowed."),
-      "502": errorResponseSpec("Graph request failed.")
+      "502": errorResponseSpec("Graph request failed (auth-class or uncategorized Meta error)."),
+      "503": errorResponseSpec("Graph rate-limit failure; Retry-After echoed from Meta when supplied.")
     }
   };
 }

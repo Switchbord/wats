@@ -21,6 +21,13 @@ export class GraphApiError extends Error {
   readonly fbtraceId?: string;
   readonly payload?: GraphApiErrorPayload;
   /**
+   * Raw `Retry-After` response header value when Meta supplied one on a
+   * throttled request, preserved verbatim so an HTTP-facing layer can echo
+   * it back to its own caller. Only populated when the originating Graph
+   * response carried the header; otherwise undefined. WATS-130 R1.2.
+   */
+  readonly retryAfter?: string;
+  /**
    * Broad HTTP-status-driven classification:
    *   4xx → "ClientError"
    *   5xx → "ServerError"
@@ -37,11 +44,15 @@ export class GraphApiError extends Error {
     message: string;
     status: number;
     payload?: GraphApiErrorPayload;
+    retryAfter?: string;
   }) {
     super(params.message);
     this.name = "GraphApiError";
     this.status = params.status;
     this.classification = classifyStatus(params.status);
+    if (params.retryAfter !== undefined) {
+      this.retryAfter = params.retryAfter;
+    }
     if (params.payload !== undefined) {
       this.payload = params.payload;
       if (params.payload.type !== undefined) {
@@ -70,11 +81,35 @@ function classifyStatus(status: number): GraphErrorClassification {
   return "Unknown";
 }
 
+/**
+ * Extract the raw `Retry-After` header value from a Graph response's headers,
+ * if present and non-empty. Returns the trimmed string verbatim (seconds or an
+ * HTTP-date) so callers can echo Meta's directive unchanged. Hostile or absent
+ * headers fail closed to undefined. WATS-130 R1.2.
+ */
+function readRetryAfterHeader(headers: Headers | undefined): string | undefined {
+  if (headers === undefined) {
+    return undefined;
+  }
+  let raw: string | null;
+  try {
+    raw = headers.get("retry-after");
+  } catch {
+    return undefined;
+  }
+  if (typeof raw !== "string") {
+    return undefined;
+  }
+  const trimmed = raw.trim();
+  return trimmed.length === 0 ? undefined : trimmed;
+}
+
 export class GraphAuthError extends GraphApiError {
   constructor(params: {
     message: string;
     status: number;
     payload?: GraphApiErrorPayload;
+    retryAfter?: string;
   }) {
     super(params);
     this.name = "GraphAuthError";
@@ -86,6 +121,7 @@ export class GraphRateLimitError extends GraphApiError {
     message: string;
     status: number;
     payload?: GraphApiErrorPayload;
+    retryAfter?: string;
   }) {
     super(params);
     this.name = "GraphRateLimitError";
@@ -336,12 +372,22 @@ export function createGraphApiError(params: {
     params.payload?.message ?? params.fallbackMessage ?? "Graph API request failed";
   const shouldClassify = params.classify ?? true;
 
-  const ctorParams: { message: string; status: number; payload?: GraphApiErrorPayload } = {
+  const retryAfter = readRetryAfterHeader(params.headers);
+
+  const ctorParams: {
+    message: string;
+    status: number;
+    payload?: GraphApiErrorPayload;
+    retryAfter?: string;
+  } = {
     message,
     status: params.status
   };
   if (params.payload !== undefined) {
     ctorParams.payload = params.payload;
+  }
+  if (retryAfter !== undefined) {
+    ctorParams.retryAfter = retryAfter;
   }
 
   if (!shouldClassify) {

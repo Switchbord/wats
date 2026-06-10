@@ -312,7 +312,17 @@
             }
           },
           "502": {
-            "description": "Graph request failed.",
+            "description": "Graph request failed (auth-class or uncategorized Meta error).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Graph rate-limit failure; Retry-After echoed from Meta when supplied.",
             "content": {
               "application/json": {
                 "schema": {
@@ -410,7 +420,17 @@
             }
           },
           "502": {
-            "description": "Graph request failed.",
+            "description": "Graph request failed (auth-class or uncategorized Meta error).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Graph rate-limit failure; Retry-After echoed from Meta when supplied.",
             "content": {
               "application/json": {
                 "schema": {

@@ -50,15 +50,37 @@ function messageOf(ctx: GraphErrorFactoryContext, fallback: string): string {
 function coreParams(
   ctx: GraphErrorFactoryContext,
   fallback: string
-): { message: string; status: number; payload?: GraphApiErrorPayload } {
-  const out: { message: string; status: number; payload?: GraphApiErrorPayload } = {
+): { message: string; status: number; payload?: GraphApiErrorPayload; retryAfter?: string } {
+  const out: { message: string; status: number; payload?: GraphApiErrorPayload; retryAfter?: string } = {
     message: messageOf(ctx, fallback),
     status: ctx.status
   };
   if (ctx.payload !== undefined) {
     out.payload = ctx.payload;
   }
+  const retryAfter = retryAfterFromContext(ctx);
+  if (retryAfter !== undefined) {
+    out.retryAfter = retryAfter;
+  }
   return out;
+}
+
+/**
+ * Pull a non-empty `Retry-After` header off the factory context, failing
+ * closed on a hostile headers object. Mirrors the generic-path extraction in
+ * errors.ts so registry-mapped rate-limit subclasses also carry the directive.
+ * WATS-130 R1.2.
+ */
+function retryAfterFromContext(ctx: GraphErrorFactoryContext): string | undefined {
+  let raw: string | null;
+  try {
+    raw = ctx.headers.get("retry-after");
+  } catch {
+    return undefined;
+  }
+  if (typeof raw !== "string") return undefined;
+  const trimmed = raw.trim();
+  return trimmed.length === 0 ? undefined : trimmed;
 }
 
 // ---------------------------------------------------------------------
