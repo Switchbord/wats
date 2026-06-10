@@ -1680,7 +1680,7 @@ function upgradeCommandText(): string {
 
 async function defaultSpawn(command: string, args: readonly string[], options: Readonly<{ cwd: string }>): Promise<CliSpawnResult> {
   try {
-    const proc = (globalThis as { Bun?: { spawnSync?: (command: readonly string[], options: { cwd: string; stdout: "pipe"; stderr: "pipe" }) => { exitCode: number | null; stdout: Uint8Array; stderr: Uint8Array } } }).Bun;
+    const proc = (globalThis as unknown as { Bun?: { spawnSync?: (command: readonly string[], options: { cwd: string; stdout: "pipe"; stderr: "pipe" }) => { exitCode: number | null; stdout: Uint8Array; stderr: Uint8Array } } }).Bun;
     if (proc?.spawnSync === undefined) return { exitCode: 1, stdout: "", stderr: "" };
     const completed = proc.spawnSync([command, ...args], { cwd: options.cwd, stdout: "pipe", stderr: "pipe" });
     const decoder = new TextDecoder();

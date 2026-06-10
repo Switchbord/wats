@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.25] - 2026-06-10
+
+### Changed
+
+- **Service Graph-failure transparency and rate-limit status mapping (WATS-130).** `@wats/service` now maps Meta rate-limit failures (`GraphRateLimitError`: codes 4, 80007, 130429, 131048, 131056, or HTTP 429) to `503`, echoing Meta's `Retry-After` header verbatim when supplied, while auth-class and uncategorized Graph errors continue to return `502`. The 5xx boundary is preserved — Meta's own 4xx is never passed through as the service's status; the sanitized cause (`metaCode`, `metaSubcode`, `metaType`, `fbtraceId`) is surfaced inside the stable `graph_request_failed` body instead. Every Graph failure also emits one `warn`-level JSON log line (`event: "wats.graph.failure"`) carrying only those structured identifiers. Meta's free-form error text is deliberately never forwarded to body or log, and all diagnostic reads fail closed against hostile error objects (throwing getters, wrong-typed or oversize fields). `GraphApiError` now carries the originating `Retry-After` value via a new `retryAfter` field. The service OpenAPI document advertises the new `503` response on message routes.
+
+### Build
+
+- **Full-source typecheck integrity gate (WATS-140).** The release typecheck (`tsconfig.release.json`, `types: []`) only ever covered `packages/*/src` and hid Bun's stricter runtime lib typings. A new `typecheck:full` gate compiles every package's `src/` with `@types/bun` (the runtime WATS actually targets) and is wired into CI after the release typecheck so the two cannot silently diverge. This surfaced and fixed 3 genuine src-level type errors visible only under Bun runtime types (`packages/graph/src/endpoints/media.ts` ReadableStream result typing ×2; `packages/cli/src/index.ts` `globalThis`→`Bun` structural cast). `@types/bun` is added as a root devDependency only — no publishable `@wats/*` package gains a dependency. No runtime behavior change. Remaining test-file type-only errors are tracked in WATS-148.
+
+### Release
+
+- Release metadata is aligned for 0.3.25: all publishable `@wats/*` packages, the service OpenAPI default version, README, and release-contract locks move together. No new dependencies are added to any publishable `@wats/*` package; the sole new dependency (`@types/bun`) is a root devDependency not shipped to consumers.
+
 ## [0.3.24] - 2026-06-09
 
 ### Added

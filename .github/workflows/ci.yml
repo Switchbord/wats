@@ -37,6 +37,9 @@ jobs:
       - name: Typecheck publishable packages
         run: bun run typecheck
 
+      - name: Typecheck full source tree (all packages, Bun runtime types)
+        run: bun run typecheck:full
+
       - name: Check public docs site
         run: bun run docs:check
 

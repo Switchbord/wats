@@ -201,7 +201,10 @@ Common HTTP error codes:
 - `401` missing or invalid service bearer token
 - `404` route not found
 - `405` method not allowed
-- `502` Graph request failure. When the underlying `GraphApiError` exposes sanitized Meta details, the body includes `metaCode`, `metaSubcode`, `metaType`, and `fbtraceId` alongside the stable `graph_request_failed` code. The service deliberately omits Meta's free-form error message because it may quote request/account identifiers; it never includes access tokens, app secrets, verify tokens, service bearer tokens, request bodies, or `Authorization` headers.
+- `502` Graph request failure (auth-class and uncategorized Meta errors). When the underlying `GraphApiError` exposes sanitized Meta details, the body includes `metaCode`, `metaSubcode`, `metaType`, and `fbtraceId` alongside the stable `graph_request_failed` code. The service deliberately omits Meta's free-form error message because it may quote request/account identifiers; it never includes access tokens, app secrets, verify tokens, service bearer tokens, request bodies, or `Authorization` headers.
+- `503` Graph rate-limit failure. When Meta classifies the failure as rate limiting (`GraphRateLimitError`: codes 4, 80007, 130429, 131048, 131056, or HTTP 429), the service returns `503` with the same sanitized `graph_request_failed` body. If Meta supplied a `Retry-After` header, it is echoed verbatim on the `503` response so callers can back off correctly.
+
+The service keeps the 5xx boundary on every Graph failure: it never passes Meta's own 4xx through as the service's status, because the caller did not send a bad request to the service — the cause is surfaced inside the body instead. Each Graph failure also emits one `warn`-level JSON log line (`{"event":"wats.graph.failure","metaCode":…,"metaSubcode":…,"metaType":…,"fbtraceId":…,"at":…}`) carrying only the sanitized structured identifiers, so container logs are diagnosable without probing Meta.
 
 Example:
 

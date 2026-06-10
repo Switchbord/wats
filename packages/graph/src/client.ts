@@ -501,7 +501,8 @@ export class GraphClient {
         throw createGraphApiError({
           status: response.status,
           payload: parsedBody.error,
-          fallbackMessage: getFallbackErrorMessage(response.status)
+          fallbackMessage: getFallbackErrorMessage(response.status),
+          headers: response.headers
         });
       }
 
@@ -511,10 +512,12 @@ export class GraphClient {
         fallbackMessage: string;
         classify: boolean;
         payload?: GraphApiErrorPayload;
+        headers: Headers;
       } = {
         status: response.status,
         fallbackMessage: getFallbackErrorMessage(response.status),
-        classify: false
+        classify: false,
+        headers: response.headers
       };
       if (fallbackPayload !== undefined) {
         params.payload = fallbackPayload;
