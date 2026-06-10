@@ -32,7 +32,16 @@ const CAPTURED_REQUEST = JSON.stringify(heroCaptured, null, 2)
 // refreshed per release) and consumed via src/lib/meta.ts — never hand-written.
 const TRUST_ITEMS = [
   `${testCountRounded}+ tests passing`,
-  "live-validated against Meta",
+  <span key="parity">
+    live-validated against Meta (
+    <a
+      href="/docs/parity"
+      className="text-text-muted underline transition-colors duration-150 hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
+    >
+      parity →
+    </a>
+    )
+  </span>,
   "0 hard dependencies",
   "Bun-first",
   "MIT",

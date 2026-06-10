@@ -5,7 +5,6 @@ import {
   Outlet,
   Scripts,
 } from '@tanstack/react-router'
-import { RootProvider } from 'fumadocs-ui/provider/tanstack'
 import appCss from '../styles/app.css?url'
 
 const TITLE = 'wats — WhatsApp Cloud API toolkit for TypeScript'
@@ -49,12 +48,7 @@ function RootDocument({ children }: { children: ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        <RootProvider
-          theme={{ defaultTheme: 'dark' }}
-          search={{ options: { type: 'static', api: '/api/search' } }}
-        >
-          {children}
-        </RootProvider>
+        {children}
         <Scripts />
       </body>
     </html>

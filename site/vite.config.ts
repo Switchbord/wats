@@ -20,6 +20,12 @@ export default defineConfig({
     mdx(),
     tailwindcss(),
     tanstackStart({
+      // Per-route code splitting: keeps fumadocs-ui (docs routes) out of the
+      // landing entry chunk — landing JS budget is ≤100KB gz (T12 M1).
+      // NOTE: autoCodeSplitting is in the runtime zod schema (validated) but
+      // missing from the published input *type* in start-plugin-core 1.171.17.
+      // @ts-expect-error -- type lag, see note above
+      router: { autoCodeSplitting: true },
       prerender: {
         enabled: true,
         crawlLinks: true,
