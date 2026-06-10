@@ -1,10 +1,10 @@
 # WATS credentialed live-testing campaign
 
-- status: planned
+- status: executed (2026-06-10; see execution log)
 - decisionStatus: locked
 - labels: [WATS-44, credentialed, liveValidation, redaction]
 - owner: WATS maintainers
-- lastReviewed: 2026-05-01
+- lastReviewed: 2026-06-10
 
 ## Purpose
 
@@ -395,3 +395,37 @@ secrets, verify tokens, and recipient PII.
 - Result: outbound send and inbound `status` webhook delivery are
   live-validated for the test asset. Inbound `message` and richer update
   families remain to be exercised with recipient-initiated traffic.
+
+### 2026-06-10 — WATS-80 harness run against live Meta (v0.3.25)
+
+- Environment: WATS-80 env-gated probe harness (`packages/testing/live/`),
+  driven via `railway run --service WATS` so secrets arrived only as subprocess
+  env. `WATS_LIVE_ENABLE=1` + `WATS_YES_LIVE=1`; mutating phases additionally
+  flagged (`WATS_ENABLE_SEND`/`WATS_ENABLE_MEDIA`/`WATS_ENABLE_GROUPS`).
+- Authorization: explicit operator authorization for the disposable test asset.
+  Redacted ledgers written outside the repo (`~/.hermes/notes/wats-live/`).
+- Phase 1 read-only (8/8 pass): `getWabaInfo`, `listSubscribedApps`,
+  `listPhoneNumbers`, `getPhoneNumberInfo`, `getBusinessProfile`,
+  `getCommerceSettings`, `listMessageTemplates`, `listFlows` — all parsed live
+  Graph v25.0 responses into the current WATS types. (`getCommerceSettings` and
+  `listFlows` returned empty on this asset; Flow mutation phases not exercised.)
+- Phase 3 sends: text send accepted (HTTP 200 + message id); its status webhook
+  reported `failed` — expected, since freeform text needs an open 24h customer
+  window. An approved-template send (`hello_world`) produced the full
+  `sent` → `delivered` → `read` status chain plus an inbound `kind="message"`
+  reaction, exercising the webhook runtime (HMAC → normalize → router) end to
+  end for both status and message families.
+- Phase 4 media lifecycle: `uploadMedia`, `downloadMedia` (metadata),
+  `sendImage` by media id, and `deleteMedia` (cleanup) all passed; zero leaked
+  assets. **Finding:** `downloadMediaBytes({ expectedSha256: metadata.sha256 })`
+  failed because `downloadMedia` returns Meta's 64-char hex digest while the
+  validator only accepted base64 — a real wire-contract bug filed and fixed as
+  WATS-149 (download-without-integrity worked).
+- Phase 2c Groups: `listGroups` read path passed (200, empty). `createGroup`
+  was blocked by Meta `#131215` "This phone number is not eligible to access
+  Groups APIs" — an asset entitlement limitation, not a WATS defect. WATS sent
+  the request and surfaced the structured code via WATS-130 diagnostics. The
+  Groups mutation matrix remains shape-only until a Groups-entitled test number
+  is provided.
+- Cleanup: media deleted; no group created; no leaked assets. One bug (WATS-149)
+  found and fixed same-day per the campaign's fix-or-file rule.

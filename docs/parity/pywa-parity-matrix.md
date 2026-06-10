@@ -4,7 +4,7 @@
 - decisionStatus: locked
 - labels: [camelCaseOnly, asyncOnly, aggressiveParity, monorepo]
 - owner: TBD
-- lastReviewed: 2026-05-01
+- lastReviewed: 2026-06-10
 
 ## Purpose
 
@@ -66,12 +66,14 @@ Live validation status remains separate from credential-free implementation stat
 
 | Surface | Credential-free status | Live validation status |
 | --- | --- | --- |
-| WATS-37 media runtime | implemented with MockTransport/local crypto checks | pending WATS-44 campaign |
-| WATS-38 message composers | implemented with MockTransport | pending WATS-44 campaign |
-| WATS-39 templates | management helpers implemented | live WABA mutation checks pending WATS-44 campaign |
-| WATS-40 Flows | management helpers implemented | live Flow mutation/hosting checks pending WATS-44 campaign |
+| WATS-37 media runtime | implemented with MockTransport/local crypto checks | live-validated 2026-06-10: upload/metadata(download)/send-by-id/delete pass; `downloadMediaBytes` integrity-verify bug found+fixed (WATS-149) |
+| WATS-38 message composers | implemented with MockTransport | live-validated 2026-06-10: text send accepted (delivery `failed` — no open 24h window, expected); image send-by-id accepted |
+| WATS-39 templates | management helpers implemented | live-validated 2026-06-10: `listMessageTemplates` read + approved-template send → full sent/delivered/read; live WABA template *mutation* checks still pending |
+| WATS-40 Flows | management helpers implemented | live read 2026-06-10: `listFlows` returns empty on test asset; live Flow mutation/hosting checks pending (no Flow assets) |
 | WATS-41 calling | request/webhook helpers implemented | live call sessions pending WATS-44 campaign |
-| WATS-42A business/admin | read-only inventory implemented | live read-only inventory checks pending WATS-44 campaign |
+| WATS-42A business/admin | read-only inventory implemented | live-validated 2026-06-10: `getWabaInfo`, `listSubscribedApps`, `listPhoneNumbers`, `getPhoneNumberInfo`, `getBusinessProfile`, `getCommerceSettings` all parsed live Graph v25.0 |
+| WATS-139 Groups | SDK/webhook/service implemented | live read 2026-06-10: `listGroups` passes; `createGroup` blocked by Meta `#131215` (phone not Groups-eligible) — mutation matrix shape-only until a Groups-entitled test number is provided |
+| Webhook runtime (WATS-34 service) | implemented with MockTransport + synthetic signatures | live-validated 2026-06-10: HMAC verify → normalize → router for `status` (sent/delivered/read/failed) and inbound `message` (reaction) families end to end |
 
 Objective live parity evidence requires Meta accepting the request, WATS parsing the response shape, webhook/result side effects observed where applicable, and cleanup completed or explicitly documented.
 
