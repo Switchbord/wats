@@ -1,5 +1,15 @@
 {
-  "pages": ["/", "/docs", "/dev-components"],
+  "pages": [
+    "/",
+    "/docs",
+    "/docs/quickstart",
+    "/docs/parity",
+    "/docs/reference/errors",
+    "/docs/reference/webhook-normalizer",
+    "/docs/reference/groups",
+    "/playground",
+    "/dev-components"
+  ],
   "notes": {
     "/dev-components": "devOnly: internal component gallery, removed from the public build by T24"
   }

@@ -7,6 +7,8 @@ export type Status = "live-validated" | "shape-only" | "planned"
 
 export interface StatusTagProps {
   status: Status
+  /** Optional visible text override (e.g. "implemented, live-validation pending"); dot keeps the status color. */
+  label?: string
 }
 
 const STYLES: Record<Status, { dot: string; text: string }> = {
@@ -24,12 +26,12 @@ const STYLES: Record<Status, { dot: string; text: string }> = {
   },
 }
 
-export function StatusTag({ status }: StatusTagProps) {
+export function StatusTag({ status, label }: StatusTagProps) {
   const s = STYLES[status]
   return (
     <span className={`mono inline-flex items-center gap-1.5 text-xs ${s.text}`}>
       <span aria-hidden="true" className={`inline-block h-2 w-2 rounded-full ${s.dot}`} />
-      {status}
+      {label ?? status}
     </span>
   )
 }

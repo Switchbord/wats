@@ -5,11 +5,13 @@ export interface FeatureCardProps {
   body: string
   href: string
   status: Status
+  /** Optional visible text override for the status tag (e.g. Groups card per 04-content.md §5). */
+  statusLabel?: string
 }
 
 // 1px border, bg-raised, hover border-accent-dim (T04 spec).
 // Plain <a> for now — target routes may not exist yet; router Link in later tasks.
-export function FeatureCard({ title, body, href, status }: FeatureCardProps) {
+export function FeatureCard({ title, body, href, status, statusLabel }: FeatureCardProps) {
   return (
     <a
       href={href}
@@ -17,7 +19,7 @@ export function FeatureCard({ title, body, href, status }: FeatureCardProps) {
     >
       <div className="flex items-start justify-between gap-3">
         <h3 className="font-semibold text-text">{title}</h3>
-        <StatusTag status={status} />
+        <StatusTag status={status} label={statusLabel} />
       </div>
       <p className="mt-2 text-sm leading-relaxed text-text-muted">{body}</p>
     </a>

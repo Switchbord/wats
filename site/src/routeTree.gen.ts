@@ -9,11 +9,17 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as PlaygroundRouteImport } from './routes/playground'
 import { Route as DevComponentsRouteImport } from './routes/dev-components'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DocsSplatRouteImport } from './routes/docs/$'
 import { Route as ApiSearchRouteImport } from './routes/api/search'
 
+const PlaygroundRoute = PlaygroundRouteImport.update({
+  id: '/playground',
+  path: '/playground',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DevComponentsRoute = DevComponentsRouteImport.update({
   id: '/dev-components',
   path: '/dev-components',
@@ -38,12 +44,14 @@ const ApiSearchRoute = ApiSearchRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dev-components': typeof DevComponentsRoute
+  '/playground': typeof PlaygroundRoute
   '/api/search': typeof ApiSearchRoute
   '/docs/$': typeof DocsSplatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dev-components': typeof DevComponentsRoute
+  '/playground': typeof PlaygroundRoute
   '/api/search': typeof ApiSearchRoute
   '/docs/$': typeof DocsSplatRoute
 }
@@ -51,26 +59,41 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/dev-components': typeof DevComponentsRoute
+  '/playground': typeof PlaygroundRoute
   '/api/search': typeof ApiSearchRoute
   '/docs/$': typeof DocsSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dev-components' | '/api/search' | '/docs/$'
+  fullPaths: '/' | '/dev-components' | '/playground' | '/api/search' | '/docs/$'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dev-components' | '/api/search' | '/docs/$'
-  id: '__root__' | '/' | '/dev-components' | '/api/search' | '/docs/$'
+  to: '/' | '/dev-components' | '/playground' | '/api/search' | '/docs/$'
+  id:
+    | '__root__'
+    | '/'
+    | '/dev-components'
+    | '/playground'
+    | '/api/search'
+    | '/docs/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DevComponentsRoute: typeof DevComponentsRoute
+  PlaygroundRoute: typeof PlaygroundRoute
   ApiSearchRoute: typeof ApiSearchRoute
   DocsSplatRoute: typeof DocsSplatRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/playground': {
+      id: '/playground'
+      path: '/playground'
+      fullPath: '/playground'
+      preLoaderRoute: typeof PlaygroundRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dev-components': {
       id: '/dev-components'
       path: '/dev-components'
@@ -105,6 +128,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DevComponentsRoute: DevComponentsRoute,
+  PlaygroundRoute: PlaygroundRoute,
   ApiSearchRoute: ApiSearchRoute,
   DocsSplatRoute: DocsSplatRoute,
 }
