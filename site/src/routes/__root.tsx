@@ -28,7 +28,12 @@ function RootDocument({ children }: { children: ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        <RootProvider theme={{ defaultTheme: 'dark' }}>{children}</RootProvider>
+        <RootProvider
+          theme={{ defaultTheme: 'dark' }}
+          search={{ options: { type: 'static', api: '/api/search' } }}
+        >
+          {children}
+        </RootProvider>
         <Scripts />
       </body>
     </html>

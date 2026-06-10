@@ -26,7 +26,7 @@ export default defineConfig({
         autoSubfolderIndex: true,
         failOnError: true,
       },
-      pages: [{ path: '/docs' }],
+      pages: [{ path: '/docs' }, { path: '/api/search' }],
     }),
     viteReact(),
   ],
