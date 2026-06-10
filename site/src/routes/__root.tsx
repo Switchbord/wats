@@ -5,6 +5,7 @@ import {
   Outlet,
   Scripts,
 } from '@tanstack/react-router'
+import { RootProvider } from 'fumadocs-ui/provider/tanstack'
 import appCss from '../styles/app.css?url'
 
 export const Route = createRootRoute({
@@ -22,12 +23,12 @@ export const Route = createRootRoute({
 
 function RootDocument({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
       <body>
-        {children}
+        <RootProvider theme={{ defaultTheme: 'dark' }}>{children}</RootProvider>
         <Scripts />
       </body>
     </html>

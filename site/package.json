@@ -11,11 +11,15 @@
   "dependencies": {
     "@tanstack/react-router": "1.170.15",
     "@tanstack/react-start": "1.168.25",
+    "fumadocs-core": "16.9.3",
+    "fumadocs-mdx": "15.0.11",
+    "fumadocs-ui": "16.9.3",
     "react": "19.2.7",
     "react-dom": "19.2.7"
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.3.0",
+    "@types/mdx": "2.0.13",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "5.2.0",
