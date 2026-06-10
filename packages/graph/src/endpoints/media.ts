@@ -1219,7 +1219,11 @@ function wrapUploadSessionStream(stream: ReadableStream<Uint8Array>, maxBytes: n
   return new ReadableStream<Uint8Array>({
     async pull(controller) {
       if (done) return;
-      let result: ReadableStreamReadResult<Uint8Array>;
+      // WATS-140: type the read result off the reader itself rather than the
+      // DOM `ReadableStreamReadResult` alias, which is incompatible with Bun's
+      // `ReadableStreamDefaultReadResult` under @types/bun. `Awaited<...>` keeps
+      // this lib-agnostic so full typecheck (src + bun types) stays clean.
+      let result: Awaited<ReturnType<typeof reader.read>>;
       try {
         result = await reader.read();
       } catch (cause) {
@@ -1281,7 +1285,7 @@ async function readTransportBytes(response: TransportResponse, maxBytes: number)
     let total = 0;
     try {
       while (true) {
-        let result: ReadableStreamReadResult<Uint8Array>;
+        let result: Awaited<ReturnType<typeof reader.read>>;
         try {
           result = await reader.read();
         } catch (cause) {
