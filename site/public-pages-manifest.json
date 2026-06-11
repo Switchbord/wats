@@ -45,9 +45,11 @@
     "/docs/reference/webhook-adapter",
     "/docs/reference/webhook-normalizer",
     "/docs/reference/whatsapp-facade",
-    "/playground"
+    "/playground",
+    "/playground/runner"
   ],
   "notes": {
-    "/dev-components": "devOnly: internal component gallery, removed from the public build by T24"
+    "/dev-components": "devOnly: internal component gallery, removed from the public build by T24",
+    "/playground/runner": "noindex: static sandbox iframe document (public/playground/runner.html), not a route — loaded as the playground's sandboxed execution frame"
   }
 }

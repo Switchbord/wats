@@ -28,8 +28,13 @@ if (!Array.isArray(manifest.pages) || manifest.pages.some((p) => typeof p !== "s
   process.exit(1);
 }
 
-const isDevOnly = (route: string): boolean =>
-  (manifest.notes?.[route] ?? "").trimStart().startsWith("devOnly");
+// Routes whose note starts with "devOnly" (stripped from public build) or
+// "noindex" (shipped but not a user-facing page, e.g. the sandbox iframe doc)
+// are excluded from the sitemap.
+const isDevOnly = (route: string): boolean => {
+  const note = (manifest.notes?.[route] ?? "").trimStart();
+  return note.startsWith("devOnly") || note.startsWith("noindex");
+};
 
 const routes = manifest.pages.filter((route) => !isDevOnly(route)).sort();
 const excluded = manifest.pages.filter(isDevOnly).sort();
