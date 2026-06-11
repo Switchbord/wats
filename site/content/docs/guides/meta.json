@@ -1,0 +1,13 @@
+{
+  "title": "Guides",
+  "pages": [
+    "transport-and-testing",
+    "cli-init",
+    "groups-quickstart",
+    "community-examples",
+    "deploy-docker",
+    "deploy-bun",
+    "deploy-node",
+    "deploy-cloudflare-workers"
+  ]
+}

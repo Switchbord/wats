@@ -2,11 +2,47 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://wats.sh/</loc></url>
   <url><loc>https://wats.sh/docs</loc></url>
+  <url><loc>https://wats.sh/docs/concepts/overview</loc></url>
+  <url><loc>https://wats.sh/docs/concepts/package-map</loc></url>
+  <url><loc>https://wats.sh/docs/concepts/public-api-surface</loc></url>
   <url><loc>https://wats.sh/docs/guide</loc></url>
+  <url><loc>https://wats.sh/docs/guides/cli-init</loc></url>
+  <url><loc>https://wats.sh/docs/guides/community-examples</loc></url>
+  <url><loc>https://wats.sh/docs/guides/deploy-bun</loc></url>
+  <url><loc>https://wats.sh/docs/guides/deploy-cloudflare-workers</loc></url>
+  <url><loc>https://wats.sh/docs/guides/deploy-docker</loc></url>
+  <url><loc>https://wats.sh/docs/guides/deploy-node</loc></url>
+  <url><loc>https://wats.sh/docs/guides/groups-quickstart</loc></url>
+  <url><loc>https://wats.sh/docs/guides/transport-and-testing</loc></url>
+  <url><loc>https://wats.sh/docs/meta/api-stability</loc></url>
+  <url><loc>https://wats.sh/docs/meta/privacy</loc></url>
+  <url><loc>https://wats.sh/docs/meta/release-policy</loc></url>
+  <url><loc>https://wats.sh/docs/meta/roadmap</loc></url>
+  <url><loc>https://wats.sh/docs/migration/pywa</loc></url>
   <url><loc>https://wats.sh/docs/parity</loc></url>
+  <url><loc>https://wats.sh/docs/parity/live-campaign</loc></url>
   <url><loc>https://wats.sh/docs/quickstart</loc></url>
+  <url><loc>https://wats.sh/docs/reference</loc></url>
+  <url><loc>https://wats.sh/docs/reference/cli</loc></url>
+  <url><loc>https://wats.sh/docs/reference/client</loc></url>
+  <url><loc>https://wats.sh/docs/reference/config</loc></url>
+  <url><loc>https://wats.sh/docs/reference/crypto</loc></url>
+  <url><loc>https://wats.sh/docs/reference/endpoints</loc></url>
   <url><loc>https://wats.sh/docs/reference/errors</loc></url>
+  <url><loc>https://wats.sh/docs/reference/filters</loc></url>
   <url><loc>https://wats.sh/docs/reference/groups</loc></url>
+  <url><loc>https://wats.sh/docs/reference/internal-utils</loc></url>
+  <url><loc>https://wats.sh/docs/reference/listeners</loc></url>
+  <url><loc>https://wats.sh/docs/reference/media</loc></url>
+  <url><loc>https://wats.sh/docs/reference/pagination</loc></url>
+  <url><loc>https://wats.sh/docs/reference/persistence</loc></url>
+  <url><loc>https://wats.sh/docs/reference/router</loc></url>
+  <url><loc>https://wats.sh/docs/reference/scoped-clients</loc></url>
+  <url><loc>https://wats.sh/docs/reference/service</loc></url>
+  <url><loc>https://wats.sh/docs/reference/types</loc></url>
+  <url><loc>https://wats.sh/docs/reference/webhook</loc></url>
+  <url><loc>https://wats.sh/docs/reference/webhook-adapter</loc></url>
   <url><loc>https://wats.sh/docs/reference/webhook-normalizer</loc></url>
+  <url><loc>https://wats.sh/docs/reference/whatsapp-facade</loc></url>
   <url><loc>https://wats.sh/playground</loc></url>
 </urlset>

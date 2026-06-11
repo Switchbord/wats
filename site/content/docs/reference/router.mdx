@@ -1,0 +1,314 @@
+---
+title: "Router reference (`TypedRouter`)"
+description: "The TypedRouter handler-dispatch engine: handle-based registration, observer seams, and the DispatchReport shape."
+---
+
+<DocMeta status="active" />
+
+## TypedRouter
+
+`TypedRouter` is the handler-dispatch engine that sits ABOVE the F-8
+`TypedUpdate` discriminated union and the F-9 branded `TypedFilter`
+surface. It owns three contracts the lower layers do not:
+
+1. **Handle-based registration.** Every call to `.on(filter, handler)`
+   returns a `RegistrationHandle` the caller can use to
+   `.unregister()` the handler. The handle carries the unique
+   `Symbol()` id and a live `.registered` flag.
+2. **Registration-order dispatch (WATS-10 L4).** Matching handlers
+   fire in the exact order they were registered. The router does
+   NOT implicitly group by kind, filter shape, or any other
+   property.
+3. **Observer seams (WATS-15 A3).** Consumers plug in
+   `onBeforeDispatch` / `onAfterDispatch` / `onHandlerMatch` /
+   `onHandlerError` hooks to log, trace, or count without taking a
+   hard dependency on the router internals.
+
+The router is the FINAL try/catch boundary for handler evaluation.
+Handler throws NEVER propagate out of `.dispatch()`.
+
+## Construction
+
+```ts
+import { TypedRouter } from "@wats/core";
+
+const router = new TypedRouter({
+  concurrency: "sequential",            // default; "parallel" is also supported
+  maxHandlersPerDispatch: 10_000,       // default cap (per WATS-10 L4 spec)
+  observer: {
+    onBeforeDispatch: (id, update) => { /* ... */ },
+    onAfterDispatch:  (id, report) => { /* ... */ },
+    onHandlerMatch:   (id, handle, update) => { /* ... */ },
+    onHandlerError:   (id, handle, err, update) => { /* ... */ }
+  }
+});
+```
+
+All options are validated at CONSTRUCTION time with
+`TypedRouterOptionsError` and a stable `.code`:
+
+| Code | When it fires |
+| ---- | ------------- |
+| `invalid_options` | options is not a plain object |
+| `invalid_observer` | observer is not an object OR a hook is not a function |
+| `invalid_max_handlers` | `maxHandlersPerDispatch` is not a positive integer |
+| `invalid_concurrency` | value is not `"sequential"` or `"parallel"` |
+| `invalid_dispatch_id_factory` | `dispatchIdFactory` is not a function |
+| `invalid_filter` | `.on(filter, …)` received a non-`TypedFilter` |
+| `invalid_handler` | `.on(…, handler)` received a non-function |
+
+## Handle-based registration
+
+```ts
+const handle = router.on(message, (ctx) => {
+  console.log(ctx.update.message.text?.body);
+});
+
+handle.unregister();    // idempotent — calling twice is a no-op
+handle.registered;      // live boolean; false after unregister
+handle.registrationIndex; // 0-based, monotonically increasing
+handle.id;                // unique Symbol() — never collides
+```
+
+`.unregister()` is **idempotent**. Calling it a second time is a
+safe no-op — no throw, no change to the router.
+
+## Dispatch
+
+```ts
+const report: DispatchReport = await router.dispatch(update);
+```
+
+`.dispatch()` always resolves. It never rejects with a handler error.
+The returned `DispatchReport` describes what happened:
+
+```ts
+interface DispatchReport {
+  readonly dispatchId: string;         // unique per dispatch()
+  readonly matchedHandlers: number;    // matching in-snapshot count
+  readonly errors: ReadonlyArray<{ handleId: symbol; error: unknown }>;
+  readonly stopped: boolean;           // a handler returned "stop"
+  readonly capped: boolean;            // maxHandlersPerDispatch hit
+}
+```
+
+### Registration-order guarantee (WATS-10 L4)
+
+If five handlers are registered, and all five match the dispatched
+update, the router invokes them in indexes `0, 1, 2, 3, 4` — in
+exactly that order — and awaits them sequentially (in the default
+`sequential` concurrency mode). No reordering by kind, by filter
+shape, or by any other implicit criterion is performed.
+
+### Stop semantics
+
+A handler may return (or an async handler may resolve to) the
+string literal `"stop"` to halt the current dispatch early. No
+later matching handlers fire for that dispatch, and the report's
+`stopped` flag is set to `true`. The stop signal is scoped to one
+dispatch; subsequent dispatches start fresh.
+
+### Error collection
+
+When a handler throws (or an async handler rejects), the router:
+
+1. Catches the error.
+2. Appends `{ handleId, error }` to `DispatchReport.errors`.
+3. Invokes `observer.onHandlerError(dispatchId, handle, error, update)`
+   if an observer is registered. The observer call is isolated — see
+   "Observer-throw isolation" below.
+4. Continues with the next matching handler — subsequent handlers
+   still fire.
+
+`.dispatch()` always resolves with a report. It NEVER rejects with
+a handler error, and it NEVER throws synchronously.
+
+Filter-predicate throws (from consumer-supplied `custom()` predicates
+per F-9) are treated as **handler errors**: they originate from
+consumer-supplied code and are therefore handler-side. The error is
+appended to `DispatchReport.errors` with the predicate-owning
+registration's `handleId` AND forwarded to `onHandlerError` (if an
+observer is registered). The matching handler is SKIPPED for that
+dispatch — the predicate never returned `true`, so the handler does
+not fire. The router is the final try/catch boundary that architecture notes
+reserves for F-10.
+
+This means observer-less callers will see a non-empty `errors` array
+when a `custom()` predicate explodes — they no longer silently lose
+the failure.
+
+## Observer seams (WATS-15 A3)
+
+Every hook is optional; pass only what you need.
+
+```ts
+interface RouterObserver {
+  onBeforeDispatch?(dispatchId: string, update: TypedUpdate): void;
+  onAfterDispatch?(dispatchId: string, report: DispatchReport): void;
+  onHandlerMatch?(dispatchId: string, handle: RegistrationHandle, update: TypedUpdate): void;
+  onHandlerError?(dispatchId: string, handle: RegistrationHandle, error: unknown, update: TypedUpdate): void;
+}
+```
+
+Invariants:
+
+- `onBeforeDispatch` fires exactly once, before any handler.
+- `onAfterDispatch` fires exactly once, after all handlers (or the
+  first `"stop"`), with the final report.
+- Both hooks share the same `dispatchId` for their call pair — use
+  it to correlate log/trace spans.
+- `onHandlerMatch` fires once per MATCHING handler (never for
+  non-matching handlers).
+- `onHandlerError` fires synchronously with the collection into
+  `report.errors` — so log-append and report-read are consistent.
+
+### Observer-throw isolation (WATS-29 / F-10 remediation)
+
+**Every observer hook is invoked inside a try/catch.** If a hook
+throws (sync or via a returned-but-unawaited rejection), the throw
+is **silently swallowed** by the router. The dispatch still resolves
+with the same `DispatchReport` it would have produced if the hook had
+returned cleanly.
+
+The rationale: the dispatch contract is "always resolves". Letting
+observer throws propagate out of `.dispatch()` would make every
+observer a single point of failure for the whole router — and worse,
+a throw from `onHandlerError` would *replace* the original handler
+error (already appended to `report.errors`) with the observer's
+error, so callers would lose the real failure.
+
+Implementation contract:
+
+- Do NOT rely on observer throws to signal exceptional flow. They are
+  swallowed and there is no `onObserverError` re-entry seam in F-10.
+- Observers should treat themselves as best-effort instrumentation
+  (logging, metrics, tracing). If your observer must surface an
+  error, route it via your own external mechanism — not by throwing.
+- All four hooks (`onBeforeDispatch`, `onHandlerMatch`,
+  `onHandlerError`, `onAfterDispatch`) are isolated identically, in
+  both `sequential` and `parallel` concurrency modes.
+
+## Snapshot semantics during unregister
+
+The router takes a SNAPSHOT of the registered handlers at the
+start of `.dispatch()`. The dispatch then iterates the snapshot.
+
+- **Unregister during dispatch:** if handler `H1` calls
+  `h2.unregister()` while H1 is running, `H2` still fires in the
+  same dispatch (it was already in the snapshot). The next
+  dispatch will not see `H2`.
+- **Register during dispatch:** a new `router.on(...)` call made by
+  a running handler does NOT fire in the current dispatch. It
+  becomes visible to the next dispatch.
+
+This picks determinism over "live" semantics. Handlers observing a
+frozen handler list for the duration of one dispatch is easier to
+reason about than racing-against-mutation.
+
+## Concurrency modes
+
+`sequential` (default) — the router awaits handlers one at a time,
+in registration order. Side-effects observe registration order
+exactly. This is the recommended default.
+
+`parallel` — the router fires all matching handlers concurrently
+via `Promise.allSettled`. Errors are still collected, but
+interleaving is undefined and `"stop"` decisions are applied
+post-hoc (after all handlers have settled). Use `parallel` only
+when handler order is irrelevant and concurrency materially speeds
+up dispatch.
+
+## `maxHandlersPerDispatch` cap
+
+Default `10_000`. Configurable via the constructor option. When
+the cap is reached during dispatch, the router halts cleanly,
+further matching handlers are skipped, and `report.capped` is set
+to `true`. This closes the WATS-10 L4 bound on per-event work.
+
+## Dispatch IDs
+
+Every dispatch gets a unique string id. Default factory uses
+`crypto.randomUUID()` when available, falling back to
+`dsp-<timestamp-base36>-<counter-base36>` in environments without
+Web Crypto. Inject a custom `dispatchIdFactory` in options if you
+need a different scheme (e.g. to match an external tracing id).
+
+## Handler contract
+
+```ts
+type Handler<T extends TypedUpdate = TypedUpdate> =
+  (ctx: HandlerContext<T>) => void | "stop" | Promise<void | "stop">;
+
+interface HandlerContext<T extends TypedUpdate> {
+  readonly update: T;
+  readonly registrationIndex: number;
+  readonly dispatchId: string;
+}
+```
+
+Handlers are passed a `HandlerContext` with the narrowed update,
+their `registrationIndex`, and the current `dispatchId`. The context
+is ergonomic for logging and tracing without forcing handlers to
+reach back into the router.
+
+## Usage example
+
+```ts
+import {
+  TypedRouter,
+  type HandlerContext
+} from "@wats/core";
+import { and, message } from "@wats/core/filtersTyped";
+
+const router = new TypedRouter({
+  concurrency: "sequential",
+  maxHandlersPerDispatch: 10_000
+});
+
+const helloHandle = router.on(
+  and(message, message.textMatches(/hello/i)),
+  (ctx: HandlerContext) => {
+    if (ctx.update.kind !== "message") return;
+    console.log(`hello from ${ctx.update.message.from}`);
+  }
+);
+
+const report = await router.dispatch(someTypedUpdate);
+if (report.errors.length > 0) { /* … */ }
+
+helloHandle.unregister();
+```
+
+## Non-goals
+
+- No direct HTTP server integration inside `TypedRouter`; `@wats/http`
+  owns webhook adapters and calls a facade/router-shaped dispatch method.
+- No persistence for the handler registry.
+- No retry / backoff for failed handlers.
+- No wire-payload re-normalization — `normalizeWebhookEnvelope` owns
+  inbound webhook validation and typing.
+- Listener persistence and cross-process listener distribution are out
+  of scope; the F-11 listener substrate is in-memory and composes with
+  dispatch before normal handler execution.
+- **No abort/signal mechanism for handler dispatch.** Dispatch runs to
+  completion (modulo `"stop"` and `maxHandlersPerDispatch`). If callers
+  need cancellation detection, snapshot state in `observer.onBeforeDispatch`
+  and check it in handlers via the `dispatchId` correlator.
+- **No runtime validation of `dispatch(update)` arguments.** The router
+  does not check whether the value is a well-formed `TypedUpdate`. Filter
+  predicates are the matching mechanism; passing a non-TypedUpdate value
+  yields a dispatch where built-in predicates return `false`. This is
+  intentional: the webhook normalizer is the validator for inbound Meta
+  payloads. Custom predicates must defend themselves if they expect a
+  richer shape — predicate throws are collected as handler errors per the
+  rules above.
+
+## Related
+
+- architecture notes — typed-updates + handler model.
+- `docs/reference/filters.md` — `TypedFilter` surface consumed by
+  `.on()`.
+- `docs/reference/webhook-normalizer.md` — the F-8 normalizer that
+  emits the `TypedUpdate` values this router dispatches.
+- `docs/reference/whatsapp-facade.md` — the `WhatsApp` composition
+  root that owns a default `TypedRouter`.

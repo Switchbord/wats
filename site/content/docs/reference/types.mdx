@@ -1,0 +1,302 @@
+---
+title: "Types Reference"
+description: "Foundational shared TypeScript contracts: discriminated-union domain types for inbound WhatsApp objects."
+---
+
+<DocMeta status="active" lastReviewed="2026-04-21" />
+
+## Purpose
+
+Define foundational shared TypeScript contracts used across WATS packages.
+
+`@wats/types` ships discriminated-union shapes for every inbound WhatsApp
+domain object the library exposes. Callers narrow via `switch` on the
+`type` discriminator; exhaustive switches with a `never` default branch
+catch any future variant that is added to the union.
+
+## Config Types
+
+- `WhatsAppClientConfig`
+  - required: `token`, `phoneNumberId`
+  - optional: `appSecret`, `verifyToken`, `apiVersion`, `baseUrl`
+- `WhatsAppClientRuntimeConfig`
+  - normalized runtime shape for async client initialization paths
+
+## WhatsAppMessage (discriminated union)
+
+`WhatsAppMessage` is a closed union keyed by a string-literal `type`:
+
+- `TextMessage` — `type: "text"`, `text: { body: string }`
+- `ImageMessage` — `type: "image"`, `image: MediaReference`
+- `VideoMessage` — `type: "video"`, `video: MediaReference`
+- `AudioMessage` — `type: "audio"`, `audio: MediaReference`
+- `DocumentMessage` — `type: "document"`, `document: DocumentReference`
+  (`filename` required)
+- `StickerMessage` — `type: "sticker"`, `sticker: MediaReference`
+- `LocationMessage` — `type: "location"`, `location: { latitude,
+  longitude, name?, address? }`
+- `ContactsMessage` — `type: "contacts"`, `contacts: WhatsAppContact[]`
+- `ReactionMessage` — `type: "reaction"`, `reaction: { messageId, emoji }`
+- `OrderMessage` — `type: "order"`, `order: OrderPayload`
+- `SystemMessage` — `type: "system"`, `system: SystemNotification`
+- `UnsupportedMessage` — `type: "unsupported"`, `errors?: WhatsAppError[]`,
+  `raw: unknown`
+- `InteractiveMessage` — `type: "interactive"`, `interactive:
+  InteractiveReply` (nested discriminated union)
+- `ButtonMessage` — `type: "button"`, `button: { text, payload? }`
+
+Every variant shares the base fields `id: string`, `from: string`,
+`timestamp: string` (with `SystemMessage` retaining the same base and
+`UnsupportedMessage` reserving `raw` as an escape hatch). Every variant
+also exposes an optional `raw?: unknown` so userland keeps byte-level
+access to the original wire payload without re-opening the typed
+surface — this is the WATS-2 camelCase-only contract with a single
+bounded escape hatch.
+
+### InteractiveReply (nested union)
+
+`InteractiveMessage.interactive` is itself a discriminated union keyed by
+`type`:
+
+- `button_reply` → `{ buttonReply: { id, title } }`
+- `list_reply` → `{ listReply: { id, title, description? } }`
+- `nfm_reply` → `{ nfmReply: { responseJson?, body?, name? } }`
+- `product_reply` → `{ productReply: { catalogId, productRetailerId } }`
+- `product_list_reply` → `{ productListReply: { catalogId,
+  productItems: ReadonlyArray<{ productRetailerId }> } }`
+- `cta_url_reply` → `{ ctaUrlReply: { displayText, url } }`
+
+## WhatsAppMessageStatus
+
+`WhatsAppMessageStatus.status: WhatsAppMessageStatusKind` narrows to
+one of six literals:
+
+- `sent`, `delivered`, `read`, `failed`, `deleted`, `warning`
+
+Other fields: `id`, `recipientId`, `timestamp`, optional
+`conversation?`, `pricing?`, `errors?: WhatsAppError[]`, `raw?`.
+
+## WhatsAppContact
+
+Closed shape (no `[key: string]: unknown`). Optional fields:
+
+- `wa_id?` (snake_case retained until the F-8 normalizer; see TODO below)
+- `profile?: { name? }`
+- `name?: WhatsAppContactName` (carries both snake_case wire fields
+  such as `first_name` / `formatted` and camelCase mirrors
+  `firstName` / `formattedName` for forward compatibility)
+- `phones?: ContactPhone[]`
+- `emails?: ContactEmail[]`
+- `addresses?: ContactAddress[]`
+- `org?: ContactOrg`
+- `urls?: ContactUrl[]`
+- `birthday?: string`
+- `raw?: unknown`
+
+> TODO(F-8): the snake_case sub-fields (`first_name`, `formatted`,
+> `country_code`, ...) migrate to camelCase-only when the typed update
+> normalizer lands in F-8. Until then both casings are accepted.
+
+## WhatsAppWebhookValue (discriminated union)
+
+`WhatsAppWebhookValue` is closed but every variant keeps a `raw: unknown`
+escape hatch. Variants:
+
+- `WhatsAppMessagesFieldValue` — standard inbound messages payload
+  (`messagingProduct: "whatsapp"`, `metadata`, `messages?`, `statuses?`,
+  `contacts?`, `errors?`).
+- `WhatsAppTemplateStatusUpdateValue` — `messageTemplateId`,
+  `messageTemplateName`, `messageTemplateLanguage`, `event:
+  "APPROVED" | "REJECTED" | "FLAGGED" | "PAUSED" | "DISABLED" |
+  "PENDING_DELETION"`, `reason?`.
+- `WhatsAppAccountReviewUpdateValue` — `decision`.
+- `WhatsAppUserMarketingPreferencesValue` — `waId`, `category`,
+  `preference: "opt_in" | "opt_out"`, `timestamp`.
+- `WhatsAppPhoneNumberChangeValue` — `mobileDisplayName?`,
+  `oldPhoneNumber?`, `newPhoneNumber`.
+- `WhatsAppIdentityChangeValue` — `waId`, `acknowledged`,
+  `createdTimestamp`, `hash?`.
+- `WhatsAppRawWebhookValue` — catch-all for unrecognized fields;
+  exposes `raw: unknown` and optional `errors?`.
+
+The outer envelope remains `WhatsAppWebhookEnvelope` → `entry[]` →
+`changes[]` with the discriminating `field` on each change.
+
+## Narrowing recipes
+
+### Exhaustive switch
+
+```ts
+import type { WhatsAppMessage } from "@wats/types";
+
+function describe(message: WhatsAppMessage): string {
+  switch (message.type) {
+    case "text":
+      return message.text.body;
+    case "image":
+      return `image:${message.image.mimeType}`;
+    case "interactive":
+      return `interactive:${message.interactive.type}`;
+    // ...handle every variant...
+    default: {
+      const _exhaustive: never = message;
+      return _exhaustive;
+    }
+  }
+}
+```
+
+The `_exhaustive: never` branch forces a compile error the moment a new
+variant is added to the union, which is the contract WATS-23 encodes.
+
+### Status narrowing
+
+```ts
+import type {
+  WhatsAppMessageStatus,
+  WhatsAppMessageStatusKind
+} from "@wats/types";
+
+function isTerminal(status: WhatsAppMessageStatus): boolean {
+  const kind: WhatsAppMessageStatusKind = status.status;
+  return kind === "failed" || kind === "deleted" || kind === "read";
+}
+```
+
+### Interactive narrowing
+
+```ts
+import type { InteractiveMessage, InteractiveReply } from "@wats/types";
+
+function replyBody(message: InteractiveMessage): string {
+  const reply: InteractiveReply = message.interactive;
+  switch (reply.type) {
+    case "button_reply":
+      return reply.buttonReply.title;
+    case "list_reply":
+      return reply.listReply.title;
+    case "nfm_reply":
+      return reply.nfmReply.name ?? "";
+    case "product_reply":
+      return reply.productReply.productRetailerId;
+    case "product_list_reply":
+      return reply.productListReply.catalogId;
+    case "cta_url_reply":
+      return reply.ctaUrlReply.url;
+    default: {
+      const _exhaustive: never = reply;
+      return _exhaustive;
+    }
+  }
+}
+```
+
+### Raw escape hatch
+
+Every typed variant exposes an optional `raw?: unknown` so you can
+reach into the original wire payload without breaking strict types:
+
+```ts
+if (message.type === "unsupported") {
+  const wire = message.raw; // typed as `unknown`
+  // userland does its own narrowing / logging / forwarding
+}
+```
+
+## Parsed update event types (C2)
+
+`@wats/core` introduces normalized parsed-event contracts for handler
+routing.
+
+- `ParsedUpdateEvent`
+  - `object: string` (validated top-level webhook `object` value)
+  - `discriminator`
+    - `field: string`
+    - `subtype?: string` (from change `event` when present)
+    - `eventType: string` (`field` or `${field}.${subtype}`)
+  - `entry`
+    - `index: number`
+    - `id?: string`
+    - `time?: number`
+  - `change`
+    - `index: number`
+    - `value: Record<string, unknown>` (reference to raw `change.value`)
+  - `raw`
+    - `entry: Record<string, unknown>`
+    - `change: Record<string, unknown>`
+
+`parseWebhookUpdate(rawEnvelope, options?)` options:
+
+- `maxEntries?: number`
+- `maxChangesPerEntry?: number`
+- `maxTotalEvents?: number`
+- `supportedObjects?: readonly string[]` (default allows `whatsapp_business_account`)
+
+`parseWebhookUpdate` result union:
+
+- success: `{ ok: true, events: ParsedUpdateEvent[], skippedEntries: number, skippedChanges: number }`
+- failure: `{ ok: false, events: [], error: { code, message } }`
+
+Parser error codes:
+
+- `invalid_envelope`
+- `unsupported_object`
+- `entries_limit_exceeded`
+- `changes_limit_exceeded`
+- `events_limit_exceeded`
+
+`createUpdateRouter(options?)` dispatch summary includes:
+
+- base counters: `totalEvents`, `matchedHandlers`, `executedHandlers`, `failedHandlers`, `unmatchedEvents`, `errors`
+- safety metadata: `capped: boolean`, `aborted: boolean`, `limitError?: { code, message, eventIndex }`
+- limit error codes: `handlers_per_event_limit_exceeded`, `dispatches_limit_exceeded`
+
+This preserves best-effort nested malformed skipping while surfacing
+explicit degradation counters and hard-limit failures.
+
+## API Surface
+
+Exports are available via:
+
+- `@wats/types/config` — `WhatsAppClientConfig`, `WhatsAppClientRuntimeConfig`
+- `@wats/types/webhook` — webhook envelope + value union
+- `@wats/types/entities` — B1 entity barrel (retained for compatibility)
+- `@wats/types/messages` — WhatsAppMessage union + every variant +
+  supporting media/context types
+- `@wats/types/statuses` — WhatsAppMessageStatus + status kind union
+- `@wats/types/contacts` — WhatsAppContact + sub-shapes
+- `@wats/types/errors` — WhatsAppError + legacy WhatsAppErrorPayload
+- `@wats/types` — barrel (all of the above)
+
+Runtime contract constants are also exported so external-consumer
+fixtures can assert the documented surface without relying on
+type-only exports:
+
+- `WATS_TYPES_CONFIG_EXPORTS`
+- `WATS_TYPES_WEBHOOK_EXPORTS`
+- `WATS_TYPES_ENTITIES_EXPORTS`
+- `WATS_TYPES_MESSAGES_EXPORTS`
+- `WATS_TYPES_STATUSES_EXPORTS`
+- `WATS_TYPES_CONTACTS_EXPORTS`
+- `WATS_TYPES_ERRORS_EXPORTS`
+
+## Usage Notes
+
+- Prefer camelCase property names in all public contracts. Wire-level
+  snake_case is preserved only inside `WhatsAppContact` /
+  `SystemNotification` sub-fields with TODO(F-8) markers; F-8 migrates
+  those to camelCase-only.
+- Keep async-first ergonomics in calling layers by passing
+  `WhatsAppClientConfig` through initialization boundaries and
+  normalizing once.
+- Never rely on `[key: string]: unknown` on the typed surface: every
+  new field Meta introduces must either be promoted to the typed
+  shape in a future F-step or reached through `raw`.
+
+## Parity Notes
+
+F-1 closes WATS-23 (Arch-I): WhatsAppMessage, WhatsAppContact, and
+WhatsAppMessageStatus are now closed discriminated unions; the
+WhatsAppWebhookValue is closed with a `raw` escape hatch on every
+variant. Wire-format normalization (camelCase over snake_case) is
+still pending F-8.
