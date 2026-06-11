@@ -23,12 +23,28 @@ const BUNDLE_URL = new URL("/playground/wats-bundle.js", window.location.origin)
 const WASM_URL = "/playground/esbuild.wasm"
 
 // Rewrite every `@wats/<x>` / `@wats/<x>/<sub>` import specifier in the compiled
-// output to the absolute bundle URL. The bundle re-exports every subpath, so all
-// specifiers collapse to the same single module URL. Covers static `from "..."`,
-// bare `import "..."`, and dynamic `import("...")`.
+// output to the placeholder specifier "wats:bundle". The bundle re-exports every
+// subpath, so all specifiers collapse to one module. The sandboxed runner (which
+// runs at an opaque origin where CSP `script-src 'self'` cannot match our origin)
+// swaps "wats:bundle" for a blob: URL built from the bundle source we hand it —
+// keeping connect-src 'none' intact (nothing is fetched from inside the sandbox).
 const SPECIFIER = /(['"])@wats\/[^'"]+\1/g
 function rewriteImports(code: string): string {
-  return code.replace(SPECIFIER, (_m, quote: string) => `${quote}${BUNDLE_URL}${quote}`)
+  return code.replace(SPECIFIER, (_m, quote: string) => `${quote}wats:bundle${quote}`)
+}
+
+// Fetch the SDK bundle source once (same-origin, parent context — allowed). The
+// runner can't fetch it itself (opaque origin + connect-src 'none'), so we pass
+// the text in and it materializes a blob: module.
+let bundleSourcePromise: Promise<string> | null = null
+function loadBundleSource(): Promise<string> {
+  if (!bundleSourcePromise) {
+    bundleSourcePromise = fetch(BUNDLE_URL).then((r) => {
+      if (!r.ok) throw new Error(`failed to load SDK bundle (${r.status})`)
+      return r.text()
+    })
+  }
+  return bundleSourcePromise
 }
 
 type ConsoleEntry = { level: string; text: string }
@@ -110,7 +126,7 @@ export default function PlaygroundApp({
     const source = view.state.doc.toString()
     try {
       setStatus("compiling")
-      await ensureEsbuild()
+      const [, bundle] = await Promise.all([ensureEsbuild(), loadBundleSource()])
       const result = await esbuild.transform(source, {
         loader: "ts",
         format: "esm",
@@ -118,7 +134,7 @@ export default function PlaygroundApp({
       })
       const code = rewriteImports(result.code)
       setStatus("running")
-      iframe.contentWindow?.postMessage({ type: "wats-run", code }, "*")
+      iframe.contentWindow?.postMessage({ type: "wats-run", code, bundle }, "*")
     } catch (err) {
       setStatus("idle")
       const message = err instanceof Error ? err.message : String(err)

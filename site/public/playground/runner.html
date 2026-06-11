@@ -173,32 +173,46 @@
           fail(ev.reason || { name: "Error", message: "Unhandled rejection" });
         });
 
-        function run(compiledCode) {
-          // compiledCode is an ES module whose @wats/* import specifiers the parent
-          // has already rewritten to the ABSOLUTE /playground/wats-bundle.js URL
-          // (the opaque-origin frame has no usable base for relative resolution).
-          // We dynamic-import it via a Blob URL; script-src blob: allows the blob,
-          // script-src 'self' allows the absolute bundle import it triggers.
-          var blob = new Blob([compiledCode], { type: "text/javascript" });
-          var blobUrl = URL.createObjectURL(blob);
-          import(blobUrl)
+        function run(compiledCode, bundleSource) {
+          // compiledCode is an ES module that imports the WATS SDK via the
+          // placeholder specifier "wats:bundle". We cannot import the SDK by its
+          // real http(s) URL from here: this frame runs at an opaque ("null")
+          // origin, so CSP `script-src 'self'` does not match the parent origin
+          // and the import is blocked. Instead the parent hands us the bundle
+          // SOURCE TEXT; we turn it into a blob: URL (allowed by `script-src
+          // blob:`) and rewrite the scenario's "wats:bundle" import to that blob
+          // URL. No network is touched — connect-src 'none' stays intact.
+          var bundleBlobUrl = URL.createObjectURL(
+            new Blob([bundleSource], { type: "text/javascript" }),
+          );
+          var rewritten = compiledCode.split("wats:bundle").join(bundleBlobUrl);
+          var scenarioBlobUrl = URL.createObjectURL(
+            new Blob([rewritten], { type: "text/javascript" }),
+          );
+          import(scenarioBlobUrl)
             .catch(fail)
             .finally(function () {
-              URL.revokeObjectURL(blobUrl);
+              URL.revokeObjectURL(scenarioBlobUrl);
+              URL.revokeObjectURL(bundleBlobUrl);
               send({ kind: "done" });
             });
         }
 
         window.addEventListener("message", function (ev) {
           var data = ev.data;
-          if (!data || data.type !== "wats-run" || typeof data.code !== "string") {
+          if (
+            !data ||
+            data.type !== "wats-run" ||
+            typeof data.code !== "string" ||
+            typeof data.bundle !== "string"
+          ) {
             return;
           }
-          run(data.code);
+          run(data.code, data.bundle);
         });
 
         // Signal to the parent that the runner has wired up its API and is ready
-        // to receive a { type: "wats-run", code } message.
+        // to receive a { type: "wats-run", code, bundle } message.
         send({ kind: "ready" });
       })();
     </script>

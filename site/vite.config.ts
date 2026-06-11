@@ -5,7 +5,7 @@ import tailwindcss from '@tailwindcss/vite'
 import mdx from 'fumadocs-mdx/vite'
 import { fileURLToPath } from 'node:url'
 
-export default defineConfig({
+export default defineConfig(({ isSsrBuild }) => ({
   resolve: {
     // Force a single @codemirror/view copy — bun's shared monorepo store keeps
     // both 6.41 and 6.43; without dedupe the editor's keymap Commands fail to
@@ -18,6 +18,21 @@ export default defineConfig({
       'collections/browser': fileURLToPath(
         new URL('./.source/browser.ts', import.meta.url),
       ),
+      // CLIENT build only: fumadocs-core's loader does `import path from
+      // "node:path"` and calls path.join/dirname while building the page tree
+      // at module-eval. Vite externalizes node:path -> undefined for the
+      // browser, so those calls throw `(void 0) is not a function` and reject
+      // the entry module's top-level await — which silently breaks client
+      // hydration (prerendered docs survive; the playground's lazy chunk hangs
+      // forever). Point node:path at a small POSIX shim so the browser build
+      // resolves cleanly. The SSR/prerender build keeps the real node:path.
+      ...(isSsrBuild
+        ? {}
+        : {
+            'node:path': fileURLToPath(
+              new URL('./src/lib/path-browser-shim.ts', import.meta.url),
+            ),
+          }),
     },
   },
   plugins: [
@@ -40,4 +55,4 @@ export default defineConfig({
     }),
     viteReact(),
   ],
-})
+}))
