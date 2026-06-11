@@ -1,4 +1,27 @@
 {
   "title": "Reference",
-  "pages": ["errors", "webhook-normalizer", "groups"]
+  "pages": [
+    "index",
+    "client",
+    "scoped-clients",
+    "endpoints",
+    "groups",
+    "media",
+    "pagination",
+    "errors",
+    "webhook-normalizer",
+    "webhook-adapter",
+    "webhook",
+    "filters",
+    "router",
+    "listeners",
+    "whatsapp-facade",
+    "types",
+    "crypto",
+    "config",
+    "cli",
+    "service",
+    "persistence",
+    "internal-utils"
+  ]
 }
