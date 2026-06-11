@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": [],
+    "baseUrl": ".",
+    "paths": {
+      "@wats/core": ["../../../playground-build/node_modules/@wats/core/dist/index.d.ts"],
+      "@wats/core/*": ["../../../playground-build/node_modules/@wats/core/dist/*"],
+      "@wats/graph": ["../../../playground-build/node_modules/@wats/graph/dist/index.d.ts"],
+      "@wats/graph/testing": ["../../../playground-build/node_modules/@wats/graph/dist/createMockTransport.d.ts"],
+      "@wats/graph/*": ["../../../playground-build/node_modules/@wats/graph/dist/*"],
+      "@wats/types": ["../../../playground-build/node_modules/@wats/types/dist/index.d.ts"],
+      "@wats/types/*": ["../../../playground-build/node_modules/@wats/types/dist/*"]
+    },
+    "ignoreDeprecations": "6.0"
+  },
+  "include": ["send-a-text.ts", "typed-errors.ts", "webhook-normalize.ts", "route-with-filters.ts", "groups.ts", "runner-globals.d.ts"]
+}

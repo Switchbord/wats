@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <!--
+      wats playground sandbox runner (06-playground-spec.md §3 — adversarial gate T21).
+
+      This document is loaded into an <iframe sandbox="allow-scripts"> WITHOUT
+      allow-same-origin, so it executes at an opaque ("null") origin. The Content
+      Security Policy below is the hard network boundary; every directive is the
+      minimal working set for "run the real SDK against MockTransport, prove no
+      network".
+
+        default-src 'none'   Deny everything not explicitly re-allowed below. The
+                             closed-by-default base every other directive narrows.
+        script-src           blob:  -> dynamic-import of the compiled scenario,
+                                       handed to us as a Blob URL.
+                             'unsafe-inline' -> this bootstrap <script> element.
+                             'self' -> the static /playground/wats-bundle.js module
+                                       the scenario imports by absolute URL.
+        connect-src 'none'   THE INVARIANT. fetch / XMLHttpRequest / WebSocket /
+                             EventSource / navigator.sendBeacon all draw their
+                             allow-list from connect-src; 'none' means every one of
+                             them throws or is blocked. Scenario code cannot reach
+                             graph.facebook.com or anywhere else. MockTransport never
+                             calls fetch, so the captured-request pane keeps working.
+        img-src 'none'       No pixel / beacon exfiltration via <img src>.
+        style-src 'unsafe-inline'  The tiny inline status style only; no remote CSS.
+        base-uri 'none'      No <base> rewrite of the absolute bundle URL.
+        form-action 'none'   No form-submission exfiltration channel.
+        frame-src 'none' / child-src 'none'  No nested frames.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src blob: 'unsafe-inline' 'self'; connect-src 'none'; img-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'"
+    />
+    <title>wats playground runner</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: transparent;
+        color: #888;
+        font:
+          12px / 1.4 ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          monospace;
+      }
+      .note {
+        padding: 8px 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="note">runner ready — execution is sandboxed, connect-src is none</div>
+    <!--
+      Runner API exposed to scenario code (documented contract):
+        globalThis.report(mock)          surface every Graph request MockTransport
+                                         captured -> { kind: "request", method, path, body }
+        globalThis.reportUpdate(update)  surface a typed update -> { kind: "update", update }
+        console.{log,info,warn,error,debug}  captured -> { kind: "console", level, args }
+
+      Everything is serialized to plain strings here; the parent renders strings as
+      TEXT (never as HTML), so a scenario logging "<img src=x onerror=alert(1)>"
+      shows up inert.
+    -->
+    <script>
+      (function () {
+        "use strict";
+
+        function send(msg) {
+          // The parent validates event.source === iframe.contentWindow before it
+          // trusts anything, so targetOrigin "*" here is safe and necessary: a
+          // sandboxed opaque-origin frame has no fixed origin to assert.
+          parent.postMessage(msg, "*");
+        }
+
+        function serialize(value) {
+          if (typeof value === "string") return value;
+          if (typeof value === "bigint") return value.toString() + "n";
+          if (value instanceof Error) {
+            return value.name + ": " + value.message;
+          }
+          var seen = new WeakSet();
+          try {
+            return JSON.stringify(
+              value,
+              function (_key, val) {
+                if (typeof val === "bigint") return val.toString() + "n";
+                if (typeof val === "object" && val !== null) {
+                  if (seen.has(val)) return "[Circular]";
+                  seen.add(val);
+                }
+                return val;
+              },
+              2,
+            );
+          } catch (err) {
+            try {
+              return String(value);
+            } catch (_err) {
+              return "[unserializable]";
+            }
+          }
+        }
+
+        // --- console capture -------------------------------------------------
+        ["log", "info", "warn", "error", "debug"].forEach(function (level) {
+          console[level] = function () {
+            var args = Array.prototype.slice.call(arguments).map(serialize);
+            send({ kind: "console", level: level, args: args });
+          };
+        });
+
+        // --- report(mock): captured Graph requests ---------------------------
+        globalThis.report = function (mock) {
+          if (
+            !mock ||
+            typeof mock !== "object" ||
+            !Array.isArray(mock.requests)
+          ) {
+            send({
+              kind: "error",
+              name: "ReportError",
+              message:
+                "report(mock) expects a MockTransport handle exposing a requests array.",
+              stack: "",
+            });
+            return;
+          }
+          mock.requests.forEach(function (req) {
+            var method = (req && req.method) || "GET";
+            var path = "";
+            try {
+              path = new URL(req.url).pathname;
+            } catch (_err) {
+              path = String((req && req.url) || "");
+            }
+            var body = "";
+            if (typeof req.body === "string") {
+              try {
+                body = JSON.stringify(JSON.parse(req.body), null, 2);
+              } catch (_err) {
+                body = req.body;
+              }
+            } else if (req.body != null) {
+              body = serialize(req.body);
+            }
+            send({ kind: "request", method: method, path: path, body: body });
+          });
+        };
+
+        // --- reportUpdate(update): typed updates pane ------------------------
+        globalThis.reportUpdate = function (update) {
+          send({ kind: "update", update: serialize(update) });
+        };
+
+        function fail(err) {
+          send({
+            kind: "error",
+            name: (err && err.name) || "Error",
+            message: (err && err.message) || String(err),
+            stack: (err && err.stack) || "",
+          });
+        }
+
+        window.addEventListener("error", function (ev) {
+          fail(ev.error || { name: "Error", message: ev.message });
+        });
+        window.addEventListener("unhandledrejection", function (ev) {
+          fail(ev.reason || { name: "Error", message: "Unhandled rejection" });
+        });
+
+        function run(compiledCode) {
+          // compiledCode is an ES module whose @wats/* import specifiers the parent
+          // has already rewritten to the ABSOLUTE /playground/wats-bundle.js URL
+          // (the opaque-origin frame has no usable base for relative resolution).
+          // We dynamic-import it via a Blob URL; script-src blob: allows the blob,
+          // script-src 'self' allows the absolute bundle import it triggers.
+          var blob = new Blob([compiledCode], { type: "text/javascript" });
+          var blobUrl = URL.createObjectURL(blob);
+          import(blobUrl)
+            .catch(fail)
+            .finally(function () {
+              URL.revokeObjectURL(blobUrl);
+              send({ kind: "done" });
+            });
+        }
+
+        window.addEventListener("message", function (ev) {
+          var data = ev.data;
+          if (!data || data.type !== "wats-run" || typeof data.code !== "string") {
+            return;
+          }
+          run(data.code);
+        });
+
+        // Signal to the parent that the runner has wired up its API and is ready
+        // to receive a { type: "wats-run", code } message.
+        send({ kind: "ready" });
+      })();
+    </script>
+  </body>
+</html>

@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
@@ -10,10 +14,28 @@
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "types": ["vite/client"],
+    "types": [
+      "vite/client"
+    ],
     "paths": {
-      "collections/*": ["./.source/*"]
+      "collections/*": [
+        "./.source/*"
+      ],
+      "@codemirror/view": [
+        "../node_modules/.bun/@codemirror+view@6.43.1/node_modules/@codemirror/view"
+      ]
     }
   },
-  "include": ["src", "vite.config.ts", "source.config.ts"]
+  "include": [
+    "src",
+    "vite.config.ts",
+    "source.config.ts"
+  ],
+  "exclude": [
+    "src/playground/scenarios/send-a-text.ts",
+    "src/playground/scenarios/typed-errors.ts",
+    "src/playground/scenarios/webhook-normalize.ts",
+    "src/playground/scenarios/route-with-filters.ts",
+    "src/playground/scenarios/groups.ts"
+  ]
 }

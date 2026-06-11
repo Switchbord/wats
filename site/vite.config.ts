@@ -7,6 +7,10 @@ import { fileURLToPath } from 'node:url'
 
 export default defineConfig({
   resolve: {
+    // Force a single @codemirror/view copy — bun's shared monorepo store keeps
+    // both 6.41 and 6.43; without dedupe the editor's keymap Commands fail to
+    // typecheck/interop across the two instances.
+    dedupe: ['@codemirror/view', '@codemirror/state'],
     alias: {
       'collections/server': fileURLToPath(
         new URL('./.source/server.ts', import.meta.url),
