@@ -1,0 +1,22 @@
+{
+  "name": "@wats-site/playground-build",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Isolated mini-package: bundles published @wats/* into a single browser ESM asset + .d.ts for the wats.sh playground. Not part of the site build graph.",
+  "scripts": {
+    "bundle": "bun run bundle.ts",
+    "smoke": "bun run smoke.ts"
+  },
+  "dependencies": {
+    "@wats/core": "0.3.26",
+    "@wats/graph": "0.3.26",
+    "@wats/http": "0.3.26",
+    "@wats/types": "0.3.26",
+    "@wats/crypto": "0.3.26"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.0",
+    "dts-bundle-generator": "9.5.1"
+  }
+}
