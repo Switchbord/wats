@@ -78,7 +78,7 @@ function Hero() {
             href="/docs/parity"
             className={`mono text-sm text-text-muted hover:text-text ${linkFocus}`}
           >
-            alpha · honest status: see what's live-validated →
+            alpha · see what's live-validated →
           </a>
         </p>
       </div>
@@ -127,7 +127,7 @@ function FeatureCards() {
       />
       <FeatureCard
         title="Groups API. pywa can't do this."
-        body="Create groups, manage participants, send to groups — a Cloud API surface WATS's inspiration never shipped. Implemented and request-shape tested; live validation pending an eligible test number."
+        body="Create groups, manage participants, send to groups. Request-shape tested; live validation pending an eligible test number."
         href="/docs/reference/groups"
         status="shape-only"
         statusLabel="implemented, live-validation pending"
@@ -145,9 +145,8 @@ function WireSection() {
       <p className="max-w-3xl leading-relaxed text-text-muted">
         Every WATS client runs against a Transport seam. Swap in MockTransport
         and the SDK captures the exact Graph request — method, path, payload —
-        without a network in sight. That's how the playground works, how the
-        test suite works, and how you can develop a complete bot before you
-        have credentials.
+        without a network in sight. Develop a complete bot before you have
+        credentials.
       </p>
       <p>
         <a
@@ -165,12 +164,12 @@ function HonestStatusSection() {
   return (
     <section className="space-y-4">
       <h2 className="text-2xl font-semibold text-text md:text-3xl">
-        Alpha, and honest about it.
+        Every capability carries its status.
       </h2>
       <p className="max-w-3xl leading-relaxed text-text-muted">
-        Every capability is tagged: live-validated against Meta (dated),
-        shape-only (tested against the wire contract, not yet run live), or
-        planned. No blurring. The full matrix is public.
+        live-validated against Meta (dated), shape-only (tested against the
+        wire contract, not yet run live), or planned. The full matrix is
+        public.
       </p>
       <div className="flex flex-wrap gap-6">
         <StatusTag status="live-validated" />

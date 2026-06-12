@@ -75,3 +75,10 @@ pre,
 .mono {
   font-family: var(--font-mono);
 }
+
+/* Docs layout: fumadocs centers its grid inside --fd-layout-width (default
+   97rem), leaving a dead gutter left of the sidebar on wide screens. Pin the
+   layout to the viewport so the sidebar starts at the left edge. */
+#nd-docs-layout {
+  --fd-layout-width: 100vw;
+}

@@ -45,6 +45,11 @@ function RootDocument({ children }: { children: ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        {/* First-paint guard: the stylesheet is render-blocking in theory, but
+            the prerendered body can flash the UA's white canvas before it
+            arrives (slow link, cold cache). Inline the background + dark
+            color-scheme so the very first frame is already the right color. */}
+        <style>{`html{background-color:#0a0e12;color-scheme:dark}`}</style>
         <HeadContent />
       </head>
       <body>
