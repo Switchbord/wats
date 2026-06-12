@@ -6,6 +6,7 @@ import typedErrors from "./typed-errors.ts?raw"
 import webhookNormalize from "./webhook-normalize.ts?raw"
 import routeWithFilters from "./route-with-filters.ts?raw"
 import groups from "./groups.ts?raw"
+import webhookSimulator from "./webhook-simulator.ts?raw"
 
 export interface Scenario {
   readonly id: string
@@ -47,6 +48,12 @@ export const SCENARIOS: readonly Scenario[] = [
     teaser: "Create a group and send a message into it.",
     source: groups.trimEnd(),
     status: "shape-only",
+  },
+  {
+    id: "webhook-simulator",
+    title: "Webhook simulator",
+    teaser: "A three-entry envelope: two updates dispatched, one skipped with a reason.",
+    source: webhookSimulator.trimEnd(),
   },
 ]
 

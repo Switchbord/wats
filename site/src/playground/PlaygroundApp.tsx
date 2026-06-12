@@ -11,6 +11,9 @@ import {
   SCENARIOS,
   type Scenario,
 } from "./scenarios"
+import { decodeShareHash, encodeShareHash, toCurl } from "./share"
+import GuidedPanel from "./GuidedPanel"
+import LESSONS, { checkStep, findLesson, type Lesson } from "./lessons"
 
 // PlaygroundApp — the interactive playground body. Lazily imported by the
 // /playground route so CodeMirror + esbuild-wasm stay out of the landing entry
@@ -92,12 +95,19 @@ function Pane({ title, count, children }: PaneProps) {
 
 export default function PlaygroundApp({
   initialScenarioId,
+  initialLessonId,
 }: {
   initialScenarioId?: string
+  initialLessonId?: string
 }) {
   const [active, setActive] = useState<Scenario>(() =>
     findScenario(initialScenarioId ?? DEFAULT_SCENARIO_ID),
   )
+  const [guidedLesson, setGuidedLesson] = useState<Lesson | null>(() =>
+    findLesson(initialLessonId),
+  )
+  const [guidedStep, setGuidedStep] = useState(0)
+  const [stepPassed, setStepPassed] = useState(false)
   const [consoleEntries, setConsoleEntries] = useState<ConsoleEntry[]>([])
   const [requests, setRequests] = useState<RequestEntry[]>([])
   const [updates, setUpdates] = useState<string[]>([])
@@ -155,7 +165,8 @@ export default function PlaygroundApp({
     const view = new EditorView({
       parent: editorHost.current,
       state: EditorState.create({
-        doc: active.source,
+        // ?lesson= deep links start on the lesson's first step seed.
+        doc: guidedLesson?.steps[0]?.seed ?? active.source,
         extensions: [
           history(),
           keymap.of([
@@ -194,20 +205,130 @@ export default function PlaygroundApp({
     })
   }, [])
 
+  // Replace the editor contents with arbitrary text (guided-mode step seeds).
+  const seedText = useCallback((text: string) => {
+    const view = viewRef.current
+    if (!view) return
+    view.dispatch({
+      changes: { from: 0, to: view.state.doc.length, insert: text },
+    })
+  }, [])
+
   function selectScenario(scenario: Scenario) {
     setActive(scenario)
     seedEditor(scenario)
     clearPanes()
     setHasRun(false)
     setStatus("idle")
+    // Picking a scenario leaves guided mode; one driver at a time.
+    setGuidedLesson(null)
+    setGuidedStep(0)
+    setStepPassed(false)
   }
+
+  function enterGuided(lesson: Lesson) {
+    setGuidedLesson(lesson)
+    setGuidedStep(0)
+    setStepPassed(false)
+    const seed = lesson.steps[0]?.seed
+    if (seed !== undefined) seedText(seed)
+    clearPanes()
+    setHasRun(false)
+    setStatus("idle")
+  }
+
+  function leaveGuided() {
+    setGuidedLesson(null)
+    setGuidedStep(0)
+    setStepPassed(false)
+    seedEditor(active)
+    clearPanes()
+    setHasRun(false)
+    setStatus("idle")
+  }
+
+  function guidedGo(nextIndex: number) {
+    if (!guidedLesson) return
+    if (nextIndex < 0 || nextIndex >= guidedLesson.steps.length) return
+    setGuidedStep(nextIndex)
+    setStepPassed(false)
+    const seed = guidedLesson.steps[nextIndex]?.seed
+    if (seed !== undefined) seedText(seed)
+    clearPanes()
+    setHasRun(false)
+  }
+
+  // Guided-mode assertion engine. State fed by postMessage lands async, so the
+  // 'done' handler can't evaluate inline (stale closures). Instead: when the
+  // run settles (status back to idle after a run), check the current step
+  // against everything captured.
+  useEffect(() => {
+    if (!guidedLesson || !hasRun || status !== "idle") return
+    const step = guidedLesson.steps[guidedStep]
+    if (!step) return
+    if (checkStep(step, { consoleEntries, requests, updates })) {
+      setStepPassed(true)
+    }
+  }, [status, hasRun, consoleEntries, requests, updates, guidedLesson, guidedStep])
 
   function reset() {
     seedEditor(active)
     clearPanes()
     setHasRun(false)
     setStatus("idle")
+    if (window.location.hash) {
+      window.history.replaceState(null, "", window.location.pathname + window.location.search)
+    }
   }
+
+  // Restore a shared snippet from the URL hash, once, after the editor mounts.
+  useEffect(() => {
+    if (!window.location.hash.includes("code=")) return
+    let cancelled = false
+    void decodeShareHash(window.location.hash).then((payload) => {
+      if (cancelled || !payload) return
+      if (payload.scenarioId) setActive(findScenario(payload.scenarioId))
+      const view = viewRef.current
+      if (view) {
+        view.dispatch({
+          changes: { from: 0, to: view.state.doc.length, insert: payload.source },
+        })
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const [shareLabel, setShareLabel] = useState("Share")
+  const share = useCallback(async () => {
+    const view = viewRef.current
+    if (!view) return
+    const hash = await encodeShareHash(view.state.doc.toString(), active.id)
+    const url = `${window.location.origin}${window.location.pathname}${hash}`
+    window.history.replaceState(null, "", hash)
+    try {
+      await navigator.clipboard.writeText(url)
+      setShareLabel("copied")
+    } catch {
+      // Clipboard denied (permissions / non-secure context). The hash is in
+      // the address bar; the reader can copy it the old way.
+      setShareLabel("link in URL bar")
+    }
+    setTimeout(() => setShareLabel("Share"), 1600)
+  }, [active.id])
+
+  const [copiedCurl, setCopiedCurl] = useState<number | null>(null)
+  const copyCurl = useCallback(async (req: RequestEntry, i: number) => {
+    try {
+      await navigator.clipboard.writeText(toCurl(req.method, req.path, req.body))
+      setCopiedCurl(i)
+      setTimeout(() => setCopiedCurl(null), 1600)
+    } catch {
+      // Clipboard blocked; nothing useful to do beyond not pretending.
+    }
+  }, [])
 
   // Listen for runner messages. Reject any event not from our iframe window.
   useEffect(() => {
@@ -274,7 +395,7 @@ export default function PlaygroundApp({
       {/* Scenario picker */}
       <div className="flex flex-wrap gap-2">
         {SCENARIOS.map((scenario) => {
-          const isActive = scenario.id === active.id
+          const isActive = !guidedLesson && scenario.id === active.id
           return (
             <button
               key={scenario.id}
@@ -292,11 +413,46 @@ export default function PlaygroundApp({
             </button>
           )
         })}
+        {LESSONS.map((lesson) => {
+          const isActive = guidedLesson?.id === lesson.id
+          return (
+            <button
+              key={lesson.id}
+              type="button"
+              onClick={() => (isActive ? leaveGuided() : enterGuided(lesson))}
+              aria-pressed={isActive}
+              title={lesson.teaser}
+              className={`mono rounded border px-3 py-1.5 text-xs transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-accent ${
+                isActive
+                  ? "border-accent bg-bg-raised text-text"
+                  : "border-border text-text-muted hover:border-accent-dim hover:text-text"
+              }`}
+            >
+              Guided: {lesson.title}
+            </button>
+          )
+        })}
       </div>
 
-      <p className="text-sm leading-relaxed text-text-muted">{active.teaser}</p>
+      {!guidedLesson && (
+        <p className="text-sm leading-relaxed text-text-muted">{active.teaser}</p>
+      )}
 
-      {active.status === "shape-only" && (
+      {guidedLesson && (
+        <GuidedPanel
+          lesson={guidedLesson}
+          stepIndex={guidedStep}
+          stepPassed={stepPassed}
+          onNext={() => guidedGo(guidedStep + 1)}
+          onPrev={() => guidedGo(guidedStep - 1)}
+          onSeed={() => {
+            const seed = guidedLesson.steps[guidedStep]?.seed
+            if (seed !== undefined) seedText(seed)
+          }}
+        />
+      )}
+
+      {!guidedLesson && active.status === "shape-only" && (
         <div className="mono rounded border border-warn/40 bg-bg-raised px-3 py-2 text-xs text-warn">
           shape-only: request shape implemented, live-validation against Meta
           pending.
@@ -320,6 +476,14 @@ export default function PlaygroundApp({
           className="mono rounded border border-border px-4 py-1.5 text-xs text-text-muted transition-colors duration-150 hover:border-accent-dim hover:text-text disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-accent"
         >
           Reset
+        </button>
+        <button
+          type="button"
+          onClick={() => void share()}
+          className="mono rounded border border-border px-4 py-1.5 text-xs text-text-muted transition-colors duration-150 hover:border-accent-dim hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
+          title="Copy a permalink carrying this code in the URL hash. No server involved."
+        >
+          {shareLabel}
         </button>
         <span className="mono text-xs text-text-muted">Cmd/Ctrl+Enter to run</span>
         <span className="mono ml-auto rounded border border-border bg-bg-inset px-2.5 py-1 text-xs text-text-muted">
@@ -373,8 +537,18 @@ export default function PlaygroundApp({
                   <ul className="space-y-3">
                     {requests.map((req, i) => (
                       <li key={i} className="mono text-xs">
-                        <div className="text-accent">
-                          {req.method} {req.path}
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-accent">
+                            {req.method} {req.path}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => void copyCurl(req, i)}
+                            className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] text-text-muted transition-colors duration-150 hover:border-accent-dim hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
+                            title="Copy as curl. Token is a $WATS_TOKEN placeholder; bring your own."
+                          >
+                            {copiedCurl === i ? "copied" : "copy as curl"}
+                          </button>
                         </div>
                         {req.body && (
                           <pre className="mt-1 whitespace-pre-wrap break-words text-text-muted">

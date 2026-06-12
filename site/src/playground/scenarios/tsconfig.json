@@ -21,5 +21,5 @@
     },
     "ignoreDeprecations": "6.0"
   },
-  "include": ["send-a-text.ts", "typed-errors.ts", "webhook-normalize.ts", "route-with-filters.ts", "groups.ts", "runner-globals.d.ts"]
+  "include": ["send-a-text.ts", "typed-errors.ts", "webhook-normalize.ts", "route-with-filters.ts", "groups.ts", "webhook-simulator.ts", "runner-globals.d.ts"]
 }

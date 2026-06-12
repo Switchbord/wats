@@ -1,0 +1,54 @@
+# wats
+
+> TypeScript toolkit for the WhatsApp Cloud API. Bun-first, zero runtime
+> dependencies, typed end to end. Capability status is tagged honestly:
+> live-validated / shape-only / planned.
+
+Packages: @wats/core, @wats/graph, @wats/http, @wats/types, @wats/crypto,
+@wats/config, @wats/cli, @wats/service (npm). Source: https://github.com/Switchbord/wats
+Playground (runs the real SDK in-browser, no credentials): https://wats.sh/playground
+
+## Docs
+- [Quickstart](https://wats.sh/docs/quickstart): Run a WATS bot with zero credentials.
+- [Guide](https://wats.sh/docs/guide): The full getting-started guide.
+- [CLI Onboarding Guide](https://wats.sh/docs/guides/cli-init): Credential-free local onboarding and inspection with the wats CLI.
+- [Community examples](https://wats.sh/docs/guides/community-examples): Offline-by-default examples for learning the public WATS package APIs without live WhatsApp credentials.
+- [Deploying a WATS webhook on Bun](https://wats.sh/docs/guides/deploy-bun): Deploy a WATS webhook server under the Bun runtime using createBunWebhookServer.
+- [Deploying a WATS webhook on Cloudflare Workers](https://wats.sh/docs/guides/deploy-cloudflare-workers): Deploy a WATS webhook on Cloudflare Workers, Deno, and other WinterCG fetch runtimes using createFetchWebhookHandler.
+- [Docker Deployment Guide](https://wats.sh/docs/guides/deploy-docker): Container deployment shapes around the implemented wats serve contract — future Dockerfile and Compose patterns, current PaaS support.
+- [Deploying a WATS webhook on Node](https://wats.sh/docs/guides/deploy-node): Deploy a WATS webhook server under Node.js using createNodeWebhookHandler and node:http.
+- [Groups quickstart](https://wats.sh/docs/guides/groups-quickstart): The credential-free Groups flow WATS supports today — create, read the lifecycle webhook, send the invite, approve joins, and message the group.
+- [Transport and Testing](https://wats.sh/docs/guides/transport-and-testing): The @wats/graph Transport seam — testing with MockTransport, opt-in reliable transport, and the interceptor primer.
+- [Architecture Overview](https://wats.sh/docs/concepts/overview): How the WATS packages, Graph request flow, and webhook flow fit together.
+- [WATS Package Map](https://wats.sh/docs/concepts/package-map): Canonical dependency map and per-package status for the WATS workspace.
+- [WATS Public API Surface](https://wats.sh/docs/concepts/public-api-surface): The public package surfaces that ship today versus planned parity work.
+- [Reference Index](https://wats.sh/docs/reference): Every WATS reference doc and when to reach for it.
+- [CLI reference](https://wats.sh/docs/reference/cli): The @wats/cli wats command: offline config validation, diagnostics, OpenAPI export, setup, and a local serve wrapper.
+- [Client Reference](https://wats.sh/docs/reference/client): The public GraphClient API surface: configuration types, request lifecycle, and validation rules.
+- [Config Reference (`@wats/config`)](https://wats.sh/docs/reference/config): The @wats/config application config shape: YAML/JSON validation, env-secret references, and redaction.
+- [`@wats/crypto` reference](https://wats.sh/docs/reference/crypto): The CryptoProvider seam and its Node and WebCrypto adapters with a typed error hierarchy.
+- [Endpoints Reference](https://wats.sh/docs/reference/endpoints): The endpoint registry primitive defineEndpoint: path templates, param kinds, body handling, and error integration.
+- [Errors Reference](https://wats.sh/docs/reference/errors): The WATS typed error model: class hierarchy, error code registry, classification rules, and propagation behavior.
+- [Typed filters (`@wats/core/filtersTyped`)](https://wats.sh/docs/reference/filters): The typed, type-narrowing filter surface: brand, combinators, and built-in predicates over TypedUpdate.
+- [Groups API](https://wats.sh/docs/reference/groups): The WhatsApp Groups API surface: endpoint contracts, limits, webhook outcomes, and service opt-in routes.
+- [`@wats/internal-utils` (internal)](https://wats.sh/docs/reference/internal-utils): Internal shared helpers. Not a public API.
+- [Listeners Reference](https://wats.sh/docs/reference/listeners): The listener substrate: waiting for a future typed update via wa.listen, with timeouts, cancellation, and registry lifecycle.
+- [Media Reference](https://wats.sh/docs/reference/media): The credential-free media runtime: upload, metadata, binary download, delete, encrypted decrypt, upload sessions, and validation.
+- [Pagination Reference](https://wats.sh/docs/reference/pagination): paginate and paginateAll over cursor-paginated Graph list endpoints, with AbortSignal support and a typed error union.
+- [Persistence Reference](https://wats.sh/docs/reference/persistence): The experimental @wats/persistence package: durable runtime state, SQLite adapter, migrations, idempotency, and the outbox.
+- [Router reference (`TypedRouter`)](https://wats.sh/docs/reference/router): The TypedRouter handler-dispatch engine: handle-based registration, observer seams, and the DispatchReport shape.
+- [Scoped Clients Reference](https://wats.sh/docs/reference/scoped-clients): PhoneNumberClient and WABAClient: scoped sub-clients that bind a path param at construction.
+- [Service Reference (`@wats/service`)](https://wats.sh/docs/reference/service): The @wats/service runtime-neutral standalone webhook/API service and its public API.
+- [Types Reference](https://wats.sh/docs/reference/types): Shared TypeScript contracts: discriminated-union domain types for inbound WhatsApp objects.
+- [Webhook primitives reference](https://wats.sh/docs/reference/webhook): The low-level verifyWebhookChallenge and validateWebhookSignature primitives for wiring a custom HTTP boundary.
+- [Webhook Adapter](https://wats.sh/docs/reference/webhook-adapter): The @wats/http runtime-neutral WebhookAdapter and its Bun, Node, and Fetch wrappers.
+- [Webhook Normalizer](https://wats.sh/docs/reference/webhook-normalizer): normalizeWebhookEnvelope: raw Meta webhook envelope in, TypedUpdate discriminated union out.
+- [WhatsApp facade reference (`WhatsApp`)](https://wats.sh/docs/reference/whatsapp-facade): The WhatsApp composition root: what it binds, what it exposes, and when to bypass it.
+- [Migration: pywa to WATS](https://wats.sh/docs/migration/pywa): A migration map from Python pywa integrations to WATS, with honest live-parity status and known gaps.
+- [pywa Parity Matrix](https://wats.sh/docs/parity): Capability-by-capability status of WATS against pywa, tagged live-validated, shape-only, or planned.
+- [Live-testing campaign](https://wats.sh/docs/parity/live-campaign): How WATS gets validated against live Meta assets, and the redacted log of runs that earned the live-validated tags.
+- [API Stability Policy](https://wats.sh/docs/meta/api-stability): How to read stable-for-0.x, experimental, and internal WATS surfaces during the alpha line.
+- [Privacy and Telemetry](https://wats.sh/docs/meta/privacy): WATS sends no telemetry by default; what traffic occurs, how data is handled, and redaction expectations.
+- [Release Policy](https://wats.sh/docs/meta/release-policy): How WATS versions packages and what each release class may contain.
+- [Roadmap to WhatsApp / pywa Parity](https://wats.sh/docs/meta/roadmap): What WATS plans to ship next, and what is explicitly out of scope for now.
+- [WATS documentation](https://wats.sh/docs): A Bun-first TypeScript toolkit for the WhatsApp Cloud API.

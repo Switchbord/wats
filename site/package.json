@@ -9,13 +9,14 @@
     "typecheck": "tsc --noEmit",
     "gen:meta": "bun scripts/gen-meta.ts",
     "gen:sitemap": "bun scripts/gen-sitemap.ts",
-    "check": "bun run gen:source && bun run typecheck && bun run typecheck:snippets && bun run typecheck:scenarios && bun run gen:hero && bun run gen:sitemap && bun run gen:playground-assets && bun run build && bun scripts/check-canaries.ts && bun scripts/check-pages.ts && bun scripts/check-banned-phrases.ts && bun run check:playground",
+    "check": "bun run gen:source && bun run typecheck && bun run typecheck:snippets && bun run typecheck:scenarios && bun run gen:hero && bun run gen:sitemap && bun run gen:llms && bun run gen:playground-assets && bun run build && bun scripts/check-canaries.ts && bun scripts/check-pages.ts && bun scripts/check-banned-phrases.ts && bun run check:playground",
     "typecheck:snippets": "cd snippets && bun install --frozen-lockfile && bun run typecheck",
     "typecheck:scenarios": "cd playground-build && bun install --frozen-lockfile && cd ../src/playground/scenarios && bunx tsc --noEmit -p tsconfig.json",
     "check:playground": "bun scripts/check-playground.ts",
     "gen:playground-assets": "bun scripts/gen-playground-assets.ts",
     "gen:hero": "bun scripts/gen-hero-capture.ts",
-    "gen:source": "fumadocs-mdx"
+    "gen:source": "fumadocs-mdx",
+    "gen:llms": "bun scripts/gen-llms.ts"
   },
   "dependencies": {
     "@codemirror/commands": "6.10.3",

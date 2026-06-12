@@ -10,18 +10,23 @@ const PlaygroundApp = lazy(() => import("../playground/PlaygroundApp"))
 
 interface PlaygroundSearch {
   scenario?: string
+  lesson?: string
 }
 
 export const Route = createFileRoute("/playground")({
   validateSearch: (search: Record<string, unknown>): PlaygroundSearch => {
     const scenario = search.scenario
-    return typeof scenario === "string" ? { scenario } : {}
+    const lesson = search.lesson
+    const out: PlaygroundSearch = {}
+    if (typeof scenario === "string") out.scenario = scenario
+    if (typeof lesson === "string") out.lesson = lesson
+    return out
   },
   component: Playground,
 })
 
 function Playground() {
-  const { scenario } = Route.useSearch()
+  const { scenario, lesson } = Route.useSearch()
 
   return (
     <main className="flex min-h-screen flex-col bg-bg text-text">
@@ -33,7 +38,7 @@ function Playground() {
           </div>
         }
       >
-        <PlaygroundApp initialScenarioId={scenario} />
+        <PlaygroundApp initialScenarioId={scenario} initialLessonId={lesson} />
       </Suspense>
       <SiteFooter />
     </main>

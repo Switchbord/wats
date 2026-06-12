@@ -56,6 +56,7 @@ const expect: Record<string, [number, number, number]> = {
   "webhook-normalize": [1, 0, 1],
   "route-with-filters": [2, 0, 0],
   "groups": [2, 2, 0],
+  "webhook-simulator": [4, 0, 2],
 }
 
 for (const [name, [minC, minR, minU]] of Object.entries(expect)) {
@@ -85,10 +86,55 @@ for (const [name, [minC, minR, minU]] of Object.entries(expect)) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// 3. Guided-mode lessons — validate content + seeds without a browser
+// ---------------------------------------------------------------------------
+const { LESSONS } = await import("../src/playground/lessons.ts")
+const banned: { phrases: string[] } = await Bun.file(
+  new URL("./banned-phrases.json", import.meta.url).pathname,
+).json()
+const KNOWN_KINDS = new Set(["request", "console", "update"])
+const lessonTranspiler = new Transpiler({ loader: "ts", target: "browser" })
+
+for (const lesson of LESSONS) {
+  if (lesson.steps.length === 0) fail.push(`lesson ${lesson.id}: no steps`)
+  const copy: string[] = [lesson.title, lesson.teaser]
+  lesson.steps.forEach((step, i) => {
+    const label = `lesson ${lesson.id} step ${i + 1}`
+    // Known check kind.
+    if (!KNOWN_KINDS.has(step.check.kind)) {
+      fail.push(`${label}: unknown check kind ${(step.check as { kind: string }).kind}`)
+    }
+    // Seeds must transpile (loader ts) — a broken seed is a broken lesson.
+    if (step.seed !== undefined) {
+      try {
+        lessonTranspiler.transformSync(step.seed)
+      } catch (err) {
+        fail.push(`${label}: seed does not transpile: ${err}`)
+      }
+    }
+    copy.push(step.title, step.instruction, step.passText)
+    // VOICE.md hard rule: no exclamation points in instruction/passText.
+    if (step.instruction.includes("!") || step.passText.includes("!")) {
+      fail.push(`${label}: exclamation point in instruction/passText`)
+    }
+  })
+  // Banned vocabulary across all lesson copy.
+  const haystack = copy.join("\n").toLowerCase()
+  for (const phrase of banned.phrases) {
+    if (haystack.includes(phrase.toLowerCase())) {
+      fail.push(`lesson ${lesson.id}: banned phrase "${phrase}" in copy`)
+    }
+  }
+  if (!fail.some((f) => f.startsWith(`lesson ${lesson.id}`))) {
+    ok.push(`lesson ${lesson.id}: ${lesson.steps.length} steps valid (kinds, seeds, copy)`)
+  }
+}
+
 for (const o of ok) console.log(`  ok  ${o}`)
 if (fail.length) {
   console.error(`\ncheck-playground: FAIL`)
   for (const f of fail) console.error(`  FAIL ${f}`)
   process.exit(1)
 }
-console.log(`\ncheck-playground: OK — ${ok.length} assertions passed (sandbox invariants + 5 scenarios)`)
+console.log(`\ncheck-playground: OK — ${ok.length} assertions passed (sandbox invariants + scenarios + guided lessons)`)

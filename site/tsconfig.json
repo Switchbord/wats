@@ -36,6 +36,7 @@
     "src/playground/scenarios/typed-errors.ts",
     "src/playground/scenarios/webhook-normalize.ts",
     "src/playground/scenarios/route-with-filters.ts",
-    "src/playground/scenarios/groups.ts"
+    "src/playground/scenarios/groups.ts",
+    "src/playground/scenarios/webhook-simulator.ts"
   ]
 }

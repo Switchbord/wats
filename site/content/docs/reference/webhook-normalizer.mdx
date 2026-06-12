@@ -5,6 +5,8 @@ description: "normalizeWebhookEnvelope: raw Meta webhook envelope in, TypedUpdat
 
 <DocMeta status="active" />
 
+Feed a synthetic envelope to the normalizer in the [playground](/playground?scenario=webhook-normalize).
+
 `normalizeWebhookEnvelope(envelope, options?)` consumes a loose (already-JSON-parsed) Meta webhook envelope and emits a flat array of `TypedUpdate` discriminated-union values, paired with a `skipped[]` accumulator and a `limitError?` surface. It translates Meta's snake_case wire envelope into WATS-native typed objects with stable `updateId`, `wabaId`, `phoneNumberId`, and `receivedAt` fields — the exact surface handlers and listeners consume downstream.
 
 Contract at a glance:
