@@ -7,9 +7,7 @@ description: WATS sends no telemetry by default; what traffic occurs, how data i
 
 ## Default stance
 
-WATS sends no telemetry to any maintainer-owned endpoint by default.
-
-The CLI does not phone home. Importing SDK packages does not start background network activity. Local tests, docs checks, package smoke tests, OpenAPI generation, and dry-run service commands are credential-free and do not contact WATS maintainers.
+No analytics, no telemetry, no maintainer-owned endpoint. The CLI does not phone home. Importing SDK packages starts no background network activity. Local tests, docs checks, package smoke tests, OpenAPI generation, and dry-run service commands are credential-free and never contact WATS maintainers.
 
 ## Outbound traffic
 

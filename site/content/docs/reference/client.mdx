@@ -1,74 +1,40 @@
 ---
 title: "Client Reference"
-description: "The public GraphClient API surface: configuration types, request lifecycle, and validation taxonomy."
+description: "The public GraphClient API surface: configuration types, request lifecycle, and validation rules."
 ---
 
 <DocMeta status="active" lastReviewed="2026-04-21" />
 
-## Purpose
+## Configuration types
 
-Define the public client API surface for WATS.
-
-## Configuration Types (B1)
-
-Client initialization references foundational shared types from `@wats/types`.
+Client initialization uses shared types from `@wats/types`.
 
 ### `WhatsAppClientConfig`
 
-Use this for external constructor/factory inputs.
+External constructor/factory input.
 
-Required fields:
-- `token: string`
-- `phoneNumberId: string`
-
-Optional fields:
-- `appSecret?: string`
-- `verifyToken?: string`
-- `apiVersion?: string`
-- `baseUrl?: string`
+Required: `token: string`, `phoneNumberId: string`.
+Optional: `appSecret?`, `verifyToken?`, `apiVersion?`, `baseUrl?` (all strings).
 
 ### `WhatsAppClientRuntimeConfig`
 
-Use this normalized shape internally after resolving defaults (for example `apiVersion` and `baseUrl`) during async startup flows.
+The normalized internal shape after defaults (`apiVersion`, `baseUrl`) are resolved during async startup.
 
-## Graph request primitive (B2, F-4)
-
-B2 introduced a minimal Graph API client primitive in `@wats/graph`; F-4 refactored it onto a Transport seam with strict construction-time validation and baseUrl pathname preservation.
-
-### `GraphClientConfig`
+## `GraphClientConfig`
 
 Required fields:
-- `accessToken: string` — non-empty; max 4096 characters; MUST NOT be whitespace-only; MUST NOT contain CR (U+000D), LF (U+000A), NUL (U+0000), or any other control character (U+0000..U+001F, U+007F). Invalid tokens throw `GraphRequestValidationError` at construction time.
-- `apiVersion: string` — MUST match `/^v\d+(\.\d+)?$/` (for example `v20` or `v25.0`). Values containing `/`, `?`, `#`, `..`, or control characters are rejected with `GraphRequestValidationError`.
+- `accessToken: string` — non-empty; max 4096 characters; not whitespace-only; no CR (U+000D), LF (U+000A), NUL (U+0000), or any other control character (U+0000..U+001F, U+007F). Invalid tokens throw `GraphRequestValidationError` at construction. Better there than in a request header.
+- `apiVersion: string` — must match `/^v\d+(\.\d+)?$/` (for example `v20` or `v25.0`). Values containing `/`, `?`, `#`, `..`, or control characters are rejected with `GraphRequestValidationError`.
 
 Optional fields:
-- `baseUrl?: string` — defaults to `DEFAULT_GRAPH_BASE_URL` (`"https://graph.facebook.com/"`). MUST parse via `new URL(...)` AND the parsed `protocol` MUST be `http:` or `https:`; every other scheme (`javascript:`, `file:`, `ftp:`, `data:`, `about:`, `blob:`, …) is rejected with `GraphRequestValidationError`. The pathname of `baseUrl` is PRESERVED in resolved request URLs: `baseUrl: "https://proxy.example.com/api"` + `path: "/me"` + `apiVersion: "v25.0"` resolves to `"https://proxy.example.com/api/v25.0/me"`. This matches Open Question #11's default (preserve, not reject).
-- `transport?: Transport` — defaults to `createFetchTransport()`. Inject a custom `Transport` to add retry, auth-refresh, tracing, or to mock requests in tests. See the [Transport and Testing guide](/docs/guides/transport-and-testing).
+- `baseUrl?: string` — defaults to `DEFAULT_GRAPH_BASE_URL` (`"https://graph.facebook.com/"`). Must parse via `new URL(...)` and the protocol must be `http:` or `https:`; every other scheme (`javascript:`, `file:`, `ftp:`, `data:`, `about:`, `blob:`, …) is rejected with `GraphRequestValidationError`. The pathname of `baseUrl` is preserved in resolved request URLs: `baseUrl: "https://proxy.example.com/api"` + `path: "/me"` + `apiVersion: "v25.0"` resolves to `"https://proxy.example.com/api/v25.0/me"`.
+- `transport?: Transport` — defaults to `createFetchTransport()`. Inject a custom `Transport` for retry, auth-refresh, tracing, or mocking. See [Transport and Testing](/docs/guides/transport-and-testing).
 
-`DEFAULT_GRAPH_BASE_URL` is exported for consumers that want to reference the default explicitly.
+`DEFAULT_GRAPH_BASE_URL` is exported if you need the default explicitly.
 
-### `GraphClient.request<TResponse>(options)`
+## `GraphClient.request<TResponse>(options)`
 
-The request helper:
-- builds Graph URLs under the API-version prefix (`/${apiVersion}/...`) while preserving any path prefix supplied via `baseUrl`
-- validates/normalizes request paths and rejects traversal or injection patterns before network I/O
-  - rejects dot-segments (`.` / `..`) across iterative decode stages, including nested/double-encoded markers such as `%252e%252e`
-  - rejects path traversal patterns and encoded slash/backslash escapes
-  - rejects raw or encoded `?` and `#` in request path input
-  - rejects ASCII control characters U+0000..U+001F and U+007F in path segments (WATS-8 L1), including `%0A`, `%0D`, `%00`, and their double-encoded forms
-- applies a managed `Authorization` Bearer header using the client's configured access token
-- rejects caller-supplied `authorization` header overrides (any casing) with `GraphRequestValidationError`; the managed Bearer header is non-overridable by callers (defense-in-depth against request smuggling and credential confusion)
-- rejects CR / LF / NUL in any request header name or value with `GraphRequestValidationError`; the underlying `TypeError` raised by `new Headers(init)` is caught and rewrapped into the typed taxonomy
-- serializes JSON-like request bodies
-- passes BufferSource view bodies (for example `Uint8Array`, `DataView`) through unchanged without auto-forcing `application/json`
-- passes `ReadableStream` request bodies through unchanged; if the caller did not supply a `content-type`, defaults to `application/octet-stream` rather than `application/json`
-- supports typed success payloads through `TResponse`
-- maps network and Graph API failures to typed errors
-- classifies JSON body serialization failures as validation/serialization errors (not network errors)
-- throws `GraphSerializationError` when a successful (`2xx`) response declares JSON but contains invalid JSON
-- routes every HTTP call through the injected `Transport`
-
-Core request options:
+Options:
 - `method: string`
 - `path: string`
 - `query?: Record<string, string | number | boolean | null | undefined>`
@@ -76,59 +42,68 @@ Core request options:
 - `headers?: HeadersInit`
 - `signal?: AbortSignal`
 
-### `GraphClient.requestRaw(options)`
+What it does:
+- builds Graph URLs under the API-version prefix (`/${apiVersion}/...`) while preserving any path prefix from `baseUrl`
+- validates request paths before network I/O:
+  - rejects dot-segments (`.` / `..`) across iterative decode stages, including nested/double-encoded markers such as `%252e%252e`
+  - rejects traversal patterns and encoded slash/backslash escapes
+  - rejects raw or encoded `?` and `#` in path input
+  - rejects ASCII control characters U+0000..U+001F and U+007F in path segments, including `%0A`, `%0D`, `%00`, and their double-encoded forms
+- applies a managed `Authorization` Bearer header from the configured access token
+- rejects caller-supplied `authorization` header overrides (any casing) with `GraphRequestValidationError`; the managed Bearer header is non-overridable (defense against request smuggling and credential confusion)
+- rejects CR / LF / NUL in any header name or value with `GraphRequestValidationError`; the `TypeError` from `new Headers(init)` is caught and rewrapped into the typed taxonomy
+- serializes JSON-like bodies; classifies serialization failures as `GraphSerializationError`, not network errors
+- passes BufferSource views (`Uint8Array`, `DataView`) through unchanged without forcing `application/json`
+- passes `ReadableStream` bodies through unchanged; defaults missing `content-type` to `application/octet-stream`
+- throws `GraphSerializationError` when a 2xx response declares JSON but contains invalid JSON
+- maps network and Graph API failures to typed errors
+- routes every HTTP call through the injected `Transport`
 
-`requestRaw` is the low-level escape hatch for already-resolved absolute URLs such as WATS-37 media binary download URLs. Unlike `request`, it does not prepend `/${apiVersion}` and does not parse JSON; it returns the raw `TransportResponse` from the injected transport.
+## `GraphClient.requestRaw(options)`
 
-Preconditions and validation:
-- `options` MUST be a non-null, non-array object. Malformed JavaScript inputs reject with `GraphRequestValidationError` before transport.
-- `method` MUST be one of `GET`, `POST`, `PUT`, `PATCH`, or `DELETE` (case-insensitive). Non-string, empty, whitespace-only, control-character, and unsupported methods reject with `GraphRequestValidationError`.
-- `url` MUST be an absolute `http:` or `https:` URL. Relative URLs, malformed URLs, every other scheme (`ftp:`, `file:`, `data:`, `javascript:`, …), and values containing CR/LF/NUL or other ASCII controls reject with `GraphRequestValidationError`. The URL is used as the request URL directly; no Graph API-version prefix is added.
-- `headers?: HeadersInit` is optional. The client always applies a managed `Authorization` Bearer header, and caller-supplied `authorization` overrides (any casing, object/tuple/`Headers`) reject with `GraphRequestValidationError`. CR/LF/NUL/header wrapping in header names or values is caught and rewrapped as `GraphRequestValidationError` rather than leaking a raw `TypeError`.
-- `body?: unknown` follows the same BodyInit matrix as `request`: `null`/`undefined` become `null`; `string`, `FormData`, `Blob`, `ArrayBuffer`, typed-array/DataView views, `URLSearchParams`, and `ReadableStream` pass through unchanged; other objects are JSON-stringified and serialization failures reject with `GraphSerializationError`. `requestRaw` does not auto-set `content-type`.
-- `signal?: AbortSignal` MUST be AbortSignal-like (`aborted: boolean`, `addEventListener()` and `removeEventListener()` functions). Fake partial objects such as `{ aborted: false }` reject with `GraphRequestValidationError` before transport.
+The low-level escape hatch for already-resolved absolute URLs (for example, media binary download URLs). Unlike `request`, it does not prepend `/${apiVersion}` and does not parse JSON; it returns the raw `TransportResponse` from the injected transport.
+
+Validation (all failures reject with `GraphRequestValidationError` before transport unless noted):
+
+- `options` must be a non-null, non-array object.
+- `method` must be one of `GET`, `POST`, `PUT`, `PATCH`, or `DELETE` (case-insensitive). Non-string, empty, whitespace-only, control-character, and unsupported methods reject.
+- `url` must be an absolute `http:` or `https:` URL. Relative URLs, malformed URLs, other schemes, and values containing CR/LF/NUL or other ASCII controls reject. The URL is used directly; no API-version prefix is added.
+- `headers?: HeadersInit` — the managed `Authorization` Bearer header is always applied; caller `authorization` overrides (any casing, object/tuple/`Headers`) reject. CR/LF/NUL in header names or values is rewrapped as `GraphRequestValidationError`, never a raw `TypeError`.
+- `body?: unknown` — same BodyInit matrix as `request`: `null`/`undefined` become `null`; `string`, `FormData`, `Blob`, `ArrayBuffer`, typed-array/DataView views, `URLSearchParams`, and `ReadableStream` pass through unchanged; other objects are JSON-stringified and serialization failures reject with `GraphSerializationError`. `requestRaw` never auto-sets `content-type`.
+- `signal?: AbortSignal` must be AbortSignal-like (`aborted: boolean`, `addEventListener()` and `removeEventListener()` functions). Partial fakes such as `{ aborted: false }` reject.
 
 Error taxonomy:
-- Request-shape, URL, method, header, authorization-override, and signal validation failures: `GraphRequestValidationError` before network I/O.
-- Request-body JSON serialization failures: `GraphSerializationError` before network I/O.
-- Transport/fetch failures: `GraphNetworkError`, preserving existing network-error wrapping semantics.
-- HTTP status handling and response parsing are left to the caller because the raw `TransportResponse` is returned unchanged.
+- Shape/URL/method/header/signal validation: `GraphRequestValidationError` before network I/O.
+- Body JSON serialization: `GraphSerializationError` before network I/O.
+- Transport/fetch failures: `GraphNetworkError`.
+- HTTP status handling and response parsing are yours — the raw `TransportResponse` comes back unchanged.
 
-### Transport seam (F-4)
+## Transport seam
 
-F-4 introduces the `Transport` seam so every HTTP concern — retry, auth-refresh, tracing, mocking — lives in a composable layer the caller controls. Key exports:
+Every HTTP concern — retry, auth-refresh, tracing, mocking — lives in a composable layer you control. Exports:
 
 - `Transport`, `TransportRequest`, `TransportResponse`, `TransportHttpMethod`, `TransportInterceptor`, `TransportRetryPolicy`, `DEFAULT_TRANSPORT_RETRY_POLICY`
 - `createFetchTransport(options?)` — production default wrapping `globalThis.fetch`
-- `createReliableTransport(inner, options?)` — opt-in retry/backoff/per-attempt-timeout decorator; default GraphClient behavior is unchanged
-- `createMockTransport(config?)` — in-memory Transport for tests, exposed via the `@wats/graph/testing` subpath
+- `createReliableTransport(inner, options?)` — opt-in retry/backoff/per-attempt-timeout decorator
+- `createMockTransport(config?)` — in-memory Transport for tests, via the `@wats/graph/testing` subpath
 
-The default transport does NOT retry. Reliability is opt-in via `createReliableTransport`: it retries transient `GET`/`DELETE` failures and HTTP `429` rate limits, honors `Retry-After`, composes native `AbortSignal.timeout` / `AbortSignal.any`, and avoids ambiguous non-idempotent POST `5xx`/network retries by default. See the [Transport and Testing guide](/docs/guides/transport-and-testing) for the full recipe.
+The default transport does NOT retry. `createReliableTransport` retries transient `GET`/`DELETE` failures and HTTP `429` rate limits, honors `Retry-After`, composes native `AbortSignal.timeout` / `AbortSignal.any`, and does not retry non-idempotent POST `5xx`/network failures by default. Full recipe: [Transport and Testing](/docs/guides/transport-and-testing).
 
-### Endpoint scaffold
+## Messages endpoint scaffold
 
-`GraphClient` now exposes `messages` endpoint scaffolding:
-- `messages.sendMessage({ phoneNumberId, to, text, previewUrl? })`
+`GraphClient` exposes `messages.sendMessage({ phoneNumberId, to, text, previewUrl? })`, which builds a WhatsApp text payload and routes it through the shared request helper.
 
-This method builds a WhatsApp text payload and routes it through the shared request helper.
+Path safety: `phoneNumberId` must be a numeric Graph phone number ID path segment. Non-numeric values (including `/`, `?`, `#`, dot-segments) are rejected before any network call with `GraphRequestValidationError` (a subclass of `GraphApiError`, so existing `instanceof GraphApiError` checks remain valid).
 
-Path safety note:
-- `phoneNumberId` is normalized and must be a numeric Graph phone number ID path segment.
-- Non-numeric values (including `/`, `?`, `#`, dot-segments, or mixed characters) are rejected before any network call with a typed `GraphRequestValidationError` (a subclass of `GraphApiError`, so pre-existing `instanceof GraphApiError` checks remain valid).
+The legacy `GraphMessagesEndpoint` class remains for backward compatibility and delegates to the endpoint-registry callable `sendMessage` under the hood. See the [Endpoints Reference](/docs/reference/endpoints) for the `defineEndpoint` contract.
 
-### Endpoint registry (F-6)
+## Scoped sub-clients
 
-F-6 introduces the `defineEndpoint` primitive as the uniform plumbing for every Graph endpoint. The legacy `GraphMessagesEndpoint` class remains for backward-compatibility and now delegates to the endpoint-registry callable `sendMessage` under the hood. See the dedicated [Endpoints Reference](/docs/reference/endpoints) for the full contract, path-template syntax, param kinds, body handling, F-5 error-registry integration, and a custom-endpoint tutorial.
+`PhoneNumberClient` and `WABAClient` are ergonomic wrappers over the endpoint registry that bind a `phoneNumberId` / `wabaId` at construction and inject it into every call. The phone-number scope covers `sendText` plus the full composer catalog: media, location, contacts, reaction, interactive buttons/lists/CTA/catalog/product/product-list/location-request, template send, mark-as-read, and typing indicators. The WABA scope covers message-template management (`listMessageTemplates`, `createMessageTemplate`, `getMessageTemplate`, `updateMessageTemplate`, `deleteMessageTemplate`), template component builders, and parameter-count validation helpers. Media file bytes live in the media runtime ([Media Reference](/docs/reference/media)). See the [Scoped Clients Reference](/docs/reference/scoped-clients) for the construction contract, method catalog, and validation rules.
 
-### Scoped sub-clients (F-7 + WATS-30 + WATS-38)
+## `WhatsApp.startChat(input)`
 
-F-7 adds `PhoneNumberClient` and `WABAClient` — ergonomic wrappers over the endpoint registry that bind a `phoneNumberId` / `wabaId` at construction and inject it into every call. WATS-30 extends the phone-number scope with `PhoneNumberClient.sendText({ to, text, previewUrl?, replyToMessageId? })`. WATS-38 completes the credential-free composer catalog for media, location, contacts, reaction, interactive buttons/lists/CTA/catalog/product/product-list/location-request, template send, mark-as-read, and typing indicators. WATS-39 extends the WABA scope with credential-free message-template management callables (`listMessageTemplates`, `createMessageTemplate`, `getMessageTemplate`, `updateMessageTemplate`, `deleteMessageTemplate`), template component builders, and parameter-count validation helpers. Media file bytes still live in the WATS-37 media runtime. See the [Scoped Clients Reference](/docs/reference/scoped-clients) for the construction contract, method catalog, validation rules, and interplay with the F-5 error registry.
-
-### `WhatsApp.startChat(input)` (WATS-30)
-
-`WhatsApp.startChat(input)` is the facade-level text conversation starter for contacts/inbox flows that need to initiate a conversation with an arbitrary phone number. The facade MUST be constructed with `phoneNumberId`; otherwise the method rejects before transport with `GraphRequestValidationError`.
-
-Stable object-form input:
+The facade-level text conversation starter for contacts/inbox flows that initiate a conversation with an arbitrary phone number. The facade must be constructed with `phoneNumberId`; otherwise the method rejects before transport with `GraphRequestValidationError`.
 
 ```ts
 await wa.startChat({
@@ -139,18 +114,18 @@ await wa.startChat({
 });
 ```
 
-Preconditions and error taxonomy:
+Validation:
 
-- `input` MUST be a non-null object, not an array.
-- `to` MUST be a string containing E.164-ish digits with an optional leading `+`, at most 15 digits. Empty, whitespace-only, non-string, control characters, slashes, URL markers, and address-like values are rejected. This is phone-number shape validation only; WATS does not check whether the recipient is a saved contact.
-- `text` MUST be a non-empty, non-whitespace string at most 4096 characters.
-- `previewUrl`, when present, MUST be boolean and maps to wire `text.preview_url`.
-- `replyToMessageId`, when present, MUST be a non-empty string at most 256 characters and must not contain control characters; it maps to wire `context.message_id`.
-- Validation failures reject with `GraphRequestValidationError` before any network call. Graph API failures still route through the existing `GraphApiError` / F-5 registry taxonomy.
+- `input` must be a non-null object, not an array.
+- `to` must be a string of E.164-ish digits with an optional leading `+`, at most 15 digits. Empty, whitespace-only, non-string, control characters, slashes, URL markers, and address-like values are rejected. This is shape validation only; WATS does not check whether the recipient is a saved contact.
+- `text` must be a non-empty, non-whitespace string at most 4096 characters.
+- `previewUrl`, when present, must be boolean and maps to wire `text.preview_url`.
+- `replyToMessageId`, when present, must be a non-empty string at most 256 characters with no control characters; maps to wire `context.message_id`.
+- Validation failures reject with `GraphRequestValidationError` before any network call. Graph API failures route through the `GraphApiError` registry taxonomy.
 
-### `WhatsApp` composer helpers (WATS-38)
+## `WhatsApp` composer helpers
 
-Facade composer helpers mirror the phone-number scoped methods and require the facade to be constructed with `phoneNumberId`; otherwise they reject before transport with `GraphRequestValidationError`. Media helpers send existing media references only — either a previously uploaded media id or a public/resolvable http(s) link — while `uploadMedia`/download/delete/decrypt remain WATS-37 media runtime APIs.
+Facade composer helpers mirror the phone-number scoped methods and require the facade to be constructed with `phoneNumberId`; otherwise they reject before transport with `GraphRequestValidationError`. Media helpers send existing media references only — a previously uploaded media id or a resolvable http(s) link. Byte upload/download/delete/decrypt are media runtime APIs.
 
 ```ts
 await wa.sendImage({
@@ -180,17 +155,17 @@ Body matrix:
 
 Validation and limits:
 
-- `input` MUST be a non-null object, not an array.
-- `to` uses the same recipient policy as `startChat`: E.164-ish digits with optional leading `+`, max 15 digits, no control characters or URL/path/address markers.
+- `input` must be a non-null object, not an array.
+- `to` uses the same recipient policy as `startChat`.
 - Exactly one of `mediaId` and `link` is required. Missing both or providing both rejects before transport.
-- `mediaId` must be non-empty, non-whitespace, control-character-free, and at most 2048 characters.
-- `link` must be non-empty, non-whitespace, control-character-free, at most 2048 characters, parse with `new URL(...)`, and use `http:` or `https:`.
-- `caption`, where supported, must be non-empty when provided and at most 1024 characters.
-- `filename`, document-only, must be non-empty, control-character-free, and at most 256 characters.
-- `replyToMessageId` must be non-empty, control-character-free, and at most 256 characters; it maps to wire `context.message_id`.
-- Validation failures reject with `GraphRequestValidationError` before transport. Downstream Graph failures preserve `GraphApiError` / F-5 registry subclasses such as `UnsupportedMessageTypeError`.
+- `mediaId`: non-empty, non-whitespace, control-character-free, at most 2048 characters.
+- `link`: non-empty, non-whitespace, control-character-free, at most 2048 characters, parses with `new URL(...)`, `http:` or `https:` only.
+- `caption`, where supported: non-empty when provided, at most 1024 characters.
+- `filename` (document only): non-empty, control-character-free, at most 256 characters.
+- `replyToMessageId`: non-empty, control-character-free, at most 256 characters; maps to wire `context.message_id`.
+- Validation failures reject with `GraphRequestValidationError` before transport. Downstream Graph failures preserve `GraphApiError` registry subclasses such as `UnsupportedMessageTypeError`.
 
-Additional WATS-38 helpers:
+Remaining helpers:
 
 | Helper | Wire shape | Notes |
 | --- | --- | --- |
@@ -202,40 +177,30 @@ Additional WATS-38 helpers:
 | `sendCtaUrl` | `interactive.type: "cta_url"` | http(s) URL only |
 | `sendProduct` / `sendProducts` / `sendCatalog` | commerce interactive variants | validates catalog/product ids and section/product counts |
 | `requestLocation` | `interactive.type: "location_request_message"` | asks the user to share location |
-| `sendTemplate` | `type: "template"` | sends an approved template by name/language/components; WATS-39 adds template management and parameter-count validation helpers |
+| `sendTemplate` | `type: "template"` | sends an approved template by name/language/components |
 | `markMessageAsRead` | `{ status: "read", message_id }` | marks inbound message thread read |
-| `indicateTyping` | read + `typing_indicator: { type: "text" }` | typing indicator helper |
+| `indicateTyping` | read + `typing_indicator: { type: "text" }` | typing indicator |
 
-## API Surface
+## Exports
 
-B2 exports:
-- `GraphClient`
-- typed request configuration primitives
-- Graph typed error classes and mapping helpers
-- messages endpoint scaffold + payload builders
+Core:
+- `GraphClient`, typed request configuration primitives, Graph typed error classes and mapping helpers, messages endpoint scaffold + payload builders.
+- `GraphMessagesSendTextInput`, `buildSendTextPayload`, `PhoneNumberClient.sendText(input, opts?)`, `WhatsApp.startChat(input)`, `WhatsAppStartChatInput`.
 
-WATS-30 exports:
-- `GraphMessagesSendTextInput`
-- `buildSendTextPayload`
-- `PhoneNumberClient.sendText(input, opts?)`
-- `WhatsApp.startChat(input)`
-- `WhatsAppStartChatInput`
+Composer surface:
+- Input types: `GraphMessagesSendImageInput`, `GraphMessagesSendVideoInput`, `GraphMessagesSendAudioInput`, `GraphMessagesSendDocumentInput`, `GraphMessagesSendStickerInput`, plus the input types for location, contacts, reaction, interactive variants, template, read receipts, and typing indicators.
+- Payload types: `GraphMessagesImagePayload`, `GraphMessagesVideoPayload`, `GraphMessagesAudioPayload`, `GraphMessagesDocumentPayload`, `GraphMessagesStickerPayload`, `GraphMessagesLocationPayload`, `GraphMessagesContactsPayload`, `GraphMessagesReactionPayload`, `GraphMessagesInteractivePayload`, `GraphMessagesTemplatePayload`, `GraphMessagesStatusPayload`.
+- Constants: `GRAPH_MESSAGES_MEDIA_ID_MAX_LENGTH`, `GRAPH_MESSAGES_MEDIA_LINK_MAX_LENGTH`, `GRAPH_MESSAGES_MAX_REPLY_BUTTONS`, `GRAPH_MESSAGES_MAX_LIST_ROWS`, `GRAPH_MESSAGES_MAX_CONTACTS`, `GRAPH_MESSAGES_MAX_PRODUCT_ITEMS`.
+- All `buildSend*Payload` helpers, plus matching `PhoneNumberClient.*` and `WhatsApp.*` methods.
 
-WATS-38 exports:
-- `GraphMessagesSendImageInput`, `GraphMessagesSendVideoInput`, `GraphMessagesSendAudioInput`, `GraphMessagesSendDocumentInput`, `GraphMessagesSendStickerInput`, plus remaining composer input types for location, contacts, reaction, interactive variants, template, read receipts, and typing indicators.
-- `GraphMessagesImagePayload`, `GraphMessagesVideoPayload`, `GraphMessagesAudioPayload`, `GraphMessagesDocumentPayload`, `GraphMessagesStickerPayload`, `GraphMessagesLocationPayload`, `GraphMessagesContactsPayload`, `GraphMessagesReactionPayload`, `GraphMessagesInteractivePayload`, `GraphMessagesTemplatePayload`, `GraphMessagesStatusPayload`.
-- finite composer constants such as `GRAPH_MESSAGES_MEDIA_ID_MAX_LENGTH`, `GRAPH_MESSAGES_MEDIA_LINK_MAX_LENGTH`, `GRAPH_MESSAGES_MAX_REPLY_BUTTONS`, `GRAPH_MESSAGES_MAX_LIST_ROWS`, `GRAPH_MESSAGES_MAX_CONTACTS`, and `GRAPH_MESSAGES_MAX_PRODUCT_ITEMS`.
-- all WATS-38 `buildSend*Payload` helpers for media, location, contacts, reaction/remove-reaction, interactive variants, template send, mark-as-read, and typing indicators.
-- matching `PhoneNumberClient.*` and `WhatsApp.*` helper methods.
+Template management:
+- WABA-scoped callables: `listMessageTemplates`, `createMessageTemplate`, `getMessageTemplate`, `updateMessageTemplate`, `deleteMessageTemplate`.
+- Model/response types: `TemplateCategory`, `TemplateStatus`, `TemplateLanguageCode`, `TemplateParameterFormat`, `TemplateComponent`, `TemplateDetails`, `TemplateListResponse`, `TemplateMutationResponse`.
+- Component helpers: `buildTemplateHeaderComponent`, `buildTemplateBodyComponent`, `buildTemplateFooterComponent`, `buildTemplateButtonComponent`.
+- `validateTemplateParameterCounts(definition, sendComponents)` — compares HEADER/BODY placeholders (`{{1}}` positional or `{{name}}` named) against send-time parameters and throws `TemplateParamCountMismatchError` on mismatch.
+- `WABAClient` methods for the same template operations with the bound `wabaId` injected.
 
-WATS-39 exports:
-- WABA-scoped template callables: `listMessageTemplates`, `createMessageTemplate`, `getMessageTemplate`, `updateMessageTemplate`, and `deleteMessageTemplate`.
-- Template model aliases and response types: `TemplateCategory`, `TemplateStatus`, `TemplateLanguageCode`, `TemplateParameterFormat`, `TemplateComponent`, `TemplateDetails`, `TemplateListResponse`, and `TemplateMutationResponse`.
-- Component helpers: `buildTemplateHeaderComponent`, `buildTemplateBodyComponent`, `buildTemplateFooterComponent`, and `buildTemplateButtonComponent`.
-- `validateTemplateParameterCounts(definition, sendComponents)`, which compares HEADER/BODY placeholders (`{{1}}` positional or `{{name}}` named) with send-time template parameters and throws `TemplateParamCountMismatchError` on mismatch.
-- `WABAClient` methods for the same template operations with the bound `wabaId` injected where applicable.
-
-## Usage Examples
+## Usage
 
 ```ts
 import { GraphClient } from "@wats/graph";
@@ -252,18 +217,14 @@ const wa = new WhatsApp({
 });
 
 await wa.startChat({
-  to: "+15551230000",
+  to: "+155****0000",
   text: "Hi — starting this chat from WATS.",
   previewUrl: false
 });
 
 await wa.sendImage({
-  to: "+15551230000",
+  to: "+155****0000",
   mediaId: "MEDIA_ID_FROM_UPLOAD",
   caption: "Image sent from WATS"
 });
 ```
-
-## Parity Notes
-
-B1 aligns WATS client config typing with the pywa-style requirement for token/phone identity plus optional webhook verification and API customization settings.

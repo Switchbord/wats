@@ -1,13 +1,11 @@
 ---
 title: "`@wats/crypto` reference"
-description: "The CryptoProvider seam and its Node, Bun, and WebCrypto adapters with a typed error hierarchy."
+description: "The CryptoProvider seam and its Node and WebCrypto adapters with a typed error hierarchy."
 ---
 
-<DocMeta status="stable (F-2)" />
+<DocMeta status="stable" />
 
-## Provider contract
-
-`@wats/crypto` ships a single interface and two adapters:
+`@wats/crypto` ships a single interface and two adapters. Every failure surfaces as a typed `CryptoProviderError` subclass — raw `TypeError`, `RangeError`, and `DOMException` never escape.
 
 ```ts
 import type { CryptoProvider } from "@wats/crypto/provider";
@@ -33,24 +31,13 @@ export interface CryptoProvider {
 }
 ```
 
-Forward-declared optional methods (`rsaOaepDecrypt`, `aesGcmDecrypt`)
-are reserved for Flows / Media / Encrypted Payloads work. The F-2
-adapters do not attach these methods to the returned provider — the
-properties are `undefined`. Consumers MUST optional-chain
-(`provider.rsaOaepDecrypt?.(...)`) and handle `undefined` as
-"capability unavailable on this provider". A future step that ships
-these methods will either attach real implementations or attach stubs
-that throw `UnsupportedCapabilityError`; either extension is additive
-(non-breaking) because the interface already marks them optional.
+`rsaOaepDecrypt` and `aesGcmDecrypt` are forward-declared for Flows / Media / Encrypted Payloads work. The current adapters do not attach them — the properties are `undefined`, and a direct call yields a runtime `TypeError`. Optional-chain (`provider.rsaOaepDecrypt?.(...)`) and treat `undefined` as "capability unavailable". When they land, real implementations or `UnsupportedCapabilityError`-throwing stubs attach additively; the interface already marks them optional.
 
 ## Methods
 
 ### `hmacSha256(key, body)`
 
-Computes HMAC-SHA256 over `body` using `key`. Returns a fresh
-`Uint8Array` of 32 bytes.
-
-Accepted input types:
+Computes HMAC-SHA256 over `body` using `key`. Returns a fresh 32-byte `Uint8Array`.
 
 | Parameter | Types                    | Notes                                  |
 |-----------|--------------------------|----------------------------------------|
@@ -59,43 +46,26 @@ Accepted input types:
 | `body`    | `Uint8Array`             | zero-length accepted (empty-body HMAC) |
 | `body`    | `string`                 | UTF-8 encoded at the seam; `""` accepted |
 
-Validation errors (`InvalidKeyError` extending `CryptoProviderError`,
-`code: "invalid_key"`):
+Validation errors:
 
-- `null`, `undefined`, number, object, array, symbol, function
-- empty string `""`
-- empty `Uint8Array`
+- `InvalidKeyError` (`code: "invalid_key"`): `null`, `undefined`, number, object, array, symbol, function, empty string, empty `Uint8Array`.
+- `InvalidBodyError` (`code: "invalid_body"`): `null`, `undefined`, number, object, plain array, symbol, function.
 
-Validation errors (`InvalidBodyError`, `code: "invalid_body"`):
-
-- `null`, `undefined`, number, object, plain array, symbol, function
-
-Underlying `SubtleCrypto.sign` / `node:crypto.createHmac` failures are
-wrapped in a `CryptoProviderError` with a `cause` field (raw
-`TypeError` / `DOMException` never escape).
+Underlying `SubtleCrypto.sign` / `node:crypto.createHmac` failures are wrapped in a `CryptoProviderError` with a `cause` field.
 
 ### `timingSafeEqual(a, b)`
 
 Constant-time equality of two `Uint8Array` values.
 
-- Length mismatch → returns `false` (never throws). Length is public.
-- Equal length → constant-time XOR accumulator scan in the WebCrypto
-  adapter; `crypto.timingSafeEqual` in the Node adapter.
-- Non-`Uint8Array` input → throws `CryptoProviderError`
-  (`code: "invalid_body"`). Never throws a raw `TypeError`.
+- Length mismatch → returns `false`, never throws. Length is public.
+- Equal length → constant-time XOR accumulator scan (WebCrypto adapter) or `crypto.timingSafeEqual` (Node adapter).
+- Non-`Uint8Array` input → throws `CryptoProviderError` (`code: "invalid_body"`), never a raw `TypeError`.
 
 ### `randomBytes(n)`
 
-Returns a `Uint8Array` of length `n`. Backed by
-`crypto.getRandomValues` (WebCrypto) or `node:crypto.randomBytes`
-(Node/Bun). The returned buffer is detached from any underlying
-runtime identity (not a `Buffer`, not a pooled slab).
+Returns a `Uint8Array` of length `n`, backed by `crypto.getRandomValues` (WebCrypto) or `node:crypto.randomBytes` (Node/Bun). The returned buffer is detached from any runtime identity — not a `Buffer`, not a pooled slab.
 
-Validation (`InvalidLengthError`, `code: "invalid_length"`):
-
-- `n` must be a finite integer in `[1, 1_048_576]`.
-- Rejects `0`, negative, `NaN`, `±Infinity`, non-integer, non-number.
-- Boundary `n = 1_048_576` is accepted.
+Validation (`InvalidLengthError`, `code: "invalid_length"`): `n` must be a finite integer in `[1, 1_048_576]`. Rejects `0`, negative, `NaN`, `±Infinity`, non-integer, non-number. The boundary `n = 1_048_576` is accepted.
 
 ## Adapter selection
 
@@ -108,29 +78,17 @@ const web = await createCryptoProvider({ prefer: "webcrypto" });
 const node = await createCryptoProvider({ prefer: "node" });
 ```
 
-Algorithm:
-
 1. If `options.prefer` is supplied, try that adapter first.
-2. Otherwise, prefer the Node adapter when running on Node or Bun
-   (`globalThis.process?.versions?.node` is defined OR `globalThis.Bun`
-   is defined). Otherwise select the WebCrypto adapter.
-3. If the chosen adapter fails capability detection with
-   `UnsupportedCapabilityError`, fall back to the other.
-4. If both adapters fail, throw `UnsupportedCapabilityError` with the
-   two underlying errors attached via `cause`.
-5. Unknown `prefer` values (anything other than `"node"` /
-   `"webcrypto"`) throw `UnsupportedCapabilityError` synchronously.
+2. Otherwise, prefer the Node adapter on Node or Bun (`globalThis.process?.versions?.node` defined OR `globalThis.Bun` defined); otherwise WebCrypto.
+3. If the chosen adapter fails capability detection with `UnsupportedCapabilityError`, fall back to the other.
+4. If both fail, throw `UnsupportedCapabilityError` with both underlying errors attached via `cause`.
+5. Unknown `prefer` values (anything other than `"node"` / `"webcrypto"`) throw `UnsupportedCapabilityError` synchronously.
 
-The `node:crypto` module is **never statically imported** from anywhere
-in `packages/crypto/src`. The Node adapter loads it via a dynamic
-`await import(specifier)` inside the factory body so bundlers targeting
-Cloudflare Workers / Vercel Edge / Deno do not have to resolve
-`node:*`. The invariant is enforced by
-`packages/testing/tests/workspace-policy.test.ts`.
+`node:crypto` is never statically imported anywhere in `packages/crypto/src`. The Node adapter loads it via dynamic `await import(specifier)` inside the factory body, so bundlers targeting Cloudflare Workers / Vercel Edge / Deno never resolve `node:*`. `packages/testing/tests/workspace-policy.test.ts` enforces this.
 
 ## Error taxonomy
 
-```
+```text
 CryptoProviderError (Error)
 ├── InvalidKeyError              code: "invalid_key"
 ├── InvalidBodyError             code: "invalid_body"
@@ -138,13 +96,7 @@ CryptoProviderError (Error)
 └── UnsupportedCapabilityError   code: "unsupported_capability"
 ```
 
-Every error from `@wats/crypto` inherits from `CryptoProviderError`.
-Consumers that care about individual codes may branch on `err.code`;
-consumers that only need to distinguish crypto failures from other
-runtime errors may use `instanceof CryptoProviderError`.
-
-Raw `TypeError`, `RangeError`, `DOMException` are never allowed to
-escape the provider surface. Internal wrapping policy:
+Branch on `err.code` for individual codes, or `instanceof CryptoProviderError` to separate crypto failures from everything else.
 
 | Underlying failure                  | Surface error              |
 |-------------------------------------|----------------------------|
@@ -167,9 +119,7 @@ escape the provider surface. Internal wrapping policy:
 | `@wats/crypto/node`         | `createNodeCryptoProvider` (direct adapter)    |
 | `@wats/crypto/webcrypto`    | `createWebCryptoProvider` (direct adapter)     |
 
-All subpaths are listed in `packages/crypto/package.json`'s `exports`
-map. Every subpath has at least one consumer-fixture assertion in
-`packages/testing/fixtures/crypto-consumer/verify-imports.ts`.
+All subpaths are listed in `packages/crypto/package.json`'s `exports` map; each has at least one consumer-fixture assertion in `packages/testing/fixtures/crypto-consumer/verify-imports.ts`.
 
 ## Runtime portability matrix
 
@@ -183,51 +133,24 @@ map. Every subpath has at least one consumer-fixture assertion in
 | Vercel Edge            | `webcrypto`     | SubtleCrypto available; `node:*` forbidden |
 | Modern browsers        | `webcrypto`     | SubtleCrypto in secure contexts           |
 
-Callers may override the default via `prefer`. The cross-adapter
-behavior is byte-for-byte identical for `hmacSha256` (RFC 4231 TC1/TC2/
-TC4 are pinned in tests against both adapters).
-
-## Forward-declared capabilities
-
-`rsaOaepDecrypt` and `aesGcmDecrypt` are declared on the interface as
-OPTIONAL methods but intentionally left unattached in F-2. On a
-provider returned by F-2 both properties are `undefined`. TypeScript
-consumers MUST optional-chain (`provider.rsaOaepDecrypt?.(...)`); a
-direct call on an F-2 provider yields a runtime `TypeError` rather
-than a typed error, so optional-chaining is the supported calling
-pattern. They land with Flows / Media endpoint work and are covered
-by future parity issues; declaring them here reserves the method
-names so later additions are additive (not breaking).
+Override the default via `prefer`. Cross-adapter `hmacSha256` output is byte-for-byte identical (RFC 4231 TC1/TC2/TC4 pinned in tests against both adapters).
 
 ## Validation helpers
 
-`@wats/crypto/errors` re-exports validation helpers used by the
-adapters and available to downstream consumers:
+`@wats/crypto/errors` re-exports the validation helpers the adapters use; they are stable for downstream consumers:
 
 - `assertValidKey(key)` — asserts `Uint8Array | string` (non-empty).
 - `assertValidBody(body)` — asserts `Uint8Array | string` (empty OK).
 - `assertUint8Array(value, label)` — asserts plain `Uint8Array`.
 - `assertFiniteLength(n, min, max)` — asserts finite integer in range.
 
-Each helper throws the corresponding typed error on failure. They are
-stable and safe to rely on.
+Each throws the corresponding typed error on failure.
 
-## Adversarial guarantees (battery outcome)
+## Test-pinned guarantees
 
-F-2 was shipped under the adversarial-battery discipline. The
-behavior is pinned by:
-
-- RFC 4231 HMAC-SHA256 known-answer vectors (TC1, TC2, TC4) run
-  against both adapters via a shared contract suite.
-- Full input-rejection matrix per method, every branch asserted as a
-  typed error subclass (never raw `TypeError`).
-- Constant-time compare verified with first-byte and last-byte
-  divergence tests and non-throwing length-mismatch behavior.
-- `randomBytes` boundary acceptance at `1_048_576` and rejection at
-  `1_048_577`; probabilistic distinct-output test.
-- Cross-adapter byte-for-byte output parity for HMAC.
-- Consumer-fixture round-trip that imports from all five subpaths,
-  runs live HMAC / timingSafeEqual / randomBytes calls, and asserts
-  the `InvalidKeyError` type surfaces across the package boundary.
-- Workspace policy test pins the adapter's dynamic-import pattern
-  and forbids static `node:*` imports anywhere else in `src/`.
+- RFC 4231 HMAC-SHA256 known-answer vectors (TC1, TC2, TC4) run against both adapters via a shared contract suite.
+- Full input-rejection matrix per method; every branch asserted as a typed error subclass.
+- Constant-time compare verified with first-byte and last-byte divergence tests and non-throwing length-mismatch behavior.
+- `randomBytes` boundary acceptance at `1_048_576`, rejection at `1_048_577`, probabilistic distinct-output test.
+- Consumer-fixture round-trip imports all five subpaths, runs live HMAC / timingSafeEqual / randomBytes calls, and asserts `InvalidKeyError` surfaces across the package boundary.
+- Workspace policy test pins the dynamic-import pattern and forbids static `node:*` imports in `src/`.

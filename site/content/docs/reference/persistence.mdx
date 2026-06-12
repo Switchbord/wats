@@ -1,13 +1,9 @@
 ---
 title: "Persistence Reference"
-description: "The experimental @wats/persistence package: durable runtime state, SQLite/Postgres adapter contract, migrations, and idempotency."
+description: "The experimental @wats/persistence package: durable runtime state, SQLite adapter, migrations, idempotency, and the outbox."
 ---
 
-<DocMeta status="experimental" lastReviewed="2026-05-25" appliesTo="WATS-48, WATS-87, WATS-120, WATS-121" />
-
-## Current implementation status
-
-WATS ships an experimental persistence package:
+<DocMeta status="experimental" lastReviewed="2026-05-25" />
 
 ```ts
 import {
@@ -22,7 +18,7 @@ import {
 import { createSqlitePersistence } from "@wats/persistence/sqlite";
 ```
 
-The SQLite adapter is for local and single-instance testing. It is not a production or multi-replica recommendation.
+The SQLite adapter is for local and single-instance testing — not a production or multi-replica recommendation.
 
 ## SQLite quickstart
 
@@ -33,9 +29,9 @@ const health = await store.health();
 await store.close();
 ```
 
-Use a local path or `:memory:`. Database paths are operationally sensitive and diagnostics report only `[REDACTED_SQLITE_DATABASE]`.
+Use a local path or `:memory:`. Database paths are operationally sensitive; diagnostics report only `[REDACTED_SQLITE_DATABASE]`.
 
-## Implemented schema
+## Schema and migrations
 
 The migration runner creates:
 
@@ -45,7 +41,7 @@ The migration runner creates:
 - `wats_service_requests`
 - `wats_outbox`
 
-Migrations are forward-only for alpha. Already-applied migration checksums must match the package migration definitions. Checksum drift fails closed with `PersistenceError`. `001_initial` keeps its originally shipped checksum; `002_outbox_lease_id` upgrades existing v1 databases with the `leaseId` outbox column. A held migration lock fails closed with `PersistenceError` code `migration_lock_failed`.
+Migrations are forward-only for alpha. Already-applied migration checksums must match the package migration definitions; checksum drift fails closed with `PersistenceError`. `001_initial` keeps its originally shipped checksum; `002_outbox_lease_id` upgrades existing v1 databases with the `leaseId` outbox column. A held migration lock fails closed with `PersistenceError` code `migration_lock_failed`.
 
 ## Runtime contract
 
@@ -63,13 +59,13 @@ Migrations are forward-only for alpha. Already-applied migration checksums must 
 - `markOutboxItemSucceeded(...)`
 - `close(): Promise<void>`
 
-Webhook event records store safe event keys and hashes, not raw webhook bodies. Duplicate event keys return `"duplicate"` so service can acknowledge Meta retries without dispatching the same update twice.
+Webhook event records store safe event keys and hashes, not raw webhook bodies. Duplicate event keys return `"duplicate"`, so the service can acknowledge Meta retries without dispatching the same update twice.
 
-Service request idempotency stores an idempotency key, request hash, and response JSON. A matching key/body hash replays the stored response. The same key with a different body hash conflicts.
+Service request idempotency stores an idempotency key, request hash, and response JSON. A matching key/body hash replays the stored response; the same key with a different body hash conflicts.
 
 ## Outbox
 
-WATS-87 adds first-slice outbox record APIs for at-least-once local work scheduling:
+At-least-once local work scheduling:
 
 ```ts
 await store.enqueueOutboxItem({
@@ -88,50 +84,29 @@ const report = await runOutboxWorkerOnce(store, {
 });
 ```
 
-The persistence table stores only payload hashes, status, attempt counts, `leaseId`, and retry timestamps. It does not store raw webhook bodies, does not store message text, and does not store Graph request bodies, contacts, or other payload content. `runOutboxWorkerOnce(...)` claims due `pending` items, calls the handler, marks successes as `succeeded`, and reschedules failures with `nextAttemptAt = now + retryDelayMs`. Claimed items use a five-minute processing lease; stale `processing` rows become claimable again so a killed worker does not strand records forever. The lease is fenced: `markOutboxItemFailed(...)` and `markOutboxItemSucceeded(...)` require the current `leaseId`, so stale workers cannot mark a newer reclaimed lease as succeeded or failed.
+The outbox table stores only payload hashes, status, attempt counts, `leaseId`, and retry timestamps — no raw webhook bodies, message text, Graph request bodies, or contacts. `runOutboxWorkerOnce(...)` claims due `pending` items, calls the handler, marks successes `succeeded`, and reschedules failures with `nextAttemptAt = now + retryDelayMs`.
+
+Claimed items use a five-minute processing lease; stale `processing` rows become claimable again, so a killed worker does not strand records forever. The lease is fenced: `markOutboxItemFailed(...)` and `markOutboxItemSucceeded(...)` require the current `leaseId`, so a stale worker cannot complete a newer reclaimed lease.
 
 ## Redaction boundary
 
-Persistence diagnostics must not print:
-
-- access tokens
-- app secrets
-- webhook verify tokens
-- service bearer tokens
-- authorization headers
-- database URLs or SQLite paths
-- raw webhook bodies
-- message text or contact payloads
+Persistence diagnostics must not print: access tokens, app secrets, webhook verify tokens, service bearer tokens, authorization headers, database URLs or SQLite paths, raw webhook bodies, message text, or contact payloads.
 
 ## Relationship to service and CLI
 
-`@wats/service` can now accept an injected `PersistenceStore`. The service does not read database environment variables directly.
-
-When persistence is injected:
+`@wats/service` accepts an injected `PersistenceStore` and does not read database environment variables directly. When persistence is injected:
 
 - signed webhook POSTs are recorded by event key/hash and duplicates are acknowledged without redispatch;
 - service send routes honor `Idempotency-Key` for replay/conflict behavior;
-- injected stores must expose the WATS-87 outbox methods as part of the accepted service persistence contract.
+- injected stores must expose the outbox methods as part of the accepted service persistence contract.
 
-Current `@wats/cli` has no database navigation commands. WATS-123 will add thread/message navigation after service exposes persisted conversation/event-store APIs.
-
-## Postgres target
-
-Postgres remains a follow-up adapter target. It must satisfy the same root contract and keep database URLs secret. Default CI must not require Postgres credentials.
+The CLI has no database navigation commands yet.
 
 ## Non-goals
 
-- no Postgres adapter yet
-- no CLI thread navigation yet
-- no observed delivery/read status UI yet
-- no raw webhook body storage by default
-- no automatic service send enqueueing yet
-- no production hosting guarantee
-- no live Meta validation
+Not implemented yet: a Postgres adapter (it must satisfy the same root contract, keep database URLs secret, and never be required by default CI), CLI thread/message navigation, delivery/read status UI, raw webhook body storage, automatic service send enqueueing, production hosting guarantees, and live Meta validation.
 
-## Related
+## Related docs
 
-- `docs/reference/config.md`
-- `docs/reference/service.md`
-- `docs/architecture/package-map.md`
-- `docs/architecture/public-api-surface.md`
+- [Config Reference](/docs/reference/config)
+- [Service Reference](/docs/reference/service)

@@ -7,6 +7,38 @@
     "game-changing",
     "production-ready",
     "simply",
-    "just works"
+    "just works",
+    "leverage",
+    "utilize",
+    "it's important to note",
+    "in order to",
+    "dive in",
+    "dive into",
+    "delightful",
+    "best-in-class",
+    "cutting-edge",
+    "state-of-the-art",
+    "empowers",
+    "unleash",
+    "comprehensive",
+    "robustly"
+  ],
+  "patterns": [
+    {
+      "name": "ticket archaeology (WATS-nn)",
+      "regex": "\\bWATS-\\d+\\b"
+    },
+    {
+      "name": "phase label (F-n / B1 / B2 / C2 / D1)",
+      "regex": "\\b(?:F-\\d{1,2}|B[12]|C[12]|D1)\\b(?=[^a-z]|$)"
+    },
+    {
+      "name": "architecture ticket (Arch-X)",
+      "regex": "\\bArch-[A-Z]\\b"
+    },
+    {
+      "name": "reviewer-gate jargon",
+      "regex": "adversarial (?:remediation|closure|battery)"
+    }
   ]
 }

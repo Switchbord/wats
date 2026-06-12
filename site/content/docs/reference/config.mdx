@@ -3,13 +3,9 @@ title: "Config Reference (`@wats/config`)"
 description: "The @wats/config application config shape: YAML/JSON validation, env-secret references, and redaction."
 ---
 
-<DocMeta status="experimental" lastReviewed="2026-04-28" appliesTo="WATS-32" />
+<DocMeta status="experimental" lastReviewed="2026-04-28" />
 
-## Purpose
-
-`@wats/config` defines the first WATS application config shape for CLI onboarding and the future standalone service. It validates YAML or JSON config into a frozen `WatsConfig` object and keeps secrets as environment-variable references rather than raw credential values.
-
-## Install / import
+`@wats/config` validates YAML or JSON config into a frozen `WatsConfig` object and keeps secrets as environment-variable references — never raw credential values.
 
 ```ts
 import {
@@ -54,54 +50,41 @@ profiles:
 
 JSON uses the same object shape.
 
-## WATS-51 checked templates
+## Checked-in templates
 
-WATS-51 adds checked-in alpha templates with placeholder env names only:
+Alpha templates with placeholder env names only:
 
 - `examples/config/wats.config.example.yaml`
 - `examples/config/wats.config.example.json`
 - `.env.example`
 
-The YAML and JSON templates parse through `@wats/config` and use the same validated shape shown above. They include `local` and `prod` profiles, placeholder WABA/phone ids, env-secret refs for all secret-bearing fields, service routing defaults, and no raw tokens. `.env.example` lists placeholder env names only; copy it to an ignored local file such as `.env.local` before filling real values.
-
-These templates are also available through `wats init` as of WATS-69. The command writes config/env placeholder files with no overwrite by default and keeps secret-bearing `.env.example` values blank.
+The YAML and JSON templates parse through `@wats/config` and match the shape above: `local` and `prod` profiles, placeholder WABA/phone ids, env-secret refs for all secret-bearing fields, service routing defaults, no raw tokens. `.env.example` lists placeholder env names only; copy it to an ignored local file such as `.env.local` before filling real values. `wats init` writes the same files with no-overwrite defaults and blank secret values.
 
 ## Secret model
 
-Secrets are not represented as raw values. Every secret-bearing field must be an object with an `env` string:
+Every secret-bearing field must be an object with an `env` string:
 
 ```ts
 { env: "WATS_ACCESS_TOKEN" }
 ```
 
-The following fields are secret references:
-
-- `auth.accessToken`
-- `webhook.verifyToken`
-- `webhook.appSecret`
-- `service.bearerToken`
-
-Raw strings in these positions are rejected with `ConfigValidationError` code `invalid_env_ref`.
+Secret-reference fields: `auth.accessToken`, `webhook.verifyToken`, `webhook.appSecret`, `service.bearerToken`. A raw string in any of these positions is rejected with `ConfigValidationError` code `invalid_env_ref`.
 
 ## API
 
 ### `validateConfig(value)`
 
-Validates an unknown in-memory value and returns a frozen `WatsConfig`.
-
-Throws `ConfigValidationError` for malformed input. Host `TypeError` should not escape for expected bad input.
+Validates an unknown in-memory value and returns a frozen `WatsConfig`. Throws `ConfigValidationError` for malformed input; a host `TypeError` never escapes for expected bad input.
 
 ### `parseConfig(source, options?)`
 
-Parses a config string as JSON or YAML and then validates it.
+Parses a config string as JSON or YAML, then validates it.
 
 ```ts
 const config = parseConfig(source, { format: "yaml" });
 ```
 
-If `format` is omitted, JSON is inferred when the string starts with `{` or `[`; otherwise YAML is assumed.
-
-YAML support in WATS-32 is intentionally small and dependency-free. It supports the generated onboarding mapping shape; full YAML language coverage is not a goal for this slice.
+If `format` is omitted, JSON is inferred when the string starts with `{` or `[`; otherwise YAML is assumed. YAML support is intentionally small and dependency-free: it covers the generated onboarding mapping shape, not the full YAML language.
 
 ### `loadConfig(filePath, options?)`
 
@@ -111,13 +94,11 @@ Reads a `.json`, `.yaml`, or `.yml` file and returns validated config.
 const config = await loadConfig("./wats.config.yaml");
 ```
 
-Unsupported extensions fail with `unsupported_format`. Read failures fail with `file_read_error`.
+Unsupported extensions fail with `unsupported_format`; read failures fail with `file_read_error`.
 
 ### `redactConfig(value)`
 
-Validates and returns a copy where all env names under secret references are replaced with `[REDACTED_ENV]`. Non-secret fields remain visible.
-
-Use this for logs, diagnostics, and `wats config print`-style output.
+Validates and returns a copy where every env name under a secret reference is replaced with `[REDACTED_ENV]`. Non-secret fields stay visible. Use it for logs, diagnostics, and `wats config print`-style output.
 
 ## Validation rules
 
@@ -139,39 +120,13 @@ Use this for logs, diagnostics, and `wats config print`-style output.
 
 ## Error taxonomy
 
-`ConfigValidationError` fields:
+`ConfigValidationError` carries `code: ConfigErrorCode`, `path: string`, and `issues: ConfigIssue[]`.
 
-- `code: ConfigErrorCode`
-- `path: string`
-- `issues: ConfigIssue[]`
-
-Primary codes:
-
-- `invalid_config`
-- `invalid_source`
-- `parse_error`
-- `unsupported_format`
-- `file_read_error`
-- `invalid_version`
-- `missing_default_profile`
-- `invalid_profiles`
-- `invalid_profile`
-- `invalid_graph`
-- `invalid_api_version`
-- `invalid_base_url`
-- `invalid_whatsapp`
-- `invalid_env_ref`
-- `invalid_webhook`
-- `invalid_webhook_path`
-- `invalid_max_body_bytes`
-- `invalid_service`
-- `invalid_service_host`
-- `invalid_service_port`
-- `invalid_service_api_prefix`
+Codes: `invalid_config`, `invalid_source`, `parse_error`, `unsupported_format`, `file_read_error`, `invalid_version`, `missing_default_profile`, `invalid_profiles`, `invalid_profile`, `invalid_graph`, `invalid_api_version`, `invalid_base_url`, `invalid_whatsapp`, `invalid_env_ref`, `invalid_webhook`, `invalid_webhook_path`, `invalid_max_body_bytes`, `invalid_service`, `invalid_service_host`, `invalid_service_port`, `invalid_service_api_prefix`.
 
 ## Live testing profile
 
-Use env-secret refs for any credentialed campaign profile. Do not place raw tokens in config files:
+Use env-secret refs for any credentialed profile. Raw tokens do not belong in config files:
 
 ```yaml
 version: 1
@@ -202,26 +157,12 @@ profiles:
         env: WATS_SERVICE_TOKEN
 ```
 
-The WATS-44 live campaign also requires runtime env flags such as `WATS_LIVE_ENABLE=1` and domain-specific mutation opt-ins. Keep those outside checked-in config examples.
+Live runs also require runtime env flags such as `WATS_LIVE_ENABLE=1` plus domain-specific mutation opt-ins. Keep those out of checked-in config examples.
 
-## WATS-48 persistence config design note
+## Persistence
 
-WATS-48 is design-only. The current @wats/config schema has no persistence field.
-
-A future persistence config may introduce SQLite local paths and Postgres database URL env-secret references such as `WATS_DATABASE_URL`. Raw database credentials must not be committed, printed, or passed as CLI arguments; in lowercase, raw database credentials must not be committed. Config examples should keep database URLs as env-secret refs rather than raw credential-bearing strings.
+The current schema has no persistence field. Not implemented yet: a persistence config introducing SQLite local paths and Postgres database-URL env-secret references such as `WATS_DATABASE_URL`. When it lands, database URLs stay env-secret refs — raw database credentials must not be committed, printed, or passed as CLI arguments.
 
 ## Non-goals
 
-WATS-32/WATS-48 do not implement:
-
-- CLI file generation (`WATS-33`)
-- standalone service runtime (`WATS-34`)
-- live Graph credential checks
-- secret storage, encryption, or vault integration
-- full YAML language support
-
-## Related
-
-- Linear: WATS-32
-- `docs/reference/openapi.md`
-- `docs/architecture/roadmap-to-whatsapp-pywa-parity.md`
+`@wats/config` does not implement CLI file generation, the standalone service runtime, live Graph credential checks, secret storage/encryption/vault integration, or full YAML language support.

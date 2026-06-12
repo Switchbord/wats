@@ -18,7 +18,11 @@ const siteRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const clientRoot = join(siteRoot, "dist", "client");
 const phrasesPath = join(dirname(fileURLToPath(import.meta.url)), "banned-phrases.json");
 
-const { phrases } = JSON.parse(readFileSync(phrasesPath, "utf8")) as { phrases: string[] };
+const { phrases, patterns = [] } = JSON.parse(readFileSync(phrasesPath, "utf8")) as {
+  phrases: string[];
+  patterns?: { name: string; regex: string }[];
+};
+const compiled = patterns.map((p) => ({ name: p.name, re: new RegExp(p.regex, "gu") }));
 
 if (!existsSync(clientRoot)) {
   console.error(`check-banned-phrases: build output missing at ${clientRoot} — run \`bun run build\` first`);
@@ -73,6 +77,14 @@ for (const file of htmlFiles) {
     while ((idx = lower.indexOf(phrase.toLowerCase(), from)) !== -1) {
       findings.push(`${rel}: banned phrase "${phrase}": ...${context(text, idx, phrase.length)}...`);
       from = idx + phrase.length;
+    }
+  }
+  for (const { name, re } of compiled) {
+    re.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text)) !== null) {
+      findings.push(`${rel}: ${name} "${m[0]}": ...${context(text, m.index, m[0].length)}...`);
+      if (m.index === re.lastIndex) re.lastIndex++;
     }
   }
   const exclamation = text.indexOf("!");

@@ -3,12 +3,12 @@ title: Deploying a WATS webhook on Bun
 description: Deploy a WATS webhook server under the Bun runtime using createBunWebhookServer.
 ---
 
-<DocMeta status="guide (F-12). Shipped with WATS-22 (Arch-K) and WATS-25 (edge-runtime) resolution. WATS-96 adds the v25 webhook mTLS boundary note." />
+<DocMeta status="active" lastReviewed="2026-06-12" />
 
-This guide covers deploying a WATS webhook server under the **Bun
-runtime** using `createBunWebhookServer`. For Node, see
-`docs/guides/deploy-node.md`. For Cloudflare Workers / Deno / other
-edge runtimes, see `docs/guides/deploy-cloudflare-workers.md`.
+This page covers the **Bun runtime** with `createBunWebhookServer`. For Node,
+see [deploy on Node](/docs/guides/deploy-node). For Cloudflare Workers, Deno,
+and other edge runtimes, see
+[deploy on Cloudflare Workers](/docs/guides/deploy-cloudflare-workers).
 
 ## Install
 
@@ -64,18 +64,24 @@ Run it:
 bun run server.ts
 ```
 
-## What `createBunWebhookServer` does
+`Bun.serve` already speaks WinterCG `Request → Response`, so the Bun adapter
+is a thin wrapper over `createFetchWebhookHandler`. Every request goes through
+the same runtime-neutral core as the fetch and Node adapters, so the
+status-code taxonomy is identical across runtimes.
 
-`Bun.serve` already speaks WinterCG `Request → Response`, so the Bun
-adapter is a thin wrapper over `createFetchWebhookHandler`. Every
-request goes through the same runtime-neutral core as the fetch and
-Node adapters, which means the status-code taxonomy is identical.
+## mTLS and the HMAC boundary
 
-## WATS-96 webhook mTLS and HMAC boundary
+`createBunWebhookServer` verifies Meta webhook POST bodies at the app layer
+with HMAC-SHA256 from `X-Hub-Signature-256`. Keep that verification enabled;
+it is independent of TLS termination.
 
-`createBunWebhookServer` verifies Meta webhook POST bodies at the WATS app layer with HMAC-SHA256 from `X-Hub-Signature-256`. Keep that app-level HMAC verification enabled; it is independent of TLS termination.
-
-If your production ingress opts into Meta outbound webhook mTLS, configure infrastructure-level client certificate validation at the TLS terminator, reverse proxy, load balancer, CDN, or platform in front of Bun. Meta's transition names the Meta-owned root `meta-outbound-api-ca-2025-12.pem`; WATS does not vendor that CA, does not include PEM contents, and does not configure user infrastructure automatically. Obtain and rotate the CA through Meta's authoritative channel, then pass only already-accepted HTTP requests to the Bun WATS handler.
+If your production ingress opts into Meta outbound webhook mTLS, configure
+client-certificate validation at the TLS terminator in front of Bun — reverse
+proxy, load balancer, CDN, or platform. Meta's transition names the Meta-owned
+root `meta-outbound-api-ca-2025-12.pem`; WATS does not vendor that CA, embed
+PEM contents, or configure your infrastructure. Obtain and rotate the CA
+through Meta's authoritative channel, then pass only already-accepted HTTP
+requests to the Bun handler.
 
 ## Graceful shutdown
 
@@ -104,8 +110,19 @@ logger: (event) => {
 }
 ```
 
+## Verify it works
+
+Hit the GET verify endpoint the way Meta will:
+
+```bash
+curl -i "http://127.0.0.1:8787/?hub.mode=subscribe&hub.verify_token=$VERIFY_TOKEN&hub.challenge=ping"
+```
+
+A correct setup returns `200` with body `ping`. A wrong token returns `401`.
+Only point Meta at the URL once this passes.
+
 ## See also
 
-- `docs/reference/webhook-adapter.md` — full adapter reference
-- `docs/guides/deploy-node.md`
-- `docs/guides/deploy-cloudflare-workers.md`
+- [Webhook adapter reference](/docs/reference/webhook-adapter)
+- [Deploy on Node](/docs/guides/deploy-node)
+- [Deploy on Cloudflare Workers](/docs/guides/deploy-cloudflare-workers)

@@ -1,13 +1,13 @@
 ---
 title: "WhatsApp facade reference (`WhatsApp`)"
-description: "The WATS-26 / Arch-L WhatsApp composition root: what it binds, what it exposes, and when to bypass it."
+description: "The WhatsApp composition root: what it binds, what it exposes, and when to bypass it."
 ---
 
-<DocMeta status="active" lastReviewed="2026-04-28" appliesTo="0.3.x-alpha-tooling (@wats/core)" />
+<DocMeta status="active" lastReviewed="2026-04-28" />
 
 ## WhatsApp
 
-`WhatsApp` is the WATS-26 / Arch-L composition root for application code. It does not hide the lower-level packages; it binds them into one object so handlers, listeners, webhook dispatch, and scoped Graph calls share the same runtime context. The class shipped in the F-10 scope and was extended with listener support in F-11.
+`WhatsApp` is the composition root for application code. It does not hide the lower-level packages; it binds them into one object so handlers, listeners, webhook dispatch, and scoped Graph calls share the same runtime context.
 
 ## Construction
 
@@ -67,10 +67,9 @@ await wa.phoneNumberClient?.sendMessage({
 });
 ```
 
-## Group helpers (WATS-136)
+## Group helpers
 
-When constructed with `phoneNumberId`, the facade exposes thin Groups helpers over
-the phone-number scoped client:
+When constructed with `phoneNumberId`, the facade exposes thin Groups helpers over the phone-number scoped client:
 
 ```ts
 await wa.createGroup({ subject: "Launch team" });
@@ -78,23 +77,11 @@ await wa.sendGroupMessage({ groupId: "120363...", text: "Hello group" });
 const groupClient = wa.group("120363...");
 ```
 
-`createGroup` returns the async Graph acknowledgement with camelCase public
-fields such as `requestId`; the group id and `inviteLink` arrive later through
-the `group_lifecycle_update` webhook. `wa.group(groupId)` returns the scoped
-GroupClient, whose read methods expose camelCase response fields such as
-`joinApprovalMode`, `creationTimestamp`, and `totalParticipantCount`. Meta
-snake_case stays only at the Graph wire boundary.
+`createGroup` returns the async Graph acknowledgement with camelCase public fields such as `requestId`; the group id and `inviteLink` arrive later through the `group_lifecycle_update` webhook. `wa.group(groupId)` returns the scoped GroupClient, whose read methods expose camelCase response fields such as `joinApprovalMode`, `creationTimestamp`, and `totalParticipantCount`. Meta snake_case stays only at the Graph wire boundary.
 
-`sendGroupMessage` sends a text payload to `POST /{phoneNumberId}/messages` with
-`recipient_type: "group"` and `to` set to the group id. Missing `phoneNumberId`
-or malformed group/text input rejects before transport with `GraphRequestValidationError`.
-Use `listen({ groupId: "120363..." })` to wait for a group message/status or
-`group_*_update` webhook from one group.
+`sendGroupMessage` sends a text payload to `POST /{phoneNumberId}/messages` with `recipient_type: "group"` and `to` set to the group id. Missing `phoneNumberId` or malformed group/text input rejects before transport with `GraphRequestValidationError`. Use `listen({ groupId: "120363..." })` to wait for a group message/status or `group_*_update` webhook from one group.
 
-Groups enforce Meta's bounded surface: subject ≤128, description ≤2048, and
-participant removal accepts at most 8 ids. Photo upload is not implemented in
-this facade slice; there is no direct participant-add helper and no promote/demote helper
-because official Cloud API groups are invite-only and the business is the sole admin.
+Groups enforce Meta's bounded surface: subject ≤128, description ≤2048, and participant removal accepts at most 8 ids. Photo upload is not implemented in this facade slice; there is no direct participant-add helper and no promote/demote helper because official Cloud API groups are invite-only and the business is the sole admin.
 
 ## Handlers
 
@@ -144,7 +131,7 @@ Options:
 
 - `type: "message" | "status" | "account" | "unknown" | "callConnect" | "callTerminate" | "callStatus" | "groupLifecycle" | "groupParticipants" | "groupSettings" | "groupStatus"`
 - `from?: string` — currently narrows message sender or status recipient.
-- `groupId?: string` — WATS-136 group narrower for group messages/statuses and `group_*_update` webhooks.
+- `groupId?: string` — group narrower for group messages/statuses and `group_*_update` webhooks.
 - `filter?: TypedFilter<...>` — additional typed constraint.
 - `timeoutMs?: number`
 - `signal?: AbortSignal`
@@ -152,7 +139,7 @@ Options:
 
 Listener evaluation runs before normal handler dispatch when `wa.dispatch(update)` is called. Listeners are additive; a matched listener does not prevent normal handlers from running.
 
-## Sent-result waiters (WATS-78)
+## Sent-result waiters
 
 `wa.startChat(...)` returns a `WhatsAppWaitableSentResult`: the normal Graph send response plus pywa-like helper methods:
 
@@ -217,8 +204,8 @@ Future CLI/service packages should compose this facade rather than embedding new
 
 ## Related
 
-- `docs/reference/router.md`
-- `docs/reference/listeners.md`
-- `docs/reference/scoped-clients.md`
-- `docs/reference/webhook-adapter.md`
-- `docs/architecture/public-api-surface.md`
+- [Router](/docs/reference/router)
+- [Listeners](/docs/reference/listeners)
+- [Scoped clients](/docs/reference/scoped-clients)
+- [Webhook Adapter](/docs/reference/webhook-adapter)
+- [Public API surface](/docs/concepts/public-api-surface)

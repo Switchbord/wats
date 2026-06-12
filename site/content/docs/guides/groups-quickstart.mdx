@@ -3,13 +3,20 @@ title: Groups quickstart
 description: The credential-free Groups flow WATS supports today — create, read the lifecycle webhook, send the invite, approve joins, and message the group.
 ---
 
-<DocMeta status="WATS-138 credential-free quickstart; live validation pending WATS-139" />
+<DocMeta status="shape-only — live listGroups passed; group mutations are not live-validated" lastReviewed="2026-06-12" />
 
-Safety default: offline by default with MockTransport.
+This is the Groups flow WATS supports today: create a group, read the group
+id and invite link from the lifecycle webhook, send the invite link, approve
+a join request, then message the group. Everything here is **shape-only**
+except `listGroups` — the mutation matrix has not been proven against live
+Meta. See the [parity matrix](/docs/parity) for current status.
 
-This guide shows the Groups flow WATS supports today: create a group, read the group id and invite link from the lifecycle webhook, send the invite link, approve a join request, then message the group.
-
-Use placeholder values in docs and examples. For live Meta verification, Meta requires a public HTTPS callback URL; use ngrok or an equivalent HTTPS tunnel for local testing. Do not paste live access tokens, app secrets, verify tokens, WABA ids, phone-number ids, group ids, or invite links into docs, issues, logs, or examples.
+The quickstart is credential-free: offline by default with MockTransport.
+Use placeholder values in docs and examples. For live Meta verification,
+Meta requires a public HTTPS callback URL; use ngrok or an equivalent HTTPS
+tunnel for local testing. Do not paste live access tokens, app secrets,
+verify tokens, WABA ids, phone-number ids, group ids, or invite links into
+docs, issues, logs, or examples.
 
 ## 1. Create the group
 

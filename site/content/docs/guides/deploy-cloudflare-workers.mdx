@@ -3,20 +3,19 @@ title: Deploying a WATS webhook on Cloudflare Workers
 description: Deploy a WATS webhook on Cloudflare Workers, Deno, and other WinterCG fetch runtimes using createFetchWebhookHandler.
 ---
 
-<DocMeta status="guide (F-12). Sketch only — WATS-25 closes the edge-runtime shape invariant; the full Miniflare integration test is tracked for a later step. WATS-96 adds the v25 webhook mTLS boundary note." />
+<DocMeta status="shape-only on Workers — the edge invariant is structurally tested; no full Miniflare integration test yet" lastReviewed="2026-06-12" />
 
-This guide covers deploying a WATS webhook on **Cloudflare Workers**
-using `createFetchWebhookHandler`. The same pattern works on Deno
-(`Deno.serve`), on Vercel Edge Functions, and on any other runtime
-that implements the WinterCG fetch handler contract.
+This page covers **Cloudflare Workers** with `createFetchWebhookHandler`. The
+same pattern works on Deno (`Deno.serve`), Vercel Edge Functions, and any
+other runtime that implements the WinterCG fetch handler contract.
 
 ## Why the fetch adapter works on Workers
 
 `@wats/http`'s `createFetchWebhookHandler` produces a pure
 `(request: Request) => Promise<Response>` function. The file
 `packages/http/src/adapters/fetchAdapter.ts` contains **zero static
-`node:*` imports** — this invariant is enforced by two structural
-tests (`packages/testing/tests/workspace-policy.test.ts` +
+`node:*` imports** — an invariant enforced by two structural tests
+(`packages/testing/tests/workspace-policy.test.ts` +
 `packages/testing/edge/webhook-adapter.test.ts`) so regressions can't
 sneak in.
 
@@ -117,11 +116,19 @@ limits (100 MiB on paid plans as of 2024). WATS's default
 payload. Raise it via `createWebhookAdapter({ ..., maxBodyBytes })`
 if your deployment genuinely needs larger envelopes.
 
-## WATS-96 webhook mTLS and HMAC boundary
+## mTLS and the HMAC boundary
 
-The Worker handler still verifies Meta webhook POST bodies at the WATS app layer with HMAC-SHA256 from `X-Hub-Signature-256`. That app-level HMAC verification happens in `@wats/http` after the request reaches the Worker and remains required.
+The Worker handler still verifies Meta webhook POST bodies at the app layer
+with HMAC-SHA256 from `X-Hub-Signature-256`. That verification happens in
+`@wats/http` after the request reaches the Worker and remains required.
 
-Optional Meta webhook mTLS belongs to infrastructure-level client certificate validation before the Worker handler runs. During Meta's CA transition, any Cloudflare/edge ingress mTLS configuration you choose must trust Meta's owned root `meta-outbound-api-ca-2025-12.pem` through the platform controls that support client certificates. WATS does not vendor the CA, does not embed PEM contents, does not expose a Worker-side certificate validator, and does not configure user infrastructure automatically; obtain and rotate the CA from Meta's authoritative channel.
+Optional Meta webhook mTLS is infrastructure-level client-certificate
+validation before the Worker handler runs. Any Cloudflare/edge ingress mTLS
+configuration you choose must trust Meta's owned root
+`meta-outbound-api-ca-2025-12.pem` through the platform controls that support
+client certificates. WATS does not vendor the CA, embed PEM contents, expose a
+Worker-side certificate validator, or configure your infrastructure; obtain
+and rotate the CA from Meta's authoritative channel.
 
 ## Observability on Workers
 
@@ -129,8 +136,17 @@ Use `tail`ed logs or a platform logging binding — `logger` fires
 synchronously and the Worker's execution-context model is compatible
 with a non-async logger callback.
 
+## Verify it works
+
+```bash
+curl -i "https://wats-webhook.<your-subdomain>.workers.dev/?hub.mode=subscribe&hub.verify_token=<token>&hub.challenge=ping"
+```
+
+A correct deployment returns `200` with body `ping`; a wrong token returns
+`401`. Only register the URL with Meta once this passes.
+
 ## See also
 
-- `docs/reference/webhook-adapter.md`
-- `docs/guides/deploy-bun.md`
-- `docs/guides/deploy-node.md`
+- [Webhook adapter reference](/docs/reference/webhook-adapter)
+- [Deploy on Bun](/docs/guides/deploy-bun)
+- [Deploy on Node](/docs/guides/deploy-node)

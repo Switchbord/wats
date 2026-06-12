@@ -5,13 +5,11 @@ description: How to read stable-for-0.x, experimental, and internal WATS surface
 
 <DocMeta status="active" appliesTo="WATS 0.x alpha package line" lastReviewed="2026-05-24" />
 
-## Purpose
-
-This page explains how to read WATS public APIs during the 0.x alpha line. It separates stable-for-0.x surfaces from experimental surfaces and internal support so package users can choose the right level of coupling.
+WATS public APIs carry one of three labels during the 0.x alpha line: stable-for-0.x, experimental, or internal. Pick your coupling accordingly.
 
 ## Stable-for-0.x surfaces
 
-Stable-for-0.x surfaces should avoid breaking changes within the same minor version. Compatible fixes, docs clarifications, stricter validation for unsafe inputs, and additive helpers may still ship in patch releases.
+Stable-for-0.x surfaces avoid breaking changes within the same minor version. Compatible fixes, docs clarifications, stricter validation for unsafe inputs, and additive helpers may still ship in patch releases.
 
 Current stable-for-0.x surfaces:
 
@@ -25,7 +23,7 @@ Breaking changes to these surfaces require at least a 0.x minor bump plus change
 
 ## Experimental surfaces
 
-Experimental surfaces are public enough to use and test, but may change in any 0.x minor while WATS closes WhatsApp/pywa parity gaps. Experimental changes should still be documented and tested, but users should pin versions and expect movement.
+Experimental surfaces are public enough to use and test, but may change in any 0.x minor while WATS works toward WhatsApp/pywa parity. Changes are still documented and tested. Pin versions and expect movement.
 
 Current experimental surfaces:
 
@@ -36,13 +34,13 @@ Current experimental surfaces:
 - `@wats/persistence/sqlite` is experimental local/single-instance persistence; Postgres and service integration are separate follow-up surfaces.
 - Generated OpenAPI details and docs-site navigation during public alpha.
 
-The marking convention is a JSDoc `@experimental` tag on exported source barrels or declarations for surfaces called out here. Generated API docs should surface those tags when TypeDoc output is expanded beyond the current package API index.
+Experimental exports carry a JSDoc `@experimental` tag on their source barrels or declarations.
 
 ## Internal and unsupported surfaces
 
 Internal and unsupported surfaces carry no application stability guarantee.
 
-- `@wats/internal-utils` is published internal support for WATS runtime dependency closure. It is not a stable application API even though npm must install it for dependent packages.
+- `@wats/internal-utils` is published internal support for WATS runtime dependency closure. npm must install it; you should not import it.
 - `@wats/testing` is private workspace-only test infrastructure and is not published.
 - Postgres persistence adapter, config persistence schema, raw webhook-body persistence, CLI thread navigation, and observed status UI are not exported yet.
 - Credentialed local live `wats serve` is experimental operator tooling. It requires explicit `--live --yes-live --env-file .env.local` and is not a production hosting contract.
@@ -52,7 +50,7 @@ Internal and unsupported surfaces carry no application stability guarantee.
 - Patch releases may include docs fixes, test-only changes, validation hardening, packaging fixes, and bug fixes that preserve public contracts.
 - Minor releases may add new public endpoint families, package exports, CLI behavior, config fields, service routes, or experimental surface reshaping.
 - Breaking changes in stable-for-0.x surfaces require a minor release, changelog entry, docs updates, and migration notes when relevant.
-- Experimental surfaces may change in any minor, but should not break silently in a patch unless the old behavior was unsafe or clearly invalid.
+- Experimental surfaces may change in any minor, but never break silently in a patch unless the old behavior was unsafe or clearly invalid.
 
 ## Related
 
@@ -60,4 +58,3 @@ Internal and unsupported surfaces carry no application stability guarantee.
 - [Release policy](/docs/meta/release-policy)
 - [Package map](/docs/concepts/package-map)
 - [pywa parity matrix](/docs/parity)
-- Linear: WATS-115

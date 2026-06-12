@@ -1,34 +1,27 @@
 ---
 title: "CLI reference"
-description: "The @wats/cli `wats` command for safe local onboarding, config validation, diagnostics, and inspection."
+description: "The @wats/cli wats command: offline config validation, diagnostics, OpenAPI export, setup, and a local serve wrapper."
 ---
 
-<DocMeta status="experimental" lastReviewed="2026-05-25" appliesTo="WATS-33, WATS-47, and WATS-69; WATS-104 setup wizard" />
+<DocMeta status="experimental" lastReviewed="2026-05-25" />
 
-`@wats/cli` provides the `wats` command for safe local onboarding and inspection. WATS-33 ships real offline config validation and OpenAPI export. WATS-69 adds safe `wats init` config/env placeholder generation. WATS-104 adds safe single-profile `wats setup` credential-file generation. WATS-70 adds real offline `wats doctor` diagnostics. WATS-71 adds a real dry-run `wats serve` process wrapper around `@wats/service`. WATS-126 adds package-version visibility and Bun-powered WATS package upgrades.
+`@wats/cli` provides the `wats` command for local onboarding and inspection: config validation, OpenAPI export, placeholder generation (`init`), a credential setup wizard (`setup`), offline diagnostics (`doctor`), a dry-run/live `serve` wrapper around `@wats/service`, and Bun-powered package upgrades.
 
 ## No-live-credentials default
 
-The CLI does not read Meta access tokens, app secrets, service bearer tokens, `.env.local`, or live credential values by default. It does not call Meta Graph APIs by default. Config commands read WATS config files only; config secret fields remain env-secret references and are never resolved.
+The CLI does not read Meta access tokens, app secrets, service bearer tokens, `.env.local`, or live credential values by default. It does not call Meta Graph APIs by default. Config commands read WATS config files only; secret fields stay env-secret references and are never resolved.
 
-Do not paste production access tokens or app secrets into CLI arguments. Unknown arguments fail closed and intentionally do not echo user-supplied path-like or token-like values.
+Do not paste production tokens into CLI arguments. Unknown arguments fail closed and do not echo path-like or token-like values.
 
-## Implemented commands
+## Commands
 
-### `wats --help`
+### `wats --help` / `wats --version`
 
-Prints top-level help and exits 0.
-
-### `wats --version`
-
-Prints the installed `@wats/cli` package version and exits 0. No config, env files, package manifests, or live credentials are read.
-
+Help exits 0. `--version` prints the installed `@wats/cli` package version and exits 0 — no config, env files, or credentials are read.
 
 ### `wats init [dir] [--dry-run] [--format yaml|json] [--profile <name>]`
 
-Generates `wats.config.yaml` / `wats.config.json` plus `.env.example` placeholder files for local onboarding. The command uses env-secret references only, refuses to overwrite existing files, and never resolves live credentials or reads `.env.local`.
-
-Default behavior:
+Generates `wats.config.yaml` / `wats.config.json` plus `.env.example` placeholder files. Env-secret references only; refuses to overwrite existing files; never resolves live credentials or reads `.env.local`.
 
 ```bash
 wats init
@@ -45,30 +38,23 @@ format: yaml
 profile: [REDACTED_PROFILE]
 ```
 
-Success output is similarly redacted and does not print target paths, profile names, or env-secret reference names. Generated `.env.example` values are blank except non-secret live-gate defaults (`WATS_LIVE_ENABLE=0`, `WATS_YES_LIVE=0`).
+Success output is similarly redacted: no target paths, profile names, or env-secret reference names. Generated `.env.example` values are blank except the non-secret live-gate defaults (`WATS_LIVE_ENABLE=0`, `WATS_YES_LIVE=0`).
 
-Failure behavior:
-
-- unknown flags, duplicate flags, unsafe paths, unsupported formats, and unsafe profile names fail closed;
-- existing `wats.config.*` or `.env.example` targets fail with `refusing to overwrite`;
-- diagnostics do not echo attacker-supplied paths or token-like values;
-- no raw secrets are generated.
+Failure behavior: unknown flags, duplicate flags, unsafe paths, unsupported formats, and unsafe profile names fail closed. Existing `wats.config.*` or `.env.example` targets fail with `refusing to overwrite`. Diagnostics never echo attacker-supplied paths or token-like values.
 
 ### `wats setup [dir] [--profile <name>]`
 
-Runs a safe credential setup wizard for one local WATS profile. It writes `wats.config.yaml` with env-secret references and an ignored `.env.local` containing the operator-entered local values. The command validates the generated config through `@wats/config`, refuses to overwrite existing `wats.config.yaml` or `.env.local`, and rolls back the config file if the secret-file write fails.
+Credential setup wizard for one local profile. Writes `wats.config.yaml` with env-secret references and an ignored `.env.local` containing the operator-entered values. The generated config is validated through `@wats/config`; the command refuses to overwrite existing `wats.config.yaml` or `.env.local` and rolls back the config file if the secret-file write fails.
 
-The generated config keeps raw access tokens, app secrets, webhook verify tokens, and service bearer tokens out of YAML. It uses the existing env names `WATS_ACCESS_TOKEN`, `WATS_VERIFY_TOKEN`, `WATS_APP_SECRET`, and `WATS_SERVICE_TOKEN`; `.env.local` also records WABA/phone-number ids plus `WATS_LIVE_ENABLE=0` and `WATS_YES_LIVE=0`.
+Raw tokens never land in YAML. The env names are `WATS_ACCESS_TOKEN`, `WATS_VERIFY_TOKEN`, `WATS_APP_SECRET`, and `WATS_SERVICE_TOKEN`; `.env.local` also records WABA/phone-number ids plus `WATS_LIVE_ENABLE=0` and `WATS_YES_LIVE=0`.
 
 Prompted input policy:
 
-- profile names are limited to safe 1..32 character identifiers and cannot contain token/secret/password-like words;
-- access token and app secret are required, non-empty strings, max 4096 characters, and cannot contain control characters;
-- access-token and app-secret prompts state `Input hidden` before reading so operators know pasted values will not echo;
-- verify and service tokens may be left blank, in which case WATS generates local random `wats_wh_...` and `wats_srv_...` values;
-- optional secret-token prompts state they can be left blank to generate local values;
+- profile names: safe 1..32 character identifiers, no token/secret/password-like words;
+- access token and app secret: required, non-empty, max 4096 characters, no control characters; prompts state `Input hidden` before reading;
+- verify and service tokens may be left blank — WATS generates local random `wats_wh_...` and `wats_srv_...` values;
 - WABA and phone-number ids must be digit strings;
-- webhook path and service API prefix must be absolute safe paths with no traversal, encoded traversal, query, fragment, or control characters;
+- webhook path and service API prefix must be absolute safe paths: no traversal, encoded traversal, query, fragment, or control characters;
 - service host and port use the same safe local validation as dry-run serve.
 
 Success output is count/status-only:
@@ -79,21 +65,13 @@ files: 2
 profile: [REDACTED_PROFILE]
 ```
 
-Failure behavior:
+Error families: malformed args → `CliUsageError`; invalid prompt plumbing → `PromptInputError`; unsafe operator answers → `SetupInputError`; config-schema failures → `ConfigValidationError`; write conflicts → `OutputError` with `refusing to overwrite`.
 
-- malformed args return `CliUsageError`;
-- invalid prompt plumbing returns `PromptInputError`;
-- unsafe operator answers return `SetupInputError`;
-- generated config-schema failures return `ConfigValidationError`;
-- file write conflicts return `OutputError` with `refusing to overwrite`.
-
-The command does not print target paths, profile names, env-secret names, token values, or raw prompt answers. It does not read existing `.env.local`, resolve env-secret values, validate tokens against Meta, call Meta Graph APIs, manage multiple profiles, or start the service.
+The command does not print target paths, profile names, env-secret names, token values, or raw prompt answers. It does not read existing `.env.local`, validate tokens against Meta, manage multiple profiles, or start the service.
 
 ### `wats onboarding --public-url <https URL> [--webhook-path /webhooks/whatsapp]`
 
-Prints an operator-facing onboarding checklist for Meta webhook setup. The command accepts the public HTTPS base URL for the WATS service or tunnel, combines it with the configured webhook path, and prints the callback address to paste into Meta App Dashboard > WhatsApp > Configuration.
-
-Example:
+Prints an operator checklist for Meta webhook setup: it combines your public HTTPS base URL with the configured webhook path and prints the callback address to paste into Meta App Dashboard > WhatsApp > Configuration.
 
 ```bash
 wats onboarding --public-url https://example.test/wats
@@ -103,23 +81,16 @@ wats onboarding --public-url https://example.test --webhook-path /webhooks/whats
 Output includes:
 
 - `webhook callback address: https://example.test/wats/webhooks/whatsapp`
-- a locally generated `WATS_VERIFY_TOKEN` for Meta webhook verification;
-- a locally generated `WATS_SERVICE_TOKEN` for protected WATS service routes;
-- user-side values to copy from Meta/WhatsApp: `WATS_ACCESS_TOKEN`, `WATS_APP_SECRET`, `WATS_WABA_ID`, and `WATS_PHONE_NUMBER_ID`.
+- a locally generated `WATS_VERIFY_TOKEN` and `WATS_SERVICE_TOKEN` (stdout only — no files written);
+- the values to copy from Meta: `WATS_ACCESS_TOKEN`, `WATS_APP_SECRET`, `WATS_WABA_ID`, `WATS_PHONE_NUMBER_ID`.
 
-The generated tokens are printed to stdout only. The command does not write files, read `.env.local`, resolve existing environment secrets, or call Meta Graph APIs. `--public-url` must be HTTPS, cannot include raw whitespace, credentials, query strings, or fragments, and `--webhook-path` must be an absolute safe path with no traversal segments.
+`--public-url` must be HTTPS with no raw whitespace, credentials, query strings, or fragments. `--webhook-path` must be an absolute safe path with no traversal segments. The command does not read `.env.local`, resolve env secrets, or call Meta.
 
 ### `wats config validate <path>`
 
-Loads and validates a JSON/YAML WATS config file through `@wats/config` and exits 0 when valid.
+Loads and validates a JSON/YAML config through `@wats/config`; exits 0 when valid. `wats config validate --config <path>` is an equivalent alias.
 
-Equivalent alias:
-
-```bash
-wats config validate --config <path>
-```
-
-Success output is intentionally safe and count-oriented:
+Success output is count-oriented and safe:
 
 ```text
 config valid
@@ -127,22 +98,11 @@ default profile: [REDACTED_PROFILE]
 profiles: 2
 ```
 
-The command does not print profile names, env-secret reference names such as `WATS_ACCESS_TOKEN`, or any raw token values.
-
-Failure behavior:
-
-- exits 1
-- prints `ConfigValidationError`
-- prints code, path, and safe message
-- never prints stack traces
-- sanitizes file-read errors so attacker-supplied paths are not echoed
-- redacts dynamic profile-name path segments in validation paths and uses generic profile-validation messages
+No profile names, env-secret reference names, or token values are printed. On failure: exits 1, prints `ConfigValidationError` with code, path, and a safe message; no stack traces; file-read errors are sanitized so attacker-supplied paths are not echoed; dynamic profile-name path segments are redacted.
 
 ### `wats doctor --config <path> [--profile <name>] [--check-env] [--format text|json]`
 
-Runs real offline diagnostics for local operator readiness. The command checks runtime compatibility, package imports, WATS package-version drift from the current project `package.json`, config validation, selected profile availability, service route collision safety, and local OpenAPI generation.
-
-Default text output is status-only and does not print profile names, config paths, env-secret reference names, or secret values:
+Offline diagnostics: runtime compatibility, package imports, WATS package-version drift against the project `package.json`, config validation, profile availability, service route collision safety, and local OpenAPI generation.
 
 ```text
 doctor ok
@@ -156,92 +116,53 @@ openapi: ok
 summary: ok=7 warning=0 error=0
 ```
 
-`--format json` returns a stable `{ ok, summary, checks }` object. The `packages` check reads only `package.json` dependency ranges for the public WATS package set and warns when a listed WATS dependency appears older than the installed CLI version; it does not call npm. `--check-env` adds one env-presence check that reports counts only, such as `missing 1 required env value`; it does not print env names or values. Expected config/profile/route/OpenAPI failures are aggregated into safe findings instead of host stack traces.
+`--format json` returns a stable `{ ok, summary, checks }` object. The `packages` check reads only `package.json` dependency ranges for the public WATS package set and warns when a listed dependency is older than the installed CLI — it does not call npm. `--check-env` adds one env-presence check reporting counts only (`missing 1 required env value`), never env names or values. Expected failures aggregate into safe findings instead of host stack traces.
 
-The command does not call Meta Graph APIs, does not resolve or print credential values, and does not write files.
-
-### `wats doctor --help`
-
-Prints doctor usage and exits 0.
-
+No Meta calls, no credential resolution, no file writes. `wats doctor --help` prints usage and exits 0.
 
 ### `wats upgrade [--dry-run]`
 
-Updates the public WATS package set in the current Bun project without making users remember the package list. `wats update` is an alias.
+Updates the public WATS package set in the current Bun project. `wats update` is an alias.
 
 ```bash
-wats --version
 wats upgrade --dry-run
 wats upgrade
-# alias
-wats update
 ```
 
-`wats upgrade` checks that the current directory has a readable `package.json`, then runs:
+After checking for a readable `package.json`, it runs:
 
 ```bash
 bun update --latest @wats/cli @wats/core @wats/graph @wats/http @wats/config @wats/service
 ```
 
-`--dry-run` prints the Bun command and exits without changing `package.json` or `bun.lock`. Output is status-only: it does not print config paths, env names, `.env.local`, token values, or Graph responses. The command does not read credentials and does not call Meta Graph APIs.
-
-### `wats upgrade --help`
-
-Prints upgrade/update usage and exits 0. Unknown options fail closed and do not echo attacker-supplied values.
+`--dry-run` prints the Bun command without touching `package.json` or `bun.lock`. Output is status-only. `wats upgrade --help` prints usage and exits 0; unknown options fail closed.
 
 ### `wats openapi --config <path>`
 
-Loads a WATS config and prints OpenAPI 3.1 JSON for the current WATS standalone service API.
-
-Default behavior:
+Prints OpenAPI 3.1 JSON for the WATS standalone service API (not Meta Graph) to stdout, using the config `defaultProfile`. No files created, no env-secret resolution.
 
 ```bash
 wats openapi --config wats.config.json
-```
-
-- uses the config `defaultProfile`
-- prints JSON to stdout
-- does not create files
-- does not resolve env-secret references
-- does not describe the full Meta Graph API
-
-Options:
-
-```bash
 wats openapi --config wats.config.json --profile prod
 wats openapi --config wats.config.json --server-url https://service.example
 wats openapi --config wats.config.json --out openapi.json
 ```
 
-`--profile <name>` selects a named config profile. Missing or blank profiles fail closed.
+- `--profile <name>` selects a named profile; missing or blank profiles fail closed.
+- `--server-url <url>` must be `http:`/`https:` and acceptable to `@wats/service`; query strings and fragments are stripped.
+- `--out <path>` writes JSON with exclusive-create semantics and refuses existing targets. Empty paths, directories, control characters, NUL, backslashes, and `.`/`..` segments are rejected. Relative paths resolve under the current working directory.
 
-`--server-url <url>` must be an `http:` or `https:` URL accepted by `@wats/service`; query strings and fragments are stripped by the generator.
-
-`--out <path>` writes JSON only when explicit. The CLI refuses to overwrite existing files. Empty paths, directories, control characters, NUL, backslashes, and `.` / `..` path segments are rejected. Relative paths resolve under the current working directory.
-
-Failure behavior:
-
-- config parse/validation errors use the `ConfigValidationError` safe format
-- service OpenAPI option/profile errors use `WatsServiceError` safe format
-- explicit `--out` writes use exclusive create semantics and refuse existing targets
-- unexpected host errors collapse to a generic safe usage hint
-- attacker-supplied values are not echoed
-
-### `wats openapi --help`
-
-Prints OpenAPI export help and exits 0. OpenAPI export remains service-only: it describes the WATS standalone service API, not Meta Graph.
+Failures use the `ConfigValidationError` / `WatsServiceError` safe formats; unexpected host errors collapse to a generic usage hint; attacker-supplied values are not echoed.
 
 ### `wats serve --config <path> --dry-run [--profile <name>] [--host <host>] [--port <port>] [--paas] [--print-routes]`
 
-Starts the `@wats/service` Request-to-Response app as a local Bun process in dry-run mode. The command loads a WATS config file, selects the default or named profile, optionally overrides `profile.service.host` and `profile.service.port`, injects synthetic in-memory secrets plus a no-network Graph transport, and exposes:
+Starts the `@wats/service` Request-to-Response app as a local Bun process in dry-run mode: loads the config, selects the default or named profile, optionally overrides `profile.service.host`/`profile.service.port`, injects synthetic in-memory secrets plus a no-network Graph transport, and exposes:
 
 - `GET /healthz`
 - `GET /readyz`
 - `GET /openapi.json`
-- configured webhook GET/POST route
+- the configured webhook GET/POST route
 - protected service message routes under `profile.service.apiPrefix`
-
-Example:
 
 ```bash
 wats serve --config wats.config.yaml --dry-run --host 127.0.0.1 --port 3000
@@ -250,17 +171,11 @@ curl -fsS http://127.0.0.1:3000/readyz
 curl -fsS http://127.0.0.1:3000/openapi.json
 ```
 
-`--print-routes` validates the config/profile and prints the safe route inventory without binding a port:
+`--print-routes` validates the config/profile and prints the safe route inventory without binding a port. Dry-run serve never resolves env-secret values, reads `.env.local`, calls Meta, or prints config paths, profile names, env names, synthetic secret values, or token-like arguments.
 
-```bash
-wats serve --config wats.config.yaml --dry-run --print-routes
-```
+### `wats serve --config <path> --live --yes-live --env-file .env.local [...]`
 
-Dry-run serve never resolves env-secret values, reads `.env.local`, calls Meta Graph APIs, or prints config paths, profile names, env names, synthetic secret values, or token-like arguments.
-
-### `wats serve --config <path> --live --yes-live --env-file .env.local [--profile <name>] [--host <host>] [--port <port>]`
-
-Live mode starts the same local service with real env-secret values and the fetch-backed Graph transport. It is built for local live testing: run it behind a secure HTTPS tunnel such as ngrok because Meta requires a public HTTPS webhook URL.
+Live mode starts the same service with real env-secret values and the fetch-backed Graph transport. Built for local live testing behind a secure HTTPS tunnel (Meta requires a public HTTPS webhook URL):
 
 ```bash
 ngrok http 8787
@@ -271,101 +186,36 @@ WATS_LIVE_ENABLE=1 WATS_YES_LIVE=1 \
 
 Rules:
 
-- `--live`, `--yes-live`, and `--env-file .env.local` must be present together.
-- The CLI does not read `.env.local` implicitly.
-- `--env-file` must be a relative local env filename; absolute paths, traversal, duplicate flags, and token-looking path values fail closed.
-- The env file may contain the setup-generated keys `WATS_ACCESS_TOKEN`, `WATS_VERIFY_TOKEN`, `WATS_APP_SECRET`, `WATS_SERVICE_TOKEN`, `WATS_WABA_ID`, `WATS_PHONE_NUMBER_ID`, `WATS_LIVE_ENABLE`, and `WATS_YES_LIVE` plus comments/blanks. Live serve resolves only the four secret keys.
-- Output is status-only and does not print env names, profile names, config paths, token values, app secrets, verify tokens, service bearer tokens, or Graph responses.
+- `--live`, `--yes-live`, and `--env-file .env.local` must appear together; nothing is read implicitly.
+- `--env-file` must be a relative local env filename; absolute paths, traversal, duplicate flags, and token-looking values fail closed.
+- The env file may contain `WATS_ACCESS_TOKEN`, `WATS_VERIFY_TOKEN`, `WATS_APP_SECRET`, `WATS_SERVICE_TOKEN`, `WATS_WABA_ID`, `WATS_PHONE_NUMBER_ID`, `WATS_LIVE_ENABLE`, and `WATS_YES_LIVE` plus comments/blanks. Live serve resolves only the four secret keys.
+- Output is status-only: no env names, profile names, config paths, token values, or Graph responses.
 - This is not a production hosting or Docker contract.
 
 ### `wats serve ... --paas`
 
-PaaS deploy mode for platforms that inject a `$PORT` and require binding `0.0.0.0` (Railway, Fly, Render, Cloud Run). `--paas` is opt-in and works with both dry-run and live serve:
+Opt-in PaaS mode for platforms that inject `$PORT` and require binding `0.0.0.0` (Railway, Fly, Render, Cloud Run). Works with both dry-run and live serve:
 
 ```bash
-# Railway/Fly/Render/Cloud Run inject $PORT; bind it on 0.0.0.0:
 wats serve --config wats.config.yaml --dry-run --paas
 wats serve --config wats.config.yaml --live --yes-live --env-file .env.local --paas
 ```
 
-Resolution rules:
-
-- With `--paas`, the bind port comes from the platform `$PORT` unless `--port` is given, and the bind host defaults to `0.0.0.0` unless `--host` is given.
-- Explicit `--host` / `--port` always override the PaaS defaults.
+- With `--paas`, the bind port comes from `$PORT` unless `--port` is given; the bind host defaults to `0.0.0.0` unless `--host` is given. Explicit flags always win.
 - Serve fails closed if `--paas` needs `$PORT` but it is missing or not an integer in `1..65535`.
-- Without `--paas`, `$PORT` is ignored entirely; `profile.service.port` (or `--port`) governs. This keeps default/local behavior identical for forks that do not deploy to a PaaS.
-- `--print-routes` under `--paas` validates and prints the route inventory without binding, so it does not require `$PORT`.
+- Without `--paas`, `$PORT` is ignored entirely — `profile.service.port` (or `--port`) governs.
+- `--print-routes` under `--paas` validates and prints routes without binding, so it does not require `$PORT`.
 
-This removes the need for an external container entrypoint shim that maps `$PORT`/`0.0.0.0` onto the static `--host`/`--port` flags.
-
-### `wats serve --help`
-
-Prints serve usage and exits 0.
-
-WATS-49 deployment note: Docker packaging must target implemented `wats serve`, but the current dry-run serve usage is not a supported Docker or live-production contract.
+This removes the need for a container entrypoint shim mapping `$PORT`/`0.0.0.0` onto static flags. `wats serve --help` prints usage and exits 0.
 
 ### `wats webhook token`
 
-Prints one freshly generated verify token and exits 0. The token has a `wats_wh_` prefix and is generated from Web Crypto random bytes when available, with a `crypto.randomUUID()` fallback for compatible runtimes.
-
-The command writes only to stdout. It does not create, update, or overwrite files.
-
-### `wats webhook token --help`
-
-Prints safe token-generation help and exits 0.
-
-## WATS-47 design target
-
-Design-only note: this section records the WATS-47 alpha CLI target. It is not an implementation claim until matching command tests and consumer fixtures land.
-
-Target command examples:
-
-```bash
-wats init [dir]
-wats init --dry-run
-wats init --format yaml --profile local
-wats config validate --config wats.config.yaml --profile local
-wats config print --redacted
-wats config paths
-wats doctor --config wats.config.yaml --profile local
-wats doctor --check-env
-wats --version
-wats upgrade --dry-run
-wats upgrade
-wats serve --config wats.config.yaml --profile local --host 127.0.0.1 --port 3000
-wats serve --dry-run
-wats serve --live --yes-live --env-file .env.local
-wats openapi --config wats.config.yaml --out openapi.json
-wats webhook token
-```
-
-WATS-47 target rules:
-
-- `wats init` writes `wats.config.yaml` or `wats.config.json` and `.env.example` only with explicit command intent.
-- Generated configs use env-secret references rather than embedded secret values.
-- All CLI file creation uses no overwrite by default.
-- `wats doctor` is offline by default and reports env variable presence by name/presence only; it may inspect `package.json` for WATS package-version drift without calling npm.
-- `wats upgrade` shells out to Bun for the public WATS package set only after explicit command intent.
-- `wats serve` wraps `@wats/service` and starts in dry-run/mock mode by default for alpha.
-- Credential-gated live validation requires explicit live flags and an acknowledgement.
-- The phrase credential-gated live validation means the CLI requires both a live flag and an operator acknowledgement before any live check can run.
-- There are no live Meta calls by default, and no command prints raw secrets.
-- `@wats/cli` composes `@wats/config` for schema validation and `@wats/service` for routing/OpenAPI; it does not duplicate either package.
-
-See `docs/reference/cli.md` for the full design.
+Prints one freshly generated verify token (prefix `wats_wh_`, Web Crypto random bytes with a `crypto.randomUUID()` fallback) and exits 0. Stdout only — no files touched. `--help` prints usage and exits 0.
 
 ## Error behavior
 
-Unknown commands and unsupported flags fail closed with exit code 1 and a generic usage hint. User-supplied path-like or secret-like values are not echoed in diagnostics.
+Unknown commands and unsupported flags fail closed with exit code 1 and a generic usage hint. User-supplied path-like or secret-like values are never echoed.
 
-WATS-47 target error families include `CliUsageError`, `CliConfigError`, `ConfigValidationError`, `SecretResolutionError`, `LiveGuardError`, `OutputError`, `DoctorError`, `ServeError`, and `WatsServiceError`.
+Error families: `CliUsageError`, `CliConfigError`, `ConfigValidationError`, `SecretResolutionError`, `LiveGuardError`, `OutputError`, `DoctorError`, `ServeError`, `WatsServiceError`.
 
-## Still planned
-
-Future implementation work may add:
-
-- production hosting/deployment wrappers around `wats serve`;
-- optional live checks behind explicit credential-gated flags;
-- deeper doctor integrations beyond the current offline runtime/package/version/config/profile/routes/OpenAPI/env-presence checks.
-
-Those planned commands must keep the no-live-credentials default unless a user explicitly opts into live validation.
+Not implemented yet: production hosting/deployment wrappers, `wats config print --redacted`, `wats config paths`, and optional live checks behind explicit credential-gated flags — meaning both a live flag and an operator acknowledgement before any live check runs. Planned commands keep the no-live-credentials default.

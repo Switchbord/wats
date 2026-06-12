@@ -2,8 +2,8 @@ import { GraphClient, PhoneNumberClient } from "@wats/graph"
 import { createMockTransport } from "@wats/graph/testing"
 
 // Groups: create an invite-only business group, then send a text into it.
-// shape-only: implemented, live-validation pending — the request shape is
-// captured here, but end-to-end behaviour against Meta is not yet verified.
+// shape-only: the request shape is implemented and captured here; behavior
+// against live Meta is not yet verified.
 const mock = createMockTransport({
   responses: [
     { status: 200, body: { request_id: "req-create", success: true } },

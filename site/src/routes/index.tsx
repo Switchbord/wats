@@ -10,7 +10,7 @@ import heroSource from "../../snippets/hero.ts?raw"
 import heroCaptured from "../generated/hero-captured.json"
 
 // Landing page — section order locked by 03-design.md §4.
-// Copy verbatim from 04-content.md §2 / §5 / §6 / §7 (footer §8 lives in SiteFooter).
+// Copy is governed by VOICE.md; numeric/capability claims stay generated-or-true.
 
 export const Route = createFileRoute("/")({
   head: () => ({

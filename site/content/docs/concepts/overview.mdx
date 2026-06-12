@@ -5,7 +5,7 @@ description: How the WATS packages, Graph request flow, and webhook flow fit tog
 
 <DocMeta status="active" appliesTo="0.3.x-alpha-tooling" lastReviewed="2026-05-01" />
 
-WATS is a Bun-first TypeScript monorepo for WhatsApp operations. The repo is organized around small packages with explicit dependency direction rather than one large framework package.
+WATS is a Bun-first TypeScript monorepo for WhatsApp operations. It is built as small packages with explicit dependency direction, not one large framework package. You take the layers you need and ignore the rest.
 
 ## Package layers
 
@@ -19,9 +19,6 @@ WATS is a Bun-first TypeScript monorepo for WhatsApp operations. The repo is org
 
 @wats/core
   typed updates, filters, router, listeners, WhatsApp facade
-
-@wats/testing
-  workspace fixtures and workspace policy tests
 ```
 
 Application-edge packages sit above these foundations:
@@ -32,7 +29,7 @@ Application-edge packages sit above these foundations:
 @wats/cli      init, validate, doctor, serve, openapi commands
 ```
 
-Those app-layer packages may depend on `@wats/core`; lower-level packages should not. architecture notes keeps the alpha CLI/runtime/operator layer in this monorepo by default rather than splitting it into a second repository.
+App-layer packages may depend on `@wats/core`; lower-level packages must not. The dependency arrows only point down.
 
 ## Request flow
 
@@ -41,9 +38,9 @@ A Graph request starts in either user code or a scoped client:
 1. `PhoneNumberClient`, `WABAClient`, or a custom `defineEndpoint` callable builds path/query/body options.
 2. `GraphClient` validates the path, query, headers, base URL, API version, token, and body handling.
 3. The injected `Transport` sends the request.
-4. Graph failures map into the typed error taxonomy and pywa-seeded error registry.
+4. Graph failures map into the typed error taxonomy. Catch by `instanceof`, not by parsing Meta's prose.
 
-This lets endpoint breadth grow without duplicating transport, auth, validation, or error plumbing.
+Endpoint breadth grows without duplicating transport, auth, validation, or error plumbing.
 
 ## Webhook flow
 
@@ -51,11 +48,11 @@ A webhook request enters through `@wats/http`:
 
 1. A runtime wrapper adapts Bun, Node, or Fetch `Request` shapes to the runtime-neutral `WebhookAdapter`.
 2. The adapter verifies the Meta challenge or `X-Hub-Signature-256` signature.
-3. The raw JSON body is normalized by `normalizeWebhookEnvelope` into `TypedUpdate` values.
+3. `normalizeWebhookEnvelope` turns the raw JSON body into `TypedUpdate` values.
 4. The supplied facade-shaped object dispatches each update.
 5. `TypedRouter` evaluates listeners and handlers, preserving dispatch reports and isolating user-code failures.
 
-The adapter acknowledges valid webhooks even when downstream handlers fail, preventing Meta retry storms caused by application bugs.
+The adapter acknowledges valid webhooks even when your handlers throw. Meta retries unacknowledged webhooks until you acknowledge them or die; a bug in your handler should not trigger that storm.
 
 ## Extension points
 
@@ -64,7 +61,6 @@ The adapter acknowledges valid webhooks even when downstream handlers fail, prev
 - `TypedFilter` and filter combinators for handler/listener matching.
 - `RouterObserver` and webhook logger hooks for observability.
 - `CryptoProvider` for Node/Bun/WebCrypto portability.
-- Future config/service/CLI layers for package-manager adoption and standalone operation.
 
 ## Invariants
 
@@ -72,13 +68,11 @@ The adapter acknowledges valid webhooks even when downstream handlers fail, prev
 - Public APIs are async-only where work may cross I/O or runtime seams.
 - Low-level packages stay runtime-portable; runtime-specific code is isolated behind adapters.
 - Consumer fixtures import through package specifiers, never relative source paths.
-- Docs, changelog, parity matrix, and Linear roadmap move with implementation.
-- Deferred work is tracked in Linear, not in repo-local deferred ledgers.
 
 See also:
 
 - [Package map](/docs/concepts/package-map)
 - [Public API surface](/docs/concepts/public-api-surface)
 - [Release policy](/docs/meta/release-policy)
-- [Roadmap to WhatsApp / pywa parity](/docs/meta/roadmap)
+- [Roadmap](/docs/meta/roadmap)
 - [pywa parity matrix](/docs/parity)

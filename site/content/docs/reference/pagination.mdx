@@ -1,31 +1,11 @@
 ---
 title: "Pagination Reference"
-description: "The pagination primitive: `paginate` and `paginateAll` over cursor-paginated Graph list endpoints with AbortSignal support."
+description: "paginate and paginateAll over cursor-paginated Graph list endpoints, with AbortSignal support and a typed error union."
 ---
 
 <DocMeta status="active" lastReviewed="2026-04-22" />
 
-## Purpose
-
-The pagination primitive lets consumers iterate over cursor-paginated
-Graph API list endpoints (phone numbers, message templates, etc.)
-without hand-rolling cursor plumbing. F-13 ships `paginate` and
-`paginateAll` over the F-6 `defineEndpoint` surface and closes
-WATS-25 (Arch-K pagination primitive) per the foundations-pivot plan.
-
-## Scope
-
-- `paginate(client, endpoint, params, opts?)` — async generator
-  yielding items one at a time.
-- `paginateAll(client, endpoint, params, opts?)` — convenience
-  wrapper that drives the generator to completion and returns a
-  `PaginatedResult<T>` summary with the flat items list.
-- Error taxonomy: `PaginationError` with `.code` union.
-- `maxPages` cap, `pageSize` query-hint merge, `AbortSignal`
-  cancellation.
-- Cursor extraction from Graph's `paging.next` envelope.
-
-## Pagination primitive overview
+`paginate` and `paginateAll` iterate cursor-paginated Graph list endpoints (phone numbers, message templates, etc.) without hand-rolled cursor plumbing. Both work over any `defineEndpoint` callable whose response conforms to `PaginatedPage<T>`.
 
 ```ts
 import {
@@ -84,6 +64,8 @@ console.log("pages consumed:", result.pagesConsumed);
 console.log("cap hit?", result.pageLimitReached);
 ```
 
+`paginate` is an async generator yielding items one at a time. `paginateAll` drives the generator to completion and returns a `PaginatedResult<T>` summary with the flat items list.
+
 ## PaginationOptions
 
 | Field       | Type         | Default | Notes                                                                |
@@ -92,104 +74,62 @@ console.log("cap hit?", result.pageLimitReached);
 | `pageSize`  | `number`     | —       | Positive integer; merged into first request's query under `limit`.   |
 | `signal`    | `AbortSignal`| —       | Duck-typed signal (`aborted`, `addEventListener`, `removeEventListener`). |
 
-All three fields are validated at the first `.next()` tick. Invalid
-inputs throw `PaginationError` with a typed `.code` — the generator
-never silently swallows bad options.
+All three fields are validated at the first `.next()` tick. Invalid inputs throw `PaginationError` with a typed `.code` — the generator never silently swallows bad options.
 
 ## PaginatedResult&lt;T&gt;
 
-Every pagination run returns a frozen summary regardless of how it
-ended. Callers can inspect:
+Every run returns a frozen summary regardless of how it ended:
 
-- `items: readonly T[]` — flat list of every yielded item (same
-  items the `for await` loop already observed).
-- `pagesConsumed: number` — how many pages actually hit the wire.
-- `pageLimitReached: boolean` — `true` when `maxPages` stopped
-  iteration; `false` when the stream exhausted naturally.
-- `aborted: boolean` — `true` when an `AbortSignal` interrupted
-  iteration; `false` otherwise.
+- `items: readonly T[]` — flat list of every yielded item (the same items the `for await` loop observed).
+- `pagesConsumed: number` — pages that actually hit the wire.
+- `pageLimitReached: boolean` — `true` when `maxPages` stopped iteration; `false` on natural exhaustion.
+- `aborted: boolean` — `true` when an `AbortSignal` interrupted iteration.
 
 ## Cursor extraction from paging.next
 
-Graph responds to list endpoints with a `paging.next` field that is
-an **absolute URL** carrying an `after` query parameter. The
-primitive:
+Graph list responses carry a `paging.next` field — an absolute URL with an `after` query parameter. The primitive parses `paging.next` as a `URL`, reads `after`, and merges it into the next iteration's params as `{ ..., after: <cursor> }`.
 
-1. Parses `paging.next` as a `URL`.
-2. Reads the `after` query param.
-3. Merges it into the next iteration's params as `{ ..., after: <cursor> }`.
-
-If `paging.next` is absent, empty, unparseable, or lacks `after`,
-iteration terminates cleanly — no fabricated cursor, no infinite
-loop. This makes the primitive resilient to Graph API response
-drift.
+If `paging.next` is absent, empty, unparseable, or lacks `after`, iteration terminates cleanly — no fabricated cursor, no infinite loop.
 
 ## Error taxonomy
 
-`PaginationError` is a plain `Error` subclass (sibling-NOT
-`TypeError`) with a stable `.code` union:
+`PaginationError` is a plain `Error` subclass (not a `TypeError`) with a stable `.code` union:
 
 | `.code`                | When it fires                                                                  |
 |------------------------|--------------------------------------------------------------------------------|
-| `invalid_endpoint`     | First arg is not an F-6 `EndpointCallable` (missing `.definition` brand).      |
+| `invalid_endpoint`     | First arg is not an `EndpointCallable` (missing `.definition` brand).          |
 | `invalid_max_pages`    | `maxPages` is not a positive integer (0, negatives, NaN, Infinity, 0.5 etc.).  |
 | `invalid_page_size`    | `pageSize` is not a positive integer.                                          |
 | `invalid_signal`       | `signal` is not a duck-typed `AbortSignal`.                                    |
 | `aborted`              | Reserved for programmatic abort-path signalling (currently conveyed via the result flag). |
 | `page_fetch_failed`    | Underlying endpoint threw mid-stream; original error attached as `.cause`.     |
 
-Endpoint errors are always re-thrown as
-`PaginationError(page_fetch_failed, ..., { cause })`. Consumers
-narrow via `instanceof PaginationError` and inspect `.code` for
-branching, or follow `.cause` back to the underlying
-`GraphApiError` / transport failure.
+Endpoint errors always re-throw as `PaginationError(page_fetch_failed, ..., { cause })`. Narrow via `instanceof PaginationError`, branch on `.code`, or follow `.cause` back to the underlying `GraphApiError` / transport failure.
 
-## Streaming iteration (no in-memory accumulation of pages)
+## Streaming iteration
 
-`paginate` yields each item as it arrives from the current page
-and then — once the page is exhausted — fetches the next one.
-Page bodies never accumulate in memory: the only structure that
-grows is the `items` array on `PaginatedResult`, which mirrors what
-the caller already observed item-by-item. For very large result
-sets, consumers should iterate with `for await` and skip
-`paginateAll` to avoid holding the flat items list.
+`paginate` yields each item as it arrives, then fetches the next page once the current one is exhausted. Page bodies never accumulate in memory; the only growing structure is the `items` array on `PaginatedResult`. For very large result sets, iterate with `for await` and skip `paginateAll` to avoid holding the flat list.
 
 ## AbortSignal semantics
 
-- **Pre-aborted signal** — iteration returns an empty result with
-  `aborted: true` WITHOUT touching the transport (zero requests
-  captured).
-- **Abort between pages** — the current page's items still flush
-  to the caller; the next fetch is skipped; final result carries
-  `aborted: true` and `pagesConsumed` reflects pages actually
-  fetched.
-- The signal is also forwarded to the underlying endpoint's
-  `EndpointInvokeOptions.signal`, so in-flight fetches cancel at
-  the transport layer.
+- Pre-aborted signal — iteration returns an empty result with `aborted: true` without touching the transport (zero requests).
+- Abort between pages — the current page's items still flush to the caller; the next fetch is skipped; the final result carries `aborted: true` and `pagesConsumed` reflects pages actually fetched.
+- The signal is also forwarded to the underlying endpoint's `EndpointInvokeOptions.signal`, so in-flight fetches cancel at the transport layer.
 
 ## maxPages cap
 
-Default `DEFAULT_MAX_PAGES = 1000` — large enough for any realistic
-list endpoint, small enough to prevent runaway loops against a
-misbehaving cursor. On cap:
+Default `DEFAULT_MAX_PAGES = 1000` — large enough for any realistic list endpoint, small enough to stop a runaway loop against a misbehaving cursor. On cap:
 
 - Iteration stops after the Nth page's items have been yielded.
-- Final result carries `pageLimitReached: true`.
-- `pagesConsumed === maxPages`.
+- The final result carries `pageLimitReached: true` and `pagesConsumed === maxPages`.
 
-Set `maxPages: 1` for "first page only" semantics; set a larger cap
-for long-running exports; the default is a safety net rather than a
-tight bound.
+Set `maxPages: 1` for first-page-only semantics; raise it for long exports. The default is a safety net, not a tight bound.
 
-## WATS-91 message template cursor handling
+## Message template cursor handling
 
-`listMessageTemplates(...)` accepts both `after` and `before` cursor parameters
-and forwards them to Graph `/{wabaId}/message_templates`. Graph code `131059`
-now maps to `InvalidTemplateCursorError` when Meta rejects a template cursor.
+`listMessageTemplates(...)` accepts both `after` and `before` cursor parameters and forwards them to Graph `/{wabaId}/message_templates`. Graph code `131059` maps to `InvalidTemplateCursorError` when Meta rejects a template cursor.
 
-WATS does not perform a hidden retry automatically. If an application can safely
-restart the list from the first page, it can catch `InvalidTemplateCursorError`
-and retry without before/after as an explicit opt-in policy:
+WATS performs no hidden retry. If your workflow can safely restart from the first page, catch `InvalidTemplateCursorError` and retry without `before`/`after` as an explicit opt-in:
 
 ```ts
 try {
@@ -202,36 +142,20 @@ try {
 }
 ```
 
-WATS-91 also documents `whatsapp_business_manager_messaging_limit` and
-`messaging_limit_tier` on WABA/phone-number inventory responses; these are not
-pagination inputs but they often influence how operators schedule template and
-campaign work.
+Related: `whatsapp_business_manager_messaging_limit` and `messaging_limit_tier` appear on WABA/phone-number inventory responses. They are not pagination inputs, but they often shape how operators schedule template and campaign work.
 
 ## Non-goals
 
-F-13 pagination does NOT:
+Pagination does not:
 
-- persist cursor state across process restarts (caller
-  responsibility — save `result.items` or re-read via new
-  iteration).
-- implement cross-envelope pagination (cursor chaining across
-  Graph response variants — the Graph shape is the only shape).
-- provide bidirectional iteration (no `previous` cursor walk).
-- retry or backoff transient page fetch failures (surface as
-  `PaginationError(page_fetch_failed)`; consumers wrap with their
-  own retry policy).
-- resumable streams across process boundaries.
-- Not a cache: each run hits the transport for the configured
-  endpoint.
+- persist cursor state across process restarts (save `result.items` or re-iterate);
+- implement cross-envelope pagination — the Graph shape is the only shape;
+- provide bidirectional iteration (no `previous` cursor walk);
+- retry or back off transient page-fetch failures (they surface as `PaginationError(page_fetch_failed)`; wrap with your own retry policy);
+- resume streams across process boundaries;
+- cache: each run hits the transport.
 
-## References
+## Related docs
 
-- Plan: foundations-pivot F-13 pagination primitive.
-- Linear: WATS-25 (Arch-K pagination primitive).
-- Architecture: endpoint registry architecture endpoint registry + error taxonomy (pagination shape
-  section).
-- pywa reference: `list_media` / `download_media` cursor shape in
-  `pywa/client.py`.
-- Related: `docs/reference/endpoints.md` (F-6 defineEndpoint),
-  `docs/reference/scoped-clients.md` (F-7 PhoneNumberClient /
-  WABAClient).
+- [Endpoints Reference](/docs/reference/endpoints) — `defineEndpoint`.
+- [Scoped Clients Reference](/docs/reference/scoped-clients) — `PhoneNumberClient` / `WABAClient`.

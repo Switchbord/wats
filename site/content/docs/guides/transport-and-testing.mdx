@@ -3,13 +3,11 @@ title: Transport and Testing
 description: The @wats/graph Transport seam — testing with MockTransport, opt-in reliable transport, and the interceptor primer.
 ---
 
-<DocMeta status="active" lastReviewed="2026-04-21" />
+<DocMeta status="active" lastReviewed="2026-06-12" />
 
-## Purpose
+`@wats/graph` ships a small `Transport` seam under `GraphClient` so that every HTTP concern — retries, authentication refresh, tracing, mocking in tests — lives in a composable layer you control. The default transport (`createFetchTransport`) is a thin wrapper over `globalThis.fetch`. Tests inject `createMockTransport` via the `@wats/graph/testing` subpath and assert on a `requests` array rather than monkey-patching global state.
 
-`@wats/graph` ships a small `Transport` seam under `GraphClient` so that every HTTP concern — retries, authentication refresh, tracing, mocking in tests — lives in a composable layer the user controls. The default transport (`createFetchTransport`) is a thin wrapper over `globalThis.fetch`. Tests inject `createMockTransport` via the `@wats/graph/testing` subpath and assert on a `requests` array rather than monkey-patching global state.
-
-This guide covers three recipes: the test recipe, a custom Transport for production concerns, and the Interceptor primer.
+Three recipes follow: testing with the mock, opt-in reliability for production, and the interceptor primer.
 
 ## The Transport contract
 
@@ -112,7 +110,7 @@ const client = new GraphClient({
 
 The decorator retries transient `GET`/`DELETE` failures (`GraphNetworkError`, HTTP `429`, and HTTP `5xx`) using exponential backoff with full jitter. It honors Meta's `Retry-After` header for `429` / `503` responses and caps every delay at `maxDelayMs`. Caller aborts are never retried; per-attempt timeouts compose with a caller-provided `AbortSignal` via native `AbortSignal.any` / `AbortSignal.timeout`.
 
-WATS does **not** retry non-idempotent `POST` / `PUT` / `PATCH` request failures by default, with one narrow exception: HTTP `429` is treated as a rate-limit response across methods. Retrying `POST /messages` after an ambiguous network failure or `5xx` can double-send a WhatsApp message if Meta received the first request but the client lost the response. If you override `retryOn` to retry those POST failures, pair the request with an application idempotency strategy (for example the service-level `Idempotency-Key` flow). F-4 still applies no retries by default — reliability is explicit, composable, and removable.
+WATS does **not** retry non-idempotent `POST` / `PUT` / `PATCH` request failures by default, with one narrow exception: HTTP `429` is treated as a rate-limit response across methods. Retrying `POST /messages` after an ambiguous network failure or `5xx` can double-send a WhatsApp message if Meta received the first request but the client lost the response. If you override `retryOn` to retry those POST failures, pair the request with an application idempotency strategy (for example the service-level `Idempotency-Key` flow). The default client applies no retries — reliability is explicit, composable, and removable.
 
 The same shape composes: `auth-refresh -> reliability -> tracing -> fetch`. Each layer is a function that takes `(inner: Transport) => Transport`. Because every layer sees the same `TransportRequest`/`TransportResponse` shape, the layers stay independently testable.
 
@@ -172,7 +170,7 @@ Interceptors can be async; the chain awaits each hook. For errors originating in
 
 `createMockTransport` lives at `@wats/graph/testing`, not the package root. Production code that imports `@wats/graph` never pulls the mock in. Tests import `@wats/graph/testing` explicitly, which keeps the dependency graph honest and keeps mocks out of production bundles.
 
-## Related architecture docs
+## Related
 
-- transport and crypto architecture Transport and crypto abstractions — defines the Transport contract, retry policy, and interceptor model.
-- testing and consumer fixture architecture Testing and consumer fixture strategy — motivates MockTransport over global-fetch patching.
+- [Client reference](/docs/reference/client) — `GraphClient` options and the request pipeline.
+- [Errors reference](/docs/reference/errors) — `GraphNetworkError` and the typed error hierarchy.

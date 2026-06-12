@@ -1,23 +1,23 @@
 ---
 title: "Reference Index"
-description: "Curated index of every WATS reference doc with guidance on when to use each entry point."
+description: "Every WATS reference doc and when to reach for it."
 ---
 
-<DocMeta status="canonical" lastReviewed="2026-05-02" appliesTo="0.3.x-alpha-tooling + WATS-31/32/33/34/35/WATS-37/38/39/40/41/42A/44/48/49/WATS-53/WATS-54/WATS-56 consistency line" />
+<DocMeta status="canonical" lastReviewed="2026-05-02" appliesTo="0.3.x-alpha" />
 
-Curated index of every WATS reference doc. Use the "When to use it" column to find the right entry point — the detailed surface lives in the linked doc.
+One table per package. Find the surface you need; the contract lives in the linked doc.
 
 ## Graph primitives (`@wats/graph`)
 
 | Doc | When to use it |
 | --- | --- |
-| [`reference/client.md`](/docs/reference/client) | Constructing a `GraphClient`; construction-time validation taxonomy; request lifecycle. |
+| [`reference/client.md`](/docs/reference/client) | Constructing a `GraphClient`; construction-time validation; request lifecycle. |
 | [`reference/endpoints.md`](/docs/reference/endpoints) | Defining a new endpoint with `defineEndpoint`; path templates, param kinds, body passthrough. |
 | [`reference/scoped-clients.md`](/docs/reference/scoped-clients) | Binding a `phoneNumberId` or `wabaId` into a `PhoneNumberClient` / `WABAClient`. |
-| [`reference/groups.md`](/docs/reference/groups) | WhatsApp Groups endpoint contracts, limits, webhook outcomes, service opt-in routes, and beyond-pywa status. |
-| [`reference/errors.md`](/docs/reference/errors) | The F-5 error registry; every pywa error code → WATS subclass; classification axis. |
+| [`reference/groups.md`](/docs/reference/groups) | WhatsApp Groups endpoint contracts, limits, webhook outcomes, service opt-in routes. |
+| [`reference/errors.md`](/docs/reference/errors) | The error registry; every pywa error code → WATS subclass; classification rules. |
 | [`reference/pagination.md`](/docs/reference/pagination) | `paginate` / `paginateAll`; cursor extraction; `AbortSignal`; `PaginationError` taxonomy. |
-| [`reference/media.md`](/docs/reference/media) | Media runtime: upload, metadata, binary download, delete, encrypted decrypt, upload sessions, validation, and integrity checks. Public Graph endpoint subpaths cover messages at `@wats/graph/endpoints/messages`, media at `@wats/graph/endpoints/media`, templates at `@wats/graph/endpoints/templates`, Flows at `@wats/graph/endpoints/flows`, calling at `@wats/graph/endpoints/calling`, and business management at `@wats/graph/endpoints/business-management`, plus the WATS-132 Groups API at `@wats/graph/endpoints/groups`; WATS-54 keeps these aligned with `bun run api:check`. |
+| [`reference/media.md`](/docs/reference/media) | Media runtime: upload, metadata, binary download, delete, encrypted decrypt, upload sessions. Endpoint family subpaths: `@wats/graph/endpoints/{messages,media,templates,flows,calling,business-management,groups}`. |
 
 ## Core primitives (`@wats/core`)
 
@@ -53,28 +53,19 @@ Curated index of every WATS reference doc. Use the "When to use it" column to fi
 | Doc | When to use it |
 | --- | --- |
 | [`reference/config.md`](/docs/reference/config) | `@wats/config` YAML/JSON schema, env-secret refs, validation, redaction. |
-| [`reference/cli.md`](/docs/reference/cli) | `@wats/cli` skeleton commands and planned onboarding workflow. |
-| [`reference/service.md`](/docs/reference/service) | `@wats/service` runtime-neutral standalone webhook/API service foundation. |
-| [`reference/persistence.md`](/docs/reference/persistence) | WATS-48 design target for durable runtime state, SQLite/Postgres adapter contract, migrations, and idempotency. |
+| [`reference/cli.md`](/docs/reference/cli) | `@wats/cli` commands: init, setup, doctor, serve, openapi export. |
+| [`reference/service.md`](/docs/reference/service) | `@wats/service` runtime-neutral standalone webhook/API service. |
+| [`reference/persistence.md`](/docs/reference/persistence) | Durable runtime state: SQLite adapter, migrations, idempotency, outbox. |
 | [`reference/openapi.md`](/docs/reference) | Generated OpenAPI 3.1 document and `GET /openapi.json` service route. |
 
 ## Guides
 
 | Guide | When to use it |
 | --- | --- |
-| [`../getting-started.md`](/docs/guide) | Start here for the foundations walkthrough. |
-| [`../guides/transport-and-testing.md`](/docs/guides/transport-and-testing) | Injecting `MockTransport`; consumer-fixture pattern; adversarial test hooks. |
+| [`../getting-started.md`](/docs/guide) | Start here. |
+| [`../guides/transport-and-testing.md`](/docs/guides/transport-and-testing) | Injecting `MockTransport`; consumer-fixture pattern. |
 | [`../guides/groups-quickstart.md`](/docs/guides/groups-quickstart) | Credential-free Groups flow from create through invite, approval, and group messaging. |
-| [`../guides/deploy-docker.md`](/docs/guides/deploy-docker) | WATS-49 Docker/container deployment design scaffold, not a supported runnable image yet. |
+| [`../guides/deploy-docker.md`](/docs/guides/deploy-docker) | Container deployment design scaffold — not a supported runnable image yet. |
 | [`../guides/deploy-bun.md`](/docs/guides/deploy-bun) | Deploying a webhook on Bun. |
 | [`../guides/deploy-node.md`](/docs/guides/deploy-node) | Deploying a webhook on Node `http.createServer`. |
 | [`../guides/deploy-cloudflare-workers.md`](/docs/guides/deploy-cloudflare-workers) | Deploying a webhook on Cloudflare Workers. |
-
-## Architecture
-
-- `docs/architecture/overview.md`
-- `docs/architecture/package-map.md`
-- `docs/architecture/public-api-surface.md`
-- `docs/architecture/release-policy.md`
-- `docs/architecture/roadmap-to-whatsapp-pywa-parity.md`
-- `docs/reference/openapi.md`
