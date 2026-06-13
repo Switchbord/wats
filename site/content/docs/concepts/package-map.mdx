@@ -5,35 +5,11 @@ description: Canonical dependency map and per-package status for the WATS worksp
 
 <DocMeta status="active" appliesTo="0.3.x-alpha-tooling" lastReviewed="2026-05-04" />
 
-The canonical dependency map for the WATS workspace. Arrows point from dependent package to dependency.
+The canonical dependency map for the WATS workspace. Arrows point from dependent package to dependency. The graph is generated from the package manifests at build time — it cannot drift from the code.
 
 ## Dependency graph
 
-```text
-                         @wats/types
-                              ^
-                              |
-          +-------------------+-------------------+
-          |                   |                   |
-     @wats/crypto        @wats/graph         @wats/http
-          ^                   ^                   ^
-          |                   |                   |
-          +-------------------+-------------------+
-                              |
-                         @wats/core
-                              ^
-                              |
-                   +----------+----------+
-                   |                     |
-              @wats/config          @wats/cli
-                   ^                     |
-                   |                     |
-              @wats/service --------+
-                   ^
-                   |
-              @wats/testing
-          (workspace fixtures / policy tests)
-```
+![Dependency graph of the @wats packages. Arrows point from dependent package to dependency.](/diagrams/package-graph.svg)
 
 `@wats/internal-utils` is a published internal support package used by public runtime packages that need shared helpers. It exists so registry installs resolve; it is not a stable application API.
 
