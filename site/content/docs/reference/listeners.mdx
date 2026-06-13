@@ -7,7 +7,7 @@ description: "The listener substrate: waiting for a future typed update via wa.l
 
 The listener substrate lets a handler (or any async flow) wait for a future typed update that matches a filter — conversational patterns without hand-rolling Promise wiring.
 
-The substrate is intentionally tiny. The heavy lifting lives in what it composes: the [`TypedFilter`](/docs/reference/filters) surface (matching), the [`TypedRouter`](/docs/reference/router) (dispatch), and the [`WhatsApp`](/docs/reference/whatsapp-facade) facade (composition root).
+The substrate composes the [`TypedFilter`](/docs/reference/filters) surface (matching), the [`TypedRouter`](/docs/reference/router) (dispatch), and the [`WhatsApp`](/docs/reference/whatsapp-facade) facade (composition root).
 
 ```ts
 import {

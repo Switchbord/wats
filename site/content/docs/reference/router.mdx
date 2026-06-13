@@ -146,7 +146,7 @@ This picks determinism over "live" semantics. A frozen handler list for the dura
 
 ## Concurrency modes
 
-`sequential` (default) — the router awaits handlers one at a time, in registration order. Side-effects observe registration order exactly. This is the recommended default.
+`sequential` (default) — the router awaits handlers one at a time, in registration order. Side-effects observe registration order exactly.
 
 `parallel` — the router fires all matching handlers concurrently via `Promise.allSettled`. Errors are still collected, but interleaving is undefined and `"stop"` decisions are applied post-hoc (after all handlers have settled). Use `parallel` only when handler order is irrelevant and concurrency materially speeds up dispatch.
 

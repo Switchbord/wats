@@ -7,8 +7,6 @@ description: The @wats/graph Transport seam — testing with MockTransport, opt-
 
 `@wats/graph` ships a small `Transport` seam under `GraphClient` so that every HTTP concern — retries, authentication refresh, tracing, mocking in tests — lives in a composable layer you control. The default transport (`createFetchTransport`) is a thin wrapper over `globalThis.fetch`. Tests inject `createMockTransport` via the `@wats/graph/testing` subpath and assert on a `requests` array rather than monkey-patching global state.
 
-Three recipes follow: testing with the mock, opt-in reliability for production, and the interceptor primer.
-
 ## The Transport contract
 
 ```ts
@@ -25,7 +23,7 @@ interface Transport {
 
 `TransportRequest` is a fully-resolved absolute URL, a `Headers` instance, the chosen `BodyInit | null`, and the HTTP method (`GET | POST | PUT | PATCH | DELETE`). `TransportResponse` exposes `status`, `headers`, `body: ReadableStream<Uint8Array> | null`, and `arrayBuffer() / text() / json<T>()` methods.
 
-The seam is intentionally minimal: if you can write the function, you can swap it in. `GraphClient` never looks at the underlying fetch implementation; everything goes through the `Transport`.
+`GraphClient` never looks at the underlying fetch implementation; everything goes through the `Transport`.
 
 ## Recipe 1 — Testing with `createMockTransport`
 
@@ -110,7 +108,7 @@ const client = new GraphClient({
 
 The decorator retries transient `GET`/`DELETE` failures (`GraphNetworkError`, HTTP `429`, and HTTP `5xx`) using exponential backoff with full jitter. It honors Meta's `Retry-After` header for `429` / `503` responses and caps every delay at `maxDelayMs`. Caller aborts are never retried; per-attempt timeouts compose with a caller-provided `AbortSignal` via native `AbortSignal.any` / `AbortSignal.timeout`.
 
-WATS does **not** retry non-idempotent `POST` / `PUT` / `PATCH` request failures by default, with one narrow exception: HTTP `429` is treated as a rate-limit response across methods. Retrying `POST /messages` after an ambiguous network failure or `5xx` can double-send a WhatsApp message if Meta received the first request but the client lost the response. If you override `retryOn` to retry those POST failures, pair the request with an application idempotency strategy (for example the service-level `Idempotency-Key` flow). The default client applies no retries — reliability is explicit, composable, and removable.
+WATS does **not** retry non-idempotent `POST` / `PUT` / `PATCH` request failures by default, with one narrow exception: HTTP `429` is treated as a rate-limit response across methods. Retrying `POST /messages` after an ambiguous network failure or `5xx` can double-send a WhatsApp message if Meta received the first request but the client lost the response. If you override `retryOn` to retry those POST failures, pair the request with an application idempotency strategy (for example the service-level `Idempotency-Key` flow). The default client applies no retries.
 
 The same shape composes: `auth-refresh -> reliability -> tracing -> fetch`. Each layer is a function that takes `(inner: Transport) => Transport`. Because every layer sees the same `TransportRequest`/`TransportResponse` shape, the layers stay independently testable.
 
