@@ -80,11 +80,18 @@ function RootDocument({ children }: { children: ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* First-paint guard: the stylesheet is render-blocking in theory, but
-            the prerendered body can flash the UA's white canvas before it
-            arrives (slow link, cold cache). Inline the background + dark
-            color-scheme so the very first frame is already the right color. */}
-        <style>{`html{background-color:#0a0e12;color-scheme:dark}`}</style>
+        {/* First-paint theme: decide dark/light BEFORE the stylesheet paints so
+            there is no flash of the wrong theme on cold loads. Reads the stored
+            choice (next-themes' "theme" key, shared with the docs toggle); falls
+            back to the OS preference; defaults dark. Sets the class + background
+            + color-scheme synchronously. Mirrors what next-themes injects on docs
+            routes, but also covers the prerendered landing + playground. */}
+        <script
+          // eslint-disable-next-line react/no-danger
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('theme');if(t!=='light'&&t!=='dark'){t=(t==='system'||!t)&&window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'}var d=t!=='light';document.documentElement.classList.toggle('dark',d);document.documentElement.style.colorScheme=d?'dark':'light';document.documentElement.style.backgroundColor=d?'#0a0e12':'#f7f8fa'}catch(e){document.documentElement.classList.add('dark')}})();`,
+          }}
+        />
         <HeadContent />
       </head>
       <body>

@@ -182,7 +182,12 @@ export default function PlaygroundApp({
             ...historyKeymap,
           ]),
           javascript({ typescript: true }),
-          oneDark,
+          // oneDark only in dark mode; light mode uses CodeMirror's default
+          // light highlighting (no extra dependency). Theme is read at mount.
+          ...(typeof document !== "undefined" &&
+          document.documentElement.classList.contains("dark")
+            ? [oneDark]
+            : []),
           editorTheme,
           EditorView.lineWrapping,
         ],

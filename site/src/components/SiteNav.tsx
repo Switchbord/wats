@@ -48,6 +48,42 @@ const MENU = [
 const linkClass =
   "text-sm text-text-muted transition-colors duration-150 hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
 
+// Self-contained theme toggle: no React provider on the landing chunk. Reads and
+// writes the same localStorage "theme" key next-themes uses on docs routes, and
+// toggles the `dark` class + color-scheme directly. The inline script in
+// __root.tsx applies the stored choice on first paint.
+function ThemeToggle() {
+  const [dark, setDark] = useState(true)
+
+  useEffect(() => {
+    setDark(document.documentElement.classList.contains("dark"))
+  }, [])
+
+  function toggle() {
+    const next = !dark
+    setDark(next)
+    document.documentElement.classList.toggle("dark", next)
+    document.documentElement.style.colorScheme = next ? "dark" : "light"
+    document.documentElement.style.backgroundColor = next ? "#0a0e12" : "#f7f8fa"
+    try {
+      localStorage.setItem("theme", next ? "dark" : "light")
+    } catch {
+      /* storage unavailable — toggle still applies for this session */
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-label={dark ? "Switch to light theme" : "Switch to dark theme"}
+      className="mono rounded border border-border px-2 py-0.5 text-xs text-text-muted transition-colors duration-150 hover:border-accent-dim hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
+    >
+      {dark ? "light" : "dark"}
+    </button>
+  )
+}
+
 function MenuDrawer({ onClose }: { onClose: () => void }) {
   const panelRef = useRef<HTMLDivElement | null>(null)
 
@@ -154,6 +190,7 @@ export function SiteNav() {
           >
             GitHub<span aria-hidden="true">↗</span>
           </a>
+          <ThemeToggle />
           <a
             href="https://www.npmjs.com/org/wats"
             rel="noreferrer"

@@ -2,9 +2,44 @@
 @import "fumadocs-ui/css/neutral.css";
 @import "fumadocs-ui/css/preset.css";
 
-/* Map fumadocs-ui color variables to the wats.sh palette (dark default). */
-:root,
+/* Theme variables. Default (:root) is LIGHT; .dark carries the original dark
+   palette verbatim. next-themes toggles the `dark` class on <html>; the inline
+   script in __root.tsx applies the stored/system choice before first paint. */
+:root {
+  /* fumadocs-ui variables — light */
+  --color-fd-background: #f7f8fa;
+  --color-fd-foreground: #0f172a;
+  --color-fd-card: #ffffff;
+  --color-fd-card-foreground: #0f172a;
+  --color-fd-popover: #ffffff;
+  --color-fd-popover-foreground: #0f172a;
+  --color-fd-muted: #eef1f4;
+  --color-fd-muted-foreground: #566273;
+  --color-fd-border: #d7dde3;
+  --color-fd-primary: #1a9c4b;
+  --color-fd-primary-foreground: #ffffff;
+  --color-fd-secondary: #eef1f4;
+  --color-fd-secondary-foreground: #0f172a;
+  --color-fd-accent: #e6ebf0;
+  --color-fd-accent-foreground: #0f172a;
+  --color-fd-ring: #1a9c4b;
+
+  /* custom tokens — light */
+  --bg: #f7f8fa;
+  --bg-raised: #ffffff;
+  --bg-inset: #eef1f4;
+  --border: #d7dde3;
+  --text: #0f172a;
+  --text-muted: #566273;
+  --accent: #1a9c4b;
+  --accent-dim: #15803d;
+  --info: #1d6fd6;
+  --warn: #a16207;
+  --danger: #dc2626;
+}
+
 .dark {
+  /* fumadocs-ui variables — dark (original wats.sh palette) */
   --color-fd-background: #0a0e12;
   --color-fd-foreground: #e6edf3;
   --color-fd-card: #11161c;
@@ -21,20 +56,33 @@
   --color-fd-accent: #1f2937;
   --color-fd-accent-foreground: #e6edf3;
   --color-fd-ring: #25d366;
+
+  /* custom tokens — dark (original) */
+  --bg: #0a0e12;
+  --bg-raised: #11161c;
+  --bg-inset: #060809;
+  --border: #1f2937;
+  --text: #e6edf3;
+  --text-muted: #8b98a5;
+  --accent: #25d366;
+  --accent-dim: #128c5e;
+  --info: #58a6ff;
+  --warn: #d29922;
+  --danger: #f85149;
 }
 
 @theme {
-  --color-bg: #0a0e12;
-  --color-bg-raised: #11161c;
-  --color-bg-inset: #060809;
-  --color-border: #1f2937;
-  --color-text: #e6edf3;
-  --color-text-muted: #8b98a5;
-  --color-accent: #25d366;
-  --color-accent-dim: #128c5e;
-  --color-info: #58a6ff;
-  --color-warn: #d29922;
-  --color-danger: #f85149;
+  --color-bg: var(--bg);
+  --color-bg-raised: var(--bg-raised);
+  --color-bg-inset: var(--bg-inset);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-accent: var(--accent);
+  --color-accent-dim: var(--accent-dim);
+  --color-info: var(--info);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
 
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
