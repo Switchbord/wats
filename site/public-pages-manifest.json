@@ -1,7 +1,7 @@
 {
   "pages": [
     "/",
-    "/dev-components",
+    "/404",
     "/docs",
     "/docs/concepts/overview",
     "/docs/concepts/package-map",
@@ -49,7 +49,7 @@
     "/playground/runner"
   ],
   "notes": {
-    "/dev-components": "devOnly: internal component gallery, removed from the public build by T24",
+    "/404": "noindex: static fallback page (public/404.html) served by Vercel on unknown URLs; not a user-facing route",
     "/playground/runner": "noindex: static sandbox iframe document (public/playground/runner.html), not a route — loaded as the playground's sandboxed execution frame"
   }
 }

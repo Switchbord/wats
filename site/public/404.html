@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>404 — wats</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1.5rem;
+        padding: 1.5rem;
+        text-align: center;
+        background-color: #0a0e12;
+        color: #e6edf3;
+        font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+      }
+      .code {
+        font-family: "JetBrains Mono", ui-monospace, monospace;
+        font-size: 3.75rem;
+        font-weight: 600;
+        color: #25d366;
+        margin: 0;
+      }
+      h1 {
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin: 0;
+      }
+      p {
+        max-width: 28rem;
+        line-height: 1.6;
+        color: #8b98a5;
+        margin: 0;
+      }
+      .links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        justify-content: center;
+      }
+      a {
+        text-decoration: none;
+        border-radius: 0.25rem;
+        padding: 0.5rem 1rem;
+        font-size: 0.95rem;
+        transition: border-color 0.15s, background-color 0.15s;
+      }
+      a.primary {
+        background-color: #25d366;
+        color: #060809;
+        font-weight: 600;
+      }
+      a.primary:hover {
+        background-color: #1eb558;
+      }
+      a.secondary {
+        border: 1px solid #1f2937;
+        color: #e6edf3;
+      }
+      a.secondary:hover {
+        border-color: #1a9c4b;
+      }
+    </style>
+  </head>
+  <body>
+    <p class="code">404</p>
+    <h1>No page at that path.</h1>
+    <p>
+      The link is wrong or the page moved. The docs index and the playground are
+      both one click away.
+    </p>
+    <div class="links">
+      <a class="primary" href="/">Home</a>
+      <a class="secondary" href="/docs">Docs</a>
+      <a class="secondary" href="/playground">Playground</a>
+    </div>
+  </body>
+</html>
