@@ -25,5 +25,5 @@ console.log(digest.byteLength);
 
 The package is normally consumed indirectly through `@wats/http` or `@wats/service`, but direct use is available for applications that need the same portable crypto boundary.
 
-Docs: https://github.com/Switchbord/wats
+Docs: https://wats.sh/docs/reference/crypto
 License: MIT

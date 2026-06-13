@@ -30,5 +30,5 @@ await sendMessage(graph, { phoneNumberId: "1234567890" }, {
 
 Use `createMockTransport` from `@wats/graph/testing` for credential-free tests and examples. Some endpoint families are still expanding and should be treated according to the API stability policy.
 
-Docs: https://github.com/Switchbord/wats
+Docs: https://wats.sh/docs/reference/client
 License: MIT

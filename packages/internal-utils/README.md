@@ -22,5 +22,5 @@ if (isRecord(value)) {
 
 Application code should prefer public packages such as `@wats/config`, `@wats/graph`, `@wats/http`, and `@wats/service`. This package has no stable application API guarantee.
 
-Docs: https://github.com/Switchbord/wats
+Docs: https://wats.sh/docs/reference/internal-utils
 License: MIT

@@ -36,5 +36,5 @@ await router.dispatch(update);
 
 Pair this package with `@wats/http` for webhook ingestion and `@wats/graph` for outbound Graph calls.
 
-Docs: https://github.com/Switchbord/wats
+Docs: https://wats.sh/docs/reference/whatsapp-facade
 License: MIT

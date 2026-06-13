@@ -27,5 +27,5 @@ console.log(response.status);
 
 Use this package when you want the webhook/security boundary without the standalone `@wats/service` app.
 
-Docs: https://github.com/Switchbord/wats
+Docs: https://wats.sh/docs/reference/webhook-adapter
 License: MIT

@@ -48,5 +48,5 @@ console.log(redactConfig(config));
 
 The package validates shape and redacts references; it does not resolve `.env.local` or contact Meta Graph APIs.
 
-Docs: https://github.com/Switchbord/wats
+Docs: https://wats.sh/docs/reference/config
 License: MIT

@@ -25,5 +25,5 @@ function isRead(status: WhatsAppMessageStatus): boolean {
 
 Use this package when you need WATS domain types without the Graph client, webhook adapter, CLI, or service runtime. Runtime helpers live in the other `@wats/*` packages.
 
-Docs: https://github.com/Switchbord/wats
+Docs: https://wats.sh/docs/reference/types
 License: MIT

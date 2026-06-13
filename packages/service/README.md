@@ -27,5 +27,5 @@ console.log(doc.openapi);
 
 For a runnable local process, use `@wats/cli` with `wats serve --dry-run`.
 
-Docs: https://github.com/Switchbord/wats
+Docs: https://wats.sh/docs/reference/service
 License: MIT
