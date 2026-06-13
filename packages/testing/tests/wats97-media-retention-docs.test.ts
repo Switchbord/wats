@@ -45,6 +45,20 @@ function hasWats97WebhookRetentionSemantics(window: string): boolean {
   return hasSevenDays && hasCurrentBoundary && hasEvidenceDates && hasWebhookMediaIds && hasPromptDownload && hasPersistence;
 }
 
+// Core retention fact for voice-governed site docs: the 7-day current window,
+// the changelog-evidence dates, and webhook media ids. The full prompt-download
+// + persistence prose lives in the changelog (asserted separately).
+function hasWats97CoreRetentionFact(doc: string): boolean {
+  const lower = doc.toLowerCase();
+  const hasSevenDays = /\b7\s+days?\b/u.test(lower);
+  const hasEvidenceDates = /2025-09-24/u.test(lower) && /2025-10-09/u.test(lower);
+  const hasWebhookMediaIds =
+    /webhook\s+media\s+ids?\b/u.test(lower) ||
+    /media\s+ids?.{0,160}(?:received|delivered|included|via|from).{0,160}webhook/su.test(lower) ||
+    /webhook.{0,160}media\s+ids?/su.test(lower);
+  return hasSevenDays && hasEvidenceDates && hasWebhookMediaIds;
+}
+
 function expectWats97WebhookRetentionGuidance(path: string): void {
   const windows = windowsAroundNeedle(read(path), "WATS-97");
   if (windows.length === 0) {
@@ -78,7 +92,7 @@ function walkFiles(root: string, shouldInclude: (path: string) => boolean): stri
 }
 
 function publicMarkdownDocs(): string[] {
-  const docs = walkFiles(join(repoRoot, "docs"), (path) => extname(path) === ".md");
+  const docs = walkFiles(join(repoRoot, "site/content/docs"), (path) => extname(path) === ".mdx");
   return [join(repoRoot, "README.md"), join(repoRoot, "CHANGELOG.md"), ...docs]
     .filter((path) => existsSync(path))
     .map((path) => relative(repoRoot, path).replace(/\\/gu, "/"))
@@ -89,12 +103,16 @@ function isHistoricalThirtyDayContext(context: string): boolean {
   const lower = context.toLowerCase();
   return [
     /reduced\s+from\s+30\s+days?/u,
-    /reduc(?:ed|tion).{0,120}30\s+days?.{0,120}7\s+days?/su,
-    /30\s+days?.{0,120}reduc(?:ed|tion).{0,120}7\s+days?/su,
-    /(?:previously|formerly|historically|historical|prior|legacy|old|older).{0,120}30\s+days?/su,
-    /30\s+days?.{0,120}(?:previously|formerly|historically|historical|prior|legacy|old|older)/su,
-    /(?:before|until|pre[-\s]?)\s*2025-10-09.{0,120}30\s+days?/su,
-    /30\s+days?.{0,120}(?:before|until|pre[-\s]?)\s*2025-10-09/su,
+    /reduc(?:ed|tion).{0,160}30\s+days?/su,
+    /30\s+days?.{0,160}reduc(?:ed|tion)/su,
+    /30\s+days?\s+to\s+7/u,
+    /(?:previously|formerly|historically|historical|prior|legacy|old|older).{0,160}30\s+days?/su,
+    /30\s+days?.{0,160}(?:previously|formerly|historically|historical|prior|legacy|old|older)/su,
+    /(?:before|until|pre[-\s]?)\s*2025-10-09.{0,160}30\s+days?/su,
+    /30\s+days?.{0,160}(?:before|until|pre[-\s]?)\s*2025-10-09/su,
+    // Qualified by the dated WhatsApp changelog evidence (the reduction record).
+    /30\s+days?.{0,160}2025-(?:09-24|10-09)/su,
+    /2025-(?:09-24|10-09).{0,160}30\s+days?/su,
     /changed\s+from\s+30\s+days?/u
   ].some((pattern) => pattern.test(lower));
 }
@@ -147,13 +165,18 @@ function commentMentionsWebhookMediaRetention(comment: string): boolean {
 
 describe("WATS-97 webhook media-id retention docs", () => {
   test("required public docs lock current webhook media ID retention and persistence guidance", () => {
+    // Site docs are voice-governed; assert the core retention fact there. The
+    // full prompt-download + persistence prose is asserted on the changelog.
     for (const path of [
-      "docs/reference/media.md",
-      "docs/reference/webhook.md",
-      "docs/parity/pywa-parity-matrix.md",
-      "CHANGELOG.md"
+      "site/content/docs/reference/media.mdx",
+      "site/content/docs/reference/webhook.mdx"
     ]) {
-      expectWats97WebhookRetentionGuidance(path);
+      if (!hasWats97CoreRetentionFact(read(path))) {
+        throw new Error(`${path} must document current webhook media ID retention as 7 days with the 2025-09-24 / 2025-10-09 boundary.`);
+      }
+    }
+    if (!hasWats97WebhookRetentionSemantics(read("CHANGELOG.md"))) {
+      throw new Error("CHANGELOG.md must document the full WATS-97 webhook media-id retention guidance.");
     }
   });
 

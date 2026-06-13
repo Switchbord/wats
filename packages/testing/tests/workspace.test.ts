@@ -136,7 +136,7 @@ describe("workspace integrity", () => {
       "package.json",
       "bunfig.toml",
       "tsconfig.base.json",
-      "docs/index.md"
+      "site/content/docs/reference/index.mdx"
     ];
 
     for (const relativePath of requiredRepoPaths) {
@@ -166,7 +166,7 @@ describe("workspace integrity", () => {
       expect((packageManifest.version as string).length).toBeGreaterThan(0);
     }
 
-    const publicIndex = readFileSync(join(repoRoot, "docs/index.md"), "utf8");
+    const publicIndex = readFileSync(join(repoRoot, "site/content/docs/reference/index.mdx"), "utf8");
 
     expect(publicIndex).toContain("WATS");
     expect(publicIndex).toContain("Reference");

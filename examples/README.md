@@ -32,10 +32,9 @@ Docs/examples checks are credential-free:
 bun test packages/testing/tests/wats52-community-examples.test.ts
 bun run examples:minimal-bot
 bun run examples:groups
-bun run docs:check
 ```
 
-The community examples guide is published at `docs/guides/community-examples.md`. It covers the MockTransport quickstart, service app `fetch` / OpenAPI patterns, credential-gated webhook tunnel guidance, and extensibility seams.
+The community examples guide is published at [wats.sh/docs/guides/community-examples](https://wats.sh/docs/guides/community-examples). It covers the MockTransport quickstart, service app `fetch` / OpenAPI patterns, credential-gated webhook tunnel guidance, and extensibility seams.
 
 ## Runtime boundary
 

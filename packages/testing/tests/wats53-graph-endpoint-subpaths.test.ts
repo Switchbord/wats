@@ -56,13 +56,13 @@ describe("WATS-53 @wats/graph endpoint subpath exports", () => {
 
 describe("WATS-53 docs lockstep", () => {
   test("public-surface, package-map, reference index, migration guide, and changelog document new subpaths", () => {
-    const referenceIndex = read("docs/reference/index.md");
-    const publicApi = read("docs/architecture/public-api-surface.md");
-    const packageMap = read("docs/architecture/package-map.md");
-    const migration = read("docs/migration/pywa-to-wats.md");
+    const referenceIndex = read("site/content/docs/reference/index.mdx");
+    const publicApi = read("site/content/docs/concepts/public-api-surface.mdx");
+    const packageMap = read("site/content/docs/concepts/package-map.mdx");
+    const migration = read("site/content/docs/migration/pywa.mdx");
     const changelog = read("CHANGELOG.md");
 
-    for (const doc of [referenceIndex, publicApi, packageMap, migration, changelog]) {
+    for (const doc of [publicApi, packageMap, migration, changelog]) {
       expectAll(doc, [
         "@wats/graph/endpoints/media",
         "@wats/graph/endpoints/templates",
@@ -70,8 +70,20 @@ describe("WATS-53 docs lockstep", () => {
       ], "WATS-53 docs packet");
     }
 
+    // E3: the reference index lists the endpoint family as a single brace-
+    // expansion (`@wats/graph/endpoints/{messages,media,templates,flows,...}`)
+    // rather than per-subpath literals; assert on that surviving form.
+    expect(referenceIndex).toContain("@wats/graph/endpoints/{");
+    for (const member of ["media", "templates", "flows"]) {
+      expect(referenceIndex, `reference index must list ${member} subpath`).toMatch(
+        new RegExp(`@wats/graph/endpoints/\\{[^}]*\\b${member}\\b[^}]*\\}`)
+      );
+    }
+
     expect(migration).not.toContain("Some root `@wats/graph` exports do not yet have dedicated package subpaths");
+    // WATS-53 ticket traceability legitimately lives in the changelog (not
+    // voice-governed) — keep it. The voice pass removed the WATS-53 token from
+    // public-api-surface.mdx; the subpath assertions above are its drift guard.
     expect(changelog).toContain("WATS-53");
-    expect(publicApi).toContain("WATS-53");
   });
 });

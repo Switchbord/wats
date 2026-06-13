@@ -65,10 +65,9 @@ Before publication:
 
 ```bash
 bun run check-publish
-bun run docs:build
 ```
 
-`check-publish` runs typecheck, `bun run build:packages`, `bun run pack:smoke`, and the workspace-policy tests. `pack:smoke` verifies each package tarball contains `package.json`, `dist/index.js`, and `dist/index.d.ts`, and excludes source entrypoints, `.env` files, and `node_modules`. `docs:build` generates the static OpenAPI JSON and builds the docs site credential-free.
+`check-publish` runs typecheck, `bun run build:packages`, `bun run pack:smoke`, and the workspace-policy tests. `pack:smoke` verifies each package tarball contains `package.json`, `dist/index.js`, and `dist/index.d.ts`, and excludes source entrypoints, `.env` files, and `node_modules`. The docs site is built and deployed separately from `site/`.
 
 Actual `npm publish --access public` requires a valid npm token and explicit operator authorization. Dry-run checks never publish, tag, or push.
 

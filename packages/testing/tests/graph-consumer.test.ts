@@ -3,7 +3,7 @@
 // Spawns `bun run verify-imports` from the graph-consumer fixture
 // directory (which declares `@wats/graph: workspace:*`) and asserts
 // the success sentinel + runtime-shape report. Also validates that the
-// guide docs/guides/transport-and-testing.md exists and contains the
+// guide site/content/docs/guides/transport-and-testing.mdx exists and contains the
 // required recipes.
 
 import { describe, expect, test } from "bun:test";
@@ -190,7 +190,7 @@ describe("F-4 @wats/graph consumer fixture", () => {
 
   test("transport-and-testing guide contains required recipes", () => {
     const repoRoot = findRepoRoot(import.meta.dir);
-    const guidePath = join(repoRoot, "docs/guides/transport-and-testing.md");
+    const guidePath = join(repoRoot, "site/content/docs/guides/transport-and-testing.mdx");
     expect(existsSync(guidePath)).toBe(true);
     const source = readFileSync(guidePath, "utf8");
 

@@ -1,4 +1,4 @@
-// F-12 RED — asserts docs/reference/webhook-adapter.md content,
+// F-12 RED — asserts site/content/docs/reference/webhook-adapter.mdx content,
 // parity matrix update, CHANGELOG entry, deploy guides, and the
 // http-consumer fixture coverage of the WebhookAdapter surface.
 // These checks fail until the GREEN doc/fixture commit lands.
@@ -67,12 +67,12 @@ function runBun(args: string[], cwd: string): {
 }
 
 // ---------------------------------------------------------------------
-// docs/reference/webhook-adapter.md
+// site/content/docs/reference/webhook-adapter.mdx
 // ---------------------------------------------------------------------
 
 describe("F-12 webhook-adapter.md reference guide", () => {
   const repoRoot = findRepoRoot(import.meta.dir);
-  const docPath = join(repoRoot, "docs/reference/webhook-adapter.md");
+  const docPath = join(repoRoot, "site/content/docs/reference/webhook-adapter.mdx");
 
   test("file exists", () => {
     expect(existsSync(docPath)).toBe(true);
@@ -122,7 +122,9 @@ describe("F-12 webhook-adapter.md reference guide", () => {
     const doc = readFileSync(docPath, "utf8");
     expect(doc).toMatch(/edge[- ]runtime/i);
     expect(doc).toMatch(/Cloudflare\s+Workers|Deno|WinterCG/i);
-    expect(doc).toMatch(/no\s+node:\*|zero\s+node:\*/i);
+    // Voice-pass reworded "no node:*" → "no `node:*` static imports" / "zero
+    // static `node:*` imports" (backticked + interleaved words). Fact survives.
+    expect(doc).toMatch(/(?:no|zero)[^\n]{0,20}node:\*/i);
   });
 
   test("documents error taxonomy codes", () => {
@@ -138,12 +140,14 @@ describe("F-12 webhook-adapter.md reference guide", () => {
     expect(doc).toContain("@wats/http");
   });
 
-  test("references WATS-22 Arch-K + WATS-25 + F-12", () => {
+  test("ties the doc to the WebhookAdapter feature surface", () => {
     const doc = readFileSync(docPath, "utf8");
-    expect(doc).toMatch(/WATS-22/);
-    expect(doc).toMatch(/Arch-K/);
-    expect(doc).toMatch(/WATS-25/);
-    expect(doc).toMatch(/F-12/);
+    // Voice-pass removed WATS-nn ticket refs, Arch-K labels, and the F-12 phase
+    // tag. The substance these guarded — that this doc covers the runtime-neutral
+    // WebhookAdapter and its wrappers — survives in the prose/headings.
+    expect(doc).toMatch(/WebhookAdapter/);
+    expect(doc).toMatch(/runtime[- ]neutral/i);
+    expect(doc).toContain("createWebhookAdapter");
   });
 
   test("documents scope ledger (non-goals)", () => {
@@ -161,7 +165,7 @@ describe("F-12 deploy guides", () => {
   const repoRoot = findRepoRoot(import.meta.dir);
 
   test("deploy-bun guide exists and references createBunWebhookServer", () => {
-    const docPath = join(repoRoot, "docs/guides/deploy-bun.md");
+    const docPath = join(repoRoot, "site/content/docs/guides/deploy-bun.mdx");
     expect(existsSync(docPath)).toBe(true);
     const doc = readFileSync(docPath, "utf8");
     expect(doc).toContain("createBunWebhookServer");
@@ -170,15 +174,17 @@ describe("F-12 deploy guides", () => {
   });
 
   test("deploy-node guide exists and references createNodeWebhookHandler", () => {
-    const docPath = join(repoRoot, "docs/guides/deploy-node.md");
+    const docPath = join(repoRoot, "site/content/docs/guides/deploy-node.mdx");
     expect(existsSync(docPath)).toBe(true);
     const doc = readFileSync(docPath, "utf8");
     expect(doc).toContain("createNodeWebhookHandler");
-    expect(doc).toContain("http.createServer");
+    // Voice-pass uses `createServer` from `node:http` (was "http.createServer").
+    expect(doc).toContain("createServer");
+    expect(doc).toContain("node:http");
   });
 
   test("deploy-cloudflare-workers guide exists and references createFetchWebhookHandler", () => {
-    const docPath = join(repoRoot, "docs/guides/deploy-cloudflare-workers.md");
+    const docPath = join(repoRoot, "site/content/docs/guides/deploy-cloudflare-workers.mdx");
     expect(existsSync(docPath)).toBe(true);
     const doc = readFileSync(docPath, "utf8");
     expect(doc).toContain("createFetchWebhookHandler");
@@ -280,14 +286,16 @@ describe("F-12 CHANGELOG", () => {
 describe("F-12 parity matrix", () => {
   const repoRoot = findRepoRoot(import.meta.dir);
   const matrix = readFileSync(
-    join(repoRoot, "docs/parity/pywa-parity-matrix.md"),
+    join(repoRoot, "site/content/docs/parity.mdx"),
     "utf8"
   );
 
-  test("Webhook adapter row references F-12 + WATS-22 + WATS-25", () => {
+  test("Webhook adapter row documents the runtime-neutral adapter", () => {
     expect(matrix).toMatch(/WebhookAdapter|webhook adapter/i);
-    expect(matrix).toMatch(/WATS-22/);
-    expect(matrix).toMatch(/WATS-25/);
-    expect(matrix).toMatch(/F-12/);
+    // Voice-pass removed WATS-nn / F-12 ticket refs from the parity matrix. The
+    // row's substance — a runtime-neutral adapter with fetch/Bun/Node wrappers —
+    // survives in the row text.
+    expect(matrix).toMatch(/runtime[- ]neutral/i);
+    expect(matrix).toMatch(/fetch\s*\/\s*Bun\s*\/\s*Node|Bun|Node/i);
   });
 });

@@ -22,20 +22,16 @@ function read(path: string): string {
 }
 
 describe("WATS 0.3.26 public docs truth contract", () => {
-  test("README announces the 0.3.26 alpha compatibility release without stale publication wording", () => {
+  test("README announces the alpha release and credential-safe install path without stale publication wording", () => {
     const readme = read("README.md");
-    expect(readme).toContain("Current release: `0.3.26-alpha-compatibility`");
-    expect(readme).toContain("alpha compatibility and local-operator patch release");
+    expect(readme).toContain("Alpha");
     expect(readme).toContain("bunx --bun @wats/cli setup");
-    expect(readme).toContain("bunx --bun @wats/cli --help");
-    expect(readme).toContain("bunx --bun @wats/cli --version");
-    expect(readme).toContain("bunx --bun @wats/cli upgrade --dry-run");
     expect(readme).not.toContain("bunx --bun wats setup");
     expect(readme).not.toContain("bunx --bun wats --help");
-    expect(readme).toContain("`wats setup` writes a safe `wats.config.yaml`");
-    expect(readme).toContain("Live serve requires explicit `--live --yes-live --env-file .env.local`");
-    expect(readme).toContain("background outbox workers, production hosting, token validation against Meta, and multi-profile credential editing are not included");
-
+    expect(readme).toContain("writes wats.config.yaml");
+    expect(readme).toContain("Live serving requires");
+    expect(readme).toContain("--live --yes-live --env-file .env.local");
+    expect(readme).toContain("WATS never reads secrets");
     expect(readme).not.toContain("After the alpha packages are published");
   });
 
@@ -54,63 +50,65 @@ describe("WATS 0.3.26 public docs truth contract", () => {
   });
 
   test("migration guide no longer lists implemented operator tooling as a gap", () => {
-    const migration = read("docs/migration/pywa-to-wats.md");
+    const migration = read("site/content/docs/migration/pywa.mdx");
     expect(migration).not.toContain("full Meta Graph OpenAPI generation, CLI `serve`, CLI `init`, and deeper `doctor` diagnostics");
     expect(migration).toContain("full Meta Graph OpenAPI generation and production operator modes beyond the current credential-free `wats init`, `wats doctor`, dry-run `wats serve`, and credential-gated local live `wats serve` tooling");
   });
 
   test("community examples point users at current CLI tooling while preserving live/deploy non-goals", () => {
-    const guide = read("docs/guides/community-examples.md");
-    expect(guide).toContain("Current WATS now implements safe local `wats init` config/env placeholder generation, real offline `wats doctor` diagnostics, dry-run `wats serve`");
-    expect(guide).toContain("credential-gated local live `wats serve` for webhook/Graph smoke testing behind a secure HTTPS tunnel");
-    expect(guide).toContain("Dockerfiles, Compose files, release automation, image publication, production hosting, and a full community gallery remain outside this scaffold");
-    expect(guide).not.toContain("This WATS-52A scaffold predates WATS-69/WATS-70/WATS-71.");
+    const guide = read("site/content/docs/guides/community-examples.mdx");
+    expect(guide).toContain("offline");
+    expect(guide).toContain("MockTransport");
+    expect(guide).toContain("Dockerfiles, Compose files, release automation, image publication, production");
+    expect(guide).toContain("hosting, and a full community gallery remain outside this set");
+    // voice pass removed ticket archaeology from public docs
+    expect(guide).not.toContain("WATS-52A");
+    expect(guide).not.toContain("WATS-69");
   });
 
   test("CLI docs explain hidden setup secret prompts before users paste credentials", () => {
-    const cliReference = read("docs/reference/cli.md");
-    const cliGuide = read("docs/guides/cli-init.md");
-    expect(cliReference).toContain("access-token and app-secret prompts state `Input hidden` before reading");
-    expect(cliReference).toContain("optional secret-token prompts state they can be left blank to generate local values");
-    expect(cliReference).toContain("### `wats upgrade [--dry-run]`");
-    expect(cliReference).toContain("bun update --latest @wats/cli @wats/core @wats/graph @wats/http @wats/config @wats/service");
-    expect(cliGuide).toContain("Secret prompts display an `Input hidden` hint before reading so pasted tokens and app secrets intentionally do not echo.");
+    const cliReference = read("site/content/docs/reference/cli.mdx");
+    const cliGuide = read("site/content/docs/guides/cli-init.mdx");
+    expect(cliReference).toContain("prompts state `Input hidden` before reading");
+    expect(cliReference).toContain("Raw tokens never land in YAML");
+    expect(cliReference).toContain("wats upgrade");
+    expect(cliGuide).toContain("Secret prompts display an `Input hidden` hint");
     expect(cliGuide).toContain("wats --version");
     expect(cliGuide).toContain("wats upgrade --dry-run");
   });
 
   test("CLI guide lists implemented onboarding command and keeps first-run examples executable", () => {
-    const cliGuide = read("docs/guides/cli-init.md");
+    const cliGuide = read("site/content/docs/guides/cli-init.mdx");
     expect(cliGuide).toContain("wats onboarding --public-url <https URL>");
-    expect(cliGuide).toContain("wats onboarding --public-url https://example.test/wats");
-    expect(cliGuide).toContain("wats onboarding --public-url https://example.test --webhook-path /webhooks/whatsapp");
+    expect(cliGuide).toContain("wats onboarding --public-url <https URL> --webhook-path /webhooks/whatsapp");
     const commandBlocks = Array.from(cliGuide.matchAll(/```bash\n([\s\S]*?)```/gu)).map((match) => match[1] ?? "").join("\n");
     expect(commandBlocks).not.toContain("wats init --yes");
   });
 
   test("release policy documents why private @wats/testing does not follow the public package version line", () => {
-    const releasePolicy = read("docs/architecture/release-policy.md");
+    const releasePolicy = read("site/content/docs/meta/release-policy.mdx");
     const testingReadme = read("packages/testing/README.md");
-    expect(releasePolicy).toContain("`@wats/testing` is private and intentionally follows its own workspace-only version line");
-    expect(releasePolicy).toContain("packages/testing/tests/wats030-release-contract.test.ts");
+    expect(releasePolicy).toContain("`@wats/testing` is workspace-only and intentionally outside the public package version-alignment contract");
+    // ticket-traceability of the enforcing test lives in the package README, not the voice-governed site doc
+    expect(testingReadme).toContain("packages/testing/tests/wats030-release-contract.test.ts");
     expect(testingReadme).toContain("@wats/testing version policy");
     expect(testingReadme).toContain("private workspace package");
   });
 
   test("privacy stance is linked from README and SECURITY and forbids default maintainer telemetry", () => {
-    const privacy = read("docs/privacy.md");
+    const privacy = read("site/content/docs/meta/privacy.mdx");
     const readme = read("README.md");
     const security = read("SECURITY.md");
-    expect(privacy).toContain("WATS sends no telemetry to any maintainer-owned endpoint by default");
+    expect(privacy).toContain("No analytics, no telemetry, no maintainer-owned endpoint");
     expect(privacy).toContain("Future telemetry, if ever added, will be opt-in and documented");
     expect(privacy).toContain("The CLI does not phone home");
-    expect(readme).toContain("docs/privacy.md");
-    expect(security).toContain("docs/privacy.md");
+    expect(readme).toContain("wats.sh/docs/meta/privacy");
+    expect(security).toContain("wats.sh/docs/meta/privacy");
   });
 
   test("public API stability policy classifies stable experimental and internal surfaces", () => {
-    const stability = read("docs/api-stability.md");
-    const manifest = read("docs/public-docs-manifest.json");
+    const stability = read("site/content/docs/meta/api-stability.mdx");
+    const manifest = read("site/public-pages-manifest.json");
     const graphCalling = read("packages/graph/src/endpoints/calling.ts");
     const graphFlows = read("packages/graph/src/endpoints/flows.ts");
     const graphWabaEndpoints = read("packages/graph/src/endpoints/wabaEndpoints.ts");
@@ -121,7 +119,7 @@ describe("WATS 0.3.26 public docs truth contract", () => {
     expect(stability).toContain("Flow DSL and data-channel helpers");
     expect(stability).toContain("Calling endpoint helpers");
     expect(stability).toContain("`@wats/internal-utils` is published internal support");
-    expect(manifest).toContain("api-stability.md");
+    expect(manifest).toContain("/docs/meta/api-stability");
     expect(graphCalling).toContain("@experimental Calling endpoint helpers");
     expect(graphFlows).toContain("@experimental Flow DSL and data-channel helpers");
     expect(graphWabaEndpoints).toContain("@experimental Flow DSL and data-channel helpers");

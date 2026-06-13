@@ -113,6 +113,7 @@ Docs change in the same PR as the code they describe.
 
 - Site, docs, playground: [wats.sh](https://wats.sh)
 - Parity & live status: [wats.sh/docs/parity](https://wats.sh/docs/parity)
+- Privacy & telemetry stance: [wats.sh/docs/meta/privacy](https://wats.sh/docs/meta/privacy)
 - npm: [@wats](https://www.npmjs.com/org/wats)
 - `CONTRIBUTING.md` — contribution workflow and credential-free defaults
 - `SECURITY.md` — vulnerability reporting and live-credential policy

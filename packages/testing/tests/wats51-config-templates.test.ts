@@ -111,13 +111,15 @@ describe("WATS-51 config and env templates", () => {
     expect(envExample).toContain("Do not commit real values");
   });
 
-  test("public docs describe WATS-51 templates and WATS-69 init generation boundary", () => {
-    const configReference = read("docs/reference/config.md");
-    const cliGuide = read("docs/guides/cli-init.md");
+  test("public docs describe config/env templates and the init generation boundary", () => {
+    const configReference = read("site/content/docs/reference/config.mdx");
+    const cliGuide = read("site/content/docs/guides/cli-init.mdx");
     const changelog = read("CHANGELOG.md");
 
+    // Ticket traceability lives in the changelog, not the voice-governed site docs.
+    expect(changelog).toContain("WATS-51");
+
     for (const doc of [configReference, cliGuide, changelog]) {
-      expect(doc).toContain("WATS-51");
       expect(doc).toContain("examples/config/wats.config.example.yaml");
       expect(doc).toContain(".env.example");
       expect(doc).not.toMatch(/EAA[A-Za-z0-9_-]{20,}/u);
@@ -125,8 +127,8 @@ describe("WATS-51 config and env templates", () => {
       expect(doc).not.toMatch(/postgres(?:ql)?:\/\/[^\s]*:[^\s]*@/iu);
     }
 
-    expect(cliGuide).toContain("WATS-69 adds real local generation");
-    expect(configReference).toContain("wats init` as of WATS-69");
+    expect(cliGuide).toContain("wats init");
+    expect(configReference).toContain("wats init");
     expect(changelog).toContain("no live Meta calls");
   });
 });

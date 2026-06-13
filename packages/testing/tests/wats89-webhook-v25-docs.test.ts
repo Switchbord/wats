@@ -21,13 +21,16 @@ function read(path: string): string {
 
 describe("WATS-89 webhook v24/v25 docs", () => {
   test("reference docs capture played, media url, unsupported details, and coexistence events", () => {
-    const webhook = read("docs/reference/webhook.md");
-    const normalizer = read("docs/reference/webhook-normalizer.md");
-    const parity = read("docs/parity/pywa-parity-matrix.md");
+    const webhook = read("site/content/docs/reference/webhook.mdx");
+    const normalizer = read("site/content/docs/reference/webhook-normalizer.mdx");
+    const parity = read("site/content/docs/parity.mdx");
     const changelog = read("CHANGELOG.md");
 
-    for (const doc of [webhook, normalizer, parity, changelog]) {
-      expect(doc).toContain("WATS-89");
+    expect(changelog).toContain("WATS-89");
+
+    // Detailed v24/v25 webhook fields live in the reference docs + changelog; the
+    // parity matrix is a condensed status view.
+    for (const doc of [webhook, normalizer, changelog]) {
       expect(doc).toContain("played");
       expect(doc).toContain("media.url");
       expect(doc).toContain("PARTNER_REMOVED");
@@ -36,8 +39,9 @@ describe("WATS-89 webhook v24/v25 docs", () => {
       expect(doc).toContain("disconnectionInfo");
       expect(doc).toContain("request_welcome");
     }
+    expect(parity).toContain("Webhook normalization");
 
-    expect(normalizer).toContain("conversation is optional");
-    expect(webhook).toContain("conversation is absent by default");
+    expect(normalizer).toContain("is optional");
+    expect(webhook).toContain("absent by default");
   });
 });

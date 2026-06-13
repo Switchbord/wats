@@ -1,4 +1,4 @@
-// F-9 RED — asserts docs/reference/filters.md content + F-9 parity
+// F-9 RED — asserts site/content/docs/reference/filters.mdx content + F-9 parity
 // matrix / CHANGELOG updates + the core-consumer fixture coverage
 // for the new typed-filter surface. These checks fail until the F-9
 // GREEN doc commit ships the reference guide in full, the parity
@@ -69,7 +69,7 @@ function runBun(args: string[], cwd: string): {
 
 describe("F-9 filters.md reference guide", () => {
   const repoRoot = findRepoRoot(import.meta.dir);
-  const docPath = join(repoRoot, "docs/reference/filters.md");
+  const docPath = join(repoRoot, "site/content/docs/reference/filters.mdx");
   const doc = readFileSync(docPath, "utf8");
 
   test("contains a TypedFilter surface section", () => {
@@ -135,9 +135,12 @@ describe("F-9 filters.md reference guide", () => {
     expect(doc).toContain("@wats/core/filtersTyped");
   });
 
-  test("references architecture notes and the F-9 scope", () => {
-    expect(doc).toMatch(/architecture notes/);
-    expect(doc).toMatch(/F-9/);
+  test("documents the transitional two-surface scope and links related API surface", () => {
+    // E3: voice pass removed the "architecture notes" prose and the F-9 ticket
+    // ref (CI banned-phrases forbids re-adding ticket tokens). Assert on the
+    // surviving feature content that conveys the same scope intent.
+    expect(doc).toMatch(/Two filter surfaces coexist/i);
+    expect(doc).toContain("/docs/concepts/public-api-surface");
   });
 
   test("documents the type-narrowing guarantee", () => {
@@ -238,14 +241,15 @@ describe("F-9 CHANGELOG", () => {
 describe("F-9 parity matrix", () => {
   const repoRoot = findRepoRoot(import.meta.dir);
   const matrix = readFileSync(
-    join(repoRoot, "docs/parity/pywa-parity-matrix.md"),
+    join(repoRoot, "site/content/docs/parity.mdx"),
     "utf8"
   );
 
-  test("WATS-21 typed filter row is marked addressed-by F-9", () => {
-    expect(matrix).toMatch(/WATS-21/);
-    expect(matrix).toMatch(/F-9/);
-    // Must mention the new surface so readers can locate it.
-    expect(matrix).toContain("TypedFilter");
+  test("typed filter row documents the filtersTyped surface", () => {
+    // E3: voice pass removed WATS-21 / F-9 ticket tokens and the "TypedFilter"
+    // phrasing from the parity matrix. Assert on the surviving Filters row that
+    // names the new typed surface so readers can still locate it.
+    expect(matrix).toContain("filtersTyped");
+    expect(matrix).toMatch(/`and`\/`or`\/`not`\/`custom`/);
   });
 });

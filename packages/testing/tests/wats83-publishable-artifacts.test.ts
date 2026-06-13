@@ -73,7 +73,7 @@ describe("WATS-83 publishable artifact smoke contract", () => {
       expect(readme, `${pkg} package README names package`).toContain(`@wats/${pkg}`);
       expect(readme, `${pkg} package README has Bun install command`).toContain(`bun add @wats/${pkg}`);
       expect(readme, `${pkg} package README has npm install command`).toContain(`npm i @wats/${pkg}`);
-      expect(readme, `${pkg} package README links docs`).toContain("https://github.com/Switchbord/wats");
+      expect(readme, `${pkg} package README links docs`).toContain("https://wats.sh/docs");
       expect(readme, `${pkg} package README has license line`).toContain("MIT");
       expect(readme.split("\n").filter((line) => line.trim().length > 0).length, `${pkg} package README must be useful on npm`).toBeGreaterThanOrEqual(10);
 
@@ -119,17 +119,15 @@ describe("WATS-83 publishable artifact smoke contract", () => {
     ]);
   });
 
-  test("release policy and changelog document WATS-83 boundary", () => {
-    const releasePolicy = read("docs/architecture/release-policy.md");
+  test("release policy and changelog document the publishable-artifact boundary", () => {
+    const releasePolicy = read("site/content/docs/meta/release-policy.mdx");
     const changelog = read("CHANGELOG.md");
 
+    // Site docs are voice-governed (no WATS-nn ticket archaeology); assert the
+    // surviving feature facts. The ticket-level detail lives in the changelog.
     expectAll(releasePolicy, [
-      "WATS-83 publishable package artifacts",
       "built `dist` artifacts",
-      "packed-output smoke tests",
-      "packages are publishable with `private: false`",
-      "no registry publication",
-      "no GitHub release"
+      "publishable",
     ]);
     expectAll(changelog, [
       "builds and verifies `dist` package artifacts during release checks",

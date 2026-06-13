@@ -25,12 +25,14 @@ const DEFAULT_MANIFEST_PATH = "scripts/public-api-consistency-manifest.json";
 const EXPECTED_SCHEMA = "wats.public-api-consistency.v1";
 const EXPECTED_SCOPE = "@wats/graph endpoint subpaths";
 const DOC_PACKET = [
-  "docs/reference/index.md",
-  "docs/architecture/public-api-surface.md",
-  "docs/architecture/package-map.md",
-  "docs/migration/pywa-to-wats.md",
+  "site/content/docs/reference/index.mdx",
+  "site/content/docs/concepts/public-api-surface.mdx",
+  "site/content/docs/concepts/package-map.mdx",
+  "site/content/docs/migration/pywa.mdx",
   "CHANGELOG.md"
 ] as const;
+
+const API_STABILITY_DOC = "site/content/docs/meta/api-stability.mdx";
 
 const EXPERIMENTAL_SOURCE_TAGS = [
   {
@@ -52,6 +54,25 @@ const EXPERIMENTAL_SOURCE_TAGS = [
 
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+// A doc "mentions" a graph endpoint subpath specifier if it either contains the
+// literal specifier, OR a brace-expansion form that enumerates the endpoint
+// family member, e.g. `@wats/graph/endpoints/{messages,media,templates,flows,
+// calling,business-management,groups}`. The site MDX voice pass collapsed the
+// reference index into the brace form; the fact (this subpath is documented as
+// public) is preserved, so we accept either rendering rather than weakening the
+// guard to a no-op.
+function docMentionsSpecifier(docText: string, specifier: string): boolean {
+  if (docText.includes(specifier)) return true;
+  const prefix = "@wats/graph/endpoints/";
+  if (!specifier.startsWith(prefix)) return false;
+  const member = specifier.slice(prefix.length);
+  const braceFormRegex = new RegExp(
+    `@wats/graph/endpoints/\\{[^}]*\\b${member.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}\\b[^}]*\\}`,
+    "u"
+  );
+  return braceFormRegex.test(docText);
 }
 
 function repoRoot(): string {
@@ -186,7 +207,7 @@ function checkEntry(root: string, entry: GraphEndpointSubpathEntry): string[] {
 
   for (const doc of entry.docs) {
     const docText = readFileSync(safeRepoPath(root, doc, `${entry.specifier} doc`), "utf8");
-    if (!docText.includes(entry.specifier)) {
+    if (!docMentionsSpecifier(docText, entry.specifier)) {
       failures.push(`${entry.specifier}: doc ${doc} missing specifier`);
     }
   }
@@ -196,14 +217,14 @@ function checkEntry(root: string, entry: GraphEndpointSubpathEntry): string[] {
 
 function checkExperimentalTags(root: string): string[] {
   const failures: string[] = [];
-  const stabilityDoc = readFileSync(safeRepoPath(root, "docs/api-stability.md", "API stability policy"), "utf8");
+  const stabilityDoc = readFileSync(safeRepoPath(root, API_STABILITY_DOC, "API stability policy"), "utf8");
   for (const entry of EXPERIMENTAL_SOURCE_TAGS) {
     const source = readFileSync(safeRepoPath(root, entry.path, `${entry.label} source`), "utf8");
     if (!source.includes(entry.marker)) {
       failures.push(`${entry.label}: ${entry.path} must include marker ${entry.marker}`);
     }
     if (!stabilityDoc.includes(entry.label)) {
-      failures.push(`${entry.label}: docs/api-stability.md must classify this experimental surface`);
+      failures.push(`${entry.label}: ${API_STABILITY_DOC} must classify this experimental surface`);
     }
   }
   return failures;

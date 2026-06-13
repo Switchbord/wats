@@ -1,4 +1,4 @@
-// F-6 RED — asserts docs/reference/endpoints.md contents and
+// F-6 RED — asserts site/content/docs/reference/endpoints.mdx contents and
 // graph-consumer fixture extension. These checks fail until commit 4
 // ships the reference doc and extends the fixture.
 
@@ -13,7 +13,7 @@ function repoRoot(): string {
 
 describe("F-6 endpoints.md reference guide", () => {
   const endpointsDoc = readFileSync(
-    join(repoRoot(), "docs/reference/endpoints.md"),
+    join(repoRoot(), "site/content/docs/reference/endpoints.mdx"),
     "utf8"
   );
 

@@ -1,4 +1,4 @@
-// F-11 RED — asserts docs/reference/listeners.md content, parity
+// F-11 RED — asserts site/content/docs/reference/listeners.mdx content, parity
 // matrix update, CHANGELOG entry, and the core-consumer fixture
 // coverage of the listener substrate. These checks fail until the
 // GREEN doc/fixture commit ships the listeners reference, the parity
@@ -68,12 +68,12 @@ function runBun(args: string[], cwd: string): {
 }
 
 // ---------------------------------------------------------------------
-// docs/reference/listeners.md
+// site/content/docs/reference/listeners.mdx
 // ---------------------------------------------------------------------
 
 describe("F-11 listeners.md reference guide", () => {
   const repoRoot = findRepoRoot(import.meta.dir);
-  const docPath = join(repoRoot, "docs/reference/listeners.md");
+  const docPath = join(repoRoot, "site/content/docs/reference/listeners.mdx");
   const doc = readFileSync(docPath, "utf8");
 
   test("contains a Listener substrate section", () => {
@@ -137,9 +137,10 @@ describe("F-11 listeners.md reference guide", () => {
   });
 
   test("references WATS-22 Arch-H and the F-11 scope", () => {
-    expect(doc).toMatch(/WATS-22/);
-    expect(doc).toMatch(/Arch-H/);
-    expect(doc).toMatch(/F-11/);
+    // Voice pass removed the WATS-22/Arch-H/F-11 labels; assert the surviving
+    // listener scope facts (non-goals: persistence + cross-instance distribution).
+    expect(doc).toMatch(/## Non-goals/);
+    expect(doc).toMatch(/persistence/i);
   });
 
   test("documents scope ledger (non-goals)", () => {
@@ -248,14 +249,16 @@ describe("F-11 CHANGELOG", () => {
 describe("F-11 parity matrix", () => {
   const repoRoot = findRepoRoot(import.meta.dir);
   const matrix = readFileSync(
-    join(repoRoot, "docs/parity/pywa-parity-matrix.md"),
+    join(repoRoot, "site/content/docs/parity.mdx"),
     "utf8"
   );
 
   test("Listeners row references F-11 + WATS-22", () => {
     expect(matrix).toMatch(/Listeners/);
-    expect(matrix).toMatch(/WATS-22/);
-    expect(matrix).toMatch(/F-11/);
-    expect(matrix).toContain("ListenerRegistry");
+    // Voice pass removed WATS-22/F-11 labels; assert the surviving Listeners-row
+    // API facts instead.
+    expect(matrix).toMatch(/wa\.listen\(/);
+    expect(matrix).toMatch(/timeoutMs/);
+    expect(matrix).toMatch(/registry/i);
   });
 });

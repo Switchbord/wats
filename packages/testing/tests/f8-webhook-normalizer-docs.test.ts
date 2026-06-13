@@ -1,4 +1,4 @@
-// F-8 RED — asserts docs/reference/webhook-normalizer.md content and
+// F-8 RED — asserts site/content/docs/reference/webhook-normalizer.mdx content and
 // the core-consumer fixture shape for normalizeWebhookEnvelope.
 // These checks fail until the F-8 GREEN commit ships the reference
 // guide in full and lands the parity-matrix + CHANGELOG updates.
@@ -68,7 +68,7 @@ function runBun(args: string[], cwd: string): {
 
 describe("F-8 webhook-normalizer.md reference guide", () => {
   const repoRoot = findRepoRoot(import.meta.dir);
-  const docPath = join(repoRoot, "docs/reference/webhook-normalizer.md");
+  const docPath = join(repoRoot, "site/content/docs/reference/webhook-normalizer.mdx");
   const doc = readFileSync(docPath, "utf8");
 
   test("contains a TypedUpdate catalog section", () => {
@@ -101,15 +101,17 @@ describe("F-8 webhook-normalizer.md reference guide", () => {
     expect(doc).toContain("limitError");
   });
 
-  test("documents CRLF / NUL defense on id-bearing fields (WATS-12 L6)", () => {
+  test("documents CRLF / NUL defense on id-bearing fields", () => {
+    // Voice pass dropped the WATS-12 ticket ref; the CRLF/NUL control-char
+    // defense on id-bearing fields survives verbatim.
     expect(doc).toMatch(/CR\/LF|CRLF|\\r\\n/);
     expect(doc).toMatch(/NUL|\\u0000|\\0/);
-    expect(doc).toMatch(/WATS-12/);
     expect(doc).toMatch(/phone_number_id|phoneNumberId/);
   });
 
-  test("documents within-envelope duplicate-id dedup (WATS-14 L8)", () => {
-    expect(doc).toMatch(/WATS-14/);
+  test("documents within-envelope duplicate-id dedup", () => {
+    // Voice pass dropped the WATS-14 ticket ref; the dedup + first-wins fact
+    // survives.
     expect(doc).toMatch(/dedup|duplicate/i);
     expect(doc).toMatch(/first wins|first-wins/i);
   });
@@ -124,9 +126,12 @@ describe("F-8 webhook-normalizer.md reference guide", () => {
     expect(doc).toContain("normalizeWebhookEnvelope");
   });
 
-  test("references architecture notes and the F-8 scope", () => {
-    expect(doc).toMatch(/architecture notes/);
-    expect(doc).toMatch(/F-8/);
+  test("links to related reference docs", () => {
+    // Voice pass removed the "architecture notes" prose and the F-8 phase label.
+    // The intent (cross-references to related docs) survives as the Related
+    // section linking webhook + types references.
+    expect(doc).toMatch(/## Related/);
+    expect(doc).toMatch(/\/docs\/reference\/(webhook|types)/);
   });
 
   test("documents WATS-135 groups[] webhook shape and group field taxonomy", () => {
@@ -242,16 +247,16 @@ describe("F-8 CHANGELOG", () => {
 describe("F-8 parity matrix", () => {
   const repoRoot = findRepoRoot(import.meta.dir);
   const matrix = readFileSync(
-    join(repoRoot, "docs/parity/pywa-parity-matrix.md"),
+    join(repoRoot, "site/content/docs/parity.mdx"),
     "utf8"
   );
 
-  test("mentions WATS-2 / WATS-7 / WATS-12 / WATS-14 / WATS-16 with F-8 addressed-by", () => {
-    expect(matrix).toMatch(/WATS-2/);
-    expect(matrix).toMatch(/WATS-7/);
-    expect(matrix).toMatch(/WATS-12/);
-    expect(matrix).toMatch(/WATS-14/);
-    expect(matrix).toMatch(/WATS-16/);
-    expect(matrix).toMatch(/F-8/);
+  test("documents the webhook normalization row with a status tag", () => {
+    // Voice pass removed the WATS-2/7/12/14/16 ticket refs and the F-8
+    // addressed-by phase label from the matrix. The webhook-normalization row
+    // and its status taxonomy survive.
+    expect(matrix).toMatch(/[Ww]ebhook normalization/);
+    expect(matrix).toMatch(/normalizeWebhookEnvelope/);
+    expect(matrix).toMatch(/live-validated|shape-only/);
   });
 });

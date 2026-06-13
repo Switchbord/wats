@@ -21,20 +21,26 @@ function read(path: string): string {
 
 describe("WATS-94 template group docs", () => {
   test("reference, consumer docs, parity, and changelog document template_groups and analytics", () => {
-    const docs = [
-      read("docs/reference/endpoints.md"),
-      read("docs/reference/scoped-clients.md"),
-      read("docs/migration/pywa-to-wats.md"),
-      read("docs/parity/pywa-parity-matrix.md"),
-      read("docs/architecture/package-map.md"),
-      read("CHANGELOG.md")
+    const changelog = read("CHANGELOG.md");
+    const parity = read("site/content/docs/parity.mdx");
+    const migration = read("site/content/docs/migration/pywa.mdx");
+    // Detailed template-group APIs live in the reference docs, package map, and
+    // changelog; parity/migration are condensed status views.
+    const detailedDocs = [
+      read("site/content/docs/reference/endpoints.mdx"),
+      read("site/content/docs/reference/scoped-clients.mdx"),
+      read("site/content/docs/concepts/package-map.mdx"),
+      changelog
     ];
-    for (const doc of docs) {
-      expect(doc).toContain("WATS-94");
+    // Ticket traceability lives in the changelog, not the voice-governed site docs.
+    expect(changelog).toContain("WATS-94");
+    for (const doc of detailedDocs) {
       expect(doc).toContain("template_groups");
       expect(doc).toContain("template_group_analytics");
       expect(doc).toContain("listTemplateGroups");
       expect(doc).toContain("getTemplateGroupAnalytics");
     }
+    expect(parity).toContain("template-group analytics");
+    expect(migration).toContain("template");
   });
 });

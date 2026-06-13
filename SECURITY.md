@@ -42,7 +42,7 @@ No live Meta credentials are required for default tests or CI. Live validation c
 
 ## Privacy stance
 
-WATS sends no telemetry to maintainer-owned endpoints by default. The CLI does not phone home, and credential-free commands stay local unless the operator explicitly configures Graph/API calls. See `docs/privacy.md` for the privacy, telemetry, and redaction stance.
+WATS sends no telemetry to maintainer-owned endpoints by default. The CLI does not phone home, and credential-free commands stay local unless the operator explicitly configures Graph/API calls. See https://wats.sh/docs/meta/privacy for the privacy, telemetry, and redaction stance.
 
 ## Maintainer response expectations
 

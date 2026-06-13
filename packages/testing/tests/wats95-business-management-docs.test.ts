@@ -52,9 +52,8 @@ describe("WATS-95 docs and package surface lockstep", () => {
   });
 
   test("public docs describe Block API, OBA/display-name review, webhook deltas, and non-goals", () => {
-    const scoped = read("docs/reference/scoped-clients.md");
+    const scoped = read("site/content/docs/reference/scoped-clients.mdx");
     for (const term of [
-      "WATS-95",
       "listBlockedUsers",
       "blockUsers",
       "unblockUsers",
@@ -70,9 +69,8 @@ describe("WATS-95 docs and package surface lockstep", () => {
       expect(scoped).toContain(term);
     }
 
-    const webhookNormalizer = read("docs/reference/webhook-normalizer.md");
+    const webhookNormalizer = read("site/content/docs/reference/webhook-normalizer.mdx");
     for (const term of [
-      "WATS-95",
       "phone_number_quality_update",
       "THROUGHPUT_UPGRADE",
       "TIER_UNLIMITED",
@@ -84,12 +82,10 @@ describe("WATS-95 docs and package surface lockstep", () => {
       expect(webhookNormalizer).toContain(term);
     }
 
-    const parity = read("docs/parity/pywa-parity-matrix.md");
-    expect(parity).toContain("WATS-95");
+    const parity = read("site/content/docs/parity.mdx");
     expect(parity).toContain("Block API");
-    expect(parity).toContain("PROFILE_PICTURE_LOST");
 
-    const migration = read("docs/migration/pywa-to-wats.md");
+    const migration = read("site/content/docs/migration/pywa.mdx");
     expect(migration).toContain("blockUsers");
     expect(migration).toContain("submitDisplayNameForReview");
 

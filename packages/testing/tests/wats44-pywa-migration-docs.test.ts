@@ -31,13 +31,17 @@ function expectAll(content: string, snippets: readonly string[]) {
 
 describe("WATS-44 pywa migration docs", () => {
   test("migration guide replaces scaffold with concrete pywa-to-WATS mapping", () => {
-    const migration = read("docs/migration/pywa-to-wats.md");
+    const migration = read("site/content/docs/migration/pywa.mdx");
     expect(migration).not.toContain("TODO(A2)");
-    expect(migration).toContain("status: active");
-    expect(migration).toContain("lastReviewed: 2026-05-01");
+    // Voice-pass moved metadata into a JSX <DocMeta> tag and refreshed the
+    // review date to the June 2026 live campaign.
+    expect(migration).toContain('status="active"');
+    expect(migration).toContain('lastReviewed="2026-06-10"');
 
     expectAll(migration, [
-      "## Status labels",
+      // "## Status labels" heading was reworded to inline prose introducing the
+      // honesty taxonomy; the substance (a documented status taxonomy) survives.
+      "Status tags below use the honesty taxonomy",
       "## Package and construction map",
       "## Client construction and auth",
       "## Message sending map",
@@ -50,7 +54,9 @@ describe("WATS-44 pywa migration docs", () => {
       "## Error handling migration",
       "## Import and subpath cheat sheet",
       "## Known gaps to plan around",
-      "## Credentialed validation campaign"
+      // "## Credentialed validation campaign" heading was dropped; the campaign
+      // content now lives in parity/live-campaign.mdx and is linked from here.
+      "[campaign gates](/docs/parity/live-campaign)"
     ]);
 
     expectAll(migration, [
@@ -72,22 +78,24 @@ describe("WATS-44 pywa migration docs", () => {
   });
 
   test("live testing campaign runbook exists and keeps credentials gated", () => {
-    const path = "docs/parity/live-testing-campaign.md";
+    const path = "site/content/docs/parity/live-campaign.mdx";
     expect(existsSync(join(repoRoot, path))).toBe(true);
     const campaign = read(path);
 
     expectAll(campaign, [
-      "# WATS credentialed live-testing campaign",
-      "status: executed (2026-06-10; see execution log)",
-      "lastReviewed: 2026-06-10",
-      "## Scope and non-goals",
+      // Voice pass moved the H1 into frontmatter title and headings were
+      // reworded; substance (the campaign runbook + executed run) survives.
+      "title: Live-testing campaign",
+      "operator-authorized run against real Meta assets",
+      'lastReviewed="2026-06-10"',
+      "## Scope",
       "## Credential inventory",
-      "## Safe ordering",
-      "## Endpoint risk classification",
+      "## Phase order",
+      "## Risk classification",
       "## Redaction rules",
       "## Cleanup and rollback",
       "## Abort criteria",
-      "## Docs and test locks",
+      "## Harness requirements",
       "## Execution log"
     ]);
 
@@ -103,7 +111,7 @@ describe("WATS-44 pywa migration docs", () => {
       "WATS_ENABLE_FLOW_MUTATIONS=1",
       "WATS_ENABLE_CALLING_LIVE=1",
       "WATS_ENABLE_ADMIN_MUTATIONS=1",
-      "read-only before side-effecting before destructive",
+      "Read-only before side-effecting before destructive",
       "run manifest outside the repository",
       "SIP credentials",
       "media URLs",
@@ -112,29 +120,32 @@ describe("WATS-44 pywa migration docs", () => {
   });
 
   test("parity and roadmap docs point to WATS-44 live-validation plan", () => {
-    const matrix = read("docs/parity/pywa-parity-matrix.md");
-    expect(matrix).toContain("lastReviewed: 2026-06-10");
-    expect(matrix).toContain("pywa migration and parity audit (WATS-44)");
-    expect(matrix).toContain("docs/parity/live-testing-campaign.md");
-    expect(matrix).toContain("Live validation status");
+    const matrix = read("site/content/docs/parity.mdx");
+    // Voice pass moved review date into a JSX <DocMeta> attribute and linked
+    // the campaign by its site route instead of the source path; the WATS-44
+    // ticket label was stripped from public docs. The surviving guard is that
+    // the matrix carries the live-validated taxonomy and links the campaign log.
+    expect(matrix).toContain('lastReviewed="2026-06-10"');
+    expect(matrix).toContain("live-validated");
+    expect(matrix).toContain("/docs/parity/live-campaign");
 
-    const roadmap = read("docs/architecture/roadmap-to-whatsapp-pywa-parity.md");
-    expect(roadmap).toContain("WATS-44");
-    expect(roadmap).toContain("credentialed validation campaign");
+    const roadmap = read("site/content/docs/meta/roadmap.mdx");
+    // WATS-44 ticket ref removed by voice pass; the campaign-plan facts survive.
+    expect(roadmap).toContain("credentialed validation");
     expect(roadmap).toContain("read-only discovery");
-    expect(roadmap).toContain("controlled side-effecting tests");
+    expect(roadmap).toContain("side-effecting tests");
   });
 
   test("current docs remove known WATS-44 stale claims", () => {
-    const openapi = read("docs/reference/openapi.md");
-    expect(openapi).not.toContain("a CLI `wats openapi` implementation");
-    expect(openapi).toContain("full Meta Graph API OpenAPI document");
-
-    const service = read("docs/reference/service.md");
+    // The openapi reference page was deliberately not migrated (the playground +
+    // service reference now cover OpenAPI); its stale-claim assertions retire with it.
+    const service = read("site/content/docs/reference/service.mdx");
     expect(service).not.toContain("CLI `wats openapi` / `wats serve` execution");
-    expect(service).toContain("credential-gated live `wats serve` execution");
+    // Voice pass reworded "execution" → "wrappers"; the fact (CLI provides a
+    // credential-gated live serve path) survives.
+    expect(service).toContain("credential-gated live `wats serve` wrappers");
 
-    const config = read("docs/reference/config.md");
+    const config = read("site/content/docs/reference/config.mdx");
     expect(config).toContain("Live testing profile");
     expect(config).toContain("env: WATS_ACCESS_TOKEN");
     expect(config).toContain("env: WATS_APP_SECRET");

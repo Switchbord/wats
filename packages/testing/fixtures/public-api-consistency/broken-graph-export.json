@@ -12,10 +12,10 @@
         "from \"@wats/graph/endpoints/messages\""
       ],
       "docs": [
-        "docs/reference/index.md",
-        "docs/architecture/public-api-surface.md",
-        "docs/architecture/package-map.md",
-        "docs/migration/pywa-to-wats.md",
+        "site/content/docs/reference/index.mdx",
+        "site/content/docs/concepts/public-api-surface.mdx",
+        "site/content/docs/concepts/package-map.mdx",
+        "site/content/docs/migration/pywa.mdx",
         "CHANGELOG.md"
       ],
       "dist": "./dist/endpoints/not-real.js"

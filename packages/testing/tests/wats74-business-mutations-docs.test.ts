@@ -12,10 +12,10 @@ function read(path: string): string {
 
 describe("WATS-74 business mutation docs lockstep", () => {
   test("reference and architecture docs name the profile/commerce mutation tranche", () => {
-    const scoped = read("docs/reference/scoped-clients.md");
-    const endpoints = read("docs/reference/endpoints.md");
-    const surface = read("docs/architecture/public-api-surface.md");
-    const packageMap = read("docs/architecture/package-map.md");
+    const scoped = read("site/content/docs/reference/scoped-clients.mdx");
+    const endpoints = read("site/content/docs/reference/endpoints.mdx");
+    const surface = read("site/content/docs/concepts/public-api-surface.mdx");
+    const packageMap = read("site/content/docs/concepts/package-map.mdx");
 
     for (const doc of [scoped, endpoints, surface, packageMap]) {
       expect(doc).toContain("updateBusinessProfile");
@@ -29,18 +29,21 @@ describe("WATS-74 business mutation docs lockstep", () => {
   });
 
   test("parity, migration, changelog, and consumer fixture expose WATS-74", () => {
-    const parity = read("docs/parity/pywa-parity-matrix.md");
-    const migration = read("docs/migration/pywa-to-wats.md");
+    const parity = read("site/content/docs/parity.mdx");
+    const migration = read("site/content/docs/migration/pywa.mdx");
     const changelog = read("CHANGELOG.md");
     const fixture = read("packages/testing/fixtures/graph-consumer/verify-imports.ts");
 
     for (const doc of [parity, migration, changelog, fixture]) {
-      expect(doc).toContain("WATS-74");
       expect(doc).toContain("updateBusinessProfile");
       expect(doc).toContain("updateCommerceSettings");
     }
 
+    // Ticket traceability stays in the changelog + consumer fixture (not voice-governed).
+    expect(changelog).toContain("WATS-74");
+    expect(fixture).toContain("WATS-74");
+
     expect(migration).toContain("profile/commerce updates");
-    expect(parity).toContain("profile/commerce mutation first tranche");
+    expect(parity).toContain("Business/admin mutations");
   });
 });

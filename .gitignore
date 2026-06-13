@@ -6,9 +6,7 @@ node_modules/
 dist/
 coverage/
 *.tsbuildinfo
-docs/.vitepress/dist/
-docs/.vitepress/cache/
-docs/api/
+.typedoc-out/
 
 # logs
 *.log

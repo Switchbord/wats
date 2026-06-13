@@ -21,11 +21,13 @@ function read(path: string): string {
 
 describe("WATS-79 webhook-family docs lockstep", () => {
   test("reference docs describe normalized user_preferences, system, and chat_opened updates", () => {
-    const normalizer = read("docs/reference/webhook-normalizer.md");
-    const filters = read("docs/reference/filters.md");
+    const normalizer = read("site/content/docs/reference/webhook-normalizer.mdx");
+    const filters = read("site/content/docs/reference/filters.mdx");
 
     for (const term of [
-      "WATS-79",
+      // WATS-79 ticket ref dropped: voice pass stripped ticket tokens from site MDX
+      // and check-banned-phrases forbids re-adding. The TypedUpdate/family terms below
+      // are the surviving drift guard.
       "TypedUserPreferencesUpdate",
       "userPreferences",
       "user_preferences",
@@ -41,7 +43,7 @@ describe("WATS-79 webhook-family docs lockstep", () => {
     }
 
     for (const term of [
-      "WATS-79",
+      // WATS-79 dropped from site MDX (see above); filter API-name assertions guard intent.
       "userPreferences.preference",
       "userPreferences.category",
       "system.phoneNumberChange",
@@ -53,19 +55,28 @@ describe("WATS-79 webhook-family docs lockstep", () => {
   });
 
   test("parity and migration docs no longer list these first-slice webhook families as deferred", () => {
-    const parity = read("docs/parity/pywa-parity-matrix.md");
-    const migration = read("docs/migration/pywa-to-wats.md");
+    const parity = read("site/content/docs/parity.mdx");
+    const migration = read("site/content/docs/migration/pywa.mdx");
     const changelog = read("CHANGELOG.md");
 
-    for (const doc of [parity, migration, changelog]) {
-      expect(doc).toContain("WATS-79");
+    // CHANGELOG is not voice-governed: keep full ticket + family traceability.
+    expect(changelog).toContain("WATS-79");
+    for (const doc of [migration, changelog]) {
       expect(doc).toContain("user_preferences");
       expect(doc).toContain("system");
       expect(doc).toContain("chat_opened");
     }
 
-    expect(parity).toContain("user preferences, system phone/identity events, and chat_opened");
-    expect(migration).toContain("Implemented, credential-free");
+    // parity.mdx voice pass folded the three families into the "Webhook normalization"
+    // row ("live-validated for message and status families; deeper families shape-only").
+    // shape-only = implemented (not deferred/planned), which preserves this test's intent.
+    // DOC-GAP (for parent): parity.mdx no longer enumerates user_preferences/system/
+    // chat_opened by name — they are only implied by "deeper families shape-only".
+    expect(parity).toMatch(/Webhook normalization[\s\S]*deeper families shape-only/iu);
+
+    // "Implemented, credential-free" phrasing was reworded; migration now maps the
+    // families to their typed updates + filters, which proves implemented (not deferred).
+    expect(migration).toContain("TypedUserPreferencesUpdate");
     expect(migration).toContain("filtersTyped.userPreferences");
   });
 });

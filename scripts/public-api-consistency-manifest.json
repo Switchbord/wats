@@ -15,10 +15,10 @@
         "\"@wats/graph/endpoints/messages\""
       ],
       "docs": [
-        "docs/reference/index.md",
-        "docs/architecture/public-api-surface.md",
-        "docs/architecture/package-map.md",
-        "docs/migration/pywa-to-wats.md",
+        "site/content/docs/reference/index.mdx",
+        "site/content/docs/concepts/public-api-surface.mdx",
+        "site/content/docs/concepts/package-map.mdx",
+        "site/content/docs/migration/pywa.mdx",
         "CHANGELOG.md"
       ],
       "dist": "./dist/endpoints/messages.js"
@@ -35,10 +35,10 @@
         "\"@wats/graph/endpoints/media\""
       ],
       "docs": [
-        "docs/reference/index.md",
-        "docs/architecture/public-api-surface.md",
-        "docs/architecture/package-map.md",
-        "docs/migration/pywa-to-wats.md",
+        "site/content/docs/reference/index.mdx",
+        "site/content/docs/concepts/public-api-surface.mdx",
+        "site/content/docs/concepts/package-map.mdx",
+        "site/content/docs/migration/pywa.mdx",
         "CHANGELOG.md"
       ],
       "dist": "./dist/endpoints/media.js"
@@ -55,10 +55,10 @@
         "\"@wats/graph/endpoints/templates\""
       ],
       "docs": [
-        "docs/reference/index.md",
-        "docs/architecture/public-api-surface.md",
-        "docs/architecture/package-map.md",
-        "docs/migration/pywa-to-wats.md",
+        "site/content/docs/reference/index.mdx",
+        "site/content/docs/concepts/public-api-surface.mdx",
+        "site/content/docs/concepts/package-map.mdx",
+        "site/content/docs/migration/pywa.mdx",
         "CHANGELOG.md"
       ],
       "dist": "./dist/endpoints/templates.js"
@@ -75,10 +75,10 @@
         "\"@wats/graph/endpoints/flows\""
       ],
       "docs": [
-        "docs/reference/index.md",
-        "docs/architecture/public-api-surface.md",
-        "docs/architecture/package-map.md",
-        "docs/migration/pywa-to-wats.md",
+        "site/content/docs/reference/index.mdx",
+        "site/content/docs/concepts/public-api-surface.mdx",
+        "site/content/docs/concepts/package-map.mdx",
+        "site/content/docs/migration/pywa.mdx",
         "CHANGELOG.md"
       ],
       "dist": "./dist/endpoints/flows.js"
@@ -95,10 +95,10 @@
         "\"@wats/graph/endpoints/calling\""
       ],
       "docs": [
-        "docs/reference/index.md",
-        "docs/architecture/public-api-surface.md",
-        "docs/architecture/package-map.md",
-        "docs/migration/pywa-to-wats.md",
+        "site/content/docs/reference/index.mdx",
+        "site/content/docs/concepts/public-api-surface.mdx",
+        "site/content/docs/concepts/package-map.mdx",
+        "site/content/docs/migration/pywa.mdx",
         "CHANGELOG.md"
       ],
       "dist": "./dist/endpoints/calling.js"
@@ -116,10 +116,10 @@
         "\"@wats/graph/endpoints/business-management\""
       ],
       "docs": [
-        "docs/reference/index.md",
-        "docs/architecture/public-api-surface.md",
-        "docs/architecture/package-map.md",
-        "docs/migration/pywa-to-wats.md",
+        "site/content/docs/reference/index.mdx",
+        "site/content/docs/concepts/public-api-surface.mdx",
+        "site/content/docs/concepts/package-map.mdx",
+        "site/content/docs/migration/pywa.mdx",
         "CHANGELOG.md"
       ],
       "dist": "./dist/endpoints/businessManagement.js"
@@ -136,10 +136,10 @@
         "\"@wats/graph/endpoints/groups\""
       ],
       "docs": [
-        "docs/reference/index.md",
-        "docs/architecture/public-api-surface.md",
-        "docs/architecture/package-map.md",
-        "docs/migration/pywa-to-wats.md",
+        "site/content/docs/reference/index.mdx",
+        "site/content/docs/concepts/public-api-surface.mdx",
+        "site/content/docs/concepts/package-map.mdx",
+        "site/content/docs/migration/pywa.mdx",
         "CHANGELOG.md"
       ],
       "dist": "./dist/endpoints/groups.js"

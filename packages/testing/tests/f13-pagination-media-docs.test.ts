@@ -1,4 +1,4 @@
-// F-13 RED — asserts docs/reference/pagination.md + docs/reference/media.md
+// F-13 RED — asserts site/content/docs/reference/pagination.mdx + site/content/docs/reference/media.mdx
 // content, parity matrix update, CHANGELOG entry, and the graph-consumer
 // fixture coverage of the F-13 surfaces. These checks fail until the
 // GREEN doc/parity commit ships the reference docs, the parity rows
@@ -69,12 +69,12 @@ function runBun(args: string[], cwd: string): {
 }
 
 // ---------------------------------------------------------------------
-// docs/reference/pagination.md
+// site/content/docs/reference/pagination.mdx
 // ---------------------------------------------------------------------
 
 describe("F-13 pagination.md reference guide", () => {
   const repoRoot = findRepoRoot(import.meta.dir);
-  const docPath = join(repoRoot, "docs/reference/pagination.md");
+  const docPath = join(repoRoot, "site/content/docs/reference/pagination.mdx");
 
   test("file exists", () => {
     expect(existsSync(docPath)).toBe(true);
@@ -131,11 +131,14 @@ describe("F-13 pagination.md reference guide", () => {
     expect(doc).toMatch(/for\s+await/);
   });
 
-  test("references WATS-25 Arch-K + F-13", () => {
+  test("documents the cursor-paginated Graph list provenance", () => {
+    // Voice pass deliberately removed WATS-nn ticket refs and F-nn/Arch-K phase
+    // labels (pure provenance), preserving the feature docs. Guard the surviving
+    // pagination substance that the provenance line used to anchor.
     const doc = readFileSync(docPath, "utf8");
-    expect(doc).toMatch(/WATS-25/);
-    expect(doc).toMatch(/Arch-K/);
-    expect(doc).toMatch(/F-13/);
+    expect(doc).toMatch(/cursor/i);
+    expect(doc).toContain("paginate");
+    expect(doc).toContain("Graph");
   });
 
   test("documents scope ledger (non-goals)", () => {
@@ -145,21 +148,24 @@ describe("F-13 pagination.md reference guide", () => {
 });
 
 // ---------------------------------------------------------------------
-// docs/reference/media.md
+// site/content/docs/reference/media.mdx
 // ---------------------------------------------------------------------
 
 describe("F-13 media.md reference guide", () => {
   const repoRoot = findRepoRoot(import.meta.dir);
-  const docPath = join(repoRoot, "docs/reference/media.md");
+  const docPath = join(repoRoot, "site/content/docs/reference/media.mdx");
 
   test("file exists", () => {
     expect(existsSync(docPath)).toBe(true);
   });
 
-  test("is marked experimental with WATS-37 runtime-complete status", () => {
+  test("is marked experimental and documents the full media runtime", () => {
+    // Voice pass dropped the "runtime-complete" status word and WATS-37 ticket
+    // ref. The fact survives: experimental DocMeta status + a credential-free
+    // runtime covering upload/download/delete/decrypt/sessions.
     const doc = readFileSync(docPath, "utf8");
     expect(doc).toMatch(/experimental/i);
-    expect(doc).toMatch(/runtime-complete|WATS-37/i);
+    expect(doc).toMatch(/credential-free media runtime|media runtime/i);
   });
 
   test("documents the four typed primitives", () => {
@@ -189,16 +195,19 @@ describe("F-13 media.md reference guide", () => {
     expect(doc).toMatch(/getUploadSession/);
   });
 
-  test("points at WATS-37 Linear issue for tracking", () => {
+  test("documents the not-yet-implemented live-credentialed surface", () => {
+    // Voice pass removed the WATS-37 Linear tracking ref. The intent — that the
+    // doc flags what remains unproven — survives in the status-taxonomy note.
     const doc = readFileSync(docPath, "utf8");
-    expect(doc).toMatch(/WATS-37/);
+    expect(doc).toMatch(/Not implemented yet|live credential/i);
   });
 
-  test("references WATS-24 Arch-J history plus WATS-37", () => {
+  test("documents the encrypted-media decrypt history surface", () => {
+    // Voice pass removed WATS-24/Arch-J provenance + WATS-37 ref. The guarded
+    // fact (encrypted media decrypt path is documented) survives as the API.
     const doc = readFileSync(docPath, "utf8");
-    expect(doc).toMatch(/WATS-24/);
-    expect(doc).toMatch(/Arch-J/);
-    expect(doc).toMatch(/WATS-37/);
+    expect(doc).toContain("decryptEncryptedMedia");
+    expect(doc).toMatch(/encrypted/i);
   });
 
   test("contains a usage code sample showing the runtime path", () => {
@@ -337,20 +346,24 @@ describe("F-13 CHANGELOG", () => {
 
 describe("F-13 parity matrix", () => {
   const repoRoot = findRepoRoot(import.meta.dir);
-  const matrixPath = join(repoRoot, "docs/parity/pywa-parity-matrix.md");
+  const matrixPath = join(repoRoot, "site/content/docs/parity.mdx");
 
-  test("pagination row references F-13 + WATS-25", () => {
+  test("pagination row documents the paginate primitives with a status tag", () => {
+    // Voice pass removed F-13/WATS-25 phase+ticket labels from the matrix rows.
+    // The pagination row's substance (paginate/paginateAll + status taxonomy)
+    // survives.
     const matrix = readFileSync(matrixPath, "utf8");
     expect(matrix).toMatch(/[Pp]agination/);
-    expect(matrix).toMatch(/WATS-25/);
-    expect(matrix).toMatch(/F-13/);
+    expect(matrix).toMatch(/paginate/);
+    expect(matrix).toMatch(/shape-only|live-validated|planned/);
   });
 
-  test("media row marks WATS-37 runtime complete without live checks", () => {
+  test("media row documents the media runtime with a status tag", () => {
+    // Voice pass removed WATS-37 ref + "runtime-complete"/"credential-gated"
+    // phrasing. The media-runtime row and its live/shape status tag survive.
     const matrix = readFileSync(matrixPath, "utf8");
-    expect(matrix).toMatch(/[Mm]edia/);
-    expect(matrix).toMatch(/WATS-37/);
-    expect(matrix).toMatch(/runtime-complete|complete/i);
-    expect(matrix).toMatch(/live credential|credential-gated/i);
+    expect(matrix).toMatch(/[Mm]edia runtime/);
+    expect(matrix).toMatch(/uploadMedia|downloadMedia/);
+    expect(matrix).toMatch(/live-validated|shape-only/);
   });
 });

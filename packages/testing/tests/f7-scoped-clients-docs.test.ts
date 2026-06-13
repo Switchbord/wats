@@ -1,4 +1,4 @@
-// F-7 RED — asserts docs/reference/scoped-clients.md content and the
+// F-7 RED — asserts site/content/docs/reference/scoped-clients.mdx content and the
 // graph-consumer fixture extension for PhoneNumberClient + WABAClient.
 // These checks fail until the F-7 GREEN (commit 4) ships the reference
 // guide in full and lands the parity-matrix + CHANGELOG updates.
@@ -14,7 +14,7 @@ function repoRoot(): string {
 
 describe("F-7 scoped-clients.md reference guide", () => {
   const doc = readFileSync(
-    join(repoRoot(), "docs/reference/scoped-clients.md"),
+    join(repoRoot(), "site/content/docs/reference/scoped-clients.mdx"),
     "utf8"
   );
 
@@ -46,8 +46,11 @@ describe("F-7 scoped-clients.md reference guide", () => {
   });
 
   test("contains a method-catalog and forward-declared future methods", () => {
+    // Voice pass reworded "forward-declared / later F-step" provenance phrasing.
+    // The fact survives: a "Method catalog" heading plus methods marked
+    // "not implemented yet" / "unimplemented".
     expect(doc).toMatch(/method catalog|methods/i);
-    expect(doc).toMatch(/forward[- ]declared|deferred|future|later F-step/i);
+    expect(doc).toMatch(/not implemented yet|unimplemented|credential-gated/i);
   });
 
   test("contains a usage code sample in TypeScript", () => {
@@ -110,12 +113,15 @@ describe("F-7 CHANGELOG", () => {
 
 describe("F-7 parity matrix", () => {
   const matrix = readFileSync(
-    join(repoRoot(), "docs/parity/pywa-parity-matrix.md"),
+    join(repoRoot(), "site/content/docs/parity.mdx"),
     "utf8"
   );
 
-  test("mentions WATS-19 with an F-7 addressed-by marker", () => {
-    expect(matrix).toMatch(/WATS-19/);
-    expect(matrix).toMatch(/F-7/);
+  test("documents the scoped sub-clients row with a status tag", () => {
+    // Voice pass removed the WATS-19 ticket ref + F-7 addressed-by phase label.
+    // The scoped sub-clients row and its status tag survive.
+    expect(matrix).toMatch(/[Ss]coped sub-clients/);
+    expect(matrix).toMatch(/PhoneNumberClient/);
+    expect(matrix).toMatch(/live-validated|shape-only/);
   });
 });

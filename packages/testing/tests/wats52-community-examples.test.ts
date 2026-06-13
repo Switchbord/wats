@@ -21,7 +21,7 @@ function findRepoRoot(startDir: string): string {
 }
 
 const repoRoot = findRepoRoot(import.meta.dir);
-const guidePath = "docs/guides/community-examples.md";
+const guidePath = "site/content/docs/guides/community-examples.mdx";
 const examplesReadmePath = "examples/README.md";
 
 function absolute(path: string): string {
@@ -52,12 +52,18 @@ function walkFiles(startPath: string): string[] {
 }
 
 function expectMentionsCommunitySafety(text: string): void {
-  expect(text).toContain("WATS-52");
+  // Voice-pass removed the "WATS-52" ticket ref from the published guide MDX
+  // (the examples/README.md keeps it). Guard the safety-contract substance,
+  // not the ticket id.
   expect(text).toMatch(/community examples/iu);
   expect(text).toMatch(/offline by default/iu);
   expect(text).toContain("MockTransport");
   expect(text).toMatch(/synthetic webhook (payloads|envelopes)/iu);
-  expect(text).toMatch(/credential-gated webhook tunnel/iu);
+  // Voice-pass reworded the guide to "Webhook tunnel ... (credential-gated)" /
+  // "credential-gated guidance" rather than the exact "credential-gated webhook
+  // tunnel" string (README keeps that order). Match credential-gated co-occurring
+  // with webhook-tunnel guidance in either order.
+  expect(text).toMatch(/credential-gated[^.]*tunnel|tunnel[^.]*credential-gated/iu);
 }
 
 const falseAvailabilityClaims = [
@@ -104,13 +110,17 @@ function isExampleCodeFile(path: string): boolean {
 }
 
 describe("WATS-52 community examples docs scaffold", () => {
-  test("public guide and examples README exist and the guide is in the public docs manifest", () => {
+  test("public guide and examples README exist and the guide is in the public pages manifest", () => {
     expect(existsSync(absolute(guidePath)), `${guidePath} should exist`).toBe(true);
     expect(existsSync(absolute(examplesReadmePath)), `${examplesReadmePath} should exist`).toBe(true);
 
-    const manifest = readJson<PublicDocsManifest>("docs/public-docs-manifest.json");
+    // Repointed from the retired VitePress docs/public-docs-manifest.json (which
+    // listed file paths) to the new prerendered-routes manifest
+    // site/public-pages-manifest.json (which lists ROUTES). Same intent: the
+    // community-examples guide must be part of the published public docs surface.
+    const manifest = readJson<PublicDocsManifest>("site/public-pages-manifest.json");
     expect(Array.isArray(manifest.pages)).toBe(true);
-    expect(manifest.pages).toContain(guidePath.replace(/^docs\//u, ""));
+    expect(manifest.pages).toContain("/docs/guides/community-examples");
   });
 
   test("guide and examples README document the offline community examples safety contract", () => {
@@ -179,6 +189,9 @@ describe("WATS-52 community examples docs scaffold", () => {
   test("guide does not infer delivered/read state from send success", () => {
     const guide = read(guidePath);
     expect(guide).toMatch(/delivered.*read.*observed webhook\/event-store evidence/isu);
-    expect(guide).toMatch(/not\s+(?:from|by)\s+send success/iu);
+    // Voice-pass reworded "not from send success" → "do not infer ... `delivered`
+    // or `read` from send success". Allow the intervening words; the guard that
+    // the guide refuses to derive delivery/read state from send success survives.
+    expect(guide).toMatch(/not\s+(?:infer|claim)[^.]*\b(?:from|by)\s+send success/iu);
   });
 });

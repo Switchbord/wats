@@ -13,18 +13,19 @@ function repoRead(path: string): string {
 
 describe("WATS-136 Groups docs lock", () => {
   test("filters, facade, parity, and changelog document the group ergonomics", () => {
-    const filters = repoRead("docs/reference/filters.md");
-    const facade = repoRead("docs/reference/whatsapp-facade.md");
-    const parity = repoRead("docs/parity/pywa-parity-matrix.md");
+    const filters = repoRead("site/content/docs/reference/filters.mdx");
+    const facade = repoRead("site/content/docs/reference/whatsapp-facade.mdx");
+    const parity = repoRead("site/content/docs/parity.mdx");
     const changelog = repoRead("CHANGELOG.md");
 
-    expect(filters).toContain("WATS-136");
+    // WATS-136 ticket refs dropped from site MDX (filters/facade/parity): voice pass
+    // stripped them and check-banned-phrases forbids re-adding. The co-located
+    // filtersTyped.group / sendGroupMessage / facade-helpers assertions are the guard.
+    // Changelog keeps WATS-136 (not voice-governed).
     expect(filters).toContain("filtersTyped.group");
     expect(filters).toContain("group.fromGroup(groupId)");
-    expect(facade).toContain("WATS-136");
     expect(facade).toContain("sendGroupMessage");
     expect(facade).toContain("listen({ groupId");
-    expect(parity).toContain("WATS-136");
     expect(parity).toContain("filters");
     expect(parity).toContain("facade helpers");
     expect(changelog).toContain("WATS-136");
@@ -34,7 +35,7 @@ describe("WATS-136 Groups docs lock", () => {
   });
 
   test("facade docs pin camelCase response shape and group hard limits/non-goals", () => {
-    const facade = repoRead("docs/reference/whatsapp-facade.md");
+    const facade = repoRead("site/content/docs/reference/whatsapp-facade.mdx");
 
     expect(facade).toContain("requestId");
     expect(facade).toContain("inviteLink");

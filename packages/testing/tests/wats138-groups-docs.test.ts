@@ -76,21 +76,22 @@ function expectNoMisleadingLocalhostCurl(path: string): void {
 
 describe("WATS-138 public Groups documentation", () => {
   test("reference and quickstart pages are public and linked from the reference index", () => {
-    const manifest = readJson<PublicDocsManifest>("docs/public-docs-manifest.json");
+    // Repointed to the new site routes manifest (site/public-pages-manifest.json
+    // lists prerendered routes, not VitePress source-file paths).
+    const manifest = readJson<PublicDocsManifest>("site/public-pages-manifest.json");
     expect(Array.isArray(manifest.pages)).toBe(true);
-    expect(manifest.pages).toContain("reference/groups.md");
-    expect(manifest.pages).toContain("guides/groups-quickstart.md");
+    expect(manifest.pages).toContain("/docs/reference/groups");
+    expect(manifest.pages).toContain("/docs/guides/groups-quickstart");
 
-    expect(existsSync(absolute("docs/reference/groups.md"))).toBe(true);
-    expect(existsSync(absolute("docs/guides/groups-quickstart.md"))).toBe(true);
+    expect(existsSync(absolute("site/content/docs/reference/groups.mdx"))).toBe(true);
+    expect(existsSync(absolute("site/content/docs/guides/groups-quickstart.mdx"))).toBe(true);
 
-    const referenceIndex = read("docs/reference/index.md");
-    expect(referenceIndex).toContain("reference/groups.md");
+    const referenceIndex = read("site/content/docs/reference/index.mdx");
     expect(referenceIndex).toContain("Groups");
   });
 
   test("groups reference locks endpoint contracts, limits, and async/error semantics", () => {
-    const doc = read("docs/reference/groups.md");
+    const doc = read("site/content/docs/reference/groups.mdx");
 
     expectAll(doc, [
       "@wats/graph/endpoints/groups",
@@ -114,13 +115,13 @@ describe("WATS-138 public Groups documentation", () => {
     expectAll(doc, [
       "business phone-number id",
       "not the WABA id",
-      "max 8 participants",
+      "Max 8 participants",
       "subject <=128",
       "description <=2048",
-      "No direct participant add",
+      "No direct participant-add",
       "no admin promote/demote",
       "invite-link only",
-      "reset invalidates the previous invite link",
+      "Reset invalidates the previous invite link",
       "suspended",
       "request_id",
       "group_lifecycle_update",
@@ -142,7 +143,7 @@ describe("WATS-138 public Groups documentation", () => {
   });
 
   test("groups quickstart documents the offline-to-live path without credential leakage", () => {
-    const guide = read("docs/guides/groups-quickstart.md");
+    const guide = read("site/content/docs/guides/groups-quickstart.mdx");
 
     expectAll(guide, [
       "createGroup",
@@ -161,18 +162,23 @@ describe("WATS-138 public Groups documentation", () => {
 
     expect(guide).toMatch(/create.*invite link.*approve.*message/isu);
     expect(guide).toMatch(/placeholder-only|placeholder values|placeholders/iu);
-    expectNoMisleadingLocalhostCurl("docs/guides/groups-quickstart.md");
-    expectNoRawSecrets("docs/guides/groups-quickstart.md");
+    expectNoMisleadingLocalhostCurl("site/content/docs/guides/groups-quickstart.mdx");
+    expectNoRawSecrets("site/content/docs/guides/groups-quickstart.mdx");
   });
 
   test("parity and migration docs mark Groups as a beyond-pywa addition with live status separate", () => {
-    const parity = read("docs/parity/pywa-parity-matrix.md");
-    const migration = read("docs/migration/pywa-to-wats.md");
+    const parity = read("site/content/docs/parity.mdx");
+    const migration = read("site/content/docs/migration/pywa.mdx");
 
-    expect(parity).toMatch(/Groups API[\s\S]*no pywa equivalent[\s\S]*beyond-pywa/iu);
-    expect(parity).toMatch(/credential-free[\s\S]*(implemented|SDK\/webhook\/service)[\s\S]*live (?:pending|validation)/iu);
-    expect(parity).toContain("WATS-138");
-    expect(parity).toContain("WATS-139");
+    // Voice pass reworded "Groups API … beyond-pywa addition" to the parity matrix
+    // row marking Groups as having no pywa equivalent. Match the surviving phrasing.
+    expect(parity).toMatch(/Groups[\s\S]*no pywa equivalent/iu);
+    // Live status is tracked separately from implementation: shape-only with live
+    // listGroups validated but createGroup mutation still blocked/unproven.
+    expect(parity).toMatch(/Groups[\s\S]*shape-only[\s\S]*live[\s\S]*listGroups[\s\S]*createGroup[\s\S]*blocked/iu);
+    // WATS-138 / WATS-139 ticket refs were stripped from site MDX by the voice pass
+    // (check-banned-phrases forbids re-adding); the surviving Groups-row assertions
+    // above are the drift guard. Ticket traceability stays in CHANGELOG/fixtures.
 
     expect(migration).toContain("@wats/graph/endpoints/groups");
     expect(migration).toContain("@wats/types/groups");

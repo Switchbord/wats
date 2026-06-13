@@ -20,8 +20,6 @@ WATS uses Bun and TypeScript workspaces.
 bun install --frozen-lockfile
 bun test
 bun run typecheck
-bun run docs:check
-bun run docs:build
 bun run check-publish
 ```
 
@@ -55,13 +53,13 @@ WATS is credential-free by default.
 
 For public behavior changes, update all applicable files:
 
-- `docs/reference/*` for public contracts and error behavior;
-- `docs/guides/*` for runnable or intentionally offline examples;
-- `docs/parity/pywa-parity-matrix.md` for pywa/WhatsApp coverage;
-- `docs/architecture/release-policy.md` when release/publication behavior changes;
+- `site/content/docs/reference/*` for public contracts and error behavior;
+- `site/content/docs/guides/*` for runnable or intentionally offline examples;
+- `site/content/docs/parity.mdx` for pywa/WhatsApp coverage;
+- `site/content/docs/meta/release-policy.mdx` when release/publication behavior changes;
 - `CHANGELOG.md` for user-facing changes.
 
-Public docs pages must be listed in `docs/public-docs-manifest.json`. Keep the public docs focused on user-facing behavior, package contracts, and release boundaries.
+Docs are authored in `site/content/docs` and published to wats.sh; doc changes land in the same PR as the code they describe. Keep the public docs focused on user-facing behavior, package contracts, and release boundaries.
 
 ## Pull request checklist
 
@@ -71,8 +69,6 @@ Before a PR is ready:
 - [ ] Tests prove behavior through public entrypoints where applicable.
 - [ ] `bun test` or relevant targeted tests pass.
 - [ ] `bun run typecheck` passes for touched packages or the full workspace.
-- [ ] `bun run docs:check` passes after docs changes.
-- [ ] `bun run docs:build` passes after public docs boundary changes.
 - [ ] No secrets, confidential operational snapshots, or generated build artifacts are committed.
 - [ ] Changelog and parity/reference docs are updated.
 

@@ -32,7 +32,7 @@ function expectAll(text: string, needles: readonly string[], label: string): voi
 
 describe("WATS-109/WATS-117 release governance docs", () => {
   test("repo settings doc captures reproducible branch protection, required CI, Dependabot, and CodeQL hygiene", () => {
-    const doc = read("docs/maintainers/repo-settings.md");
+    const doc = read("maintainers/repo-settings.md");
     expectAll(doc, [
       "WATS-109",
       "Require pull requests before merging",
@@ -76,20 +76,20 @@ describe("WATS-109/WATS-117 release governance docs", () => {
     expect(codeql).not.toMatch(/secrets\.|LINEAR_API_KEY|NPM_TOKEN|META_|WHATSAPP_/u);
   });
 
-  test("README carries the CI badge and maintainer docs are public-manifest excluded deliberately", () => {
+  test("README carries the CI badge and maintainer docs live outside the public docs surface", () => {
     const readme = read("README.md");
     expect(readme).toContain("actions/workflows/ci.yml/badge.svg");
     expect(readme).toContain("actions/workflows/ci.yml");
 
-    const manifest = readJson<{ pages?: string[]; exclude?: string[] }>("docs/public-docs-manifest.json");
-    expect(manifest.pages ?? []).not.toContain("maintainers/repo-settings.md");
-    expect(manifest.pages ?? []).not.toContain("maintainers/launch-checklist.md");
-    expect(manifest.exclude ?? []).toContain("maintainers/**");
+    // Maintainer docs are internal: they live at repo-root maintainers/, not in
+    // site/content/docs (the published surface), so they never reach wats.sh.
+    expect(existsSync(join(repoRoot, "maintainers/repo-settings.md"))).toBe(true);
+    expect(existsSync(join(repoRoot, "site/content/docs/maintainers"))).toBe(false);
   });
 
   test("launch checklist and announce draft cover public-alpha launch day without claiming release side effects", () => {
-    const checklist = read("docs/maintainers/launch-checklist.md");
-    const announce = read("docs/maintainers/announce-draft.md");
+    const checklist = read("maintainers/launch-checklist.md");
+    const announce = read("maintainers/announce-draft.md");
 
     expectAll(checklist, [
       "WATS-117",

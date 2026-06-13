@@ -88,8 +88,7 @@ describe("WATS 0.3.26 release-prep contract", () => {
   test("release scripts derive next release version instead of hard-coding stale 0.2.1", () => {
     const scripts = [
       "scripts/npm-publish-dry-run.ts",
-      "scripts/pack-smoke.ts",
-      "scripts/generate-docs-openapi.ts"
+      "scripts/pack-smoke.ts"
     ];
     for (const scriptPath of scripts) {
       const script = read(scriptPath);
@@ -98,12 +97,8 @@ describe("WATS 0.3.26 release-prep contract", () => {
     }
   });
 
-  test("service OpenAPI default and generated docs use the package release version", () => {
+  test("service OpenAPI default uses the package release version", () => {
     const serviceSource = read("packages/service/src/index.ts");
     expect(serviceSource).toContain(`DEFAULT_OPENAPI_VERSION = "${RELEASE_VERSION}"`);
-
-    const generator = read("scripts/generate-docs-openapi.ts");
-    expect(generator).not.toContain(`version: "${PREVIOUS_RELEASE_VERSION}"`);
-    expect(generator).toContain("version: readReleaseVersion()");
   });
 });

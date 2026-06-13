@@ -1,4 +1,4 @@
-// F-10 RED — asserts docs/reference/router.md + whatsapp-facade.md
+// F-10 RED — asserts site/content/docs/reference/router.mdx + whatsapp-facade.md
 // content, parity matrix update, CHANGELOG entry, and the core-
 // consumer fixture coverage of the TypedRouter + WhatsApp facade
 // surface. These checks fail until the GREEN doc/fixture commit
@@ -69,12 +69,12 @@ function runBun(args: string[], cwd: string): {
 }
 
 // ---------------------------------------------------------------------
-// docs/reference/router.md
+// site/content/docs/reference/router.mdx
 // ---------------------------------------------------------------------
 
 describe("F-10 router.md reference guide", () => {
   const repoRoot = findRepoRoot(import.meta.dir);
-  const docPath = join(repoRoot, "docs/reference/router.md");
+  const docPath = join(repoRoot, "site/content/docs/reference/router.mdx");
   const doc = readFileSync(docPath, "utf8");
 
   test("contains a TypedRouter section", () => {
@@ -91,8 +91,10 @@ describe("F-10 router.md reference guide", () => {
 
   test("documents registration-order dispatch guarantee (WATS-10 L4)", () => {
     expect(doc).toMatch(/registration[- ]order/i);
-    expect(doc).toContain("WATS-10");
-    expect(doc).toMatch(/L4/);
+    // Voice pass removed the WATS-10/L4 tracking labels; assert the surviving
+    // dispatch guarantee facts (the test's intent).
+    expect(doc).toMatch(/registration[- ]order guarantee/i);
+    expect(doc).toMatch(/exact order they were registered/i);
   });
 
   test("documents DispatchReport + error collection contract", () => {
@@ -105,7 +107,8 @@ describe("F-10 router.md reference guide", () => {
   });
 
   test("documents observer seams (WATS-15 A3)", () => {
-    expect(doc).toContain("WATS-15");
+    // Voice pass removed the WATS-15/A3 label; assert the surviving observer hooks.
+    expect(doc).toMatch(/observer/i);
     expect(doc).toContain("onBeforeDispatch");
     expect(doc).toContain("onAfterDispatch");
     expect(doc).toContain("onHandlerMatch");
@@ -139,18 +142,20 @@ describe("F-10 router.md reference guide", () => {
   });
 
   test("references architecture notes and the F-10 scope", () => {
-    expect(doc).toMatch(/architecture notes/);
-    expect(doc).toMatch(/F-10/);
+    // Voice pass dropped "architecture notes" prose and the F-10 label; the doc
+    // still cross-links related concepts and documents its non-goals/scope.
+    expect(doc).toMatch(/## Non-goals/);
+    expect(doc).toMatch(/## Related/);
   });
 });
 
 // ---------------------------------------------------------------------
-// docs/reference/whatsapp-facade.md
+// site/content/docs/reference/whatsapp-facade.mdx
 // ---------------------------------------------------------------------
 
 describe("F-10 whatsapp-facade.md reference guide", () => {
   const repoRoot = findRepoRoot(import.meta.dir);
-  const docPath = join(repoRoot, "docs/reference/whatsapp-facade.md");
+  const docPath = join(repoRoot, "site/content/docs/reference/whatsapp-facade.mdx");
   const doc = readFileSync(docPath, "utf8");
 
   test("contains a WhatsApp facade section", () => {
@@ -189,9 +194,10 @@ describe("F-10 whatsapp-facade.md reference guide", () => {
   });
 
   test("references WATS-26 Arch-L and the F-10 scope", () => {
-    expect(doc).toMatch(/WATS-26/);
-    expect(doc).toMatch(/Arch-L/);
-    expect(doc).toMatch(/F-10/);
+    // Voice pass removed the WATS-26/Arch-L/F-10 labels; assert the surviving
+    // facade scope structure (non-goals + related cross-links).
+    expect(doc).toMatch(/## Non-goals/);
+    expect(doc).toMatch(/## Related/);
   });
 });
 
@@ -304,15 +310,16 @@ describe("F-10 CHANGELOG", () => {
 describe("F-10 parity matrix", () => {
   const repoRoot = findRepoRoot(import.meta.dir);
   const matrix = readFileSync(
-    join(repoRoot, "docs/parity/pywa-parity-matrix.md"),
+    join(repoRoot, "site/content/docs/parity.mdx"),
     "utf8"
   );
 
   test("WATS-10, WATS-15, WATS-26 rows all reference F-10", () => {
-    expect(matrix).toMatch(/WATS-10/);
-    expect(matrix).toMatch(/WATS-15/);
-    expect(matrix).toMatch(/WATS-26/);
-    expect(matrix).toMatch(/F-10/);
+    // Voice pass removed WATS-nn/F-10 tracking labels from the parity matrix;
+    // assert the surviving capability rows (handler routing / facade) instead.
+    expect(matrix).toMatch(/Handler routing/);
+    expect(matrix).toMatch(/TypedRouter/);
+    expect(matrix).toMatch(/registration-order dispatch/);
     expect(matrix).toContain("TypedRouter");
     expect(matrix).toContain("WhatsApp");
   });

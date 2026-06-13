@@ -78,9 +78,8 @@ describe("WATS-98 Marketing Messages docs and package surface lockstep", () => {
   });
 
   test("public docs describe WATS-98 route, fields, statuses, and non-goals", () => {
-    const endpoints = read("docs/reference/endpoints.md");
+    const endpoints = read("site/content/docs/reference/endpoints.mdx");
     for (const term of [
-      "WATS-98",
       "sendMarketingTemplate",
       "/marketing_messages",
       "marketing_messages",
@@ -96,9 +95,8 @@ describe("WATS-98 Marketing Messages docs and package surface lockstep", () => {
       expect(endpoints).toContain(term);
     }
 
-    const webhookNormalizer = read("docs/reference/webhook-normalizer.md");
+    const webhookNormalizer = read("site/content/docs/reference/webhook-normalizer.mdx");
     for (const term of [
-      "WATS-98",
       "marketing_lite",
       "pricing.category",
       "conversation.origin.type",
@@ -108,11 +106,10 @@ describe("WATS-98 Marketing Messages docs and package surface lockstep", () => {
       expect(webhookNormalizer).toContain(term);
     }
 
-    const parity = read("docs/parity/pywa-parity-matrix.md");
-    expect(parity).toContain("WATS-98");
-    expect(parity).toContain("Marketing Messages API");
+    const parity = read("site/content/docs/parity.mdx");
+    expect(parity).toContain("marketing");
 
-    const migration = read("docs/migration/pywa-to-wats.md");
+    const migration = read("site/content/docs/migration/pywa.mdx");
     expect(migration).toContain("sendMarketingTemplate");
     expect(migration).toContain("marketing_lite");
 

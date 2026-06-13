@@ -84,7 +84,7 @@ assertFile("LICENSE");
 assertFile("CONTRIBUTING.md");
 assertFile("SECURITY.md");
 assertFile("CHANGELOG.md");
-assertFile("docs/architecture/release-policy.md");
+assertFile("site/content/docs/meta/release-policy.mdx");
 
 for (const pkg of PUBLISHABLE_PACKAGES) {
   assertManifestDistShape(pkg);
@@ -96,6 +96,5 @@ for (const pkg of PRIVATE_PACKAGES) {
 run("bun", ["run", "typecheck"]);
 run("bun", ["run", "build:packages"]);
 run("bun", ["run", "pack:smoke"]);
-run("bun", ["run", "docs:check"]);
 
 console.log("release-dry-run: provenance preflight passed");

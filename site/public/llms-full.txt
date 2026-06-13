@@ -1354,8 +1354,6 @@ URL: https://wats.sh/docs/guides/transport-and-testing
 
 `@wats/graph` ships a small `Transport` seam under `GraphClient` so that every HTTP concern — retries, authentication refresh, tracing, mocking in tests — lives in a composable layer you control. The default transport (`createFetchTransport`) is a thin wrapper over `globalThis.fetch`. Tests inject `createMockTransport` via the `@wats/graph/testing` subpath and assert on a `requests` array rather than monkey-patching global state.
 
-Three recipes follow: testing with the mock, opt-in reliability for production, and the interceptor primer.
-
 ## The Transport contract
 
 ```ts
@@ -1372,7 +1370,7 @@ interface Transport {
 
 `TransportRequest` is a fully-resolved absolute URL, a `Headers` instance, the chosen `BodyInit | null`, and the HTTP method (`GET | POST | PUT | PATCH | DELETE`). `TransportResponse` exposes `status`, `headers`, `body: ReadableStream<Uint8Array> | null`, and `arrayBuffer() / text() / json<T>()` methods.
 
-The seam is intentionally minimal: if you can write the function, you can swap it in. `GraphClient` never looks at the underlying fetch implementation; everything goes through the `Transport`.
+`GraphClient` never looks at the underlying fetch implementation; everything goes through the `Transport`.
 
 ## Recipe 1 — Testing with `createMockTransport`
 
@@ -1457,7 +1455,7 @@ const client = new GraphClient({
 
 The decorator retries transient `GET`/`DELETE` failures (`GraphNetworkError`, HTTP `429`, and HTTP `5xx`) using exponential backoff with full jitter. It honors Meta's `Retry-After` header for `429` / `503` responses and caps every delay at `maxDelayMs`. Caller aborts are never retried; per-attempt timeouts compose with a caller-provided `AbortSignal` via native `AbortSignal.any` / `AbortSignal.timeout`.
 
-WATS does **not** retry non-idempotent `POST` / `PUT` / `PATCH` request failures by default, with one narrow exception: HTTP `429` is treated as a rate-limit response across methods. Retrying `POST /messages` after an ambiguous network failure or `5xx` can double-send a WhatsApp message if Meta received the first request but the client lost the response. If you override `retryOn` to retry those POST failures, pair the request with an application idempotency strategy (for example the service-level `Idempotency-Key` flow). The default client applies no retries — reliability is explicit, composable, and removable.
+WATS does **not** retry non-idempotent `POST` / `PUT` / `PATCH` request failures by default, with one narrow exception: HTTP `429` is treated as a rate-limit response across methods. Retrying `POST /messages` after an ambiguous network failure or `5xx` can double-send a WhatsApp message if Meta received the first request but the client lost the response. If you override `retryOn` to retry those POST failures, pair the request with an application idempotency strategy (for example the service-level `Idempotency-Key` flow). The default client applies no retries.
 
 The same shape composes: `auth-refresh -> reliability -> tracing -> fetch`. Each layer is a function that takes `(inner: Transport) => Transport`. Because every layer sees the same `TransportRequest`/`TransportResponse` shape, the layers stay independently testable.
 
@@ -4051,7 +4049,7 @@ URL: https://wats.sh/docs/reference/listeners
 
 The listener substrate lets a handler (or any async flow) wait for a future typed update that matches a filter — conversational patterns without hand-rolling Promise wiring.
 
-The substrate is intentionally tiny. The heavy lifting lives in what it composes: the [`TypedFilter`](/docs/reference/filters) surface (matching), the [`TypedRouter`](/docs/reference/router) (dispatch), and the [`WhatsApp`](/docs/reference/whatsapp-facade) facade (composition root).
+The substrate composes the [`TypedFilter`](/docs/reference/filters) surface (matching), the [`TypedRouter`](/docs/reference/router) (dispatch), and the [`WhatsApp`](/docs/reference/whatsapp-facade) facade (composition root).
 
 ```ts
 import {
@@ -4867,7 +4865,7 @@ This picks determinism over "live" semantics. A frozen handler list for the dura
 
 ## Concurrency modes
 
-`sequential` (default) — the router awaits handlers one at a time, in registration order. Side-effects observe registration order exactly. This is the recommended default.
+`sequential` (default) — the router awaits handlers one at a time, in registration order. Side-effects observe registration order exactly.
 
 `parallel` — the router fires all matching handlers concurrently via `Promise.allSettled`. Errors are still collected, but interleaving is undefined and `"stop"` decisions are applied post-hoc (after all handlers have settled). Use `parallel` only when handler order is irrelevant and concurrency materially speeds up dispatch.
 
@@ -7098,8 +7096,8 @@ Evidence for every live-validated tag: [live campaign log](/docs/parity/live-cam
 
 ## Notes
 
-- Webhook media ids are downloadable for 7 days after receipt (Meta reduced
-  the window from 30 days, effective 2025-10-09). Download promptly and persist
+- Webhook media ids are downloadable for 7 days after receipt (Meta reduced the
+  window from 30 days to 7, effective 2025-10-09). Download promptly and persist
   to your own storage if you need media later; WATS does not persist it for you.
 - A send accepted with HTTP 200 proves Meta took the request, not that anyone
   received it. Delivered/read state comes only from observed status webhooks.
@@ -7446,7 +7444,7 @@ Future telemetry, if ever added, will be opt-in and documented. Any future telem
 # Release Policy
 URL: https://wats.sh/docs/meta/release-policy
 
-WATS uses semantic versioning across published workspace packages. Release mechanics are kept boring, auditable, and easy to automate.
+WATS uses semantic versioning across published workspace packages.
 
 ## `0.x` development line
 
@@ -7506,10 +7504,9 @@ Before publication:
 
 ```bash
 bun run check-publish
-bun run docs:build
 ```
 
-`check-publish` runs typecheck, `bun run build:packages`, `bun run pack:smoke`, and the workspace-policy tests. `pack:smoke` verifies each package tarball contains `package.json`, `dist/index.js`, and `dist/index.d.ts`, and excludes source entrypoints, `.env` files, and `node_modules`. `docs:build` generates the static OpenAPI JSON and builds the docs site credential-free.
+`check-publish` runs typecheck, `bun run build:packages`, `bun run pack:smoke`, and the workspace-policy tests. `pack:smoke` verifies each package tarball contains `package.json`, `dist/index.js`, and `dist/index.d.ts`, and excludes source entrypoints, `.env` files, and `node_modules`. The docs site is built and deployed separately from `site/`.
 
 Actual `npm publish --access public` requires a valid npm token and explicit operator authorization. Dry-run checks never publish, tag, or push.
 
@@ -7564,7 +7561,7 @@ Before tagging or pushing a release:
 # Roadmap to WhatsApp / pywa Parity
 URL: https://wats.sh/docs/meta/roadmap
 
-What is planned, what is shipped, and what is explicitly out of scope. Issue-level tracking lives in the project tracker; this page keeps you oriented.
+What is planned, what is shipped, and what is explicitly out of scope. Issue-level tracking lives in the project tracker.
 
 ## Shipped
 

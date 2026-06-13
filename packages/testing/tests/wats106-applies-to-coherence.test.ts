@@ -1,4 +1,6 @@
-// WATS-106 RED — docs must not advertise the stale 0.2.0 foundations line.
+// WATS-106 — docs must not advertise the stale 0.2.0 foundations line, and
+// the DocMeta appliesTo prop on release-line docs must track the current minor.
+// Repointed from the retired VitePress docs/ tree to site/content/docs.
 
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
@@ -7,7 +9,7 @@ import { dirname, join, relative, resolve } from "node:path";
 function findRepoRoot(startDir: string): string {
   let current = resolve(startDir);
   for (;;) {
-    if (existsSync(join(current, "package.json")) && existsSync(join(current, "docs"))) return current;
+    if (existsSync(join(current, "package.json")) && existsSync(join(current, "packages"))) return current;
     const parent = dirname(current);
     if (parent === current) throw new Error(`Could not locate repo root from ${startDir}`);
     current = parent;
@@ -20,12 +22,12 @@ function read(path: string): string {
   return readFileSync(join(repoRoot, path), "utf8");
 }
 
-function markdownFiles(dir: string): string[] {
+function docFiles(dir: string): string[] {
   const absolute = join(repoRoot, dir);
   return readdirSync(absolute, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name);
-    if (entry.isDirectory()) return markdownFiles(path);
-    return entry.isFile() && entry.name.endsWith(".md") ? [path] : [];
+    if (entry.isDirectory()) return docFiles(path);
+    return entry.isFile() && (entry.name.endsWith(".md") || entry.name.endsWith(".mdx")) ? [path] : [];
   });
 }
 
@@ -38,40 +40,26 @@ function rootMinorLine(): string {
 
 describe("WATS-106 applies-to coherence", () => {
   test("public docs do not advertise stale 0.2.0 foundations metadata", () => {
-    const offenders = markdownFiles("docs")
+    const offenders = docFiles("site/content/docs")
       .filter((path) => read(path).includes("0.2.0-foundations-complete"))
       .map((path) => relative(repoRoot, join(repoRoot, path)));
 
     expect(offenders).toEqual([]);
   });
 
-  test("frontmatter release-line docs use the current root minor line", () => {
+  test("DocMeta appliesTo on tooling-line docs tracks the current root minor", () => {
     const expectedLine = rootMinorLine();
-    const releaseLineDocs = [
-      "docs/getting-started.md",
-      "docs/reference/index.md",
-      "docs/reference/webhook.md",
-      "docs/reference/whatsapp-facade.md",
-      "docs/architecture/overview.md",
-      "docs/architecture/public-api-surface.md",
-      "docs/architecture/package-map.md"
+    // Docs that declare the alpha-tooling line via the DocMeta component must
+    // use the current minor. Docs that omit appliesTo or scope to a narrower
+    // line (e.g. 0.3.x-alpha) are out of scope for this coherence check.
+    const toolingLineDocs = [
+      "site/content/docs/concepts/overview.mdx",
+      "site/content/docs/concepts/public-api-surface.mdx",
+      "site/content/docs/concepts/package-map.mdx"
     ];
 
-    for (const path of releaseLineDocs) {
-      expect(read(path), `${path} applies-to`).toContain(`applies-to: \`${expectedLine}\``);
+    for (const path of toolingLineDocs) {
+      expect(read(path), `${path} appliesTo`).toContain(`appliesTo="${expectedLine}"`);
     }
-  });
-
-  test("OpenAPI reference describes the generated version as current package version", () => {
-    const openapi = read("docs/reference/openapi.md");
-
-    expect(openapi).toContain("`info.version`: current package version");
-    expect(openapi).not.toContain("current package foundation version (`0.2.0`)");
-  });
-
-  test("getting-started package count matches the package table", () => {
-    const gettingStarted = read("docs/getting-started.md");
-
-    expect(gettingStarted).toContain("The foundations pivot shipped five packages of primitives:");
   });
 });

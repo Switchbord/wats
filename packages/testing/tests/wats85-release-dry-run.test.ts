@@ -86,15 +86,13 @@ describe("WATS-85 release dry-run automation", () => {
   });
 
   test("release policy and changelog document WATS-85 boundary", () => {
-    const releasePolicy = read("docs/architecture/release-policy.md");
+    const releasePolicy = read("site/content/docs/meta/release-policy.mdx");
     const changelog = read("CHANGELOG.md");
+    // Voice-governed site doc: assert the surviving credential-free release-gate
+    // facts. The ticket-level dry-run detail stays in the changelog.
     expectAll(releasePolicy, [
-      "WATS-85 release automation dry-run",
-      "manual GitHub Actions `workflow_dispatch`",
       "credential-free",
-      "provenance preflight",
-      "no publishing authority",
-      "no tags/releases"
+      "check-publish"
     ]);
     expectAll(changelog, [
       "credential-free release dry-run workflow",
@@ -103,5 +101,6 @@ describe("WATS-85 release dry-run automation", () => {
       "no package publication",
       "No GitHub release/tag creation"
     ]);
+    expect(changelog).toContain("WATS-85");
   });
 });

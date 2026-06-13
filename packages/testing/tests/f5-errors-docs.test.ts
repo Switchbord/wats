@@ -1,4 +1,4 @@
-// F-5 RED — asserts docs/reference/errors.md rewrite phrases and fixture
+// F-5 RED — asserts site/content/docs/reference/errors.mdx rewrite phrases and fixture
 // F-5 coverage. These assertions fail until commit 4 ships the rewrite.
 
 import { describe, expect, test } from "bun:test";
@@ -12,7 +12,7 @@ function repoRoot(): string {
 
 describe("F-5 errors.md rewrite", () => {
   const errorsDoc = readFileSync(
-    join(repoRoot(), "docs/reference/errors.md"),
+    join(repoRoot(), "site/content/docs/reference/errors.mdx"),
     "utf8"
   );
 

@@ -21,11 +21,13 @@ function read(path: string): string {
 
 describe("WATS-78 sent-result waiter docs lockstep", () => {
   test("facade and listener docs describe waitable sent results and boundaries", () => {
-    const facade = read("docs/reference/whatsapp-facade.md");
-    const listeners = read("docs/reference/listeners.md");
+    const facade = read("site/content/docs/reference/whatsapp-facade.mdx");
+    const listeners = read("site/content/docs/reference/listeners.mdx");
 
+    // E3: voice pass removed the WATS-78 ticket token from these site docs
+    // (CI banned-phrases forbids re-adding it). The surviving API-name terms
+    // below are the real drift guard.
     for (const term of [
-      "WATS-78",
       "WhatsAppWaitableSentResult",
       "waitForReply",
       "waitUntilDelivered",
@@ -37,26 +39,32 @@ describe("WATS-78 sent-result waiter docs lockstep", () => {
       expect(facade).toContain(term);
     }
 
-    expect(listeners).toContain("WATS-78");
-    expect(listeners).toContain("sent-result waiters");
+    expect(listeners).toMatch(/sent-result waiters/i);
     expect(listeners).toContain("timeoutMs");
     expect(listeners).toContain("AbortSignal");
   });
 
-  test("parity, migration, changelog, and consumer fixture expose WATS-78", () => {
-    const parity = read("docs/parity/pywa-parity-matrix.md");
-    const migration = read("docs/migration/pywa-to-wats.md");
+  test("parity, migration, changelog, and consumer fixture expose sent-result waiters", () => {
+    const parity = read("site/content/docs/parity.mdx");
+    const migration = read("site/content/docs/migration/pywa.mdx");
     const changelog = read("CHANGELOG.md");
     const fixture = read("packages/testing/fixtures/core-consumer/verify-imports.ts");
 
-    for (const doc of [parity, migration, changelog, fixture]) {
+    // E3: WATS-78 ticket traceability legitimately lives in the changelog and
+    // the consumer fixture (not voice-governed) — keep those assertions.
+    for (const doc of [changelog, fixture]) {
       expect(doc).toContain("WATS-78");
+    }
+
+    // The voice pass dropped WATS-78 from parity + migration site docs; the
+    // surviving feature/API-name assertions below preserve the drift guard.
+    for (const doc of [parity, migration, changelog, fixture]) {
       expect(doc).toContain("waitForReply");
       expect(doc).toContain("waitUntilRead");
     }
 
-    expect(parity).toContain("sent-result waiters");
-    expect(migration).toContain("Implemented, credential-free");
+    expect(parity).toMatch(/sent-result waiters/i);
+    expect(migration).toContain("observed webhook updates");
     expect(fixture).toContain("WhatsAppWaitableSentResult");
   });
 });

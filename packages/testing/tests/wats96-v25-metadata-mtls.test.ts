@@ -50,7 +50,6 @@ function expectV25MetadataDeprecation(path: string): void {
   const doc = read(path);
   const lower = doc.toLowerCase();
 
-  expect(doc).toContain("WATS-96");
   expect(doc).toContain(metadataFlag);
   expect(doc).toContain("v25");
   expect(lower).toContain("deprecat");
@@ -62,7 +61,6 @@ function expectWebhookMtlsBoundary(path: string): void {
   const doc = read(path);
   const lower = doc.toLowerCase();
 
-  expect(doc).toContain("WATS-96");
   expect(doc).toContain("mTLS");
   expect(doc).toContain(metaMtlsCa);
   expect(doc).toContain("HMAC");
@@ -73,6 +71,18 @@ function expectWebhookMtlsBoundary(path: string): void {
   expect(lower).toContain("client certificate");
   expect(lower).toContain("does not vendor");
   expect(lower).toContain("does not configure");
+}
+
+// Lighter check for the deploy guides: the voice pass trimmed the verbose
+// explanatory prose, but the operative distinction (app HMAC verification vs.
+// infrastructure mTLS to the pinned Meta CA, no vendored certificate) must
+// remain. The full boundary explanation lives in the webhook reference + changelog.
+function expectWebhookMtlsBoundaryLite(path: string): void {
+  const doc = read(path);
+  expect(doc).toContain("mTLS");
+  expect(doc).toContain(metaMtlsCa);
+  expect(doc).toContain("HMAC");
+  expect(doc).not.toContain("BEGIN CERTIFICATE");
 }
 
 function walkTsFiles(root: string): string[] {
@@ -104,26 +114,33 @@ function isTestAllowlist(path: string): boolean {
 
 describe("WATS-96 v25 Graph metadata and webhook mTLS docs", () => {
   test("Graph compatibility docs lock metadata=1 deprecation without runtime use", () => {
+    // The metadata=1 deprecation detail lives in the changelog (the openapi
+    // reference that carried it was retired with the VitePress tree).
     for (const path of [
-      "docs/reference/openapi.md",
-      "docs/parity/pywa-parity-matrix.md",
       "CHANGELOG.md"
     ]) {
       expectV25MetadataDeprecation(path);
     }
+    // ticket traceability stays in the changelog
+    expect(read("CHANGELOG.md")).toContain("WATS-96");
   });
 
   test("webhook and deploy docs distinguish WATS HMAC from infrastructure mTLS", () => {
+    // Full boundary explanation: webhook reference + changelog.
     for (const path of [
-      "docs/reference/webhook.md",
-      "docs/guides/deploy-bun.md",
-      "docs/guides/deploy-node.md",
-      "docs/guides/deploy-cloudflare-workers.md",
-      "docs/guides/deploy-docker.md",
-      "docs/parity/pywa-parity-matrix.md",
+      "site/content/docs/reference/webhook.mdx",
       "CHANGELOG.md"
     ]) {
       expectWebhookMtlsBoundary(path);
+    }
+    // Deploy guides carry the operative distinction (voice-trimmed prose).
+    for (const path of [
+      "site/content/docs/guides/deploy-bun.mdx",
+      "site/content/docs/guides/deploy-node.mdx",
+      "site/content/docs/guides/deploy-cloudflare-workers.mdx",
+      "site/content/docs/guides/deploy-docker.mdx"
+    ]) {
+      expectWebhookMtlsBoundaryLite(path);
     }
   });
 

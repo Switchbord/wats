@@ -28,20 +28,17 @@ Closes WATS-
 - [ ] `bun test packages/testing/tests/<relevant-test>.test.ts`
 - [ ] `bun test packages/testing/tests/`
 - [ ] `bun run api:check`
-- [ ] `bun run docs:check`
-- [ ] `bun run docs:build`
 - [ ] `git diff --check`
 
 ## Docs in lockstep
 
 Behavior-bearing changes must update docs in the same PR. Check what applies:
 
-- [ ] `docs/reference/*` — public contract and error semantics
-- [ ] `docs/guides/*` — usage guide / runnable example
-- [ ] `docs/parity/pywa-parity-matrix.md` — parity status
-- [ ] `docs/migration/pywa-to-wats.md` — import / migration mapping
+- [ ] `site/content/docs/reference/*` — public contract and error semantics
+- [ ] `site/content/docs/guides/*` — usage guide / runnable example
+- [ ] `site/content/docs/parity.mdx` — parity status
+- [ ] `site/content/docs/migration/pywa.mdx` — import / migration mapping
 - [ ] `CHANGELOG.md` — release entry for the next patch/minor line
-- [ ] `docs/public-docs-manifest.json` (if public docs added / removed)
 
 ## Non-goals (verified)
 

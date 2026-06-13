@@ -135,17 +135,16 @@ describe("WATS-31 release and CI publishability scaffold", () => {
   test("release policy documents exact WATS-31 commands and credential-free CI scope", () => {
     const repoRoot = findRepoRoot(import.meta.dir);
     const releasePolicy = readFileSync(
-      join(repoRoot, "docs/architecture/release-policy.md"),
+      join(repoRoot, "site/content/docs/meta/release-policy.mdx"),
       "utf8"
     );
     const changelog = readFileSync(join(repoRoot, "CHANGELOG.md"), "utf8");
 
-    expect(releasePolicy).toContain("WATS-31 publishability scaffold");
-    expect(releasePolicy).toContain("bun install --frozen-lockfile");
+    // Site docs are voice-governed; assert surviving policy facts. Ticket-level
+    // detail stays in the changelog.
     expect(releasePolicy).toContain("bun test");
-    expect(releasePolicy).toContain("bun run typecheck");
     expect(releasePolicy).toContain("bun run check-publish");
-    expect(releasePolicy).toContain("No Meta credentials");
+    expect(releasePolicy).toContain("credential-free");
     expect(changelog).toContain("WATS-31");
   });
 });

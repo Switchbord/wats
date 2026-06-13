@@ -6,21 +6,20 @@ type JsonRecord = Record<string, unknown>;
 
 const REQUIRED_DOC_PATHS = [
   "README.md",
-  "docs/index.md",
-  "docs/getting-started.md",
-  "docs/reference/index.md",
-  "docs/reference/client.md",
-  "docs/reference/endpoints.md",
-  "docs/reference/webhook.md",
-  "docs/reference/config.md",
-  "docs/reference/cli.md",
-  "docs/reference/service.md",
-  "docs/guides/cli-init.md",
-  "docs/migration/pywa-to-wats.md",
-  "docs/parity/pywa-parity-matrix.md",
-  "docs/architecture/overview.md",
-  "docs/architecture/package-map.md",
-  "docs/architecture/release-policy.md"
+  "site/content/docs/reference/index.mdx",
+  "site/content/docs/guide.mdx",
+  "site/content/docs/reference/client.mdx",
+  "site/content/docs/reference/endpoints.mdx",
+  "site/content/docs/reference/webhook.mdx",
+  "site/content/docs/reference/config.mdx",
+  "site/content/docs/reference/cli.mdx",
+  "site/content/docs/reference/service.mdx",
+  "site/content/docs/guides/cli-init.mdx",
+  "site/content/docs/migration/pywa.mdx",
+  "site/content/docs/parity.mdx",
+  "site/content/docs/concepts/overview.mdx",
+  "site/content/docs/concepts/package-map.mdx",
+  "site/content/docs/meta/release-policy.mdx"
 ] as const;
 
 function isJsonRecord(value: unknown): value is JsonRecord {
