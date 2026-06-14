@@ -31,7 +31,7 @@
     "esbuild-wasm": "0.28.0",
     "fumadocs-core": "16.9.3",
     "fumadocs-mdx": "15.0.11",
-    "fumadocs-ui": "16.9.3",
+    "fumadocs-ui": "16.10.2",
     "react": "19.2.7",
     "react-dom": "19.2.7"
   },
