@@ -39,7 +39,7 @@ accepts the request and WATS parses the live response.
 | Flows | Flow management | List/get/create/update/publish/delete/deprecate/assets callables, bounded Flow JSON validation, response builders. | shape-only — live read returned empty; mutations never exercised. |
 | Flow hosting + encrypted exchange | richer Flow runtime | Not built. | planned. |
 | Calling | `initiate_call` etc. | Initiate/pre-accept/accept/reject/terminate callables, typed calling webhooks and filters. | shape-only — no live call sessions yet. |
-| Call permissions, calling-settings mutation + WebRTC | permission models, waiters, SIP/settings writes | Not built; only the settings read shape exists. | planned. |
+| Call permissions + calling-settings mutation | permission models, SIP/settings writes | `getCallPermissions` (typed permission/action/limit models), `calling` settings sub-object on `updatePhoneNumberSettings` (status, call hours, call icons, callback permission, SIP servers), `call_permission_reply` webhook fields (`isPermanent`, `responseSource`). | shape-only — no live calls; WebRTC/media orchestration still planned. |
 | Business/admin reads | `get_business_account` etc. | `getWabaInfo`, `listSubscribedApps`, `listPhoneNumbers`, `getPhoneNumberInfo`, `getBusinessProfile`, `getCommerceSettings`. | live-validated — all parsed live Graph v25.0. |
 | Phone-number settings read | settings getter | `getPhoneNumberSettings` (storage config, optional SIP credentials). | shape-only — not exercised in the live campaign. |
 | Business/admin mutations | profile/commerce/settings updates | `updateBusinessProfile`, `updateCommerceSettings`, `updatePhoneNumberSettings`, Block API, OBA/display-name helpers. | shape-only. |

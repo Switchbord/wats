@@ -110,8 +110,8 @@ Migration notes:
 | --- | --- | --- | --- |
 | pywa `initiate_call` / `accept_call` / `terminate_call` | WATS `PhoneNumberClient.initiateCall`, `.acceptCall`, `.terminateCall` | shape-only | Also includes `preAcceptCall` and `rejectCall`. |
 | call connect/status/terminate handlers | `normalizeWebhookEnvelope` calling variants plus `filtersTyped.call` | shape-only | Synthetic payloads only. |
-| call permission request/update | No complete WATS equivalent yet | planned | pywa has richer permission models and waiters. |
-| calling settings/SIP models | Read-only `getPhoneNumberSettings`; mutating settings planned | shape-only (read) | `includeSipCredentials` may return secret-bearing SIP material. |
+| call permission request/update | `getCallPermissions` typed permission/action/limit models; `call_permission_reply` webhook carries `isPermanent`/`responseSource` | shape-only | Waiters still planned; pywa also exposes permission waiters. |
+| calling settings/SIP models | Read via `getPhoneNumberSettings`; writes via the `calling` sub-object on `updatePhoneNumberSettings` (status, call hours, call icons, callback permission, SIP servers) | shape-only | `includeSipCredentials` may return secret-bearing SIP material; `sip_user_password` is never serialized into update bodies. |
 | live WebRTC/media orchestration | No first-class WATS equivalent yet | planned | Requires real calling-enabled phone numbers and explicit authorization. |
 
 ## Business and admin map
