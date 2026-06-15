@@ -35,6 +35,18 @@
     "packages/cli/src/**/*.ts",
     "packages/service/src/**/*.ts",
     "packages/config/src/**/*.ts",
-    "packages/persistence/src/**/*.ts"
+    "packages/persistence/src/**/*.ts",
+    "packages/types/tests/**/*.ts",
+    "packages/crypto/tests/**/*.ts",
+    "packages/graph/tests/**/*.ts",
+    "packages/core/tests/**/*.ts",
+    "packages/http/tests/**/*.ts",
+    "packages/internal-utils/tests/**/*.ts",
+    "packages/cli/tests/**/*.ts",
+    "packages/service/tests/**/*.ts",
+    "packages/config/tests/**/*.ts",
+    "packages/persistence/tests/**/*.ts",
+    "packages/testing/src/**/*.ts",
+    "packages/testing/tests/**/*.ts"
   ]
 }
