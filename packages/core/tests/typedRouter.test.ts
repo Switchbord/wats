@@ -83,10 +83,10 @@ function makeStatusUpdate(
     receivedAt: 1_713_697_200_000,
     status: {
       id: "wamid.S1",
-      recipient_id: "15551234567",
+      recipientId: "15551234567",
       status: statusName,
       timestamp: "1713697200"
-    } as TypedStatusUpdate["status"],
+    },
     rawChange: {
       field: "messages",
       value: { messaging_product: "whatsapp", metadata: {}, statuses: [] }
@@ -262,10 +262,18 @@ describe("TypedRouter dispatch — ordering + matching", () => {
   test("only matching handlers fire; non-matching are skipped", async () => {
     const r = new TypedRouter();
     const hits: string[] = [];
-    r.on(message, () => hits.push("msg-1"));
-    r.on(status, () => hits.push("status-1"));
-    r.on(message, () => hits.push("msg-2"));
-    r.on(status, () => hits.push("status-2"));
+    r.on(message, () => {
+      hits.push("msg-1");
+    });
+    r.on(status, () => {
+      hits.push("status-1");
+    });
+    r.on(message, () => {
+      hits.push("msg-2");
+    });
+    r.on(status, () => {
+      hits.push("status-2");
+    });
     await r.dispatch(makeMessageUpdate());
     // Sibling-kind: status handlers must NOT fire on a message update.
     expect(hits).toEqual(["msg-1", "msg-2"]);
@@ -274,8 +282,12 @@ describe("TypedRouter dispatch — ordering + matching", () => {
   test("filter uses predicate (text match)", async () => {
     const r = new TypedRouter();
     const hits: string[] = [];
-    r.on(and(message, message.textMatches(/hello/i)), () => hits.push("hello"));
-    r.on(and(message, message.textMatches(/goodbye/i)), () => hits.push("bye"));
+    r.on(and(message, message.textMatches(/hello/i)), () => {
+      hits.push("hello");
+    });
+    r.on(and(message, message.textMatches(/goodbye/i)), () => {
+      hits.push("bye");
+    });
     await r.dispatch(makeMessageUpdate({ body: "Hello there" }));
     expect(hits).toEqual(["hello"]);
   });

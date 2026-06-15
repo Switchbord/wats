@@ -33,7 +33,9 @@ function msg(body: string | undefined, type = "text", from = "1"): TypedMessageU
     phoneNumberId: "111",
     wabaId: "W",
     receivedAt: 1,
-    message: inner as TypedMessageUpdate["message"],
+    // `inner` is built dynamically with a string `type` param, so it can't be
+    // statically proven to match a GroupMessage variant — route through unknown.
+    message: inner as unknown as TypedMessageUpdate["message"],
     rawChange: {} as TypedMessageUpdate["rawChange"]
   };
 }
