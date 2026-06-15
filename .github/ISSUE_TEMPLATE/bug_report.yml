@@ -63,6 +63,17 @@ body:
         - "Other / not sure"
     validations:
       required: true
+  - type: dropdown
+    id: target
+    attributes:
+      label: Reproduced against
+      description: Did you observe this against live Meta, or against fixtures / the mock transport?
+      options:
+        - "Fixtures / mock transport (credential-free)"
+        - "Live Meta Graph API"
+        - "Both"
+    validations:
+      required: true
   - type: checkboxes
     id: confirmations
     attributes:
