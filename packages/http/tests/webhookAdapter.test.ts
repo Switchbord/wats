@@ -758,7 +758,6 @@ describe("F-12 remediation — runtime body-type guard in handleDispatch", () =>
       method: "POST",
       url: "https://wats.test/webhook",
       headers: new Headers({ "x-hub-signature-256": signature }),
-      // @ts-expect-error DataView is an ArrayBufferView — acceptable
       body: view
     });
     expect(response.status).toBe(200);

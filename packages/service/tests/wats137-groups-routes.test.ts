@@ -230,6 +230,11 @@ describe("WATS-137 opt-in group service routes", () => {
       const methods = Object.values(enabled.paths[path]!);
       expect(methods.every((op) => Array.isArray((op as { security?: unknown }).security))).toBe(true);
     }
-    expect(enabled.components.schemas.ErrorEnvelope.properties.error.properties.metaCode.description).toContain("Sanitized Meta Graph error code");
+    // The OpenAPI document types component schemas loosely (JSON-schema index),
+    // so drill into the known ErrorEnvelope shape through a typed view.
+    const schemas = enabled.components.schemas as Record<string, {
+      properties: { error: { properties: { metaCode: { description: string } } } };
+    }>;
+    expect(schemas.ErrorEnvelope.properties.error.properties.metaCode.description).toContain("Sanitized Meta Graph error code");
   });
 });

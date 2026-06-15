@@ -33,7 +33,7 @@ function expectAll(source: string, needles: readonly string[], label: string): v
 describe("WATS-53 @wats/graph endpoint subpath exports", () => {
   test("package exports publish media, templates, and flows subpaths", () => {
     const packageJson = JSON.parse(read("packages/graph/package.json")) as {
-      exports?: Record<string, string>;
+      exports?: Record<string, { types: string; import: string }>;
     };
 
     expect(packageJson.exports?.["./endpoints/media"]).toEqual({ types: "./dist/endpoints/media.d.ts", import: "./dist/endpoints/media.js" });

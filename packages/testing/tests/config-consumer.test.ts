@@ -60,10 +60,10 @@ describe("WATS-32 @wats/config consumer fixture", () => {
     expect((dependencies as JsonRecord)["@wats/config"]).toBe("workspace:*");
 
     const result = runBun(["run", "verify-imports"], fixtureDir);
-    expect(result.exitCode).toBe(
-      0,
+    expect(
+      result.exitCode,
       `fixture verify-imports failed:\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
-    );
+    ).toBe(0);
 
     const lines = result.stdout.trim().split("\n").filter((line) => line.length > 0);
     expect(lines.at(-1)).toBe("config-consumer:ok");

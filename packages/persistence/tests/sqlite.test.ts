@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { Database } from "bun:sqlite";
+import { Database, type SQLQueryBindings } from "bun:sqlite";
 import {
   CURRENT_SCHEMA_VERSION,
   PersistenceError,
@@ -57,10 +57,7 @@ function applyOriginalV1Migration(filename: string): void {
     for (const statement of ORIGINAL_001_STATEMENTS) database.run(statement);
     database.run(
       "INSERT INTO wats_schema_migrations (id, version, checksum, applied_at) VALUES (?, ?, ?, ?)",
-      "001_initial",
-      1,
-      ORIGINAL_001_CHECKSUM,
-      "2026-05-24T00:00:00.000Z"
+      ["001_initial", 1, ORIGINAL_001_CHECKSUM, "2026-05-24T00:00:00.000Z"]
     );
     database.exec("COMMIT");
   } catch (error) {
@@ -74,7 +71,7 @@ function applyOriginalV1Migration(filename: string): void {
 function outboxColumns(filename: string): string[] {
   const database = new Database(filename, { readonly: true });
   try {
-    return database.query<{ name: string }>("PRAGMA table_info(wats_outbox)").all().map((column) => column.name);
+    return database.query<{ name: string }, []>("PRAGMA table_info(wats_outbox)").all().map((column) => column.name);
   } finally {
     database.close();
   }
@@ -188,7 +185,7 @@ describe("WATS-120 SQLite persistence", () => {
       expect(report.appliedMigrations).toEqual(["001_initial", "002_outbox_lease_id"]);
       const database = new Database(filename, { readonly: true });
       try {
-        const first = database.query<{ checksum: string; version: number }>(
+        const first = database.query<{ checksum: string; version: number }, [string]>(
           "SELECT version, checksum FROM wats_schema_migrations WHERE id = ?"
         ).get("001_initial");
         expect(first).toEqual({ version: 1, checksum: ORIGINAL_001_CHECKSUM });
@@ -211,9 +208,7 @@ describe("WATS-120 SQLite persistence", () => {
     )`);
     database.run(
       "INSERT INTO wats_persistence_lock (id, holder, acquired_at) VALUES (?, ?, ?)",
-      1,
-      heldLock,
-      "2026-06-01T00:00:00.000Z"
+      [1, heldLock, "2026-06-01T00:00:00.000Z"]
     );
     database.close();
 
@@ -234,7 +229,7 @@ describe("WATS-120 SQLite persistence", () => {
     const afterFailure = await createSqlitePersistence({ filename });
     try {
       const lockRow = new Database(filename, { readonly: true })
-        .query<{ holder: string }>("SELECT holder FROM wats_persistence_lock WHERE id = 1")
+        .query<{ holder: string }, []>("SELECT holder FROM wats_persistence_lock WHERE id = 1")
         .get();
       expect(lockRow?.holder).toBe(heldLock);
     } finally {

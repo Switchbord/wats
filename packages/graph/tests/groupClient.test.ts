@@ -14,6 +14,7 @@ import {
   type GroupInviteLinkResponse,
   type GroupJoinRequestsResponse,
   type GroupMutationResponse,
+  type GroupSummaryWire,
   type ListGroupsResponse
 } from "../src";
 import {
@@ -115,7 +116,12 @@ describe("WATS-133 scoped Groups clients", () => {
     const listed = await phone.listGroups();
 
     expect(created).toEqual({ requestId: "req-create" });
-    expect(listed.data?.groups?.[0]).toEqual({ id: "grp-1", subject: "Team", createdAt: "1700000000" });
+    // `data` is a union of the object form `{ groups: [...] }` and a bare array.
+    const listedData = listed.data;
+    const groups: readonly GroupSummaryWire[] | undefined = Array.isArray(listedData)
+      ? listedData
+      : (listedData as { groups?: readonly GroupSummaryWire[] } | undefined)?.groups;
+    expect(groups?.[0]).toEqual({ id: "grp-1", subject: "Team", createdAt: "1700000000" });
     expect(snakeCaseKeys(created)).toEqual([]);
     expect(snakeCaseKeys(listed)).toEqual([]);
   });

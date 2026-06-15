@@ -214,7 +214,7 @@ async function delay(ms: number): Promise<void> {
   await new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
 }
 
-async function waitForHttpStatus(proc: ServeProcess, url: string, status: number): Promise<Response> {
+async function waitForHttpStatus(proc: Pick<ServeProcess, "exited">, url: string, status: number): Promise<Response> {
   const deadline = Date.now() + 5000;
   while (Date.now() < deadline) {
     const earlyExit = await Promise.race([
@@ -326,7 +326,7 @@ describe("exported runCli process side effects", () => {
       expect(result.stdout).toContain("status: listening");
       expect(typeof result.shutdown).toBe("function");
       expect(registrations).toEqual([]);
-      const response = await waitForHttpStatus({ exited: new Promise<never>(() => {}) } as ServeProcess, `http://127.0.0.1:${port}/healthz`, 200);
+      const response = await waitForHttpStatus({ exited: new Promise<never>(() => {}) }, `http://127.0.0.1:${port}/healthz`, 200);
       expect(response.status).toBe(200);
     } finally {
       result?.shutdown?.();

@@ -174,6 +174,6 @@ describe("C2 update parser", () => {
     expect(event.discriminator.field).toBe("messages");
     expect(event.discriminator.subtype).toBe("message_status");
     expect(event.discriminator.eventType).toBe("messages.message_status");
-    expect(event.change.value).toBe(envelope.entry[0]?.changes[0]?.value);
+    expect<unknown>(event.change.value).toBe(envelope.entry[0]?.changes[0]?.value);
   });
 });

@@ -109,7 +109,7 @@ function settings(groupId = "group-1"): TypedGroupSettingsUpdate {
     phoneNumberId: "1234567890",
     wabaId: "WABA-GROUPS",
     receivedAt: 1,
-    group: { messagingProduct: "whatsapp", type: "group_subject", metadata: { displayPhoneNumber: "1", phoneNumberId: "1234567890" }, groupId, raw: {} } as TypedGroupSettingsUpdate["group"],
+    group: { messagingProduct: "whatsapp", type: "group_settings_update", metadata: { displayPhoneNumber: "1", phoneNumberId: "1234567890" }, groupId, raw: {} } as TypedGroupSettingsUpdate["group"],
     rawChange: { field: "group_settings_update", value: {} } as TypedGroupSettingsUpdate["rawChange"]
   };
 }

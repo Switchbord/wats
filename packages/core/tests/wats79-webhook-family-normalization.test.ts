@@ -6,10 +6,21 @@
 import { describe, expect, test } from "bun:test";
 import {
   normalizeWebhookEnvelope,
+  type NormalizedSystemPayload,
   type TypedChatOpenedUpdate,
   type TypedSystemUpdate,
   type TypedUserPreferencesUpdate
 } from "../src/webhookNormalizer";
+
+// Narrow the system payload union on its `.type` discriminant before reading
+// the variant-specific helper field (also asserts the discriminant at runtime).
+function asSystem<K extends NormalizedSystemPayload["type"]>(
+  s: NormalizedSystemPayload,
+  t: K
+): Extract<NormalizedSystemPayload, { type: K }> {
+  if (s.type !== t) throw new Error(`expected ${t}, got ${s.type}`);
+  return s as Extract<NormalizedSystemPayload, { type: K }>;
+}
 
 function envelope(field: string, value: Record<string, unknown>): Record<string, unknown> {
   return {
@@ -78,15 +89,17 @@ describe("WATS-79 webhook-family normalization", () => {
     const identityChange = result.updates[1] as TypedSystemUpdate;
     expect(phoneChange.kind).toBe("system");
     expect(phoneChange.system.type).toBe("phoneNumberChange");
-    expect(phoneChange.system.phoneNumberChange?.mobileDisplayName).toBe("Support");
-    expect(phoneChange.system.phoneNumberChange?.oldPhoneNumber).toBe("15551110000");
-    expect(phoneChange.system.phoneNumberChange?.newPhoneNumber).toBe("15552220000");
+    const phonePayload = asSystem(phoneChange.system, "phoneNumberChange");
+    expect(phonePayload.phoneNumberChange?.mobileDisplayName).toBe("Support");
+    expect(phonePayload.phoneNumberChange?.oldPhoneNumber).toBe("15551110000");
+    expect(phonePayload.phoneNumberChange?.newPhoneNumber).toBe("15552220000");
     expect(identityChange.kind).toBe("system");
     expect(identityChange.system.type).toBe("identityChange");
-    expect(identityChange.system.identityChange?.waId).toBe("15551234567");
-    expect(identityChange.system.identityChange?.acknowledged).toBe(false);
-    expect(identityChange.system.identityChange?.createdTimestamp).toBe("1713697200");
-    expect(identityChange.system.identityChange?.hash).toBe("identity-hash");
+    const identityPayload = asSystem(identityChange.system, "identityChange");
+    expect(identityPayload.identityChange?.waId).toBe("15551234567");
+    expect(identityPayload.identityChange?.acknowledged).toBe(false);
+    expect(identityPayload.identityChange?.createdTimestamp).toBe("1713697200");
+    expect(identityPayload.identityChange?.hash).toBe("identity-hash");
   });
 
   test("chat_opened REQUEST_WELCOME update is typed", () => {

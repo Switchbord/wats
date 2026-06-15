@@ -3,6 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  type ConfigErrorCode,
   ConfigValidationError,
   loadConfig,
   parseConfig,
@@ -42,13 +43,35 @@ const VALID_CONFIG = Object.freeze({
   }
 });
 
-type MutableConfig = typeof VALID_CONFIG & Record<string, unknown>;
+// Deeply-mutable, all-optional mirror of the frozen fixture so negative tests can
+// reassign/delete fields without weakening the readonly src config types.
+interface MutableEnvRef {
+  env?: string;
+}
+interface MutableConfig {
+  version?: number;
+  defaultProfile?: string;
+  profiles: {
+    local: {
+      graph: { apiVersion?: string; baseUrl?: string };
+      whatsapp: { wabaId?: string; phoneNumberId?: string };
+      auth: { accessToken: MutableEnvRef };
+      webhook: {
+        path?: string;
+        verifyToken: MutableEnvRef;
+        appSecret: MutableEnvRef;
+        maxBodyBytes?: number;
+      };
+      service: { host?: string; port?: number; apiPrefix?: string; bearerToken: MutableEnvRef };
+    };
+  };
+}
 
 function validConfig(): MutableConfig {
   return structuredClone(VALID_CONFIG) as MutableConfig;
 }
 
-function expectConfigValidationError(fn: () => unknown, code: string, path: string): void {
+function expectConfigValidationError(fn: () => unknown, code: ConfigErrorCode, path: string): void {
   expect(fn).toThrow(ConfigValidationError);
   try {
     fn();
@@ -128,7 +151,8 @@ describe("@wats/config validateConfig", () => {
     );
 
     const rawSecret = validConfig();
-    rawSecret.profiles.local.auth.accessToken = "do-not-accept-raw-token";
+    // Deliberately inject a raw secret string where an env ref is required to assert rejection.
+    rawSecret.profiles.local.auth.accessToken = "do-not-accept-raw-token" as unknown as MutableEnvRef;
     expectConfigValidationError(
       () => validateConfig(rawSecret),
       "invalid_env_ref",

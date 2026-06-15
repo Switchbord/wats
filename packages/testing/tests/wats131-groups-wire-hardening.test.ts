@@ -77,10 +77,10 @@ describe("WATS-131 Groups webhook wire hardening", () => {
       );
 
       const result = runBun(["x", "tsc", "--noEmit", "-p", join(tempRoot, "tsconfig.json")], repoRoot);
-      expect(result.exitCode).toBe(
-        0,
+      expect(
+        result.exitCode,
         `WATS-131 wire hardening type fixture failed:\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
-      );
+      ).toBe(0);
     } finally {
       rmSync(tempRoot, { recursive: true, force: true });
     }
