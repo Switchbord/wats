@@ -112,10 +112,10 @@ describe("B1 external consumer importability", () => {
       writeFileSync(fixtureManifestPath, `${JSON.stringify(fixtureManifest, null, 2)}\n`);
 
       const installResult = runBun(["install"], fixtureRuntimeDir);
-      expect(installResult.exitCode).toBe(
-        0,
+      expect(
+        installResult.exitCode,
         `bun install failed:\n${installResult.stdout}\n${installResult.stderr}`
-      );
+      ).toBe(0);
 
       const installedTypesPackageManifestPath = join(
         fixtureRuntimeDir,
@@ -124,10 +124,10 @@ describe("B1 external consumer importability", () => {
       expect(existsSync(installedTypesPackageManifestPath)).toBe(true);
 
       const verifyResult = runBun(["run", "verify-imports"], fixtureRuntimeDir);
-      expect(verifyResult.exitCode).toBe(
-        0,
+      expect(
+        verifyResult.exitCode,
         `fixture import verification failed:\n${verifyResult.stdout}\n${verifyResult.stderr}`
-      );
+      ).toBe(0);
 
       const reportLine = verifyResult.stdout
         .trim()

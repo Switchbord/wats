@@ -229,10 +229,10 @@ describe("F-10 core-consumer fixture coverage", () => {
 
     const result = runBun(["run", "verify-imports"], fixtureDir);
 
-    expect(result.exitCode).toBe(
-      0,
+    expect(
+      result.exitCode,
       `fixture verify-imports failed:\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
-    );
+    ).toBe(0);
 
     const lines = result.stdout
       .trim()

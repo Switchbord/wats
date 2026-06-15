@@ -96,10 +96,10 @@ describe("WATS-54 public API consistency check", () => {
 
   test("bun run api:check validates the manifest and emits a deterministic summary", () => {
     const result = runBun(["run", "api:check"], repoRoot);
-    expect(result.exitCode).toBe(
-      0,
+    expect(
+      result.exitCode,
       `api:check failed:\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
-    );
+    ).toBe(0);
     expect(result.stdout).toContain("public-api-consistency:ok");
     expect(result.stdout).toContain("checked 7 graph endpoint subpaths");
     expect(result.stdout).toContain("docs=35");
