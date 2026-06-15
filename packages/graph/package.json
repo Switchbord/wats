@@ -69,7 +69,7 @@
     "url": "git+https://github.com/Switchbord/wats.git",
     "directory": "packages/graph"
   },
-  "homepage": "https://github.com/Switchbord/wats#readme",
+  "homepage": "https://wats.sh",
   "bugs": {
     "url": "https://github.com/Switchbord/wats/issues"
   },

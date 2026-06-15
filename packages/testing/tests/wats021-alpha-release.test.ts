@@ -48,7 +48,7 @@ describe("WATS 0.2.1 alpha launch release contract", () => {
         url: "git+https://github.com/Switchbord/wats.git",
         directory: `packages/${pkg}`
       });
-      expect(manifest.homepage, `${pkg} homepage`).toBe("https://github.com/Switchbord/wats#readme");
+      expect(manifest.homepage, `${pkg} homepage`).toBe("https://wats.sh");
       expect(manifest.files).toEqual(["dist", "README.md", "LICENSE"]);
       for (const deps of [manifest.dependencies, manifest.peerDependencies, manifest.optionalDependencies]) {
         if (deps && typeof deps === "object") {

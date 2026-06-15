@@ -10,5 +10,6 @@
     "@wats/http": "workspace:*",
     "@wats/graph": "workspace:*",
     "@wats/service": "workspace:*"
-  }
+  },
+  "homepage": "https://wats.sh"
 }
