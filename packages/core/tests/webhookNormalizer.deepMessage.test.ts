@@ -323,4 +323,90 @@ describe("WATS-43A normalizeWebhookEnvelope deep message normalization", () => {
     expect(result.updates.length).toBe(0);
     expect(result.skipped[0]?.reason).toBe("malformed_field");
   });
+
+  // WATS-77 slice 3 — call_permission_reply: real wire response values accept/reject,
+  // plus is_permanent → isPermanent and response_source → responseSource. Back-compat
+  // for accepted/rejected preserved; malformed replies must not throw.
+  test("normalizes call_permission_reply accept with isPermanent + responseSource (WATS-77)", () => {
+    const updates = normalizedMessages([
+      baseMessage("wamid.CPA", "interactive", {
+        type: "call_permission_reply",
+        call_permission_reply: {
+          response: "accept",
+          is_permanent: true,
+          response_source: "user_action",
+          expiration_timestamp: "1718000099"
+        }
+      })
+    ]);
+
+    expect(updates.length).toBe(1);
+    const interactive = asType(updates[0]!.message, "interactive");
+    const reply = asInteractive(interactive.interactive, "call_permission_reply");
+    expect(reply.callPermissionReply.response).toBe("accept");
+    expect(reply.callPermissionReply.isPermanent).toBe(true);
+    expect(reply.callPermissionReply.responseSource).toBe("user_action");
+    expect(reply.callPermissionReply.expirationTimestamp).toBe("1718000099");
+    // snake_case wire keys must not leak into the normalized body.
+    const rawReply = reply.callPermissionReply as unknown as Record<string, unknown>;
+    expect("is_permanent" in rawReply).toBe(false);
+    expect("response_source" in rawReply).toBe(false);
+  });
+
+  test("normalizes call_permission_reply reject (WATS-77)", () => {
+    const updates = normalizedMessages([
+      baseMessage("wamid.CPR", "interactive", {
+        type: "call_permission_reply",
+        call_permission_reply: {
+          response: "reject",
+          is_permanent: false,
+          response_source: "automatic"
+        }
+      })
+    ]);
+
+    expect(updates.length).toBe(1);
+    const interactive = asType(updates[0]!.message, "interactive");
+    const reply = asInteractive(interactive.interactive, "call_permission_reply");
+    expect(reply.callPermissionReply.response).toBe("reject");
+    expect(reply.callPermissionReply.isPermanent).toBe(false);
+    expect(reply.callPermissionReply.responseSource).toBe("automatic");
+    expect(reply.callPermissionReply.expirationTimestamp).toBeUndefined();
+  });
+
+  test("handles malformed call_permission_reply payloads without throwing (WATS-77)", () => {
+    const malformedBodies: unknown[] = [null, "accept", 42, true, ["accept"]];
+    for (const body of malformedBodies) {
+      const messages = [
+        {
+          from: "15551234567",
+          id: "wamid.CPBAD",
+          timestamp: "1713697198",
+          type: "interactive",
+          interactive: {
+            type: "call_permission_reply",
+            call_permission_reply: body
+          }
+        }
+      ];
+      expect(() =>
+        normalizeWebhookEnvelope(envelopeForChange(changeWithMessages(messages)))
+      ).not.toThrow();
+    }
+
+    // Unknown response value is dropped (not asserted onto the normalized body).
+    const updates = normalizedMessages([
+      baseMessage("wamid.CPU", "interactive", {
+        type: "call_permission_reply",
+        call_permission_reply: { response: "maybe", is_permanent: "yes", response_source: "spoofed" }
+      })
+    ]);
+    expect(updates.length).toBe(1);
+    const interactive = asType(updates[0]!.message, "interactive");
+    const reply = asInteractive(interactive.interactive, "call_permission_reply");
+    const rawReply = reply.callPermissionReply as unknown as Record<string, unknown>;
+    expect("response" in rawReply).toBe(false);
+    expect("isPermanent" in rawReply).toBe(false); // non-boolean is_permanent ignored
+    expect("responseSource" in rawReply).toBe(false); // unknown source ignored
+  });
 });

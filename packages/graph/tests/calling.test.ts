@@ -22,12 +22,20 @@ type CallAction = "connect" | "pre_accept" | "accept" | "reject" | "terminate";
 type CallLifecycleResponse = { readonly id?: string; readonly success?: boolean; readonly [key: string]: unknown };
 type CallSessionDescription = { readonly sdpType?: string; readonly sdp_type?: string; readonly sdp: string; readonly [key: string]: unknown };
 
+type CallPermissionsResponse = {
+  readonly messagingProduct?: string;
+  readonly permission?: { readonly status?: string; readonly expirationTime?: number; readonly [key: string]: unknown };
+  readonly actions?: ReadonlyArray<{ readonly actionName?: string; readonly canPerformAction?: boolean; readonly limits?: ReadonlyArray<Record<string, unknown>>; readonly [key: string]: unknown }>;
+  readonly [key: string]: unknown;
+};
+
 type CallingExports = typeof graphRoot & {
   initiateCall: (client: GraphClient, params: { phoneNumberId: string }, body: unknown, opts?: unknown) => Promise<CallLifecycleResponse>;
   preAcceptCall: (client: GraphClient, params: { phoneNumberId: string }, body: unknown, opts?: unknown) => Promise<CallLifecycleResponse>;
   acceptCall: (client: GraphClient, params: { phoneNumberId: string }, body: unknown, opts?: unknown) => Promise<CallLifecycleResponse>;
   rejectCall: (client: GraphClient, params: { phoneNumberId: string }, body: unknown, opts?: unknown) => Promise<CallLifecycleResponse>;
   terminateCall: (client: GraphClient, params: { phoneNumberId: string }, body: unknown, opts?: unknown) => Promise<CallLifecycleResponse>;
+  getCallPermissions: (client: GraphClient, input: unknown, body?: undefined, opts?: unknown) => Promise<CallPermissionsResponse>;
 };
 
 const {
@@ -35,7 +43,8 @@ const {
   preAcceptCall,
   acceptCall,
   rejectCall,
-  terminateCall
+  terminateCall,
+  getCallPermissions
 } = graphRoot as CallingExports;
 import {
   createMockTransport,
@@ -288,5 +297,160 @@ describe("WATS-41 Calling error taxonomy", () => {
     ]);
     await expect(initiateCall(client, { phoneNumberId: "555" }, { to: "15551234567", session })).rejects.toThrow(DuplicateCallError);
     await expect(initiateCall(client, { phoneNumberId: "555" }, { to: "15551234567", session })).rejects.toThrow(CallConnectionError);
+  });
+});
+
+const permissionsWire = {
+  messaging_product: "whatsapp",
+  permission: { status: "temporary", expiration_time: 1745343479 },
+  actions: [
+    {
+      action_name: "send_call_permission_request",
+      can_perform_action: true,
+      limits: [{ time_period: "PT24H", max_allowed: 1, current_usage: 0 }]
+    },
+    {
+      action_name: "start_call",
+      can_perform_action: false,
+      limits: [{ time_period: "PT24H", max_allowed: 5, current_usage: 5, limit_expiration_time: 1745622600 }]
+    }
+  ]
+};
+
+function okPerm(body: object = permissionsWire): MockTransportResponseSpec {
+  return { status: 200, headers: { "content-type": "application/json" }, body };
+}
+
+describe("WATS-77 getCallPermissions request mapping", () => {
+  test("userWaId maps to GET /{phoneNumberId}/call_permissions?user_wa_id=...", async () => {
+    const { client, handle } = clientWith(okPerm());
+    await getCallPermissions(client, { phoneNumberId: "555", userWaId: "16505551234" });
+    expect(handle.requests[0]?.method).toBe("GET");
+    expect(handle.requests[0]?.url).toBe(
+      "https://graph.facebook.com/v25.0/555/call_permissions?user_wa_id=16505551234"
+    );
+  });
+
+  test("recipient maps to GET /{phoneNumberId}/call_permissions?recipient=...", async () => {
+    const { client, handle } = clientWith(okPerm());
+    await getCallPermissions(client, { phoneNumberId: "555", recipient: "BSUID-abc" });
+    expect(handle.requests[0]?.method).toBe("GET");
+    expect(handle.requests[0]?.url).toBe(
+      "https://graph.facebook.com/v25.0/555/call_permissions?recipient=BSUID-abc"
+    );
+    expect(handle.requests[0]?.url).not.toContain("user_wa_id");
+  });
+});
+
+describe("WATS-77 getCallPermissions response normalization", () => {
+  test("normalizes snake_case wire shape to camelCase including nested actions/limits", async () => {
+    const { client } = clientWith(okPerm());
+    const res = await getCallPermissions(client, { phoneNumberId: "555", userWaId: "16505551234" });
+    expect(res).toEqual({
+      messagingProduct: "whatsapp",
+      permission: { status: "temporary", expirationTime: 1745343479 },
+      actions: [
+        {
+          actionName: "send_call_permission_request",
+          canPerformAction: true,
+          limits: [{ timePeriod: "PT24H", maxAllowed: 1, currentUsage: 0 }]
+        },
+        {
+          actionName: "start_call",
+          canPerformAction: false,
+          limits: [{ timePeriod: "PT24H", maxAllowed: 5, currentUsage: 5, limitExpirationTime: 1745622600 }]
+        }
+      ]
+    });
+  });
+
+  test("permanent status has no expirationTime and omits limit_expiration_time when not present", async () => {
+    const { client } = clientWith(
+      okPerm({
+        messaging_product: "whatsapp",
+        permission: { status: "permanent" },
+        actions: [{ action_name: "start_call", can_perform_action: true, limits: [{ time_period: "P7D", max_allowed: 10, current_usage: 2 }] }]
+      })
+    );
+    const res = await getCallPermissions(client, { phoneNumberId: "555", recipient: "r1" });
+    expect(res.permission).toEqual({ status: "permanent" });
+    expect(res.permission?.expirationTime).toBeUndefined();
+    expect(res.actions?.[0]?.limits?.[0]).toEqual({ timePeriod: "P7D", maxAllowed: 10, currentUsage: 2 });
+  });
+
+  test("preserves unknown fields at every level via index signatures", async () => {
+    const { client } = clientWith(
+      okPerm({
+        messaging_product: "whatsapp",
+        future_top_level: "keep-me",
+        permission: { status: "no_permission", future_perm_field: 99 },
+        actions: [
+          {
+            action_name: "start_call",
+            can_perform_action: true,
+            future_action_field: "x",
+            limits: [{ time_period: "PT24H", max_allowed: 1, current_usage: 0, future_limit_field: true }]
+          }
+        ]
+      })
+    );
+    const res = await getCallPermissions(client, { phoneNumberId: "555", userWaId: "16505551234" });
+    expect(res.future_top_level).toBe("keep-me");
+    expect(res.permission?.future_perm_field).toBe(99);
+    expect(res.permission?.status).toBe("no_permission");
+    expect(res.actions?.[0]?.future_action_field).toBe("x");
+    expect((res.actions?.[0]?.limits?.[0] as Record<string, unknown>).future_limit_field).toBe(true);
+  });
+});
+
+describe("WATS-77 getCallPermissions rejection matrix", () => {
+  test("rejects missing/invalid phoneNumberId", async () => {
+    const { client } = clientWith(okPerm());
+    for (const bad of [null, undefined, "", "   ", 123, {}, [], "bad\n", "bad\u0000", ".", "..", "a/b", "a\\b", "a?b", "a#b"]) {
+      await expect(
+        getCallPermissions(client, { phoneNumberId: bad as never, userWaId: "16505551234" })
+      ).rejects.toThrow(GraphRequestValidationError);
+    }
+  });
+
+  test("rejects neither userWaId nor recipient (exactly-one rule)", async () => {
+    const { client } = clientWith(okPerm());
+    await expect(getCallPermissions(client, { phoneNumberId: "555" } as never)).rejects.toThrow(GraphRequestValidationError);
+  });
+
+  test("rejects both userWaId and recipient (exactly-one rule)", async () => {
+    const { client } = clientWith(okPerm());
+    await expect(
+      getCallPermissions(client, { phoneNumberId: "555", userWaId: "16505551234", recipient: "r1" })
+    ).rejects.toThrow(GraphRequestValidationError);
+  });
+
+  test("rejects non-string/empty/whitespace/control-char userWaId", async () => {
+    const { client } = clientWith(okPerm());
+    for (const bad of ["", "   ", 123, {}, [], true, "bad\n", "bad\r", "bad\u0000", "bad\u007f"]) {
+      await expect(
+        getCallPermissions(client, { phoneNumberId: "555", userWaId: bad as never })
+      ).rejects.toThrow(GraphRequestValidationError);
+    }
+  });
+
+  test("rejects non-string/empty/whitespace/control-char recipient", async () => {
+    const { client } = clientWith(okPerm());
+    for (const bad of ["", "   ", 123, {}, [], true, "bad\n", "bad\u0000"]) {
+      await expect(
+        getCallPermissions(client, { phoneNumberId: "555", recipient: bad as never })
+      ).rejects.toThrow(GraphRequestValidationError);
+    }
+  });
+
+  test("a valid userWaId request does not throw", async () => {
+    const { client } = clientWith(okPerm());
+    let threw = false;
+    try {
+      await getCallPermissions(client, { phoneNumberId: "555", userWaId: "16505551234" });
+    } catch {
+      threw = true;
+    }
+    expect(threw).toBe(false);
   });
 });

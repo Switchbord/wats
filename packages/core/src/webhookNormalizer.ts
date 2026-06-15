@@ -818,9 +818,23 @@ function normalizeInteractivePayload(value: unknown): Record<string, unknown> | 
     if (!isRecord(reply)) return undefined;
     const response = readStringField(reply, "response");
     const expirationTimestamp = readStringField(reply, "expiration_timestamp");
+    const isPermanent = readBooleanField(reply, "is_permanent");
+    const responseSource = readStringField(reply, "response_source");
     const out: Record<string, unknown> = {};
-    if (response === "accepted" || response === "rejected") out.response = response;
+    // Meta's real wire values are "accept"/"reject"; "accepted"/"rejected" kept for back-compat.
+    if (
+      response === "accept" ||
+      response === "reject" ||
+      response === "accepted" ||
+      response === "rejected"
+    ) {
+      out.response = response;
+    }
     if (expirationTimestamp !== undefined) out.expirationTimestamp = expirationTimestamp;
+    if (isPermanent !== undefined) out.isPermanent = isPermanent;
+    if (responseSource === "user_action" || responseSource === "automatic") {
+      out.responseSource = responseSource;
+    }
     return { type, callPermissionReply: out };
   }
   return safeCloneMessageJsonValue(value) as Record<string, unknown> | undefined;

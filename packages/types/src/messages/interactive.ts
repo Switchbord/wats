@@ -38,7 +38,13 @@ export interface InteractiveCtaUrlReply {
 
 export interface InteractiveCallPermissionReply {
   type: "call_permission_reply";
-  callPermissionReply: { response: "accepted" | "rejected"; expirationTimestamp?: string };
+  callPermissionReply: {
+    // Meta wire values are "accept"/"reject"; "accepted"/"rejected" retained for back-compat.
+    response: "accept" | "reject" | "accepted" | "rejected";
+    expirationTimestamp?: string;
+    isPermanent?: boolean;
+    responseSource?: "user_action" | "automatic";
+  };
 }
 
 export type InteractiveReply =
