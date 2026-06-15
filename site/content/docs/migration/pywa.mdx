@@ -70,7 +70,7 @@ Migration notes:
 | pywa buttons / lists / CTA objects | `sendButtons`, `sendList`, `sendCtaUrl` | shape-only | WATS exposes separate helpers rather than pywa's overloaded `send_message(buttons=...)`. |
 | pywa catalog/product sends | `sendCatalog`, `sendProduct`, `sendProducts` | shape-only | Requires commerce/catalog assets for live validation. |
 | `mark_message_as_read` / `indicate_typing` | `markMessageAsRead` / `indicateTyping` | shape-only | Only use on test conversations during live campaigns. |
-| pywa `tracker` | WATS `bizOpaqueCallbackData`-style inputs where supported | shape-only, partial | Check the specific WATS helper; WATS uses camelCase. |
+| pywa `tracker` | WATS `bizOpaqueCallbackData`-style inputs where supported | shape-only | Check the specific WATS helper; WATS uses camelCase. Not on every composer. |
 
 ## Media map
 
@@ -89,7 +89,7 @@ Migration notes:
 | --- | --- | --- | --- |
 | pywa `create_template` / `get_templates` / `delete_template` | WATS `WABAClient.createMessageTemplate`, `.listMessageTemplates`, `.getMessageTemplate`, `.updateMessageTemplate`, `.deleteMessageTemplate` | live-validated (list); mutations shape-only | Auth OTP buttons use `supportedApps` → Graph `supported_apps` with nested `package_name` / `signature_hash`; auth template DSL fields `autofillText` / `zeroTapTermsAccepted` map to Graph `autofill_text` / `zero_tap_terms_accepted`. Template Group helpers: `listTemplateGroups`, `createTemplateGroup`, `getTemplateGroupAnalytics`. |
 | pywa `send_template` | `PhoneNumberClient.sendTemplate` or `WhatsApp.sendTemplate`; `PhoneNumberClient.sendMarketingTemplate` for Meta `/marketing_messages` | live-validated (approved-template send); marketing send shape-only | Parameter-count validation runs locally. Marketing Messages status webhooks (`marketing_lite`) are modeled. |
-| pywa template component DSL | WATS component builders such as `buildTemplateHeaderComponent` | shape-only, partial | Core HEADER/BODY/FOOTER/BUTTONS helpers exist; pywa's larger DSL is broader. |
+| pywa template component DSL | WATS component builders such as `buildTemplateHeaderComponent` | shape-only | Core HEADER/BODY/FOOTER/BUTTONS helpers exist; pywa's larger DSL is broader. |
 | template status/category/quality/components handlers | `normalizeWebhookEnvelope` account helpers plus `filtersTyped.template` | shape-only | Synthetic webhook coverage. |
 | `compare_templates`, `migrate_templates`, `unpause_template`, bulk auth/library helpers | No first-class WATS helper yet | planned | |
 

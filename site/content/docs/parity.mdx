@@ -30,7 +30,7 @@ accepts the request and WATS parses the live response.
 | Pagination | iterator helpers | `paginate` / `paginateAll` async generators over cursor pages. | shape-only. |
 | Crypto provider | n/a (internal) | `CryptoProvider` seam with Node and WebCrypto adapters. | live-validated via live HMAC verification. |
 | Text sends | `send_text` / `send_message` | `sendText`, `WhatsApp.startChat` to arbitrary recipients. | live-validated — accepted with a real message id. |
-| Media sends | `send_image` etc. | `sendImage` / `sendVideo` / `sendAudio` / `sendDocument` / `sendSticker` by media id or link. | live-validated — image send by media id accepted. |
+| Media sends | `send_image` etc. | `sendImage` / `sendVideo` / `sendAudio` / `sendDocument` / `sendSticker` by media id or link. | live-validated for image by media id; other media composers shape-only. |
 | Other composers | location, contacts, reactions, buttons, lists, CTA, catalog, mark-read, typing | Matching helpers on `PhoneNumberClient` and the facade. | shape-only. |
 | One-call local-file media send | file/bytes polymorphism | Upload first, then send by returned media id. | planned as a single call; the two-step path works today. |
 | Media runtime | media helpers | `uploadMedia`, `downloadMedia`, `downloadMediaBytes`, `deleteMedia`, `decryptEncryptedMedia`, upload sessions. | live-validated — upload/metadata/send/delete passed live; decrypt and sessions shape-only. |
@@ -39,8 +39,9 @@ accepts the request and WATS parses the live response.
 | Flows | Flow management | List/get/create/update/publish/delete/deprecate/assets callables, bounded Flow JSON validation, response builders. | shape-only — live read returned empty; mutations never exercised. |
 | Flow hosting + encrypted exchange | richer Flow runtime | Not built. | planned. |
 | Calling | `initiate_call` etc. | Initiate/pre-accept/accept/reject/terminate callables, typed calling webhooks and filters. | shape-only — no live call sessions yet. |
-| Call permissions + WebRTC | permission models, waiters | Not built. | planned. |
-| Business/admin reads | `get_business_account` etc. | `getWabaInfo`, `listSubscribedApps`, `listPhoneNumbers`, phone info/settings, business profile, commerce settings. | live-validated — all reads parsed live Graph v25.0. |
+| Call permissions, calling-settings mutation + WebRTC | permission models, waiters, SIP/settings writes | Not built; only the settings read shape exists. | planned. |
+| Business/admin reads | `get_business_account` etc. | `getWabaInfo`, `listSubscribedApps`, `listPhoneNumbers`, `getPhoneNumberInfo`, `getBusinessProfile`, `getCommerceSettings`. | live-validated — all parsed live Graph v25.0. |
+| Phone-number settings read | settings getter | `getPhoneNumberSettings` (storage config, optional SIP credentials). | shape-only — not exercised in the live campaign. |
 | Business/admin mutations | profile/commerce/settings updates | `updateBusinessProfile`, `updateCommerceSettings`, `updatePhoneNumberSettings`, Block API, OBA/display-name helpers. | shape-only. |
 | Admin: registration, tokens, QR, catalog CRUD | established | Not built. | planned. |
 | Groups | no pywa equivalent | Types, endpoint callables, `GroupClient`, webhook normalization, filters, facade helpers, opt-in service routes. | shape-only — live `listGroups` passed; `createGroup` blocked by a Meta entitlement on the test number, so the mutation matrix is unproven. |
