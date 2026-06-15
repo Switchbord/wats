@@ -105,7 +105,9 @@ describe("F-9 createTypedFilter + brand + isTypedFilter", () => {
   test("FILTER_BRAND is a registered symbol across module boundaries", () => {
     // `Symbol.for` interns globally — any other module importing
     // `@wats/core/filtersTyped` sees the same symbol.
-    expect(FILTER_BRAND).toBe(Symbol.for("@wats/core/filter-brand"));
+    // FILTER_BRAND is a `unique symbol`; widen the matcher to plain `symbol`
+    // so the runtime registered-symbol identity check typechecks.
+    expect<symbol>(FILTER_BRAND).toBe(Symbol.for("@wats/core/filter-brand"));
     expect(typeof FILTER_BRAND).toBe("symbol");
   });
 

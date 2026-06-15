@@ -76,7 +76,7 @@ async function startServer(
     createServer: (h: unknown) => HttpListenerServer & { listen: (port: number, host: string, cb: () => void) => void };
   };
   return await new Promise((resolve, reject) => {
-    const server = mod.createServer((req, res) => {
+    const server = mod.createServer((req: unknown, res: unknown) => {
       handler(req, res).catch((err: unknown) => {
         try {
           (res as { statusCode: number; end: (s?: string) => void }).statusCode =

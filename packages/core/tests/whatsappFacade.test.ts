@@ -382,6 +382,9 @@ describe("WATS-78 WhatsApp sent-result waiters", () => {
     const reply = await promise;
     expect(reply.kind).toBe("message");
     expect(reply.message.from).toBe("15551230000");
+    if (reply.message.type !== "text") {
+      throw new Error(`expected text reply, got ${reply.message.type}`);
+    }
     expect(reply.message.context?.messageId).toBe("wamid.START");
     expect(wa.activeListenerCount).toBe(0);
   });

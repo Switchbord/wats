@@ -269,7 +269,7 @@ describe("ListenerRegistry.evaluate — match + resolve", () => {
   test("filters that throw in predicate propagate unchanged", () => {
     const reg = createListenerRegistry();
     const boom = custom<TypedMessageUpdate>(
-      () => {
+      (_u): _u is TypedMessageUpdate => {
         throw new Error("boom");
       },
       "boom"
@@ -287,6 +287,9 @@ describe("ListenerRegistry.evaluate — match + resolve", () => {
     expect(hit.matched).toBe(true);
     expect(hit.listenerId).toBe(h.id);
     const u = await h.promise;
+    if (u.message.type !== "text") {
+      throw new Error(`expected text message, got ${u.message.type}`);
+    }
     expect(u.message.text?.body).toBe("Hello there");
   });
 });
