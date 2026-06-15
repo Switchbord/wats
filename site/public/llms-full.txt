@@ -6879,7 +6879,7 @@ Migration notes:
 | pywa buttons / lists / CTA objects | `sendButtons`, `sendList`, `sendCtaUrl` | shape-only | WATS exposes separate helpers rather than pywa's overloaded `send_message(buttons=...)`. |
 | pywa catalog/product sends | `sendCatalog`, `sendProduct`, `sendProducts` | shape-only | Requires commerce/catalog assets for live validation. |
 | `mark_message_as_read` / `indicate_typing` | `markMessageAsRead` / `indicateTyping` | shape-only | Only use on test conversations during live campaigns. |
-| pywa `tracker` | WATS `bizOpaqueCallbackData`-style inputs where supported | shape-only, partial | Check the specific WATS helper; WATS uses camelCase. |
+| pywa `tracker` | WATS `bizOpaqueCallbackData`-style inputs where supported | shape-only | Check the specific WATS helper; WATS uses camelCase. Not on every composer. |
 
 ## Media map
 
@@ -6898,7 +6898,7 @@ Migration notes:
 | --- | --- | --- | --- |
 | pywa `create_template` / `get_templates` / `delete_template` | WATS `WABAClient.createMessageTemplate`, `.listMessageTemplates`, `.getMessageTemplate`, `.updateMessageTemplate`, `.deleteMessageTemplate` | live-validated (list); mutations shape-only | Auth OTP buttons use `supportedApps` → Graph `supported_apps` with nested `package_name` / `signature_hash`; auth template DSL fields `autofillText` / `zeroTapTermsAccepted` map to Graph `autofill_text` / `zero_tap_terms_accepted`. Template Group helpers: `listTemplateGroups`, `createTemplateGroup`, `getTemplateGroupAnalytics`. |
 | pywa `send_template` | `PhoneNumberClient.sendTemplate` or `WhatsApp.sendTemplate`; `PhoneNumberClient.sendMarketingTemplate` for Meta `/marketing_messages` | live-validated (approved-template send); marketing send shape-only | Parameter-count validation runs locally. Marketing Messages status webhooks (`marketing_lite`) are modeled. |
-| pywa template component DSL | WATS component builders such as `buildTemplateHeaderComponent` | shape-only, partial | Core HEADER/BODY/FOOTER/BUTTONS helpers exist; pywa's larger DSL is broader. |
+| pywa template component DSL | WATS component builders such as `buildTemplateHeaderComponent` | shape-only | Core HEADER/BODY/FOOTER/BUTTONS helpers exist; pywa's larger DSL is broader. |
 | template status/category/quality/components handlers | `normalizeWebhookEnvelope` account helpers plus `filtersTyped.template` | shape-only | Synthetic webhook coverage. |
 | `compare_templates`, `migrate_templates`, `unpause_template`, bulk auth/library helpers | No first-class WATS helper yet | planned | |
 
@@ -7071,7 +7071,7 @@ accepts the request and WATS parses the live response.
 | Pagination | iterator helpers | `paginate` / `paginateAll` async generators over cursor pages. | shape-only. |
 | Crypto provider | n/a (internal) | `CryptoProvider` seam with Node and WebCrypto adapters. | live-validated via live HMAC verification. |
 | Text sends | `send_text` / `send_message` | `sendText`, `WhatsApp.startChat` to arbitrary recipients. | live-validated — accepted with a real message id. |
-| Media sends | `send_image` etc. | `sendImage` / `sendVideo` / `sendAudio` / `sendDocument` / `sendSticker` by media id or link. | live-validated — image send by media id accepted. |
+| Media sends | `send_image` etc. | `sendImage` / `sendVideo` / `sendAudio` / `sendDocument` / `sendSticker` by media id or link. | live-validated for image by media id; other media composers shape-only. |
 | Other composers | location, contacts, reactions, buttons, lists, CTA, catalog, mark-read, typing | Matching helpers on `PhoneNumberClient` and the facade. | shape-only. |
 | One-call local-file media send | file/bytes polymorphism | Upload first, then send by returned media id. | planned as a single call; the two-step path works today. |
 | Media runtime | media helpers | `uploadMedia`, `downloadMedia`, `downloadMediaBytes`, `deleteMedia`, `decryptEncryptedMedia`, upload sessions. | live-validated — upload/metadata/send/delete passed live; decrypt and sessions shape-only. |
@@ -7080,8 +7080,9 @@ accepts the request and WATS parses the live response.
 | Flows | Flow management | List/get/create/update/publish/delete/deprecate/assets callables, bounded Flow JSON validation, response builders. | shape-only — live read returned empty; mutations never exercised. |
 | Flow hosting + encrypted exchange | richer Flow runtime | Not built. | planned. |
 | Calling | `initiate_call` etc. | Initiate/pre-accept/accept/reject/terminate callables, typed calling webhooks and filters. | shape-only — no live call sessions yet. |
-| Call permissions + WebRTC | permission models, waiters | Not built. | planned. |
-| Business/admin reads | `get_business_account` etc. | `getWabaInfo`, `listSubscribedApps`, `listPhoneNumbers`, phone info/settings, business profile, commerce settings. | live-validated — all reads parsed live Graph v25.0. |
+| Call permissions, calling-settings mutation + WebRTC | permission models, waiters, SIP/settings writes | Not built; only the settings read shape exists. | planned. |
+| Business/admin reads | `get_business_account` etc. | `getWabaInfo`, `listSubscribedApps`, `listPhoneNumbers`, `getPhoneNumberInfo`, `getBusinessProfile`, `getCommerceSettings`. | live-validated — all parsed live Graph v25.0. |
+| Phone-number settings read | settings getter | `getPhoneNumberSettings` (storage config, optional SIP credentials). | shape-only — not exercised in the live campaign. |
 | Business/admin mutations | profile/commerce/settings updates | `updateBusinessProfile`, `updateCommerceSettings`, `updatePhoneNumberSettings`, Block API, OBA/display-name helpers. | shape-only. |
 | Admin: registration, tokens, QR, catalog CRUD | established | Not built. | planned. |
 | Groups | no pywa equivalent | Types, endpoint callables, `GroupClient`, webhook normalization, filters, facade helpers, opt-in service routes. | shape-only — live `listGroups` passed; `createGroup` blocked by a Meta entitlement on the test number, so the mutation matrix is unproven. |
