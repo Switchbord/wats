@@ -4,12 +4,32 @@
 // no-raw-throw guarantees. Implementation is intentionally absent in RED.
 
 import { describe, expect, test } from "bun:test";
+import type { InteractiveReply, WhatsAppMessage } from "@wats/types";
 import {
   MAX_ID_LENGTH,
   WebhookNormalizationError,
   normalizeWebhookEnvelope,
   type TypedMessageUpdate
 } from "../src/webhookNormalizer";
+
+// Narrow a message union on its `.type` discriminant before reading variant
+// fields. Also asserts the discriminant at runtime, strengthening the test.
+function asType<K extends WhatsAppMessage["type"]>(
+  m: WhatsAppMessage,
+  t: K
+): Extract<WhatsAppMessage, { type: K }> {
+  if (m.type !== t) throw new Error(`expected ${t}, got ${m.type}`);
+  return m as Extract<WhatsAppMessage, { type: K }>;
+}
+
+// Same narrowing for the nested interactive reply union.
+function asInteractive<K extends InteractiveReply["type"]>(
+  r: InteractiveReply,
+  t: K
+): Extract<InteractiveReply, { type: K }> {
+  if (r.type !== t) throw new Error(`expected ${t}, got ${r.type}`);
+  return r as Extract<InteractiveReply, { type: K }>;
+}
 
 function changeWithMessages(messages: readonly unknown[]): Record<string, unknown> {
   return {
@@ -97,15 +117,20 @@ describe("WATS-43A normalizeWebhookEnvelope deep message normalization", () => {
     const document = result.updates[3] as TypedMessageUpdate;
     const sticker = result.updates[4] as TypedMessageUpdate;
 
-    expect(image.rawChange).toBe(change);
+    expect<unknown>(image.rawChange).toBe(change); // rawChange is WhatsAppWebhookChange; the fixture is a Record — compare by identity
     expect(image.message.type).toBe("image");
-    expect(image.message.image.id).toBe("media-image");
-    expect(image.message.image.mimeType).toBe("image/jpeg");
-    expect("mime_type" in (image.message.image as unknown as Record<string, unknown>)).toBe(false);
-    expect(video.message.video.mimeType).toBe("video/mp4");
-    expect(audio.message.audio.mimeType).toBe("audio/ogg");
-    expect(document.message.document.filename).toBe("invoice.pdf");
-    expect(sticker.message.sticker.mimeType).toBe("image/webp");
+    const imageMsg = asType(image.message, "image");
+    const videoMsg = asType(video.message, "video");
+    const audioMsg = asType(audio.message, "audio");
+    const documentMsg = asType(document.message, "document");
+    const stickerMsg = asType(sticker.message, "sticker");
+    expect(imageMsg.image.id).toBe("media-image");
+    expect(imageMsg.image.mimeType).toBe("image/jpeg");
+    expect("mime_type" in (imageMsg.image as unknown as Record<string, unknown>)).toBe(false);
+    expect(videoMsg.video.mimeType).toBe("video/mp4");
+    expect(audioMsg.audio.mimeType).toBe("audio/ogg");
+    expect(documentMsg.document.filename).toBe("invoice.pdf");
+    expect(stickerMsg.sticker.mimeType).toBe("image/webp");
   });
 
   test("normalizes interactive button/list/nfm replies and quick-reply buttons", () => {
@@ -129,12 +154,19 @@ describe("WATS-43A normalizeWebhookEnvelope deep message normalization", () => {
     ]);
 
     expect(updates.length).toBe(4);
-    expect(updates[0]?.message.interactive.type).toBe("button_reply");
-    expect(updates[0]?.message.interactive.buttonReply.id).toBe("btn-1");
-    expect("button_reply" in (updates[0]?.message.interactive as unknown as Record<string, unknown>)).toBe(false);
-    expect(updates[1]?.message.interactive.listReply.description).toBe("Row desc");
-    expect(updates[2]?.message.interactive.nfmReply.responseJson).toBe("{\"flow\":true}");
-    expect(updates[3]?.message.button.payload).toBe("payload-1");
+    const interactive0 = asType(updates[0]!.message, "interactive");
+    const interactive1 = asType(updates[1]!.message, "interactive");
+    const interactive2 = asType(updates[2]!.message, "interactive");
+    const buttonMsg = asType(updates[3]!.message, "button");
+    const buttonReply = asInteractive(interactive0.interactive, "button_reply");
+    const listReply = asInteractive(interactive1.interactive, "list_reply");
+    const nfmReply = asInteractive(interactive2.interactive, "nfm_reply");
+    expect(interactive0.interactive.type).toBe("button_reply");
+    expect(buttonReply.buttonReply.id).toBe("btn-1");
+    expect("button_reply" in (interactive0.interactive as unknown as Record<string, unknown>)).toBe(false);
+    expect(listReply.listReply.description).toBe("Row desc");
+    expect(nfmReply.nfmReply.responseJson).toBe("{\"flow\":true}");
+    expect(buttonMsg.button.payload).toBe("payload-1");
   });
 
   test("normalizes location and reaction messages including reaction removal", () => {
@@ -156,12 +188,15 @@ describe("WATS-43A normalizeWebhookEnvelope deep message normalization", () => {
     ]);
 
     expect(updates.length).toBe(3);
-    expect(updates[0]?.message.location.latitude).toBe(37.422);
-    expect(updates[0]?.message.location.longitude).toBe(-122.084);
-    expect(updates[1]?.message.reaction.messageId).toBe("wamid.ORIGINAL");
-    expect(updates[1]?.message.reaction.emoji).toBe("👍");
-    expect(updates[2]?.message.reaction.emoji).toBe("");
-    expect("message_id" in (updates[1]?.message.reaction as unknown as Record<string, unknown>)).toBe(false);
+    const locationMsg = asType(updates[0]!.message, "location");
+    const reaction1 = asType(updates[1]!.message, "reaction");
+    const reaction2 = asType(updates[2]!.message, "reaction");
+    expect(locationMsg.location.latitude).toBe(37.422);
+    expect(locationMsg.location.longitude).toBe(-122.084);
+    expect(reaction1.reaction.messageId).toBe("wamid.ORIGINAL");
+    expect(reaction1.reaction.emoji).toBe("👍");
+    expect(reaction2.reaction.emoji).toBe("");
+    expect("message_id" in (reaction1.reaction as unknown as Record<string, unknown>)).toBe(false);
   });
 
   test("normalizes context to camelCase and omits unsafe prototype keys and cyclic extras", () => {
@@ -187,7 +222,7 @@ describe("WATS-43A normalizeWebhookEnvelope deep message normalization", () => {
       }
     ]);
 
-    const normalizedContext = updates[0]?.message.context as unknown as Record<string, unknown>;
+    const normalizedContext = asType(updates[0]!.message, "text").context as unknown as Record<string, unknown>;
     expect(normalizedContext.messageId).toBe("wamid.PARENT");
     expect(normalizedContext.frequentlyForwarded).toBe(true);
     expect(Object.prototype.hasOwnProperty.call(normalizedContext, "__proto__")).toBe(false);
@@ -256,7 +291,7 @@ describe("WATS-43A normalizeWebhookEnvelope deep message normalization", () => {
     );
     expect(atLimit.updates.length).toBe(2);
     expect(atLimit.limitError).toBeUndefined();
-    expect(((atLimit.updates[0] as TypedMessageUpdate).message.image.mimeType)).toBe("image/jpeg");
+    expect(asType((atLimit.updates[0] as TypedMessageUpdate).message, "image").image.mimeType).toBe("image/jpeg");
 
     const overLimit = normalizeWebhookEnvelope(
       envelopeForChange(
