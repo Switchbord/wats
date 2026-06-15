@@ -1,10 +1,21 @@
 import { describe, expect, test } from "bun:test";
+import type { WhatsAppMessage } from "@wats/types";
 import {
   normalizeWebhookEnvelope,
   type TypedAccountUpdate,
   type TypedMessageUpdate,
   type TypedStatusUpdate
 } from "../src/webhookNormalizer";
+
+// Narrow a message union on its `.type` discriminant before reading variant
+// fields (also asserts the discriminant at runtime).
+function asType<K extends WhatsAppMessage["type"]>(
+  m: WhatsAppMessage,
+  t: K
+): Extract<WhatsAppMessage, { type: K }> {
+  if (m.type !== t) throw new Error(`expected ${t}, got ${m.type}`);
+  return m as Extract<WhatsAppMessage, { type: K }>;
+}
 
 function makeEnvelope(changes: readonly unknown[]): Record<string, unknown> {
   return {
@@ -70,8 +81,9 @@ describe("WATS-89 v24/v25 webhook normalization refresh", () => {
     expect(result.skipped).toEqual([]);
     const update = result.updates[0] as TypedMessageUpdate;
     expect(update.message.type).toBe("image");
-    expect(update.message.image.url).toBe("https://lookaside.fbsbx.com/whatsapp_business/attachments/?mid=MEDIA_ID");
-    expect("mime_type" in (update.message.image as unknown as Record<string, unknown>)).toBe(false);
+    const imageMsg = asType(update.message, "image");
+    expect(imageMsg.image.url).toBe("https://lookaside.fbsbx.com/whatsapp_business/attachments/?mid=MEDIA_ID");
+    expect("mime_type" in (imageMsg.image as unknown as Record<string, unknown>)).toBe(false);
   });
 
   test("unsupported messages preserve detailed unsupported payload fields", () => {
@@ -95,9 +107,10 @@ describe("WATS-89 v24/v25 webhook normalization refresh", () => {
     expect(result.skipped).toEqual([]);
     const update = result.updates[0] as TypedMessageUpdate;
     expect(update.message.type).toBe("unsupported");
-    expect(update.message.unsupported?.type).toBe("request_welcome");
-    expect(update.message.unsupported?.title).toBe("Request Welcome removed");
-    expect(update.message.errors?.[0]?.code).toBe(131051);
+    const unsupportedMsg = asType(update.message, "unsupported");
+    expect(unsupportedMsg.unsupported?.type).toBe("request_welcome");
+    expect(unsupportedMsg.unsupported?.title).toBe("Request Welcome removed");
+    expect(unsupportedMsg.errors?.[0]?.code).toBe(131051);
   });
 
   test("coexistence account_update PARTNER_REMOVED carries disconnection_info", () => {
