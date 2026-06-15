@@ -78,7 +78,63 @@ export interface PhoneNumberInfo {
   readonly [key: string]: unknown;
 }
 
+/** Read-side `calling.sip.servers[]` entry. `sip_user_password`/`app_id` are GET-only. */
+export interface SipServerSettings {
+  readonly hostname?: string;
+  readonly port?: number;
+  readonly request_uri_user_params?: Record<string, string>;
+  /** Response-only; present on read only when `include_sip_credentials=true`. Never sent in updates. */
+  readonly sip_user_password?: string;
+  /** Response-only; never sent in updates. */
+  readonly app_id?: number;
+  readonly [key: string]: unknown;
+}
+
+export interface SipSettings {
+  readonly status?: string;
+  readonly servers?: readonly SipServerSettings[];
+  readonly [key: string]: unknown;
+}
+
+export interface CallHoursWeeklyOperatingHoursSettings {
+  readonly day_of_week?: string;
+  readonly open_time?: string;
+  readonly close_time?: string;
+  readonly [key: string]: unknown;
+}
+
+export interface CallHoursHolidayScheduleSettings {
+  readonly date?: string;
+  readonly start_time?: string;
+  readonly end_time?: string;
+  readonly [key: string]: unknown;
+}
+
+export interface CallHoursSettings {
+  readonly status?: string;
+  readonly timezone_id?: string;
+  readonly weekly_operating_hours?: readonly CallHoursWeeklyOperatingHoursSettings[];
+  readonly holiday_schedule?: readonly CallHoursHolidayScheduleSettings[];
+  readonly [key: string]: unknown;
+}
+
+export interface CallIconsSettings {
+  readonly restrict_to_user_countries?: readonly string[];
+  readonly [key: string]: unknown;
+}
+
+export interface CallingSettings {
+  readonly status?: string;
+  readonly call_icon_visibility?: string;
+  readonly call_icons?: CallIconsSettings;
+  readonly call_hours?: CallHoursSettings;
+  readonly callback_permission_status?: string;
+  readonly sip?: SipSettings;
+  readonly [key: string]: unknown;
+}
+
 export interface PhoneNumberSettingsEntry {
+  readonly calling?: CallingSettings;
   readonly [key: string]: unknown;
 }
 
@@ -179,9 +235,55 @@ export interface StorageConfigurationInput {
   readonly [key: string]: unknown;
 }
 
+export type CallingStatus = "ENABLED" | "DISABLED";
+
+export interface CallIconsInput {
+  readonly restrictToUserCountries?: readonly string[];
+}
+
+export interface WeeklyOperatingHoursInput {
+  readonly dayOfWeek: string;
+  readonly openTime: string;
+  readonly closeTime: string;
+}
+
+export interface HolidayScheduleInput {
+  readonly date: string;
+  readonly startTime: string;
+  readonly endTime: string;
+}
+
+export interface CallHoursInput {
+  readonly status?: CallingStatus | string;
+  readonly timezoneId?: string;
+  readonly weeklyOperatingHours?: readonly WeeklyOperatingHoursInput[];
+  readonly holidaySchedule?: readonly HolidayScheduleInput[];
+}
+
+export interface SipServerInput {
+  readonly hostname: string;
+  readonly port?: number;
+  readonly requestUriUserParams?: Record<string, string>;
+}
+
+export interface SipInput {
+  readonly status?: CallingStatus | string;
+  readonly servers?: readonly SipServerInput[];
+}
+
+export interface CallingInput {
+  readonly status?: CallingStatus | string;
+  readonly callIconVisibility?: "DEFAULT" | "DISABLE_ALL" | string;
+  readonly callIcons?: CallIconsInput;
+  readonly callHours?: CallHoursInput;
+  readonly callbackPermissionStatus?: CallingStatus | string;
+  readonly sip?: SipInput;
+}
+
 export interface UpdatePhoneNumberSettingsInput {
   readonly phoneNumberId: string;
   readonly storageConfiguration?: StorageConfigurationInput;
+  readonly calling?: CallingInput;
 }
 
 export interface PhoneNumberSettingsUpdateResponse {
@@ -507,6 +609,194 @@ function sanitizeStorageConfiguration(value: unknown, helperName: string): Recor
   return out;
 }
 
+const MAX_SIP_SERVERS = 3;
+const MAX_WEEKLY_OPERATING_HOURS_PER_DAY = 2;
+const MAX_HOLIDAY_SCHEDULE_ENTRIES = 20;
+const MAX_RESTRICT_COUNTRIES = 64;
+const MAX_URI_USER_PARAM_KEYS = 32;
+const MAX_HOSTNAME_LENGTH = 253;
+const MAX_TIMEZONE_LENGTH = 64;
+const MAX_PORT = 65535;
+const CALLING_STATUS_VALUES = new Set(["ENABLED", "DISABLED"]);
+const CALL_ICON_VISIBILITY_VALUES = new Set(["DEFAULT", "DISABLE_ALL"]);
+const DAY_OF_WEEK_VALUES = new Set(["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]);
+const HHMM_PATTERN = /^([01]\d|2[0-3])[0-5]\d$/u;
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
+
+function assertCallingEnum(value: unknown, allowed: ReadonlySet<string>, fieldName: string, helperName: string): string {
+  const str = assertQueryString(value, fieldName, helperName, 64).toUpperCase();
+  if (!allowed.has(str)) {
+    throw validationError(`Invalid ${helperName} input: ${fieldName} must be one of ${[...allowed].join(", ")}.`);
+  }
+  return str;
+}
+
+function assertHhmm(value: unknown, fieldName: string, helperName: string): string {
+  const str = assertQueryString(value, fieldName, helperName, 4);
+  if (!HHMM_PATTERN.test(str)) {
+    throw validationError(`Invalid ${helperName} input: ${fieldName} must be a 24h "HHMM" string.`);
+  }
+  return str;
+}
+
+function assertPort(value: unknown, fieldName: string, helperName: string): number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value > MAX_PORT) {
+    throw validationError(`Invalid ${helperName} input: ${fieldName} must be an integer between 0 and ${MAX_PORT}.`);
+  }
+  return value;
+}
+
+function sanitizeCallingArray(value: unknown, path: string, helperName: string, maxLength: number): unknown[] {
+  return assertDenseDataArray(value, {
+    helperName,
+    path,
+    maxLength,
+    invalidTypeMessage: `Invalid ${helperName} input: ${path} must be an array.`,
+    invalidLengthMessage: `Invalid ${helperName} input: ${path} must contain at most ${maxLength} entries.`,
+    sparseArrayMessage: `Invalid ${helperName} input: ${path} must not contain sparse array holes.`,
+    unsafePrototypeKeyMessage: `Invalid ${helperName} input: ${path} contains an unsafe prototype key.`,
+    unsupportedPropertyMessage: `Invalid ${helperName} input: ${path} contains unsupported properties.`
+  });
+}
+
+function sanitizeRequestUriUserParams(value: unknown, path: string, helperName: string): Record<string, string> {
+  const record = assertPlainRecord(value, helperName, path);
+  const out: Record<string, string> = {};
+  const keys = Object.keys(record);
+  if (keys.length > MAX_URI_USER_PARAM_KEYS) {
+    throw validationError(`Invalid ${helperName} input: ${path} must contain at most ${MAX_URI_USER_PARAM_KEYS} keys.`);
+  }
+  for (const key of keys) {
+    const nested = ownDataValue(record, key, helperName, false);
+    out[key] = assertQueryString(nested, `${path}.${key}`, helperName, 256);
+  }
+  return out;
+}
+
+function sanitizeSipServer(value: unknown, path: string, helperName: string): Record<string, unknown> {
+  const record = assertPlainRecord(value, helperName, path);
+  const out: Record<string, unknown> = {
+    hostname: assertQueryString(ownDataValue(record, "hostname", helperName, true), `${path}.hostname`, helperName, MAX_HOSTNAME_LENGTH)
+  };
+  const port = ownDataValue(record, "port", helperName, false);
+  if (port !== undefined) out.port = assertPort(port, `${path}.port`, helperName);
+  const requestUriUserParams = ownDataValue(record, "requestUriUserParams", helperName, false);
+  if (requestUriUserParams !== undefined) {
+    out.request_uri_user_params = sanitizeRequestUriUserParams(requestUriUserParams, `${path}.requestUriUserParams`, helperName);
+  }
+  // Response-only credential/identity fields (sip_user_password, app_id, camelCase variants) are
+  // never copied into `out`, so they are silently dropped even if a GET response is round-tripped here.
+  return out;
+}
+
+function sanitizeSip(value: unknown, helperName: string): Record<string, unknown> {
+  const path = "calling.sip";
+  const record = assertPlainRecord(value, helperName, path);
+  const out: Record<string, unknown> = {};
+  const status = ownDataValue(record, "status", helperName, false);
+  if (status !== undefined) out.status = assertCallingEnum(status, CALLING_STATUS_VALUES, `${path}.status`, helperName);
+  const servers = ownDataValue(record, "servers", helperName, false);
+  if (servers !== undefined) {
+    const items = sanitizeCallingArray(servers, `${path}.servers`, helperName, MAX_SIP_SERVERS);
+    out.servers = items.map((item, index) => sanitizeSipServer(item, `${path}.servers[${index}]`, helperName));
+  }
+  return out;
+}
+
+function sanitizeWeeklyOperatingHours(value: unknown, helperName: string): Record<string, unknown>[] {
+  const path = "calling.callHours.weeklyOperatingHours";
+  const items = assertDenseDataArray(value, {
+    helperName,
+    path,
+    invalidTypeMessage: `Invalid ${helperName} input: ${path} must be an array.`,
+    sparseArrayMessage: `Invalid ${helperName} input: ${path} must not contain sparse array holes.`,
+    unsafePrototypeKeyMessage: `Invalid ${helperName} input: ${path} contains an unsafe prototype key.`,
+    unsupportedPropertyMessage: `Invalid ${helperName} input: ${path} contains unsupported properties.`
+  });
+  const perDay = new Map<string, number>();
+  return items.map((item, index) => {
+    const entryPath = `${path}[${index}]`;
+    const record = assertPlainRecord(item, helperName, entryPath);
+    const day = assertCallingEnum(ownDataValue(record, "dayOfWeek", helperName, true), DAY_OF_WEEK_VALUES, `${entryPath}.dayOfWeek`, helperName);
+    const count = (perDay.get(day) ?? 0) + 1;
+    perDay.set(day, count);
+    if (count > MAX_WEEKLY_OPERATING_HOURS_PER_DAY) {
+      throw validationError(`Invalid ${helperName} input: ${path} must contain at most ${MAX_WEEKLY_OPERATING_HOURS_PER_DAY} entries per day.`);
+    }
+    return {
+      day_of_week: day,
+      open_time: assertHhmm(ownDataValue(record, "openTime", helperName, true), `${entryPath}.openTime`, helperName),
+      close_time: assertHhmm(ownDataValue(record, "closeTime", helperName, true), `${entryPath}.closeTime`, helperName)
+    };
+  });
+}
+
+function sanitizeHolidaySchedule(value: unknown, helperName: string): Record<string, unknown>[] {
+  const path = "calling.callHours.holidaySchedule";
+  const items = sanitizeCallingArray(value, path, helperName, MAX_HOLIDAY_SCHEDULE_ENTRIES);
+  return items.map((item, index) => {
+    const entryPath = `${path}[${index}]`;
+    const record = assertPlainRecord(item, helperName, entryPath);
+    const date = assertQueryString(ownDataValue(record, "date", helperName, true), `${entryPath}.date`, helperName, 10);
+    if (!DATE_PATTERN.test(date)) {
+      throw validationError(`Invalid ${helperName} input: ${entryPath}.date must be a "YYYY-MM-DD" string.`);
+    }
+    return {
+      date,
+      start_time: assertHhmm(ownDataValue(record, "startTime", helperName, true), `${entryPath}.startTime`, helperName),
+      end_time: assertHhmm(ownDataValue(record, "endTime", helperName, true), `${entryPath}.endTime`, helperName)
+    };
+  });
+}
+
+function sanitizeCallHours(value: unknown, helperName: string): Record<string, unknown> {
+  const path = "calling.callHours";
+  const record = assertPlainRecord(value, helperName, path);
+  const out: Record<string, unknown> = {};
+  const status = ownDataValue(record, "status", helperName, false);
+  if (status !== undefined) out.status = assertCallingEnum(status, CALLING_STATUS_VALUES, `${path}.status`, helperName);
+  const timezoneId = ownDataValue(record, "timezoneId", helperName, false);
+  if (timezoneId !== undefined) out.timezone_id = assertQueryString(timezoneId, `${path}.timezoneId`, helperName, MAX_TIMEZONE_LENGTH);
+  const weekly = ownDataValue(record, "weeklyOperatingHours", helperName, false);
+  if (weekly !== undefined) out.weekly_operating_hours = sanitizeWeeklyOperatingHours(weekly, helperName);
+  const holiday = ownDataValue(record, "holidaySchedule", helperName, false);
+  if (holiday !== undefined) out.holiday_schedule = sanitizeHolidaySchedule(holiday, helperName);
+  return out;
+}
+
+function sanitizeCallIcons(value: unknown, helperName: string): Record<string, unknown> {
+  const path = "calling.callIcons";
+  const record = assertPlainRecord(value, helperName, path);
+  const out: Record<string, unknown> = {};
+  const restrict = ownDataValue(record, "restrictToUserCountries", helperName, false);
+  if (restrict !== undefined) {
+    const items = sanitizeCallingArray(restrict, `${path}.restrictToUserCountries`, helperName, MAX_RESTRICT_COUNTRIES);
+    out.restrict_to_user_countries = items.map((item, index) =>
+      assertQueryString(item, `${path}.restrictToUserCountries[${index}]`, helperName, 8)
+    );
+  }
+  return out;
+}
+
+function sanitizeCalling(value: unknown, helperName: string): Record<string, unknown> {
+  const path = "calling";
+  const record = assertPlainRecord(value, helperName, path);
+  const out: Record<string, unknown> = {};
+  const status = ownDataValue(record, "status", helperName, false);
+  if (status !== undefined) out.status = assertCallingEnum(status, CALLING_STATUS_VALUES, `${path}.status`, helperName);
+  const callIconVisibility = ownDataValue(record, "callIconVisibility", helperName, false);
+  if (callIconVisibility !== undefined) out.call_icon_visibility = assertCallingEnum(callIconVisibility, CALL_ICON_VISIBILITY_VALUES, `${path}.callIconVisibility`, helperName);
+  const callIcons = ownDataValue(record, "callIcons", helperName, false);
+  if (callIcons !== undefined) out.call_icons = sanitizeCallIcons(callIcons, helperName);
+  const callHours = ownDataValue(record, "callHours", helperName, false);
+  if (callHours !== undefined) out.call_hours = sanitizeCallHours(callHours, helperName);
+  const callbackPermissionStatus = ownDataValue(record, "callbackPermissionStatus", helperName, false);
+  if (callbackPermissionStatus !== undefined) out.callback_permission_status = assertCallingEnum(callbackPermissionStatus, CALLING_STATUS_VALUES, `${path}.callbackPermissionStatus`, helperName);
+  const sip = ownDataValue(record, "sip", helperName, false);
+  if (sip !== undefined) out.sip = sanitizeSip(sip, helperName);
+  return out;
+}
+
 export function buildUpdatePhoneNumberSettingsBody(input: UpdatePhoneNumberSettingsInput): Record<string, unknown> {
   const helperName = "updatePhoneNumberSettings";
   const record = assertPlainRecord(input, helperName);
@@ -514,10 +804,14 @@ export function buildUpdatePhoneNumberSettingsBody(input: UpdatePhoneNumberSetti
     throw validationError(`Invalid ${helperName} input: dataLocalizationRegion is not supported; use storageConfiguration.`);
   }
   const storageConfiguration = ownDataValue(record, "storageConfiguration", helperName, false);
-  if (storageConfiguration === undefined) {
-    throw validationError(`Invalid ${helperName} input: storageConfiguration is required.`);
+  const calling = ownDataValue(record, "calling", helperName, false);
+  if (storageConfiguration === undefined && calling === undefined) {
+    throw validationError(`Invalid ${helperName} input: at least one of storageConfiguration or calling is required.`);
   }
-  return { storage_configuration: sanitizeStorageConfiguration(storageConfiguration, helperName) };
+  const body: Record<string, unknown> = {};
+  if (storageConfiguration !== undefined) body.storage_configuration = sanitizeStorageConfiguration(storageConfiguration, helperName);
+  if (calling !== undefined) body.calling = sanitizeCalling(calling, helperName);
+  return body;
 }
 
 export function normalizeUpdatePhoneNumberSettingsParams(input: UpdatePhoneNumberSettingsInput): WireParams {
