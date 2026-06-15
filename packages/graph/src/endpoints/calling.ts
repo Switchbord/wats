@@ -393,3 +393,175 @@ export const terminateCall = Object.assign(
     callsEndpoint(client, safeParams(params), buildTerminate(body), opts),
   { definition: callsEndpoint.definition }
 );
+
+// --- WATS-77 slice 1: GET Call Permissions ------------------------------
+//
+// GET /{phoneNumberId}/call_permissions — read a consumer's calling
+// permission state. Exactly one of user_wa_id / recipient is required on
+// the wire. Public input is camelCase ({ phoneNumberId, userWaId?,
+// recipient? }); the snake_case response is normalized back to camelCase
+// while preserving any unknown fields via index signatures.
+
+export type CallPermissionStatus = "no_permission" | "temporary" | "permanent";
+
+export interface CallPermissionActionLimit {
+  readonly timePeriod?: string;
+  readonly maxAllowed?: number;
+  readonly currentUsage?: number;
+  readonly limitExpirationTime?: number;
+  readonly [key: string]: unknown;
+}
+
+export interface CallPermissionAction {
+  readonly actionName?: string;
+  readonly canPerformAction?: boolean;
+  readonly limits?: ReadonlyArray<CallPermissionActionLimit>;
+  readonly [key: string]: unknown;
+}
+
+export interface CallPermission {
+  readonly status?: CallPermissionStatus | string;
+  readonly expirationTime?: number;
+  readonly [key: string]: unknown;
+}
+
+export interface CallPermissionsResponse {
+  readonly messagingProduct?: string;
+  readonly permission?: CallPermission;
+  readonly actions?: ReadonlyArray<CallPermissionAction>;
+  readonly [key: string]: unknown;
+}
+
+export interface GetCallPermissionsInput {
+  readonly phoneNumberId: string;
+  readonly userWaId?: string;
+  readonly recipient?: string;
+}
+
+type CallPermissionsParams = {
+  readonly phoneNumberId: string;
+  readonly user_wa_id?: string;
+  readonly recipient?: string;
+};
+
+type WireResponse = Record<string, unknown>;
+
+const callPermissionsEndpoint = defineEndpoint<CallPermissionsParams, never, WireResponse>({
+  method: "GET",
+  pathTemplate: "/{phoneNumberId}/call_permissions",
+  params: {
+    phoneNumberId: { in: "path", required: true },
+    user_wa_id: { in: "query" },
+    recipient: { in: "query" }
+  }
+});
+
+function asWireRecord(value: unknown): Record<string, unknown> | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return undefined;
+  }
+  return value as Record<string, unknown>;
+}
+
+function asWireArray(value: unknown): readonly unknown[] | undefined {
+  return Array.isArray(value) ? value : undefined;
+}
+
+// Normalize a known camelCase target field from its snake_case wire key,
+// then copy through every remaining (unknown) field verbatim.
+function normalizeWith(
+  source: Record<string, unknown>,
+  rename: Record<string, string>,
+  transform: Record<string, (value: unknown) => unknown> = {}
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(source)) {
+    if (isUnsafePrototypeKey(key)) continue;
+    const targetKey = rename[key] ?? key;
+    const fn = transform[key];
+    out[targetKey] = fn !== undefined ? fn(value) : value;
+  }
+  return out;
+}
+
+function normalizeLimit(value: unknown): CallPermissionActionLimit {
+  const record = asWireRecord(value);
+  if (record === undefined) return {} as CallPermissionActionLimit;
+  return normalizeWith(record, {
+    time_period: "timePeriod",
+    max_allowed: "maxAllowed",
+    current_usage: "currentUsage",
+    limit_expiration_time: "limitExpirationTime"
+  }) as CallPermissionActionLimit;
+}
+
+function normalizeAction(value: unknown): CallPermissionAction {
+  const record = asWireRecord(value);
+  if (record === undefined) return {} as CallPermissionAction;
+  return normalizeWith(
+    record,
+    { action_name: "actionName", can_perform_action: "canPerformAction" },
+    {
+      limits: (limits) => {
+        const arr = asWireArray(limits);
+        return arr !== undefined ? arr.map(normalizeLimit) : limits;
+      }
+    }
+  ) as CallPermissionAction;
+}
+
+function normalizePermission(value: unknown): CallPermission {
+  const record = asWireRecord(value);
+  if (record === undefined) return value as CallPermission;
+  return normalizeWith(record, { expiration_time: "expirationTime" }) as CallPermission;
+}
+
+function normalizeCallPermissionsResponse(wire: WireResponse): CallPermissionsResponse {
+  const record = asWireRecord(wire);
+  if (record === undefined) return {} as CallPermissionsResponse;
+  return normalizeWith(
+    record,
+    { messaging_product: "messagingProduct" },
+    {
+      permission: normalizePermission,
+      actions: (actions) => {
+        const arr = asWireArray(actions);
+        return arr !== undefined ? arr.map(normalizeAction) : actions;
+      }
+    }
+  ) as CallPermissionsResponse;
+}
+
+function buildCallPermissionsParams(input: GetCallPermissionsInput): CallPermissionsParams {
+  if (typeof input !== "object" || input === null || Array.isArray(input)) {
+    throw validationError("Invalid Calling API input: getCallPermissions input must be an object.");
+  }
+  const phoneNumberId = safeParams({ phoneNumberId: (input as { phoneNumberId?: unknown }).phoneNumberId as string }).phoneNumberId;
+
+  const hasUserWaId = input.userWaId !== undefined;
+  const hasRecipient = input.recipient !== undefined;
+  if (hasUserWaId === hasRecipient) {
+    throw validationError(
+      "Invalid Calling API input: exactly one of userWaId or recipient is required."
+    );
+  }
+
+  if (hasUserWaId) {
+    return { phoneNumberId, user_wa_id: assertPublicString(input.userWaId, "userWaId") };
+  }
+  return { phoneNumberId, recipient: assertPublicString(input.recipient, "recipient") };
+}
+
+export const getCallPermissions = Object.assign(
+  async (
+    client: GraphClient,
+    input: GetCallPermissionsInput,
+    _body?: undefined,
+    opts?: EndpointInvokeOptions
+  ): Promise<CallPermissionsResponse> => {
+    const params = buildCallPermissionsParams(input);
+    const wire = await callPermissionsEndpoint(client, params, undefined, opts);
+    return normalizeCallPermissionsResponse(wire);
+  },
+  { definition: callPermissionsEndpoint.definition }
+);
