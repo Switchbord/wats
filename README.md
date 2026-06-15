@@ -117,5 +117,6 @@ Docs change in the same PR as the code they describe.
 - npm: [@wats](https://www.npmjs.com/org/wats)
 - `CONTRIBUTING.md` — contribution workflow and credential-free defaults
 - `SECURITY.md` — vulnerability reporting and live-credential policy
+- `CODE_OF_CONDUCT.md` — Contributor Covenant 2.1 for community spaces
 
 MIT.

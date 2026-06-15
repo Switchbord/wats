@@ -2,6 +2,8 @@
 
 Thanks for helping improve WATS. The project is an alpha-stage TypeScript toolkit for WhatsApp operations, and the contribution bar is intentionally high because the code touches webhooks, authorization headers, signatures, and user-controlled payloads.
 
+Participation in WATS community spaces is governed by `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1).
+
 ## Source of truth
 
 Linear is the source of truth for issue-level planning and prioritization. Repository docs may summarize current roadmap shape, but do not add repo-local deferred ledgers for backlog tracking.
