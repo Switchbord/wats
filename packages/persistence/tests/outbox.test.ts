@@ -58,10 +58,7 @@ function applyOriginalV1Migration(filename: string): void {
     for (const statement of ORIGINAL_001_STATEMENTS) database.run(statement);
     database.run(
       "INSERT INTO wats_schema_migrations (id, version, checksum, applied_at) VALUES (?, ?, ?, ?)",
-      "001_initial",
-      1,
-      ORIGINAL_001_CHECKSUM,
-      "2026-05-24T00:00:00.000Z"
+      ["001_initial", 1, ORIGINAL_001_CHECKSUM, "2026-05-24T00:00:00.000Z"]
     );
     database.exec("COMMIT");
   } catch (error) {

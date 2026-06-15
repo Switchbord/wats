@@ -60,7 +60,7 @@ async function bodyText(req: TransportRequest): Promise<string> {
   if (body instanceof FormData) {
     const entries: string[] = [];
     for (const [key, value] of body.entries()) {
-      entries.push(`${key}=${typeof value === "string" ? value : value.name}`);
+      entries.push(`${key}=${typeof value === "string" ? value : (value as File).name}`);
     }
     return entries.join("&");
   }

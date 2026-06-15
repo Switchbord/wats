@@ -29,16 +29,25 @@ function buildRequest(overrides: Partial<TransportRequest> = {}): TransportReque
   };
 }
 
+// Bun's `typeof fetch` requires a `.preconnect` member that simple test stubs
+// don't provide. Attach a no-op preconnect so stubs satisfy the full fetch type
+// without weakening the production CreateFetchTransportOptions.fetch type.
+function asFetch(
+  fn: (input: URL | RequestInfo, init?: RequestInit) => Promise<Response>
+): typeof globalThis.fetch {
+  return Object.assign(fn, { preconnect: async () => {} }) as typeof globalThis.fetch;
+}
+
 describe("createFetchTransport", () => {
   test("invokes the injected fetch with method, url, headers, body, signal", async () => {
     const calls: Array<{ url: string; init: RequestInit }> = [];
-    const fakeFetch: typeof globalThis.fetch = async (input, init) => {
+    const fakeFetch = asFetch(async (input, init) => {
       calls.push({ url: String(input), init: init ?? {} });
       return new Response(JSON.stringify({ ok: true }), {
         status: 200,
         headers: { "content-type": "application/json" }
       });
-    };
+    });
 
     const transport = createFetchTransport({ fetch: fakeFetch });
     const controller = new AbortController();
@@ -57,9 +66,9 @@ describe("createFetchTransport", () => {
   });
 
   test("maps fetch-level errors to GraphNetworkError", async () => {
-    const fakeFetch: typeof globalThis.fetch = async () => {
+    const fakeFetch = asFetch(async () => {
       throw new TypeError("socket hang up");
-    };
+    });
     const transport = createFetchTransport({ fetch: fakeFetch });
 
     let thrown: unknown;
@@ -94,17 +103,17 @@ describe("createFetchTransport", () => {
       }
     ];
 
-    let seenHeader: string | null = null;
-    const fakeFetch: typeof globalThis.fetch = async (_input, init) => {
-      seenHeader = new Headers(init?.headers).get("x-trace");
+    const seen: { header: string | null } = { header: null };
+    const fakeFetch = asFetch(async (_input, init) => {
+      seen.header = new Headers(init?.headers).get("x-trace");
       return new Response(null, { status: 204 });
-    };
+    });
 
     const transport = createFetchTransport({ fetch: fakeFetch, interceptors });
     const response = await transport.request(buildRequest());
     expect(response.status).toBe(204);
     expect(observed).toEqual(["A", "B"]);
-    expect(seenHeader).toBe("1-2");
+    expect(seen.header).toBe("1-2");
   });
 
   test("runs onResponse interceptors in array order", async () => {
@@ -124,8 +133,8 @@ describe("createFetchTransport", () => {
       }
     ];
 
-    const fakeFetch: typeof globalThis.fetch = async () =>
-      new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
+    const fakeFetch = asFetch(async () =>
+      new Response("{}", { status: 200, headers: { "content-type": "application/json" } }));
     const transport = createFetchTransport({ fetch: fakeFetch, interceptors });
     await transport.request(buildRequest());
     expect(observed).toEqual(["A", "B"]);
