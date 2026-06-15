@@ -1525,7 +1525,7 @@ Interceptors can be async; the chain awaits each hook. For errors originating in
 # Architecture Overview
 URL: https://wats.sh/docs/concepts/overview
 
-WATS is a Bun-first TypeScript monorepo for WhatsApp operations. It is built as small packages with explicit dependency direction, not one large framework package. You take the layers you need and ignore the rest.
+WATS is a Bun-first TypeScript toolkit for WhatsApp operations. It is built as small packages with explicit dependency direction, not one large framework package. You take the layers you need and ignore the rest.
 
 ## Package layers
 
@@ -1743,7 +1743,7 @@ The facade binds a `GraphClient`, optional `PhoneNumberClient` / `WABAClient`, a
 
 1. `@wats/types` has no runtime dependencies.
 2. `@wats/graph`, `@wats/http`, and `@wats/crypto` expose portable seams and keep runtime-specific behavior behind adapters.
-3. `@wats/core` is the SDK composition root; app-layer packages compose it rather than duplicating router/webhook semantics.
+3. `@wats/core` is the core composition root; app-layer packages compose it rather than duplicating router/webhook semantics.
 4. `@wats/internal-utils` may be published only as an internal support package; `@wats/testing` stays private and is never published.
 5. Consumer fixtures import through package specifiers, never relative source paths.
 
@@ -5620,7 +5620,7 @@ Not implemented: a full Meta Graph API OpenAPI document, live Meta credential ch
 # Types Reference
 URL: https://wats.sh/docs/reference/types
 
-`@wats/types` ships discriminated-union shapes for every inbound WhatsApp domain object the library exposes. Narrow via `switch` on the `type` discriminator; exhaustive switches with a `never` default branch catch any future variant added to the union.
+`@wats/types` ships discriminated-union shapes for every inbound WhatsApp domain object the types package exposes. Narrow via `switch` on the `type` discriminator; exhaustive switches with a `never` default branch catch any future variant added to the union.
 
 ## Config Types
 
@@ -7448,7 +7448,7 @@ WATS uses semantic versioning across published workspace packages.
 
 ## `0.x` development line
 
-The `0.x` line covers the public SDK while it expands toward full WhatsApp/pywa parity.
+The `0.x` line covers the public toolkit while it expands toward full WhatsApp/pywa parity.
 
 - Patch bump: documentation fixes, test-only changes, non-behavioral repo hygiene, or bug fixes that do not change public contracts.
 - Minor bump: any new public feature, endpoint family, package, CLI command, config schema field, standalone service route, persistence contract, or deployment artifact that defines supported behavior.
@@ -7611,8 +7611,16 @@ URL: https://wats.sh/docs
 
 WATS is a Bun-first TypeScript toolkit for the WhatsApp Cloud API. It ships as composable packages — Graph client, webhook adapter, typed routing, config, CLI, standalone service — not one monolithic framework. Take the parts you need.
 
+It is for TypeScript teams who want the WhatsApp Cloud API typed end to end and portable across Bun, Node, Workers, and Deno. Unlike pywa, WATS runs outside Python, types every Graph call and webhook update, and ships a Groups API with no pywa equivalent.
+
 - [Quickstart](/docs/quickstart) — install the packages and send your first message.
 - [Guide](/docs/guide) — the end-to-end walkthrough of clients, webhooks, and handlers.
 - [Reference](/docs/reference) — per-package API documentation.
 - [Parity](/docs/parity) — what is live-validated, shape-only, or planned against WhatsApp and pywa.
+
+## When not to use WATS
+
+- You already run pywa on Python and it covers your needs. WATS does not port your stack; it replaces it in TypeScript.
+- You need every endpoint live against Meta today. Much of the surface is shape-only, not yet live-validated — check [parity](/docs/parity) first.
+- You need a frozen API. The 0.x line still makes breaking changes.
 

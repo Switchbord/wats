@@ -6,6 +6,11 @@ The WhatsApp Cloud API, typed end to end. A set of composable TypeScript
 packages for Graph calls, webhook ingestion, typed routing, and a standalone
 service — Bun-first, portable to Node, Workers, and Deno.
 
+WATS is a TypeScript toolkit for the WhatsApp Cloud API. It is for TypeScript
+teams who want every Graph call and webhook update typed, portable across Bun,
+Node, Workers, and Deno. Unlike pywa, it runs outside Python and ships a Groups
+API with no pywa equivalent.
+
 Docs, an interactive playground, and the live parity matrix: **[wats.sh](https://wats.sh)**.
 
 ```ts
@@ -31,7 +36,7 @@ console.log(JSON.stringify(mock.requests, null, 2));
 ```
 
 Every client runs against a Transport seam. Swap in `createMockTransport` and
-the SDK captures the exact Graph request — method, path, payload — with no
+the toolkit captures the exact Graph request — method, path, payload — with no
 network. That is how the test suite, the playground, and a credential-free
 local workflow all work.
 

@@ -146,7 +146,7 @@ The facade binds a `GraphClient`, optional `PhoneNumberClient` / `WABAClient`, a
 
 1. `@wats/types` has no runtime dependencies.
 2. `@wats/graph`, `@wats/http`, and `@wats/crypto` expose portable seams and keep runtime-specific behavior behind adapters.
-3. `@wats/core` is the SDK composition root; app-layer packages compose it rather than duplicating router/webhook semantics.
+3. `@wats/core` is the core composition root; app-layer packages compose it rather than duplicating router/webhook semantics.
 4. `@wats/internal-utils` may be published only as an internal support package; `@wats/testing` stays private and is never published.
 5. Consumer fixtures import through package specifiers, never relative source paths.
 
