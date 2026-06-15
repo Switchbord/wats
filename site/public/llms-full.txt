@@ -6919,8 +6919,8 @@ Migration notes:
 | --- | --- | --- | --- |
 | pywa `initiate_call` / `accept_call` / `terminate_call` | WATS `PhoneNumberClient.initiateCall`, `.acceptCall`, `.terminateCall` | shape-only | Also includes `preAcceptCall` and `rejectCall`. |
 | call connect/status/terminate handlers | `normalizeWebhookEnvelope` calling variants plus `filtersTyped.call` | shape-only | Synthetic payloads only. |
-| call permission request/update | No complete WATS equivalent yet | planned | pywa has richer permission models and waiters. |
-| calling settings/SIP models | Read-only `getPhoneNumberSettings`; mutating settings planned | shape-only (read) | `includeSipCredentials` may return secret-bearing SIP material. |
+| call permission request/update | `getCallPermissions` typed permission/action/limit models; `call_permission_reply` webhook carries `isPermanent`/`responseSource` | shape-only | Waiters still planned; pywa also exposes permission waiters. |
+| calling settings/SIP models | Read via `getPhoneNumberSettings`; writes via the `calling` sub-object on `updatePhoneNumberSettings` (status, call hours, call icons, callback permission, SIP servers) | shape-only | `includeSipCredentials` may return secret-bearing SIP material; `sip_user_password` is never serialized into update bodies. |
 | live WebRTC/media orchestration | No first-class WATS equivalent yet | planned | Requires real calling-enabled phone numbers and explicit authorization. |
 
 ## Business and admin map
@@ -7080,7 +7080,7 @@ accepts the request and WATS parses the live response.
 | Flows | Flow management | List/get/create/update/publish/delete/deprecate/assets callables, bounded Flow JSON validation, response builders. | shape-only — live read returned empty; mutations never exercised. |
 | Flow hosting + encrypted exchange | richer Flow runtime | Not built. | planned. |
 | Calling | `initiate_call` etc. | Initiate/pre-accept/accept/reject/terminate callables, typed calling webhooks and filters. | shape-only — no live call sessions yet. |
-| Call permissions, calling-settings mutation + WebRTC | permission models, waiters, SIP/settings writes | Not built; only the settings read shape exists. | planned. |
+| Call permissions + calling-settings mutation | permission models, SIP/settings writes | `getCallPermissions` (typed permission/action/limit models), `calling` settings sub-object on `updatePhoneNumberSettings` (status, call hours, call icons, callback permission, SIP servers), `call_permission_reply` webhook fields (`isPermanent`, `responseSource`). | shape-only — no live calls; WebRTC/media orchestration still planned. |
 | Business/admin reads | `get_business_account` etc. | `getWabaInfo`, `listSubscribedApps`, `listPhoneNumbers`, `getPhoneNumberInfo`, `getBusinessProfile`, `getCommerceSettings`. | live-validated — all parsed live Graph v25.0. |
 | Phone-number settings read | settings getter | `getPhoneNumberSettings` (storage config, optional SIP credentials). | shape-only — not exercised in the live campaign. |
 | Business/admin mutations | profile/commerce/settings updates | `updateBusinessProfile`, `updateCommerceSettings`, `updatePhoneNumberSettings`, Block API, OBA/display-name helpers. | shape-only. |
