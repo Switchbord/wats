@@ -16,6 +16,13 @@ COPY package.json bun.lock* bunfig.toml* tsconfig*.json ./
 COPY packages/ ./packages/
 COPY scripts/ ./scripts/
 COPY examples/ ./examples/
+# The root package.json declares "site" as a Bun workspace member, so a
+# frozen-lockfile install fails ("Workspace not found \"site\"") unless the
+# member's manifest exists. The service image does NOT build the docs site, so
+# copy ONLY site/package.json (the manifest) to satisfy workspace resolution
+# without pulling the whole site tree. If you add another root workspace member,
+# its package.json must be copied here too (or the Railway build breaks silently).
+COPY site/package.json ./site/package.json
 RUN bun install --frozen-lockfile || bun install
 
 # Build all publishable packages (produces packages/*/dist).
