@@ -25,6 +25,56 @@ export {
 export { buildFlowJson, validateFlowJson } from "./flowJson.js";
 
 export {
+  FLOW_DSL_MAX_CONTROL_DEPTH,
+  calendarPicker,
+  checkboxGroup,
+  chipsSelector,
+  completeAction,
+  dataExchangeAction,
+  dataSource,
+  datePicker,
+  documentPicker,
+  dropdown,
+  embeddedLink,
+  flowJson,
+  footer,
+  form,
+  ifComponent,
+  image,
+  imageCarousel,
+  imageCarouselItem,
+  navigateAction,
+  navigationItem,
+  navigationList,
+  openUrlAction,
+  optIn,
+  photoPicker,
+  radioButtonsGroup,
+  richText,
+  screen,
+  singleColumnLayout,
+  switchComponent,
+  textArea,
+  textBody,
+  textCaption,
+  textHeading,
+  textInput,
+  textSubheading,
+  updateDataAction
+} from "./flowDsl.js";
+
+export type {
+  FlowJsonProps,
+  FormProps,
+  IfProps,
+  ImageCarouselItemProps,
+  NavigateActionProps,
+  NavigationItemProps,
+  ScreenProps,
+  SwitchProps
+} from "./flowDsl.js";
+
+export {
   buildFlowCloseResponse,
   buildFlowErrorResponse,
   buildFlowScreenResponse
