@@ -80,10 +80,35 @@ export {
   buildFlowScreenResponse
 } from "./dataExchange.js";
 
+export {
+  FLOW_DATA_CHANNEL_MAX_BYTES,
+  FLOW_ENDPOINT_STATUS,
+  FlowCryptoUnavailableError,
+  FlowRequestDecryptionError,
+  FlowSignatureError,
+  FlowTokenNoLongerValidError,
+  buildFlowErrorAckResponse,
+  buildFlowPingResponse,
+  decryptRequest,
+  encryptResponse,
+  flowRequestHasError,
+  handleFlowRequest
+} from "./dataChannel.js";
+
+export type {
+  DecryptedFlowRequest,
+  FlowEndpointResult,
+  FlowRequestHandler,
+  HandleFlowRequestOptions
+} from "./dataChannel.js";
+
 export type { GraphPaging } from "../wabaEndpoints.js";
 
 export type {
   CreateFlowBody,
+  EncryptedFlowRequest,
+  EncryptedFlowRequestInput,
+  EncryptedFlowRequestWire,
   FlowAssetDetails,
   FlowAssetsResponse,
   FlowCategory,
@@ -95,6 +120,9 @@ export type {
   FlowJson,
   FlowListResponse,
   FlowMutationResponse,
+  FlowRequest,
+  FlowRequestAction,
+  FlowResponsePayload,
   FlowScreenResponse,
   FlowScreenResponseInput,
   FlowStatus,

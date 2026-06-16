@@ -79,5 +79,8 @@
     "bun",
     "typescript",
     "wats"
-  ]
+  ],
+  "dependencies": {
+    "@wats/crypto": "^0.3.26"
+  }
 }
