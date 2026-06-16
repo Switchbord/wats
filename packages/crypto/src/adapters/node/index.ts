@@ -12,8 +12,14 @@
 import type { CryptoProvider } from "../../provider.js";
 import {
   CryptoProviderError,
+  InvalidBodyError,
+  InvalidKeyError,
   UnsupportedCapabilityError,
+  GCM_TAG_LENGTH,
+  assertAesGcmKey,
   assertFiniteLength,
+  assertGcmIv,
+  assertOptionalAad,
   assertUint8Array,
   assertValidBody,
   assertValidKey
@@ -23,10 +29,46 @@ interface NodeHmac {
   update(data: Uint8Array | string): { digest(): Uint8Array };
 }
 
+interface NodeKeyObject {
+  readonly type: string;
+}
+
+interface NodeDecipher {
+  setAuthTag(tag: Uint8Array): void;
+  update(data: Uint8Array): Uint8Array;
+  final(): Uint8Array;
+}
+
+interface NodeCipher {
+  update(data: Uint8Array): Uint8Array;
+  final(): Uint8Array;
+  getAuthTag(): Uint8Array;
+}
+
 interface NodeCryptoModule {
   createHmac(algorithm: string, key: Uint8Array | string): NodeHmac;
   timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean;
   randomBytes(size: number): Uint8Array;
+  privateDecrypt(
+    options: {
+      key: NodeKeyObject;
+      padding: number;
+      oaepHash: string;
+    },
+    buffer: Uint8Array
+  ): Uint8Array;
+  createPrivateKey(input: unknown): NodeKeyObject;
+  createDecipheriv(
+    algorithm: string,
+    key: Uint8Array,
+    iv: Uint8Array
+  ): NodeDecipher;
+  createCipheriv(
+    algorithm: string,
+    key: Uint8Array,
+    iv: Uint8Array
+  ): NodeCipher;
+  readonly constants: { readonly RSA_PKCS1_OAEP_PADDING: number };
 }
 
 const MAX_RANDOM_BYTES = 1_048_576;
@@ -96,12 +138,152 @@ export async function createNodeCryptoProvider(): Promise<CryptoProvider> {
     return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength).slice();
   }
 
+  // Build a Node KeyObject from a JWK or a PEM key (string or its UTF-8
+  // bytes in a Uint8Array). Any failure is mapped to InvalidKeyError so a
+  // raw node error never escapes.
+  function toPrivateKeyObject(
+    privateKey: JsonWebKey | Uint8Array
+  ): NodeKeyObject {
+    try {
+      if (privateKey instanceof Uint8Array) {
+        const pem = new TextDecoder().decode(privateKey);
+        return nodeCrypto.createPrivateKey({ key: pem, format: "pem" } as unknown);
+      }
+      if (
+        privateKey !== null &&
+        typeof privateKey === "object" &&
+        !Array.isArray(privateKey)
+      ) {
+        return nodeCrypto.createPrivateKey({
+          key: privateKey,
+          format: "jwk"
+        } as unknown);
+      }
+      throw new InvalidKeyError(
+        "rsaOaepDecrypt privateKey must be a PEM string/Uint8Array or a JsonWebKey"
+      );
+    } catch (err) {
+      if (err instanceof CryptoProviderError) throw err;
+      throw new InvalidKeyError(
+        `rsaOaepDecrypt could not import private key: ${stringifyError(err)}`,
+        { cause: err }
+      );
+    }
+  }
+
+  async function rsaOaepDecrypt(
+    privateKey: JsonWebKey | Uint8Array,
+    ciphertext: Uint8Array
+  ): Promise<Uint8Array> {
+    assertUint8Array(ciphertext, "rsaOaepDecrypt `ciphertext`");
+    const keyObject = toPrivateKeyObject(privateKey);
+    try {
+      const out = nodeCrypto.privateDecrypt(
+        {
+          key: keyObject,
+          padding: nodeCrypto.constants.RSA_PKCS1_OAEP_PADDING,
+          oaepHash: "sha256"
+        },
+        ciphertext
+      );
+      return new Uint8Array(out.buffer, out.byteOffset, out.byteLength).slice();
+    } catch (err) {
+      // A ciphertext that does not decrypt under the key (wrong key, wrong
+      // padding, corrupted bytes) surfaces as a body problem, not a key one.
+      throw new InvalidBodyError(
+        `rsaOaepDecrypt failed: ciphertext could not be decrypted`,
+        { cause: err }
+      );
+    }
+  }
+
+  function algoForBits(bits: 128 | 256): string {
+    return bits === 128 ? "aes-128-gcm" : "aes-256-gcm";
+  }
+
+  async function aesGcmDecrypt(
+    key: Uint8Array,
+    iv: Uint8Array,
+    ciphertext: Uint8Array,
+    aad?: Uint8Array
+  ): Promise<Uint8Array> {
+    const bits = assertAesGcmKey(key);
+    assertGcmIv(iv);
+    assertUint8Array(ciphertext, "aesGcmDecrypt `ciphertext`");
+    assertOptionalAad(aad);
+    // CONTRACT: the auth tag is the LAST 16 bytes of `ciphertext`.
+    if (ciphertext.byteLength < GCM_TAG_LENGTH) {
+      throw new InvalidBodyError(
+        `aesGcmDecrypt ciphertext must be at least ${GCM_TAG_LENGTH} bytes (tag); got ${ciphertext.byteLength}`
+      );
+    }
+    const body = ciphertext.subarray(0, ciphertext.byteLength - GCM_TAG_LENGTH);
+    const tag = ciphertext.subarray(ciphertext.byteLength - GCM_TAG_LENGTH);
+    try {
+      const decipher = nodeCrypto.createDecipheriv(algoForBits(bits), key, iv);
+      if (aad !== undefined && aad.byteLength > 0) {
+        (decipher as unknown as { setAAD(a: Uint8Array): void }).setAAD(aad);
+      }
+      decipher.setAuthTag(tag);
+      const head = decipher.update(body);
+      const tail = decipher.final();
+      return concatBytes(head, tail);
+    } catch (err) {
+      // Auth-tag mismatch, bad IV length rejected by node, or malformed body.
+      throw new InvalidBodyError(
+        `aesGcmDecrypt failed: authentication or decryption error`,
+        { cause: err }
+      );
+    }
+  }
+
+  async function aesGcmEncrypt(
+    key: Uint8Array,
+    iv: Uint8Array,
+    plaintext: Uint8Array,
+    aad?: Uint8Array
+  ): Promise<{ ciphertext: Uint8Array; authTag: Uint8Array }> {
+    const bits = assertAesGcmKey(key);
+    assertGcmIv(iv);
+    assertUint8Array(plaintext, "aesGcmEncrypt `plaintext`");
+    assertOptionalAad(aad);
+    try {
+      const cipher = nodeCrypto.createCipheriv(algoForBits(bits), key, iv);
+      if (aad !== undefined && aad.byteLength > 0) {
+        (cipher as unknown as { setAAD(a: Uint8Array): void }).setAAD(aad);
+      }
+      const head = cipher.update(plaintext);
+      const tail = cipher.final();
+      const tag = cipher.getAuthTag();
+      return {
+        ciphertext: concatBytes(head, tail),
+        authTag: new Uint8Array(tag.buffer, tag.byteOffset, tag.byteLength).slice()
+      };
+    } catch (err) {
+      throw new InvalidBodyError(`aesGcmEncrypt failed: ${stringifyError(err)}`, {
+        cause: err
+      });
+    }
+  }
+
   return {
     name: "node",
     hmacSha256,
     timingSafeEqual,
-    randomBytes
+    randomBytes,
+    rsaOaepDecrypt,
+    aesGcmDecrypt,
+    aesGcmEncrypt
   };
+}
+
+// Concatenate two Node Buffers / Uint8Arrays into a plain Uint8Array,
+// severing any Buffer identity at the seam.
+function concatBytes(a: Uint8Array, b: Uint8Array): Uint8Array {
+  const out = new Uint8Array(a.byteLength + b.byteLength);
+  out.set(a, 0);
+  out.set(b, a.byteLength);
+  return out;
 }
 
 function stringifyError(err: unknown): string {

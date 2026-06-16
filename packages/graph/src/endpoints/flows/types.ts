@@ -140,3 +140,59 @@ export interface FlowErrorResponse {
   readonly error_message?: string;
   readonly flow_token?: string;
 }
+
+// ── WATS-76 slice B: encrypted data-channel runtime types ───────────────────
+
+/**
+ * Decrypted Flow request action verbs. Meta sends INIT/BACK uppercase and
+ * data_exchange/navigate/ping lowercase (see REFERENCE-76 §B.4).
+ */
+export type FlowRequestAction =
+  | "INIT"
+  | "BACK"
+  | "data_exchange"
+  | "navigate"
+  | "ping";
+
+/**
+ * The encrypted request envelope as it arrives from Meta. The wire payload
+ * uses snake_case keys (`encrypted_flow_data` / `encrypted_aes_key` /
+ * `initial_vector`); we also accept the camelCase form so callers that have
+ * already normalised the body can pass it straight through. All three values
+ * are base64-encoded strings.
+ */
+export interface EncryptedFlowRequest {
+  readonly encryptedFlowData: string;
+  readonly encryptedAesKey: string;
+  readonly initialVector: string;
+}
+
+export interface EncryptedFlowRequestWire {
+  readonly encrypted_flow_data: string;
+  readonly encrypted_aes_key: string;
+  readonly initial_vector: string;
+}
+
+export type EncryptedFlowRequestInput =
+  | EncryptedFlowRequest
+  | EncryptedFlowRequestWire;
+
+/**
+ * A decrypted Flow data-channel request, normalised to camelCase. `screen`
+ * is omitted when Meta sends `""`; `data` is omitted when Meta sends `{}`.
+ */
+export interface FlowRequest {
+  readonly version: string;
+  readonly action: FlowRequestAction;
+  readonly flowToken?: string;
+  readonly screen?: string;
+  readonly data?: Record<string, unknown>;
+}
+
+/**
+ * The plaintext object that gets encrypted into the HTTP response body. This
+ * is the JSON-serialisable shape produced by the response builders in
+ * dataExchange.ts (screen / close / error) plus the ping and error-ack
+ * wrappers. Kept loose because the runtime only stringifies it.
+ */
+export type FlowResponsePayload = Record<string, unknown>;

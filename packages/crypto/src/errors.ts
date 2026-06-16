@@ -135,3 +135,66 @@ function describeType(value: unknown): string {
   if (value instanceof Uint8Array) return "Uint8Array";
   return typeof value;
 }
+
+// --- AES-GCM shared validation -------------------------------------------
+//
+// The GCM auth tag is always 16 bytes (128-bit) for the Flow scheme. Both
+// adapters share these helpers so their public contracts stay identical:
+// AES-128-GCM vs AES-256-GCM is selected purely by key byte length.
+
+export const GCM_TAG_LENGTH = 16;
+
+// Reasonable upper bound on the GCM IV/nonce so a hostile caller can't pass a
+// pathological buffer; 12-byte (96-bit) nonces are standard, 16-byte nonces are
+// used by the Flow scheme, and Node/WebCrypto both accept these.
+const MAX_GCM_IV_BYTES = 256;
+
+/**
+ * Validate an AES-GCM key and return its strength in bits (128 or 256).
+ * Throws InvalidKeyError for anything other than a 16- or 32-byte Uint8Array.
+ */
+export function assertAesGcmKey(key: unknown): 128 | 256 {
+  if (!(key instanceof Uint8Array)) {
+    throw new InvalidKeyError(
+      `AES-GCM key must be a Uint8Array; got ${describeType(key)}`
+    );
+  }
+  if (key.byteLength === 16) return 128;
+  if (key.byteLength === 32) return 256;
+  throw new InvalidKeyError(
+    `AES-GCM key must be 16 bytes (AES-128) or 32 bytes (AES-256); got ${key.byteLength}`
+  );
+}
+
+/**
+ * Validate an AES-GCM IV/nonce. Throws InvalidLengthError for a non-Uint8Array,
+ * an empty IV, or an absurdly large IV.
+ */
+export function assertGcmIv(iv: unknown): asserts iv is Uint8Array {
+  if (!(iv instanceof Uint8Array)) {
+    throw new InvalidLengthError(
+      `AES-GCM iv must be a Uint8Array; got ${describeType(iv)}`
+    );
+  }
+  if (iv.byteLength === 0) {
+    throw new InvalidLengthError("AES-GCM iv must be non-empty");
+  }
+  if (iv.byteLength > MAX_GCM_IV_BYTES) {
+    throw new InvalidLengthError(
+      `AES-GCM iv must be at most ${MAX_GCM_IV_BYTES} bytes; got ${iv.byteLength}`
+    );
+  }
+}
+
+/**
+ * Validate optional AES-GCM AAD. Throws InvalidBodyError if present but not a
+ * Uint8Array.
+ */
+export function assertOptionalAad(aad: unknown): asserts aad is Uint8Array | undefined {
+  if (aad === undefined) return;
+  if (!(aad instanceof Uint8Array)) {
+    throw new InvalidBodyError(
+      `AES-GCM aad must be a Uint8Array when provided; got ${describeType(aad)}`
+    );
+  }
+}

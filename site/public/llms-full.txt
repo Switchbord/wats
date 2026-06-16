@@ -6910,7 +6910,8 @@ Migration notes:
 | update metadata / JSON | `updateFlowMetadata`, `updateFlowJson` | shape-only | Flow JSON validation is bounded and descriptor-safe. |
 | delete / deprecate / assets | `deleteFlow`, `deprecateFlow`, `getFlowAssets` | shape-only | Delete/deprecate only resources created by the test run. |
 | Flow response builders | `buildFlowScreenResponse`, `buildFlowCloseResponse`, `buildFlowErrorResponse` | shape-only | Local data-exchange response construction only. |
-| encrypted Flow request decrypt/encrypt and Flow hosting | No first-class WATS runtime yet | planned | |
+| pywa FlowJSON dataclasses | typed DSL builders (`flowJson`, `screen`, `singleColumnLayout`, `form`, every component + action builder) | shape-only | camelCase builders serialize to the hyphenated FlowJSON wire shape; output passes `validateFlowJson`. |
+| encrypted Flow request decrypt/encrypt | `decryptRequest` / `encryptResponse` / `handleFlowRequest` (RSA-OAEP + AES-GCM, IV-flip response), backed by `@wats/crypto` | shape-only | Local crypto round-trip; no hosted endpoint. Media-upload (CBC+HMAC) decryption still planned. |
 | Flow metrics / migration | No first-class WATS helper yet | planned | Credentialed and account-dependent. |
 
 ## Calling map
@@ -7077,8 +7078,8 @@ accepts the request and WATS parses the live response.
 | Media runtime | media helpers | `uploadMedia`, `downloadMedia`, `downloadMediaBytes`, `deleteMedia`, `decryptEncryptedMedia`, upload sessions. | live-validated — upload/metadata/send/delete passed live; decrypt and sessions shape-only. |
 | Template send | `send_template` | `sendTemplate` with parameter-count validation; `sendMarketingTemplate` for marketing messages. | live-validated — approved-template send produced the full sent/delivered/read chain; marketing send shape-only. |
 | Template management | `create_template` etc. | List/create/get/update/delete callables, component builders, template-group analytics. | live-validated for list reads; mutations shape-only. |
-| Flows | Flow management | List/get/create/update/publish/delete/deprecate/assets callables, bounded Flow JSON validation, response builders. | shape-only — live read returned empty; mutations never exercised. |
-| Flow hosting + encrypted exchange | richer Flow runtime | Not built. | planned. |
+| Flows | Flow management | List/get/create/update/publish/delete/deprecate/assets callables, bounded Flow JSON validation, typed FlowJSON DSL builders (screens/components/actions), response builders. | shape-only — live read returned empty; mutations never exercised. |
+| Flow encrypted data-channel | richer Flow runtime | `decryptRequest`/`encryptResponse` (RSA-OAEP + AES-GCM, IV-flip response) and a framework-agnostic `handleFlowRequest` dispatch (ping/error-ack/close), backed by `@wats/crypto`. | shape-only — local crypto round-trip; no hosted endpoint or live publish. Media-upload (CBC+HMAC) decryption still planned. |
 | Calling | `initiate_call` etc. | Initiate/pre-accept/accept/reject/terminate callables, typed calling webhooks and filters. | shape-only — no live call sessions yet. |
 | Call permissions + calling-settings mutation | permission models, SIP/settings writes | `getCallPermissions` (typed permission/action/limit models), `calling` settings sub-object on `updatePhoneNumberSettings` (status, call hours, call icons, callback permission, SIP servers), `call_permission_reply` webhook fields (`isPermanent`, `responseSource`). | shape-only — no live calls; WebRTC/media orchestration still planned. |
 | Business/admin reads | `get_business_account` etc. | `getWabaInfo`, `listSubscribedApps`, `listPhoneNumbers`, `getPhoneNumberInfo`, `getBusinessProfile`, `getCommerceSettings`. | live-validated — all parsed live Graph v25.0. |

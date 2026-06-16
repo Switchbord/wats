@@ -2,7 +2,11 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true
+    "exactOptionalPropertyTypes": true,
+    "paths": {
+      "@wats/crypto": ["../crypto/src/index.ts"],
+      "@wats/crypto/*": ["../crypto/src/*"]
+    }
   },
   "include": ["src"]
 }

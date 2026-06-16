@@ -101,7 +101,8 @@ Migration notes:
 | update metadata / JSON | `updateFlowMetadata`, `updateFlowJson` | shape-only | Flow JSON validation is bounded and descriptor-safe. |
 | delete / deprecate / assets | `deleteFlow`, `deprecateFlow`, `getFlowAssets` | shape-only | Delete/deprecate only resources created by the test run. |
 | Flow response builders | `buildFlowScreenResponse`, `buildFlowCloseResponse`, `buildFlowErrorResponse` | shape-only | Local data-exchange response construction only. |
-| encrypted Flow request decrypt/encrypt and Flow hosting | No first-class WATS runtime yet | planned | |
+| pywa FlowJSON dataclasses | typed DSL builders (`flowJson`, `screen`, `singleColumnLayout`, `form`, every component + action builder) | shape-only | camelCase builders serialize to the hyphenated FlowJSON wire shape; output passes `validateFlowJson`. |
+| encrypted Flow request decrypt/encrypt | `decryptRequest` / `encryptResponse` / `handleFlowRequest` (RSA-OAEP + AES-GCM, IV-flip response), backed by `@wats/crypto` | shape-only | Local crypto round-trip; no hosted endpoint. Media-upload (CBC+HMAC) decryption still planned. |
 | Flow metrics / migration | No first-class WATS helper yet | planned | Credentialed and account-dependent. |
 
 ## Calling map

@@ -8,8 +8,14 @@
 import type { CryptoProvider } from "../../provider.js";
 import {
   CryptoProviderError,
+  InvalidBodyError,
+  InvalidKeyError,
   UnsupportedCapabilityError,
+  GCM_TAG_LENGTH,
+  assertAesGcmKey,
   assertFiniteLength,
+  assertGcmIv,
+  assertOptionalAad,
   assertUint8Array,
   assertValidBody,
   assertValidKey
@@ -100,12 +106,200 @@ export async function createWebCryptoProvider(): Promise<CryptoProvider> {
     return out;
   }
 
+  // Import an RSA-OAEP (SHA-256) private key for decryption. Accepts a JWK or
+  // a PEM-encoded PKCS#8 key (string bytes in a Uint8Array). Any failure maps
+  // to InvalidKeyError so a raw SubtleCrypto/DOMException never escapes.
+  async function importRsaPrivateKey(
+    privateKey: JsonWebKey | Uint8Array
+  ): Promise<CryptoKey> {
+    try {
+      if (privateKey instanceof Uint8Array) {
+        const der = pemToDer(new TextDecoder().decode(privateKey));
+        return await subtle.importKey(
+          "pkcs8",
+          der as BufferSource,
+          { name: "RSA-OAEP", hash: "SHA-256" },
+          false,
+          ["decrypt"]
+        );
+      }
+      if (
+        privateKey !== null &&
+        typeof privateKey === "object" &&
+        !Array.isArray(privateKey)
+      ) {
+        return await subtle.importKey(
+          "jwk",
+          privateKey,
+          { name: "RSA-OAEP", hash: "SHA-256" },
+          false,
+          ["decrypt"]
+        );
+      }
+      throw new InvalidKeyError(
+        "rsaOaepDecrypt privateKey must be a PEM string/Uint8Array or a JsonWebKey"
+      );
+    } catch (err) {
+      if (err instanceof CryptoProviderError) throw err;
+      throw new InvalidKeyError(
+        `rsaOaepDecrypt could not import private key: ${stringifyError(err)}`,
+        { cause: err }
+      );
+    }
+  }
+
+  async function rsaOaepDecrypt(
+    privateKey: JsonWebKey | Uint8Array,
+    ciphertext: Uint8Array
+  ): Promise<Uint8Array> {
+    assertUint8Array(ciphertext, "rsaOaepDecrypt `ciphertext`");
+    const key = await importRsaPrivateKey(privateKey);
+    try {
+      const plain = await subtle.decrypt(
+        { name: "RSA-OAEP" },
+        key,
+        ciphertext as BufferSource
+      );
+      return new Uint8Array(plain);
+    } catch (err) {
+      throw new InvalidBodyError(
+        "rsaOaepDecrypt failed: ciphertext could not be decrypted",
+        { cause: err }
+      );
+    }
+  }
+
+  async function importAesKey(
+    key: Uint8Array,
+    usage: "encrypt" | "decrypt"
+  ): Promise<CryptoKey> {
+    // Key length already validated (16 or 32 bytes) by assertAesGcmKey;
+    // WebCrypto selects AES-128 vs AES-256-GCM from the raw key length.
+    try {
+      return await subtle.importKey("raw", key as BufferSource, "AES-GCM", false, [
+        usage
+      ]);
+    } catch (err) {
+      throw new InvalidKeyError(
+        `aesGcm importKey failed: ${stringifyError(err)}`,
+        { cause: err }
+      );
+    }
+  }
+
+  async function aesGcmDecrypt(
+    key: Uint8Array,
+    iv: Uint8Array,
+    ciphertext: Uint8Array,
+    aad?: Uint8Array
+  ): Promise<Uint8Array> {
+    assertAesGcmKey(key);
+    assertGcmIv(iv);
+    assertUint8Array(ciphertext, "aesGcmDecrypt `ciphertext`");
+    assertOptionalAad(aad);
+    // CONTRACT: the auth tag is the LAST 16 bytes of `ciphertext`. WebCrypto's
+    // AES-GCM decrypt expects the ciphertext WITH the tag appended, which is
+    // exactly the contract's input shape — so we pass `ciphertext` through.
+    if (ciphertext.byteLength < GCM_TAG_LENGTH) {
+      throw new InvalidBodyError(
+        `aesGcmDecrypt ciphertext must be at least ${GCM_TAG_LENGTH} bytes (tag); got ${ciphertext.byteLength}`
+      );
+    }
+    const cryptoKey = await importAesKey(key, "decrypt");
+    try {
+      const params: AesGcmParams = {
+        name: "AES-GCM",
+        iv: iv as BufferSource,
+        tagLength: GCM_TAG_LENGTH * 8
+      };
+      if (aad !== undefined && aad.byteLength > 0) {
+        params.additionalData = aad as BufferSource;
+      }
+      const plain = await subtle.decrypt(
+        params,
+        cryptoKey,
+        ciphertext as BufferSource
+      );
+      return new Uint8Array(plain);
+    } catch (err) {
+      throw new InvalidBodyError(
+        "aesGcmDecrypt failed: authentication or decryption error",
+        { cause: err }
+      );
+    }
+  }
+
+  async function aesGcmEncrypt(
+    key: Uint8Array,
+    iv: Uint8Array,
+    plaintext: Uint8Array,
+    aad?: Uint8Array
+  ): Promise<{ ciphertext: Uint8Array; authTag: Uint8Array }> {
+    assertAesGcmKey(key);
+    assertGcmIv(iv);
+    assertUint8Array(plaintext, "aesGcmEncrypt `plaintext`");
+    assertOptionalAad(aad);
+    const cryptoKey = await importAesKey(key, "encrypt");
+    try {
+      const params: AesGcmParams = {
+        name: "AES-GCM",
+        iv: iv as BufferSource,
+        tagLength: GCM_TAG_LENGTH * 8
+      };
+      if (aad !== undefined && aad.byteLength > 0) {
+        params.additionalData = aad as BufferSource;
+      }
+      // WebCrypto returns ciphertext WITH the 16-byte tag appended; split it
+      // into the separate { ciphertext, authTag } shape of the public contract.
+      const combined = new Uint8Array(
+        await subtle.encrypt(params, cryptoKey, plaintext as BufferSource)
+      );
+      const split = combined.byteLength - GCM_TAG_LENGTH;
+      return {
+        ciphertext: combined.slice(0, split),
+        authTag: combined.slice(split)
+      };
+    } catch (err) {
+      throw new InvalidBodyError(`aesGcmEncrypt failed: ${stringifyError(err)}`, {
+        cause: err
+      });
+    }
+  }
+
   return {
     name: "webcrypto",
     hmacSha256,
     timingSafeEqual,
-    randomBytes
+    randomBytes,
+    rsaOaepDecrypt,
+    aesGcmDecrypt,
+    aesGcmEncrypt
   };
+}
+
+// Convert a PEM-encoded key (PKCS#8 "BEGIN PRIVATE KEY") into raw DER bytes.
+// Throws InvalidKeyError on a malformed PEM so a raw atob/TypeError never
+// escapes the public surface.
+function pemToDer(pem: string): Uint8Array {
+  const match = pem.match(
+    /-----BEGIN [^-]+-----([\s\S]+?)-----END [^-]+-----/
+  );
+  if (match === null) {
+    throw new InvalidKeyError("rsaOaepDecrypt PEM is missing BEGIN/END markers");
+  }
+  const b64 = (match[1] ?? "").replace(/[\r\n\s]/g, "");
+  try {
+    const binary = atob(b64);
+    const out = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      out[i] = binary.charCodeAt(i);
+    }
+    return out;
+  } catch (err) {
+    throw new InvalidKeyError("rsaOaepDecrypt PEM body is not valid base64", {
+      cause: err
+    });
+  }
 }
 
 function stringifyError(err: unknown): string {
