@@ -179,7 +179,7 @@ describe("WATS-152 slice 1 PhoneNumberClient.uploadAndSend* helpers", () => {
     });
     const videoRes = await videoPnc.uploadAndSendVideo({
       to: "15551230000",
-      file: new Blob([0, 0, 1]),
+      file: new Blob([new Uint8Array([0, 0, 1])]),
       mimeType: "video/mp4"
     });
     expect(
