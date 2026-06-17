@@ -110,6 +110,53 @@ function makeReplyToSentMessage(sentMessageId = "wamid.START", from = "155512300
   };
 }
 
+function makeInteractiveReply(
+  replyType: "button_reply" | "list_reply" | "nfm_reply",
+  sentMessageId = "wamid.START",
+  from = "15551230000"
+): TypedMessageUpdate {
+  const interactive = replyType === "button_reply"
+    ? { type: "button_reply" as const, buttonReply: { id: "btn-1", title: "Yes" } }
+    : replyType === "list_reply"
+      ? { type: "list_reply" as const, listReply: { id: "row-1", title: "Row", description: "Desc" } }
+      : { type: "nfm_reply" as const, nfmReply: { responseJson: "{\"done\":true}", body: "Done", name: "flow" } };
+  return {
+    kind: "message",
+    updateId: `wamid.${replyType}`,
+    phoneNumberId: "1234567890",
+    wabaId: "WABA-Z",
+    receivedAt: 2,
+    message: {
+      from,
+      id: `wamid.${replyType}`,
+      timestamp: "2",
+      type: "interactive",
+      interactive,
+      context: { messageId: sentMessageId, from: "1234567890" }
+    } as TypedMessageUpdate["message"],
+    rawChange: { field: "messages", value: {} } as TypedMessageUpdate["rawChange"]
+  };
+}
+
+function makeQuickReplyButton(sentMessageId = "wamid.START", from = "15551230000"): TypedMessageUpdate {
+  return {
+    kind: "message",
+    updateId: "wamid.BUTTON",
+    phoneNumberId: "1234567890",
+    wabaId: "WABA-Z",
+    receivedAt: 2,
+    message: {
+      from,
+      id: "wamid.BUTTON",
+      timestamp: "2",
+      type: "button",
+      button: { text: "Yes", payload: "btn-1" },
+      context: { messageId: sentMessageId, from: "1234567890" }
+    } as TypedMessageUpdate["message"],
+    rawChange: { field: "messages", value: {} } as TypedMessageUpdate["rawChange"]
+  };
+}
+
 function makeSentStatus(status: "sent" | "delivered" | "read" | "failed", id = "wamid.START", recipientId = "15551230000"): TypedStatusUpdate {
   return {
     kind: "status",
@@ -131,6 +178,9 @@ interface WaitableSentResultForTest {
   readonly messages?: Array<{ readonly id: string }>;
   readonly contacts?: Array<{ readonly wa_id?: string }>;
   waitForReply(options?: { timeoutMs?: number; signal?: AbortSignal }): Promise<TypedMessageUpdate>;
+  waitForClick(options?: { timeoutMs?: number; signal?: AbortSignal }): Promise<TypedMessageUpdate>;
+  waitForSelection(options?: { timeoutMs?: number; signal?: AbortSignal }): Promise<TypedMessageUpdate>;
+  waitForFlowCompletion(options?: { timeoutMs?: number; signal?: AbortSignal }): Promise<TypedMessageUpdate>;
   waitUntilDelivered(options?: { timeoutMs?: number; signal?: AbortSignal }): Promise<TypedStatusUpdate>;
   waitUntilRead(options?: { timeoutMs?: number; signal?: AbortSignal }): Promise<TypedStatusUpdate>;
   waitUntilFailed(options?: { timeoutMs?: number; signal?: AbortSignal }): Promise<TypedStatusUpdate>;
@@ -362,9 +412,100 @@ describe("WATS-78 WhatsApp sent-result waiters", () => {
 
     expect(sent.messages?.[0]?.id).toBe("wamid.START");
     expect(typeof sent.waitForReply).toBe("function");
+    expect(typeof sent.waitForClick).toBe("function");
+    expect(typeof sent.waitForSelection).toBe("function");
+    expect(typeof sent.waitForFlowCompletion).toBe("function");
     expect(typeof sent.waitUntilDelivered).toBe("function");
     expect(typeof sent.waitUntilRead).toBe("function");
     expect(typeof sent.waitUntilFailed).toBe("function");
+  });
+
+  test("waitForClick resolves on interactive button replies and ignores mismatched recipient/context", async () => {
+    const { graphClient } = makeGraphClientWithHandle();
+    const wa = new WhatsApp({ graphClient, phoneNumberId: "1234567890" });
+    const sent = await startChatOf(wa)({ to: "15551230000", text: "hello" }) as WaitableSentResultForTest;
+
+    const promise = sent.waitForClick({ timeoutMs: 100 });
+    await wa.dispatch(makeInteractiveReply("button_reply", "other-message", "15551230000"));
+    expect(wa.activeListenerCount).toBe(1);
+    await wa.dispatch(makeInteractiveReply("button_reply", "wamid.START", "15559990000"));
+    expect(wa.activeListenerCount).toBe(1);
+    await wa.dispatch(makeInteractiveReply("button_reply", "wamid.START", "15551230000"));
+
+    const update = await promise;
+    if (update.message.type !== "interactive") throw new Error(`expected interactive, got ${update.message.type}`);
+    expect(update.message.interactive.type).toBe("button_reply");
+    expect(wa.activeListenerCount).toBe(0);
+  });
+
+  test("waitForClick also resolves on quick-reply button messages", async () => {
+    const { graphClient } = makeGraphClientWithHandle();
+    const wa = new WhatsApp({ graphClient, phoneNumberId: "1234567890" });
+    const sent = await startChatOf(wa)({ to: "15551230000", text: "hello" }) as WaitableSentResultForTest;
+
+    const promise = sent.waitForClick({ timeoutMs: 100 });
+    await wa.dispatch(makeQuickReplyButton("wamid.START", "15551230000"));
+    const update = await promise;
+    expect(update.message.type).toBe("button");
+    expect(wa.activeListenerCount).toBe(0);
+  });
+
+  test("waitForSelection resolves on list replies only", async () => {
+    const { graphClient } = makeGraphClientWithHandle();
+    const wa = new WhatsApp({ graphClient, phoneNumberId: "1234567890" });
+    const sent = await startChatOf(wa)({ to: "15551230000", text: "hello" }) as WaitableSentResultForTest;
+
+    const promise = sent.waitForSelection({ timeoutMs: 100 });
+    await wa.dispatch(makeInteractiveReply("button_reply", "wamid.START", "15551230000"));
+    expect(wa.activeListenerCount).toBe(1);
+    await wa.dispatch(makeInteractiveReply("list_reply", "wamid.START", "15551230000"));
+    const update = await promise;
+    if (update.message.type !== "interactive") throw new Error(`expected interactive, got ${update.message.type}`);
+    expect(update.message.interactive.type).toBe("list_reply");
+    expect(wa.activeListenerCount).toBe(0);
+  });
+
+  test("waitForFlowCompletion resolves on nfm replies only", async () => {
+    const { graphClient } = makeGraphClientWithHandle();
+    const wa = new WhatsApp({ graphClient, phoneNumberId: "1234567890" });
+    const sent = await startChatOf(wa)({ to: "15551230000", text: "hello" }) as WaitableSentResultForTest;
+
+    const promise = sent.waitForFlowCompletion({ timeoutMs: 100 });
+    await wa.dispatch(makeInteractiveReply("list_reply", "wamid.START", "15551230000"));
+    expect(wa.activeListenerCount).toBe(1);
+    await wa.dispatch(makeInteractiveReply("nfm_reply", "wamid.START", "15551230000"));
+    const update = await promise;
+    if (update.message.type !== "interactive") throw new Error(`expected interactive, got ${update.message.type}`);
+    expect(update.message.interactive.type).toBe("nfm_reply");
+    expect(wa.activeListenerCount).toBe(0);
+  });
+
+  test("interaction waiters support timeout and abort cleanup", async () => {
+    const { graphClient } = makeGraphClientWithHandle();
+    const wa = new WhatsApp({ graphClient, phoneNumberId: "1234567890" });
+    const sent = await startChatOf(wa)({ to: "15551230000", text: "hello" }) as WaitableSentResultForTest;
+
+    let timeoutErr: unknown;
+    try {
+      await sent.waitForSelection({ timeoutMs: 20 });
+    } catch (error) {
+      timeoutErr = error;
+    }
+    expect(timeoutErr).toBeInstanceOf(ListenerTimeoutError);
+    expect(wa.activeListenerCount).toBe(0);
+
+    const ctl = new AbortController();
+    const aborted = sent.waitForFlowCompletion({ signal: ctl.signal });
+    expect(wa.activeListenerCount).toBe(1);
+    ctl.abort();
+    let abortErr: unknown;
+    try {
+      await aborted;
+    } catch (error) {
+      abortErr = error;
+    }
+    expect(abortErr).toBeInstanceOf(ListenerAbortError);
+    expect(wa.activeListenerCount).toBe(0);
   });
 
   test("waitForReply resolves only when an inbound message replies to the sent message from the observed recipient", async () => {
