@@ -6966,7 +6966,7 @@ Migration differences:
 
 - WATS `TypedRouter.on(...)` returns a registration handle with `unregister()` instead of pywa decorator registration.
 - WATS handlers receive `TypedUpdate` variants rather than pywa Python classes.
-- WATS `wa.listen(...)` is the lower-level one-shot listener primitive. For text starts, `WhatsApp.startChat(...)` returns a waitable result with `waitForReply`, `waitUntilDelivered`, `waitUntilRead`, and `waitUntilFailed`, all backed by observed webhook updates through the listener registry. pywa waits for clicks/completions and broader send helpers remain planned.
+- WATS `wa.listen(...)` is the lower-level one-shot listener primitive. For text starts, `WhatsApp.startChat(...)` returns a waitable result with `waitForReply`, `waitForClick`, `waitForSelection`, `waitForFlowCompletion`, `waitUntilDelivered`, `waitUntilRead`, and `waitUntilFailed`, all backed by observed webhook updates through the listener registry. Broader send helpers remain planned.
 - WATS filters use function composition (`and`, `or`, `not`, `custom`) rather than Python `&`, `|`, and `~` operators.
 - WATS deep-normalizes common inbound message body families and adds typed filters for media, location, reaction, interactive button/list/nfm Flow-completion replies, and quick-reply buttons. This covers the most common `@wa.on_callback_button`, `@wa.on_callback_selection`, and `@wa.on_flow_completion` migration paths while keeping the update kind as `"message"`.
 - `user_preferences` maps to `TypedUserPreferencesUpdate` plus `filtersTyped.userPreferences`; `system` maps phone/identity changes to `TypedSystemUpdate` plus `filtersTyped.system`; `chat_opened` maps `REQUEST_WELCOME` to `TypedChatOpenedUpdate` plus `filtersTyped.chatOpened`.
@@ -7021,7 +7021,7 @@ Migration notes:
 Do not migrate code assuming WATS already has pywa parity for:
 
 - pywa's full decorator and handler taxonomy for callback selections/buttons, Flow request sub-actions, user marketing preferences, phone-number changes, and identity changes.
-- pywa sent-update waiters beyond `startChat` (`wait_for_selection`, `wait_for_completion`, call permission waits, and broader composer helpers).
+- pywa sent-update waiters beyond the process-local `startChat` surface (call permission waits and broader composer helpers).
 - pywa's broad filter catalog: commands, MIME/extension filters, location radius, per-error-code status filters, user marketing filters, call permission filters.
 - one-call local-file/bytes media send polymorphism.
 - pywa's complete template component DSL, compare/migrate/unpause, library/authentication helper breadth.
@@ -7060,7 +7060,7 @@ accepts the request and WATS parses the live response.
 | Handler routing | decorator registration | `TypedRouter`: registration-order dispatch, handles with `unregister()`, observer hooks. | live-validated — live webhooks dispatched through the router. |
 | Filters | `&` / `\|` / `~` operator filters | `filtersTyped`: `and`/`or`/`not`/`custom` plus message/status/template/group built-ins. | shape-only — pure local predicates; nothing here talks to Meta. |
 | Listeners | `listen` waiters | `wa.listen({ type, from?, filter?, timeoutMs?, signal? })` over a bounded registry. | shape-only. |
-| Sent-result waiters | `SentMessage.wait_for_reply` etc. | `startChat(...)` returns `waitForReply` / `waitUntilDelivered` / `waitUntilRead` / `waitUntilFailed`, resolved from observed webhooks only. | shape-only — text starts only; click/selection waits planned. |
+| Sent-result waiters | `SentMessage.wait_for_reply` etc. | `startChat(...)` returns `waitForReply`, `waitForClick`, `waitForSelection`, `waitForFlowCompletion`, and delivered/read/failed status waiters, all resolved from observed webhooks only. | shape-only — process-local listener registry, no persistence. |
 | Webhook verification | server config | Challenge echo + constant-time `X-Hub-Signature-256` HMAC over the raw body. | live-validated — verified real Meta signatures end to end. |
 | Webhook adapter | built-in server | Runtime-neutral `WebhookAdapter` with fetch / Bun / Node wrappers; identical status-code taxonomy. | live-validated — served live Meta traffic on a public callback. |
 | Webhook normalization | update classes | `normalizeWebhookEnvelope` → `TypedUpdate` union; per-entry skip taxonomy, dedup, event cap. | live-validated for message and status families; deeper families shape-only. |
