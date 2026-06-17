@@ -15,6 +15,11 @@ import type { GraphClient } from "../client.js";
 import type { EndpointInvokeOptions } from "../endpoint.js";
 import { assertSafePathParamValue } from "../endpoint.js";
 import { GraphRequestValidationError } from "../errors.js";
+import {
+  uploadMedia,
+  type MediaUploadBody,
+  type MediaUploadOptions
+} from "../endpoints/media.js";
 import { copyOptionalParamsObject } from "../internal/validation/options.js";
 import { GroupClient } from "./groupClient.js";
 import {
@@ -136,6 +141,42 @@ export interface PhoneNumberClientConfig {
   readonly graphClient: GraphClient;
   readonly phoneNumberId: string;
 }
+
+/**
+ * WATS-152 slice 1: one-call upload-and-send helpers for in-memory media
+ * bodies (`Blob | ArrayBuffer | Uint8Array`). Each helper uploads the body
+ * to Graph via `POST /{phoneNumberId}/media` and immediately sends the
+ * resulting `media.id` through the corresponding `send*` composer.
+ *
+ * File-system path support is intentionally deferred to a follow-up slice;
+ * `@wats/graph` MUST stay runtime-neutral and never import `node:fs`.
+ */
+export interface UploadAndSendMediaBaseInput {
+  readonly to: string;
+  readonly file: Blob | ArrayBuffer | Uint8Array;
+  readonly mimeType: string;
+  readonly replyToMessageId?: string;
+}
+
+export interface UploadAndSendImageInput extends UploadAndSendMediaBaseInput {
+  readonly caption?: string;
+}
+
+export interface UploadAndSendVideoInput extends UploadAndSendMediaBaseInput {
+  readonly caption?: string;
+}
+
+export interface UploadAndSendAudioInput extends UploadAndSendMediaBaseInput {
+  /** Graph v24+ voice-message designation for audio sends. */
+  readonly voice?: boolean;
+}
+
+export interface UploadAndSendDocumentInput extends UploadAndSendMediaBaseInput {
+  readonly caption?: string;
+  readonly filename?: string;
+}
+
+export type UploadAndSendStickerInput = UploadAndSendMediaBaseInput;
 
 function hasRequestMethod(
   candidate: unknown
@@ -654,5 +695,124 @@ export class PhoneNumberClient {
 
   async terminateCall(input: TerminateCallRequest, opts?: EndpointInvokeOptions): Promise<CallLifecycleResponse> {
     return terminateCallEndpoint(this.#graphClient, { phoneNumberId: this.#phoneNumberId }, input, opts);
+  }
+
+  /**
+   * WATS-152 slice 1: upload an in-memory media body to Graph and send the
+   * returned media id as the corresponding message type. Performs exactly
+   * two sequential Graph requests:
+   *   1. `POST /{phoneNumberId}/media` (multipart/form-data upload)
+   *   2. `POST /{phoneNumberId}/messages` (send by `media.id`)
+   *
+   * Accepts `Blob | ArrayBuffer | Uint8Array`; filesystem paths are NOT
+   * supported in this slice (`@wats/graph` is runtime-neutral).
+   */
+  async #uploadInMemoryMedia(
+    file: Blob | ArrayBuffer | Uint8Array,
+    mimeType: string,
+    options?: MediaUploadOptions
+  ): Promise<string> {
+    const body: MediaUploadBody = {
+      file,
+      type: mimeType,
+      messagingProduct: "whatsapp"
+    };
+    const response = await uploadMedia(
+      this.#graphClient,
+      { phoneNumberId: this.#phoneNumberId },
+      body,
+      options
+    );
+    return response.id;
+  }
+
+  async uploadAndSendImage(
+    input: UploadAndSendImageInput,
+    opts?: EndpointInvokeOptions
+  ): Promise<GraphMessagesSendResponse> {
+    const mediaId = await this.#uploadInMemoryMedia(input.file, input.mimeType, opts);
+    return this.sendImage(
+      {
+        to: input.to,
+        mediaId,
+        ...(input.caption !== undefined ? { caption: input.caption } : {}),
+        ...(input.replyToMessageId !== undefined
+          ? { replyToMessageId: input.replyToMessageId }
+          : {})
+      },
+      opts
+    );
+  }
+
+  async uploadAndSendVideo(
+    input: UploadAndSendVideoInput,
+    opts?: EndpointInvokeOptions
+  ): Promise<GraphMessagesSendResponse> {
+    const mediaId = await this.#uploadInMemoryMedia(input.file, input.mimeType, opts);
+    return this.sendVideo(
+      {
+        to: input.to,
+        mediaId,
+        ...(input.caption !== undefined ? { caption: input.caption } : {}),
+        ...(input.replyToMessageId !== undefined
+          ? { replyToMessageId: input.replyToMessageId }
+          : {})
+      },
+      opts
+    );
+  }
+
+  async uploadAndSendAudio(
+    input: UploadAndSendAudioInput,
+    opts?: EndpointInvokeOptions
+  ): Promise<GraphMessagesSendResponse> {
+    const mediaId = await this.#uploadInMemoryMedia(input.file, input.mimeType, opts);
+    return this.sendAudio(
+      {
+        to: input.to,
+        mediaId,
+        ...(input.voice !== undefined ? { voice: input.voice } : {}),
+        ...(input.replyToMessageId !== undefined
+          ? { replyToMessageId: input.replyToMessageId }
+          : {})
+      },
+      opts
+    );
+  }
+
+  async uploadAndSendDocument(
+    input: UploadAndSendDocumentInput,
+    opts?: EndpointInvokeOptions
+  ): Promise<GraphMessagesSendResponse> {
+    const mediaId = await this.#uploadInMemoryMedia(input.file, input.mimeType, opts);
+    return this.sendDocument(
+      {
+        to: input.to,
+        mediaId,
+        ...(input.caption !== undefined ? { caption: input.caption } : {}),
+        ...(input.filename !== undefined ? { filename: input.filename } : {}),
+        ...(input.replyToMessageId !== undefined
+          ? { replyToMessageId: input.replyToMessageId }
+          : {})
+      },
+      opts
+    );
+  }
+
+  async uploadAndSendSticker(
+    input: UploadAndSendStickerInput,
+    opts?: EndpointInvokeOptions
+  ): Promise<GraphMessagesSendResponse> {
+    const mediaId = await this.#uploadInMemoryMedia(input.file, input.mimeType, opts);
+    return this.sendSticker(
+      {
+        to: input.to,
+        mediaId,
+        ...(input.replyToMessageId !== undefined
+          ? { replyToMessageId: input.replyToMessageId }
+          : {})
+      },
+      opts
+    );
   }
 }
