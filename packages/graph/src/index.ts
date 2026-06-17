@@ -13,7 +13,15 @@ export {
   PhoneNumberClient,
   validatePhoneNumberClientConfig
 } from "./subclients/phoneNumberClient.js";
-export type { PhoneNumberClientConfig } from "./subclients/phoneNumberClient.js";
+export type {
+  PhoneNumberClientConfig,
+  UploadAndSendMediaBaseInput,
+  UploadAndSendImageInput,
+  UploadAndSendVideoInput,
+  UploadAndSendAudioInput,
+  UploadAndSendDocumentInput,
+  UploadAndSendStickerInput
+} from "./subclients/phoneNumberClient.js";
 export {
   GroupClient,
   validateGroupClientConfig
