@@ -157,7 +157,7 @@ Migration differences:
 
 - WATS `TypedRouter.on(...)` returns a registration handle with `unregister()` instead of pywa decorator registration.
 - WATS handlers receive `TypedUpdate` variants rather than pywa Python classes.
-- WATS `wa.listen(...)` is the lower-level one-shot listener primitive. For text starts, `WhatsApp.startChat(...)` returns a waitable result with `waitForReply`, `waitUntilDelivered`, `waitUntilRead`, and `waitUntilFailed`, all backed by observed webhook updates through the listener registry. pywa waits for clicks/completions and broader send helpers remain planned.
+- WATS `wa.listen(...)` is the lower-level one-shot listener primitive. For text starts, `WhatsApp.startChat(...)` returns a waitable result with `waitForReply`, `waitForClick`, `waitForSelection`, `waitForFlowCompletion`, `waitUntilDelivered`, `waitUntilRead`, and `waitUntilFailed`, all backed by observed webhook updates through the listener registry. Broader send helpers remain planned.
 - WATS filters use function composition (`and`, `or`, `not`, `custom`) rather than Python `&`, `|`, and `~` operators.
 - WATS deep-normalizes common inbound message body families and adds typed filters for media, location, reaction, interactive button/list/nfm Flow-completion replies, and quick-reply buttons. This covers the most common `@wa.on_callback_button`, `@wa.on_callback_selection`, and `@wa.on_flow_completion` migration paths while keeping the update kind as `"message"`.
 - `user_preferences` maps to `TypedUserPreferencesUpdate` plus `filtersTyped.userPreferences`; `system` maps phone/identity changes to `TypedSystemUpdate` plus `filtersTyped.system`; `chat_opened` maps `REQUEST_WELCOME` to `TypedChatOpenedUpdate` plus `filtersTyped.chatOpened`.
@@ -212,7 +212,7 @@ Migration notes:
 Do not migrate code assuming WATS already has pywa parity for:
 
 - pywa's full decorator and handler taxonomy for callback selections/buttons, Flow request sub-actions, user marketing preferences, phone-number changes, and identity changes.
-- pywa sent-update waiters beyond `startChat` (`wait_for_selection`, `wait_for_completion`, call permission waits, and broader composer helpers).
+- pywa sent-update waiters beyond the process-local `startChat` surface (call permission waits and broader composer helpers).
 - pywa's broad filter catalog: commands, MIME/extension filters, location radius, per-error-code status filters, user marketing filters, call permission filters.
 - one-call local-file/bytes media send polymorphism.
 - pywa's complete template component DSL, compare/migrate/unpause, library/authentication helper breadth.
