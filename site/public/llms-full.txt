@@ -6872,7 +6872,7 @@ Migration notes:
 | --- | --- | --- | --- |
 | pywa `send_message` / `send_text` | WATS `PhoneNumberClient.sendText` or `WhatsApp.startChat` | live-validated | Sends text to arbitrary E.164-ish recipients without contact lookup. |
 | `send_image`, `send_video`, `send_audio`, `send_document`, `send_sticker` | `PhoneNumberClient.sendImage` / `.sendVideo` / `.sendAudio` / `.sendDocument` / `.sendSticker` or matching `WhatsApp` helpers | live-validated (image by media id); others shape-only | WATS accepts existing media ids or http(s) links for message sends. |
-| pywa local file / bytes / file-like media sends | `uploadMedia` first, then send by returned media id | planned as one call | pywa auto-upload polymorphism is not yet a one-call WATS helper. |
+| pywa local file / bytes / file-like media sends | `uploadAndSendImage` / `uploadAndSendVideo` / `uploadAndSendAudio` / `uploadAndSendDocument` / `uploadAndSendSticker` for in-memory `Blob` / `ArrayBuffer` / `Uint8Array`; `uploadMedia` then send by id remains available | shape-only for in-memory bodies; filesystem path helpers planned | WATS keeps `@wats/graph` runtime-neutral, so file-path convenience needs a Node/Bun-specific wrapper. |
 | `send_location` / `request_location` | `sendLocation` / `requestLocation` | shape-only | |
 | `send_contact` | `sendContacts` | shape-only | WATS uses bounded arrays and strict contact shapes. |
 | `send_reaction` / `remove_reaction` | `sendReaction` / `removeReaction` | shape-only | Reactions route through `POST /{phoneNumberId}/messages`. |
@@ -7074,7 +7074,7 @@ accepts the request and WATS parses the live response.
 | Text sends | `send_text` / `send_message` | `sendText`, `WhatsApp.startChat` to arbitrary recipients. | live-validated — accepted with a real message id. |
 | Media sends | `send_image` etc. | `sendImage` / `sendVideo` / `sendAudio` / `sendDocument` / `sendSticker` by media id or link. | live-validated for image by media id; other media composers shape-only. |
 | Other composers | location, contacts, reactions, buttons, lists, CTA, catalog, mark-read, typing | Matching helpers on `PhoneNumberClient` and the facade. | shape-only. |
-| One-call local-file media send | file/bytes polymorphism | Upload first, then send by returned media id. | planned as a single call; the two-step path works today. |
+| One-call media send | file/bytes polymorphism | `PhoneNumberClient.uploadAndSendImage` / `uploadAndSendVideo` / `uploadAndSendAudio` / `uploadAndSendDocument` / `uploadAndSendSticker` upload in-memory `Blob` / `ArrayBuffer` / `Uint8Array` bodies, then send by returned media id. | shape-only for in-memory bodies; filesystem path helpers still planned. |
 | Media runtime | media helpers | `uploadMedia`, `downloadMedia`, `downloadMediaBytes`, `deleteMedia`, `decryptEncryptedMedia`, upload sessions. | live-validated — upload/metadata/send/delete passed live; decrypt and sessions shape-only. |
 | Template send | `send_template` | `sendTemplate` with parameter-count validation; `sendMarketingTemplate` for marketing messages. | live-validated — approved-template send produced the full sent/delivered/read chain; marketing send shape-only. |
 | Template management | `create_template` etc. | List/create/get/update/delete callables, component builders, template-group analytics. | live-validated for list reads; mutations shape-only. |

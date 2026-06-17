@@ -63,7 +63,7 @@ Migration notes:
 | --- | --- | --- | --- |
 | pywa `send_message` / `send_text` | WATS `PhoneNumberClient.sendText` or `WhatsApp.startChat` | live-validated | Sends text to arbitrary E.164-ish recipients without contact lookup. |
 | `send_image`, `send_video`, `send_audio`, `send_document`, `send_sticker` | `PhoneNumberClient.sendImage` / `.sendVideo` / `.sendAudio` / `.sendDocument` / `.sendSticker` or matching `WhatsApp` helpers | live-validated (image by media id); others shape-only | WATS accepts existing media ids or http(s) links for message sends. |
-| pywa local file / bytes / file-like media sends | `uploadMedia` first, then send by returned media id | planned as one call | pywa auto-upload polymorphism is not yet a one-call WATS helper. |
+| pywa local file / bytes / file-like media sends | `uploadAndSendImage` / `uploadAndSendVideo` / `uploadAndSendAudio` / `uploadAndSendDocument` / `uploadAndSendSticker` for in-memory `Blob` / `ArrayBuffer` / `Uint8Array`; `uploadMedia` then send by id remains available | shape-only for in-memory bodies; filesystem path helpers planned | WATS keeps `@wats/graph` runtime-neutral, so file-path convenience needs a Node/Bun-specific wrapper. |
 | `send_location` / `request_location` | `sendLocation` / `requestLocation` | shape-only | |
 | `send_contact` | `sendContacts` | shape-only | WATS uses bounded arrays and strict contact shapes. |
 | `send_reaction` / `remove_reaction` | `sendReaction` / `removeReaction` | shape-only | Reactions route through `POST /{phoneNumberId}/messages`. |
