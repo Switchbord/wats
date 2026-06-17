@@ -187,6 +187,28 @@ export interface WhatsAppWaitableSentResult extends GraphMessagesSendResponse {
   waitUntilDelivered(options?: WhatsAppSentWaitOptions): Promise<TypedStatusUpdate>;
   waitUntilRead(options?: WhatsAppSentWaitOptions): Promise<TypedStatusUpdate>;
   waitUntilFailed(options?: WhatsAppSentWaitOptions): Promise<TypedStatusUpdate>;
+  /**
+   * WATS-158: resolves on an inbound interactive `button_reply` OR a
+   * quick-reply `button` message from the same recipient whose
+   * `context.messageId` matches the sent message id. Closes the pywa
+   * parity gap where sent button prompts could not await their click
+   * callback. Reuses the existing bounded listener substrate — no
+   * polling, no persistence, no extra process-global state.
+   */
+  waitForClick(options?: WhatsAppSentWaitOptions): Promise<TypedMessageUpdate>;
+  /**
+   * WATS-158: resolves on an inbound interactive `list_reply` from the
+   * same recipient whose `context.messageId` matches the sent message
+   * id. Parity with pywa `SentMessage.wait_for_selection()`.
+   */
+  waitForSelection(options?: WhatsAppSentWaitOptions): Promise<TypedMessageUpdate>;
+  /**
+   * WATS-158: resolves on an inbound interactive `nfm_reply` (Flow
+   * completion) from the same recipient whose `context.messageId`
+   * matches the sent message id. Parity with pywa
+   * `SentMessage.wait_for_flow_completion()`.
+   */
+  waitForFlowCompletion(options?: WhatsAppSentWaitOptions): Promise<TypedMessageUpdate>;
 }
 
 export type WhatsAppListenErrorCode =
@@ -512,21 +534,49 @@ export class WhatsApp {
   ): WhatsAppWaitableSentResult {
     const sentMessageId = firstSentMessageId(response);
     const recipientId = firstRecipientId(response) ?? sentRecipientId;
-    const waitForReply = (options?: WhatsAppSentWaitOptions): Promise<TypedMessageUpdate> => {
+    const matchesSentMessage = (u: TypedMessageUpdate): boolean => {
+      if (sentMessageId === undefined) return false;
+      const contextValue = (u.message as unknown as { context?: { messageId?: unknown } }).context;
+      const contextMessageId = contextValue?.messageId;
+      if (contextMessageId !== sentMessageId) return false;
+      if (recipientId !== undefined && u.message.from !== recipientId) return false;
+      return true;
+    };
+    const waitForMessage = (
+      label: string,
+      predicate: (u: TypedMessageUpdate) => boolean,
+      options?: WhatsAppSentWaitOptions
+    ): Promise<TypedMessageUpdate> => {
       const filter = createTypedFilter<TypedMessageUpdate>(
-        (u): u is TypedMessageUpdate => {
-          if (u.kind !== "message") return false;
-          if (sentMessageId === undefined) return false;
-          const contextValue = (u.message as unknown as { context?: { messageId?: unknown } }).context;
-          const contextMessageId = contextValue?.messageId;
-          if (contextMessageId !== sentMessageId) return false;
-          if (recipientId !== undefined && u.message.from !== recipientId) return false;
-          return true;
-        },
-        () => `sent.waitForReply(${sentMessageId ?? "missing"})`
+        (u): u is TypedMessageUpdate => u.kind === "message" && matchesSentMessage(u) && predicate(u),
+        () => `sent.${label}(${sentMessageId ?? "missing"})`
       );
       return this.#registerSentWaiter("message", filter, options).promise;
     };
+    const waitForReply = (options?: WhatsAppSentWaitOptions): Promise<TypedMessageUpdate> =>
+      waitForMessage("waitForReply", () => true, options);
+    const waitForClick = (options?: WhatsAppSentWaitOptions): Promise<TypedMessageUpdate> =>
+      waitForMessage(
+        "waitForClick",
+        (u) => {
+          const message = u.message;
+          if (message.type === "button") return true;
+          return message.type === "interactive" && message.interactive.type === "button_reply";
+        },
+        options
+      );
+    const waitForSelection = (options?: WhatsAppSentWaitOptions): Promise<TypedMessageUpdate> =>
+      waitForMessage(
+        "waitForSelection",
+        (u) => u.message.type === "interactive" && u.message.interactive.type === "list_reply",
+        options
+      );
+    const waitForFlowCompletion = (options?: WhatsAppSentWaitOptions): Promise<TypedMessageUpdate> =>
+      waitForMessage(
+        "waitForFlowCompletion",
+        (u) => u.message.type === "interactive" && u.message.interactive.type === "nfm_reply",
+        options
+      );
     const waitForStatus = (
       expected: "delivered" | "read" | "failed",
       options?: WhatsAppSentWaitOptions
@@ -548,6 +598,9 @@ export class WhatsApp {
     };
     return Object.assign({}, response, {
       waitForReply,
+      waitForClick,
+      waitForSelection,
+      waitForFlowCompletion,
       waitUntilDelivered: (options?: WhatsAppSentWaitOptions): Promise<TypedStatusUpdate> => waitForStatus("delivered", options),
       waitUntilRead: (options?: WhatsAppSentWaitOptions): Promise<TypedStatusUpdate> => waitForStatus("read", options),
       waitUntilFailed: (options?: WhatsAppSentWaitOptions): Promise<TypedStatusUpdate> => waitForStatus("failed", options)
