@@ -11,6 +11,7 @@ export {
   buildTemplateHeaderComponent,
   createMessageTemplate,
   createTemplateGroup,
+  compareTemplates,
   deleteMessageTemplate,
   deleteTemplateGroup,
   getMessageTemplate,
@@ -18,9 +19,12 @@ export {
   getTemplateGroupAnalytics,
   listMessageTemplates,
   listTemplateGroups,
+  unpauseTemplate,
   updateMessageTemplate,
   updateTemplateGroup,
-  validateTemplateParameterCounts
+  validateTemplateParameterCounts,
+  COMPARE_TEMPLATES_MAX_IDS,
+  KNOWN_TEMPLATE_TOP_BLOCK_REASONS
 } from "./templates/index.js";
 
 export type {
@@ -60,4 +64,12 @@ export type {
   TemplateStatus,
   UpdateMessageTemplateBody,
   UpdateTemplateGroupBody
+} from "./templates/index.js";
+
+export type {
+  CompareTemplatesInput,
+  TemplateTopBlockReason,
+  TemplateUnpauseResult,
+  TemplatesCompareResult,
+  UnpauseTemplateInput
 } from "./templates/index.js";

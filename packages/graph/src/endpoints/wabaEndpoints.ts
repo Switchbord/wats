@@ -31,6 +31,10 @@ export {
   updateTemplateGroup,
   deleteTemplateGroup,
   getTemplateGroupAnalytics,
+  compareTemplates,
+  unpauseTemplate,
+  COMPARE_TEMPLATES_MAX_IDS,
+  KNOWN_TEMPLATE_TOP_BLOCK_REASONS,
   validateTemplateParameterCounts
 } from "./templates/index.js";
 
@@ -71,7 +75,12 @@ export type {
   CreateTemplateGroupBody,
   DeleteTemplateGroupInput,
   GetTemplateGroupInput,
-  UpdateTemplateGroupBody
+  UpdateTemplateGroupBody,
+  CompareTemplatesInput,
+  TemplateTopBlockReason,
+  TemplateUnpauseResult,
+  TemplatesCompareResult,
+  UnpauseTemplateInput
 } from "./templates/index.js";
 
 

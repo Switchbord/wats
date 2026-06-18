@@ -39,6 +39,8 @@ import {
   updateTemplateGroup as updateTemplateGroupEndpoint,
   deleteTemplateGroup as deleteTemplateGroupEndpoint,
   getTemplateGroupAnalytics as getTemplateGroupAnalyticsEndpoint,
+  compareTemplates as compareTemplatesEndpoint,
+  unpauseTemplate as unpauseTemplateEndpoint,
   listFlows as listFlowsEndpoint,
   getFlow as getFlowEndpoint,
   createFlow as createFlowEndpoint,
@@ -70,8 +72,12 @@ import {
   type TemplateListResponse,
   type TemplateMutationResponse,
   type CreateTemplateGroupBody,
+  type CompareTemplatesInput,
   type DeleteTemplateGroupInput,
   type GetTemplateGroupInput,
+  type TemplatesCompareResult,
+  type TemplateUnpauseResult,
+  type UnpauseTemplateInput,
   type UpdateTemplateGroupBody,
   type UpdateFlowJsonBody,
   type UpdateFlowMetadataBody,
@@ -412,6 +418,42 @@ export class WABAClient {
     return getTemplateGroupAnalyticsEndpoint(
       this.#graphClient,
       scopedParams as unknown as TemplateGroupAnalyticsInput,
+      undefined,
+      opts
+    );
+  }
+
+  /**
+   * Graph `GET /{templateId}/compare` (WATS-153). Template-id scoped edge
+   * that compares send/block metrics across templates. Delegates to the
+   * endpoint-registry callable; the bound wabaId is not used because the
+   * path is template-id scoped (mirrors getMessageTemplate).
+   */
+  async compareTemplates(
+    params: CompareTemplatesInput,
+    opts?: EndpointInvokeOptions
+  ): Promise<TemplatesCompareResult> {
+    return compareTemplatesEndpoint(
+      this.#graphClient,
+      params,
+      undefined,
+      opts
+    );
+  }
+
+  /**
+   * Graph `POST /{templateId}/unpause` (WATS-153). Template-id scoped edge
+   * that unpauses a paused template. Delegates to the endpoint-registry
+   * callable; the bound wabaId is not used (mirrors getMessageTemplate).
+   * The endpoint/response shape is UNVERIFIED — see REFERENCE-153.md.
+   */
+  async unpauseTemplate(
+    params: UnpauseTemplateInput,
+    opts?: EndpointInvokeOptions
+  ): Promise<TemplateUnpauseResult> {
+    return unpauseTemplateEndpoint(
+      this.#graphClient,
+      params,
       undefined,
       opts
     );
