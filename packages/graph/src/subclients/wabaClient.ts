@@ -43,6 +43,7 @@ import {
   unpauseTemplate as unpauseTemplateEndpoint,
   listFlows as listFlowsEndpoint,
   getFlow as getFlowEndpoint,
+  getFlowMetrics as getFlowMetricsEndpoint,
   createFlow as createFlowEndpoint,
   updateFlowMetadata as updateFlowMetadataEndpoint,
   updateFlowJson as updateFlowJsonEndpoint,
@@ -50,19 +51,24 @@ import {
   deleteFlow as deleteFlowEndpoint,
   deprecateFlow as deprecateFlowEndpoint,
   getFlowAssets as getFlowAssetsEndpoint,
+  migrateFlows as migrateFlowsEndpoint,
   type CreateFlowBody,
   type CreateMessageTemplateBody,
   type DeleteMessageTemplateInput,
   type FlowAssetsResponse,
   type FlowDetails,
   type FlowListResponse,
+  type FlowMetric,
   type FlowMutationResponse,
   type GetFlowAssetsInput,
   type GetFlowInput,
+  type GetFlowMetricsInput,
   type GetMessageTemplateInput,
   type ListFlowsInput,
   type ListMessageTemplatesInput,
   type ListTemplateGroupsInput,
+  type MigrateFlowsInput,
+  type MigrateFlowsResponse,
   type TemplateDetails,
   type TemplateGroupAnalyticsInput,
   type TemplateGroupAnalyticsResponse,
@@ -567,6 +573,59 @@ export class WABAClient {
     return getFlowAssetsEndpoint(
       this.#graphClient,
       { flowId, ...rest } as GetFlowAssetsInput & Record<string, string>,
+      undefined,
+      opts
+    );
+  }
+
+  /**
+   * Graph `GET /{flowId}?fields=metric.name(...).granularity(...)...`
+   * (WATS-154). Flow-id scoped edge that returns Flow metrics; the bound
+   * wabaId is not used because the path is flow-id scoped (mirrors
+   * getFlow / getFlowAssets). See REFERENCE-154.md §1.
+   */
+  async getFlowMetrics(
+    params: GetFlowMetricsInput,
+    opts?: EndpointInvokeOptions
+  ): Promise<FlowMetric> {
+    const { flowId, rest } = splitFlowIdParams(params, "WABAClient.getFlowMetrics");
+    return getFlowMetricsEndpoint(
+      this.#graphClient,
+      { flowId, ...rest } as unknown as GetFlowMetricsInput & Record<string, string>,
+      undefined,
+      opts
+    );
+  }
+
+  /**
+   * Graph `POST /{wabaId}/migrate_flows?source_waba_id=...&source_flow_names=...`
+   * (WATS-154). Copies (not moves) Flows from a source WABA into the bound
+   * destination WABA. Mirrors pywa's `WhatsApp.migrate_flows`. The bound
+   * wabaId is used as the destination; see REFERENCE-154.md §2.
+   */
+  async migrateFlows(
+    params: Omit<MigrateFlowsInput, "destinationWabaId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<MigrateFlowsResponse> {
+    if (typeof params !== "object" || params === null || Array.isArray(params)) {
+      throw new GraphRequestValidationError(
+        "Invalid WABAClient.migrateFlows params: expected an options object."
+      );
+    }
+    const descriptors = Object.getOwnPropertyDescriptors(params);
+    const scopedParams: Record<string, unknown> = {};
+    for (const [key, descriptor] of Object.entries(descriptors)) {
+      if (typeof descriptor.get === "function" || typeof descriptor.set === "function") {
+        throw new GraphRequestValidationError(
+          `Invalid WABAClient.migrateFlows params: ${key} must not use accessors.`
+        );
+      }
+      if (descriptor.value !== undefined) scopedParams[key] = descriptor.value;
+    }
+    scopedParams.destinationWabaId = this.#wabaId;
+    return migrateFlowsEndpoint(
+      this.#graphClient,
+      scopedParams as unknown as MigrateFlowsInput,
       undefined,
       opts
     );
