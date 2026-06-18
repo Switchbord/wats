@@ -102,6 +102,23 @@ export type {
   HandleFlowRequestOptions
 } from "./dataChannel.js";
 
+// WATS-154 Flow metrics & migration helpers (slice 1).
+export {
+  buildFlowMetricField,
+  getFlowMetrics,
+  migrateFlows
+} from "./metricsMigration.js";
+
+// Constants live on the types module (where they are declared) so the
+// metrics/migration callables and the barrel can both reference them
+// without a re-export chain.
+export {
+  KNOWN_FLOW_METRIC_NAMES,
+  KNOWN_FLOW_METRIC_GRANULARITIES,
+  MIGRATE_FLOWS_MAX_NAMES,
+  MIGRATE_FLOWS_NAME_MAX_LENGTH
+} from "./types.js";
+
 export type { GraphPaging } from "../wabaEndpoints.js";
 
 export type {
@@ -119,6 +136,10 @@ export type {
   FlowErrorResponseInput,
   FlowJson,
   FlowListResponse,
+  FlowMetric,
+  FlowMetricDataPoint,
+  FlowMetricGranularity,
+  FlowMetricName,
   FlowMutationResponse,
   FlowRequest,
   FlowRequestAction,
@@ -128,7 +149,12 @@ export type {
   FlowStatus,
   GetFlowAssetsInput,
   GetFlowInput,
+  GetFlowMetricsInput,
   ListFlowsInput,
+  MigratedFlow,
+  MigratedFlowError,
+  MigrateFlowsInput,
+  MigrateFlowsResponse,
   UpdateFlowJsonBody,
   UpdateFlowMetadataBody
 } from "./types.js";
