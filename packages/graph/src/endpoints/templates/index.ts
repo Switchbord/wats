@@ -18,6 +18,13 @@ export {
 } from "./groups.js";
 
 export {
+  compareTemplates,
+  unpauseTemplate,
+  COMPARE_TEMPLATES_MAX_IDS,
+  KNOWN_TEMPLATE_TOP_BLOCK_REASONS
+} from "./advanced.js";
+
+export {
   buildCreateMessageTemplateBody,
   buildUpdateMessageTemplateBody,
   buildTemplateBodyComponent,
@@ -72,3 +79,11 @@ export type {
   TemplateGroupMutationResponse,
   UpdateTemplateGroupBody
 } from "./groups.js";
+
+export type {
+  CompareTemplatesInput,
+  TemplateTopBlockReason,
+  TemplateUnpauseResult,
+  TemplatesCompareResult,
+  UnpauseTemplateInput
+} from "./advanced.js";
