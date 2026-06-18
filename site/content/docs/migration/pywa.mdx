@@ -103,7 +103,7 @@ Migration notes:
 | Flow response builders | `buildFlowScreenResponse`, `buildFlowCloseResponse`, `buildFlowErrorResponse` | shape-only | Local data-exchange response construction only. |
 | pywa FlowJSON dataclasses | typed DSL builders (`flowJson`, `screen`, `singleColumnLayout`, `form`, every component + action builder) | shape-only | camelCase builders serialize to the hyphenated FlowJSON wire shape; output passes `validateFlowJson`. |
 | encrypted Flow request decrypt/encrypt | `decryptRequest` / `encryptResponse` / `handleFlowRequest` (RSA-OAEP + AES-GCM, IV-flip response), backed by `@wats/crypto` | shape-only | Local crypto round-trip; no hosted endpoint. Media-upload (CBC+HMAC) decryption still planned. |
-| Flow metrics / migration | No first-class WATS helper yet | planned | Credentialed and account-dependent. |
+| Flow metrics / migration | `getFlowMetrics` and `migrateFlows` | shape-only | Credentialed and account-dependent; Meta marks Metrics API deprecated after 2026-04-30, replacement unverified. |
 
 ## Calling map
 
