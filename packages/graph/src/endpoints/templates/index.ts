@@ -19,6 +19,7 @@ export {
 
 export {
   compareTemplates,
+  migrateTemplates,
   unpauseTemplate,
   COMPARE_TEMPLATES_MAX_IDS,
   KNOWN_TEMPLATE_TOP_BLOCK_REASONS
@@ -82,6 +83,10 @@ export type {
 
 export type {
   CompareTemplatesInput,
+  FailedTemplateEntry,
+  MigrateTemplatesInput,
+  MigrateTemplatesResponse,
+  MigratedTemplateEntry,
   TemplateTopBlockReason,
   TemplateUnpauseResult,
   TemplatesCompareResult,

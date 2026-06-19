@@ -14,13 +14,13 @@
 //    the response shape `{ success, reason? }` is inferred from pywa and
 //    is UNVERIFIED. We preserve unknown fields via an index signature.
 //
-// Slice 1 scope: compare + unpause ONLY. migrate/archive/upsert/library
-// land in subsequent WATS-153 slices.
+// Slice 1 scope: compare + unpause. WATS-160A adds migrateTemplates.
+// archive/unarchive/upsert/library land in subsequent WATS-160 slices.
 
 import { defineEndpoint } from "../../endpoint.js";
 import type { EndpointInvokeOptions } from "../../endpoint.js";
 import type { GraphClient } from "../../client.js";
-import { assertArray, assertPlainRecord, assertString } from "./shared.js";
+import { assertArray, assertPlainRecord, assertString, validationError } from "./shared.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -260,4 +260,309 @@ export const unpauseTemplate = Object.assign(
     opts?: EndpointInvokeOptions
   ): Promise<TemplateUnpauseResult>;
   readonly definition: typeof unpauseTemplateRaw.definition;
+};
+
+// ---------------------------------------------------------------------------
+// migrateTemplates (WATS-160A)
+// ---------------------------------------------------------------------------
+//
+// Mirrors pywa's `WhatsApp.migrate_templates(source_waba_id, page_number=None,
+// *, destination_waba_id=None)`. Copies (not moves) message templates from a
+// source WABA into the destination WABA.
+//
+// Wire (pywa parity):
+//   POST /{destinationWabaId}/migrate_message_templates?source_waba_id={src}
+//   optional &page_number={n}
+//   No body.
+//
+// Meta also documents optional body params (`count`, `template_ids`) not
+// exposed by pywa; this slice implements pywa parity only.
+//
+// Response discrepancy (see REFERENCE-160 / handoff): Meta returns
+// `failed_templates` as a map `{ id: reason }`, while pywa parses a list
+// `[{ id, reason }]`. WATS normalizes BOTH forms defensively into the
+// camelCase `failedTemplates` array. `migrated_templates` entries may be
+// bare strings (Meta) or objects (pywa); strings are converted to `{ id }`.
+// Unknown top-level and per-entry fields are preserved.
+
+const HELPER_MIGRATE_TEMPLATES = "migrateTemplates";
+
+export interface MigrateTemplatesInput {
+  readonly destinationWabaId: string;
+  readonly sourceWabaId: string;
+  /** Optional zero-based page number (Meta examples use `0`). */
+  readonly pageNumber?: number;
+}
+
+/**
+ * A successfully migrated template entry inside
+ * {@link MigrateTemplatesResponse.migratedTemplates}. Meta returns bare id
+ * strings; pywa returns objects. Unknown per-entry fields are preserved.
+ */
+export interface MigratedTemplateEntry {
+  readonly id: string;
+  readonly [key: string]: unknown;
+}
+
+/**
+ * A failed migration entry inside
+ * {@link MigrateTemplatesResponse.failedTemplates}. Normalized from both
+ * Meta's map form (`{ id: reason }`) and pywa's list form
+ * (`[{ id, reason }]`). Unknown per-entry fields are preserved.
+ */
+export interface FailedTemplateEntry {
+  readonly id: string;
+  readonly reason: string;
+  readonly [key: string]: unknown;
+}
+
+/**
+ * Normalized result of `POST /{destinationWabaId}/migrate_message_templates`.
+ * Snake-case `migrated_templates` / `failed_templates` are camelCased; the
+ * two `failed_templates` shapes (Meta map vs pywa list) are both normalized
+ * into {@link failedTemplates}. Unknown response fields are preserved via
+ * the index signature because the Meta response shape is only partially
+ * documented.
+ */
+export interface MigrateTemplatesResponse {
+  readonly migratedTemplates?: readonly MigratedTemplateEntry[];
+  readonly failedTemplates?: readonly FailedTemplateEntry[];
+  readonly [key: string]: unknown;
+}
+
+/**
+ * Validate a WABA/template id for the migrate helper. Reuses the shared
+ * `assertString` (type / non-empty / control-char / length) and additionally
+ * rejects dot-segments and path/query/fragment separators so that ids cannot
+ * escape the `{destinationWabaId}` path segment or smuggle query/fragment
+ * data into `source_waba_id`. Mirrors the F-6 path-param taxonomy.
+ */
+function assertSafeMigrateId(
+  value: unknown,
+  fieldName: string,
+  helperName: string
+): string {
+  const str = assertString(value, fieldName, helperName);
+  if (str === "." || str === "..") {
+    throw validationError(
+      `Invalid ${helperName} input: ${fieldName} must not be a dot-segment.`
+    );
+  }
+  if (
+    str.includes("/") ||
+    str.includes("\\") ||
+    str.includes("?") ||
+    str.includes("#")
+  ) {
+    throw validationError(
+      `Invalid ${helperName} input: ${fieldName} must not contain path/query/fragment separators.`
+    );
+  }
+  return str;
+}
+
+/**
+ * Validate an optional `pageNumber`. Must be a finite, non-negative integer
+ * when present (Meta examples use `0`). Rejects NaN, Infinity, negative,
+ * and non-integer values.
+ */
+function assertPageNumber(
+  value: unknown,
+  helperName: string
+): number | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "number") {
+    throw validationError(
+      `Invalid ${helperName} input: pageNumber must be a number.`
+    );
+  }
+  if (!Number.isFinite(value)) {
+    throw validationError(
+      `Invalid ${helperName} input: pageNumber must be a finite number.`
+    );
+  }
+  if (!Number.isInteger(value)) {
+    throw validationError(
+      `Invalid ${helperName} input: pageNumber must be an integer.`
+    );
+  }
+  if (value < 0) {
+    throw validationError(
+      `Invalid ${helperName} input: pageNumber must be >= 0.`
+    );
+  }
+  return value;
+}
+
+function normalizeMigrateTemplatesParams(
+  input: MigrateTemplatesInput
+): Record<string, string> {
+  const record = assertPlainRecord(input, HELPER_MIGRATE_TEMPLATES);
+  const destinationWabaId = assertSafeMigrateId(
+    record.destinationWabaId,
+    "destinationWabaId",
+    HELPER_MIGRATE_TEMPLATES
+  );
+  const sourceWabaId = assertSafeMigrateId(
+    record.sourceWabaId,
+    "sourceWabaId",
+    HELPER_MIGRATE_TEMPLATES
+  );
+  const pageNumber = assertPageNumber(record.pageNumber, HELPER_MIGRATE_TEMPLATES);
+  const out: Record<string, string> = {
+    destinationWabaId,
+    source_waba_id: sourceWabaId
+  };
+  if (pageNumber !== undefined) {
+    out.page_number = String(pageNumber);
+  }
+  return out;
+}
+
+interface MigrateTemplatesRawResponse {
+  readonly migrated_templates?: readonly unknown[];
+  readonly failed_templates?: unknown;
+  readonly [key: string]: unknown;
+}
+
+/**
+ * Normalize a single `migrated_templates` entry. Bare strings (Meta form)
+ * become `{ id }`; objects with a non-empty string `id` preserve their
+ * unknown fields. Malformed entries (null, non-object, object without a
+ * string id) are skipped rather than thrown, because the Meta response
+ * shape is only partially documented.
+ */
+function normalizeMigratedTemplateEntry(
+  entry: unknown
+): MigratedTemplateEntry | null {
+  if (typeof entry === "string") {
+    if (entry.length === 0) return null;
+    return { id: entry };
+  }
+  if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
+    return null;
+  }
+  const rec = entry as Record<string, unknown>;
+  if (typeof rec.id !== "string" || rec.id.length === 0) return null;
+  const out: Record<string, unknown> = { id: rec.id };
+  for (const [key, value] of Object.entries(rec)) {
+    if (key === "id") continue;
+    out[key] = value;
+  }
+  return out as MigratedTemplateEntry;
+}
+
+/**
+ * Normalize a single list-form `failed_templates` entry. Requires a
+ * non-empty string `id` and a string `reason`; unknown fields are
+ * preserved. Malformed entries are skipped rather than thrown.
+ */
+function normalizeFailedTemplateEntryList(
+  entry: unknown
+): FailedTemplateEntry | null {
+  if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
+    return null;
+  }
+  const rec = entry as Record<string, unknown>;
+  if (typeof rec.id !== "string" || rec.id.length === 0) return null;
+  if (typeof rec.reason !== "string") return null;
+  const out: Record<string, unknown> = { id: rec.id, reason: rec.reason };
+  for (const [key, value] of Object.entries(rec)) {
+    if (key === "id" || key === "reason") continue;
+    out[key] = value;
+  }
+  return out as FailedTemplateEntry;
+}
+
+/**
+ * Parse the raw Graph `POST /{destinationWabaId}/migrate_message_templates`
+ * response into a typed {@link MigrateTemplatesResponse}. Snake-case fields
+ * are camelCased. `failed_templates` is normalized from BOTH the Meta map
+ * form (`{ id: reason }`) and the pywa list form (`[{ id, reason }]`).
+ * `migrated_templates` strings are converted to `{ id }`. Unknown top-level
+ * and per-entry fields are preserved; malformed entries are skipped.
+ */
+function parseMigrateTemplatesResponse(
+  raw: MigrateTemplatesRawResponse
+): MigrateTemplatesResponse {
+  const out: Record<string, unknown> = {};
+  if (raw !== null && typeof raw === "object") {
+    for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+      if (key !== "migrated_templates" && key !== "failed_templates") {
+        out[key] = value;
+      }
+    }
+  }
+  const migrated = (raw as MigrateTemplatesRawResponse | null | undefined)
+    ?.migrated_templates;
+  if (Array.isArray(migrated)) {
+    const entries: MigratedTemplateEntry[] = [];
+    for (const entry of migrated) {
+      const norm = normalizeMigratedTemplateEntry(entry);
+      if (norm !== null) entries.push(norm);
+    }
+    out.migratedTemplates = entries;
+  }
+  const failed = (raw as MigrateTemplatesRawResponse | null | undefined)
+    ?.failed_templates;
+  if (Array.isArray(failed)) {
+    // pywa list form.
+    const entries: FailedTemplateEntry[] = [];
+    for (const entry of failed) {
+      const norm = normalizeFailedTemplateEntryList(entry);
+      if (norm !== null) entries.push(norm);
+    }
+    out.failedTemplates = entries;
+  } else if (failed !== null && typeof failed === "object") {
+    // Meta map form: { id: reason }.
+    const entries: FailedTemplateEntry[] = [];
+    for (const [id, reason] of Object.entries(failed as Record<string, unknown>)) {
+      if (id.length > 0 && typeof reason === "string") {
+        entries.push({ id, reason });
+      }
+    }
+    out.failedTemplates = entries;
+  }
+  return out as unknown as MigrateTemplatesResponse;
+}
+
+const migrateTemplatesRaw = defineEndpoint<
+  { destinationWabaId: string; source_waba_id: string; page_number?: string },
+  never,
+  MigrateTemplatesRawResponse
+>({
+  method: "POST",
+  pathTemplate: "/{destinationWabaId}/migrate_message_templates",
+  params: {
+    destinationWabaId: { in: "path", required: true },
+    source_waba_id: { in: "query", required: true },
+    page_number: { in: "query" }
+  }
+});
+
+export const migrateTemplates = Object.assign(
+  async function migrateTemplates(
+    client: GraphClient,
+    params: MigrateTemplatesInput,
+    body?: never,
+    opts?: EndpointInvokeOptions
+  ): Promise<MigrateTemplatesResponse> {
+    const normalized = normalizeMigrateTemplatesParams(params);
+    const raw = await migrateTemplatesRaw(
+      client,
+      normalized as Parameters<typeof migrateTemplatesRaw>[1],
+      body,
+      opts
+    );
+    return parseMigrateTemplatesResponse(raw as unknown as MigrateTemplatesRawResponse);
+  },
+  { definition: migrateTemplatesRaw.definition }
+) as unknown as {
+  (
+    client: GraphClient,
+    params: MigrateTemplatesInput,
+    body?: never,
+    opts?: EndpointInvokeOptions
+  ): Promise<MigrateTemplatesResponse>;
+  readonly definition: typeof migrateTemplatesRaw.definition;
 };
