@@ -1657,6 +1657,7 @@ Endpoint subpaths:
 - `@wats/graph/endpoints/calling`
 - `@wats/graph/endpoints/business-management`
 - `@wats/graph/endpoints/groups`
+- `@wats/graph/node-media` (Node/Bun-only; filesystem path media helpers; not imported by the root/browser-safe entrypoint)
 
 Run `bun run api:check` after changing this list. It verifies package exports, source files, fixture imports, docs, and the changelog all agree on the same Graph endpoint subpaths.
 
@@ -1822,6 +1823,7 @@ Primary exports:
 - `WABAClient` with `.getInfo(...)`, `.listSubscribedApps(...)`, and `.listPhoneNumbers({ fields?, limit?, after?, before? })`
 - business/admin inventory callables/types: `getWabaInfo`, `listSubscribedApps`, `listPhoneNumbers`, `getPhoneNumberInfo`, `getPhoneNumberSettings`, `getBusinessProfile`, `getCommerceSettings`, `updateBusinessProfile`, `updateCommerceSettings`, `listBlockedUsers`, `blockUsers`, `unblockUsers`, `getOfficialBusinessAccountStatus`, `requestOfficialBusinessAccountReview`, and `submitDisplayNameForReview`, exported at root and at `./endpoints/business-management`. WATS maps `profilePictureHandle` to Graph `profile_picture_handle` and `isCartEnabled` / `isCatalogVisible` to `is_cart_enabled` / `is_catalog_visible`
 - public endpoint subpaths: `@wats/graph/endpoints/messages`, `@wats/graph/endpoints/media`, `@wats/graph/endpoints/templates`, `@wats/graph/endpoints/flows`, `@wats/graph/endpoints/calling`, `@wats/graph/endpoints/business-management`, and `@wats/graph/endpoints/groups`. `bun run api:check` keeps package exports, fixture imports, docs, and changelog mentions aligned
+- Node/Bun-only filesystem media helpers: `@wats/graph/node-media` exports path-based `uploadAndSend*FromPath` helpers. This subpath is deliberately separate from the root entrypoint so browser/edge users never pull `node:fs` transitively.
 - `paginate` / `paginateAll`
 - Graph error classes and pywa-seeded error registry helpers
 - media runtime: `uploadMedia`, `downloadMedia`, `downloadMediaBytes`, `deleteMedia`, `decryptEncryptedMedia`, upload-session helpers, `MediaValidationError`, `MediaCryptoError`, `MediaIntegrityError`, and finite media cap constants
@@ -2001,7 +2003,7 @@ One table per package. Find the surface you need; the contract lives in the link
 | [`reference/groups.md`](/docs/reference/groups) | WhatsApp Groups endpoint contracts, limits, webhook outcomes, service opt-in routes. |
 | [`reference/errors.md`](/docs/reference/errors) | The error registry; every pywa error code → WATS subclass; classification rules. |
 | [`reference/pagination.md`](/docs/reference/pagination) | `paginate` / `paginateAll`; cursor extraction; `AbortSignal`; `PaginationError` taxonomy. |
-| [`reference/media.md`](/docs/reference/media) | Media runtime: upload, metadata, binary download, delete, encrypted decrypt, upload sessions. Endpoint family subpaths: `@wats/graph/endpoints/{messages,media,templates,flows,calling,business-management,groups}`. |
+| [`reference/media.md`](/docs/reference/media) | Media runtime: upload, metadata, binary download, delete, encrypted decrypt, upload sessions, and Node/Bun path helpers via `@wats/graph/node-media`. Endpoint family subpaths: `@wats/graph/endpoints/{messages,media,templates,flows,calling,business-management,groups}`. |
 
 ## Core primitives (`@wats/core`)
 
@@ -4311,7 +4313,13 @@ import {
   MediaCryptoError,
   MediaIntegrityError
 } from "@wats/graph";
+import {
+  uploadAndSendImageFromPath,
+  uploadAndSendDocumentFromPath
+} from "@wats/graph/node-media";
 ```
+
+`@wats/graph/node-media` is an explicit Node/Bun-only subpath. It reads local filesystem paths and therefore is never exported from the root `@wats/graph` browser-safe entrypoint.
 
 ## Webhook media ID retention
 
@@ -4330,6 +4338,20 @@ console.log(result.id);
 ```
 
 Builds one `multipart/form-data` request, sends `POST /{phoneNumberId}/media` through `GraphClient.request`, adds a generated safe boundary to the `content-type` header, and preserves the Graph error taxonomy for non-2xx responses.
+
+## `@wats/graph/node-media` path helpers
+
+```ts
+const sent = await uploadAndSendImageFromPath(phoneNumberClient, {
+  to: "15551230000",
+  path: "./photo.jpg",
+  caption: "sent from disk"
+});
+```
+
+The Node/Bun-only subpath reads a local file, infers a MIME type from the extension, calls the existing in-memory `uploadAndSend*` helper, then sends by returned media id. The helpers perform exactly two Graph requests: media upload, then message send. They reject empty/control/NUL paths, `..` path segments, directories, unsupported extensions, over-large files, and missing files before transport. Error messages never echo the full filesystem path.
+
+Supported path helpers: `uploadAndSendImageFromPath`, `uploadAndSendVideoFromPath`, `uploadAndSendAudioFromPath`, `uploadAndSendDocumentFromPath`, `uploadAndSendStickerFromPath`.
 
 Supported file bodies for single-post upload:
 
@@ -6872,7 +6894,7 @@ Migration notes:
 | --- | --- | --- | --- |
 | pywa `send_message` / `send_text` | WATS `PhoneNumberClient.sendText` or `WhatsApp.startChat` | live-validated | Sends text to arbitrary E.164-ish recipients without contact lookup. |
 | `send_image`, `send_video`, `send_audio`, `send_document`, `send_sticker` | `PhoneNumberClient.sendImage` / `.sendVideo` / `.sendAudio` / `.sendDocument` / `.sendSticker` or matching `WhatsApp` helpers | live-validated (image by media id); others shape-only | WATS accepts existing media ids or http(s) links for message sends. |
-| pywa local file / bytes / file-like media sends | `uploadAndSendImage` / `uploadAndSendVideo` / `uploadAndSendAudio` / `uploadAndSendDocument` / `uploadAndSendSticker` for in-memory `Blob` / `ArrayBuffer` / `Uint8Array`; `uploadMedia` then send by id remains available | shape-only for in-memory bodies; filesystem path helpers planned | WATS keeps `@wats/graph` runtime-neutral, so file-path convenience needs a Node/Bun-specific wrapper. |
+| pywa local file / bytes / file-like media sends | `uploadAndSendImage` / `uploadAndSendVideo` / `uploadAndSendAudio` / `uploadAndSendDocument` / `uploadAndSendSticker` for in-memory `Blob` / `ArrayBuffer` / `Uint8Array`; `@wats/graph/node-media` adds `uploadAndSend*FromPath` helpers for Node/Bun filesystem paths | shape-only | Root `@wats/graph` stays runtime-neutral; path helpers live behind the explicit Node/Bun-only subpath. |
 | `send_location` / `request_location` | `sendLocation` / `requestLocation` | shape-only | |
 | `send_contact` | `sendContacts` | shape-only | WATS uses bounded arrays and strict contact shapes. |
 | `send_reaction` / `remove_reaction` | `sendReaction` / `removeReaction` | shape-only | Reactions route through `POST /{phoneNumberId}/messages`. |
@@ -7074,7 +7096,7 @@ accepts the request and WATS parses the live response.
 | Text sends | `send_text` / `send_message` | `sendText`, `WhatsApp.startChat` to arbitrary recipients. | live-validated — accepted with a real message id. |
 | Media sends | `send_image` etc. | `sendImage` / `sendVideo` / `sendAudio` / `sendDocument` / `sendSticker` by media id or link. | live-validated for image by media id; other media composers shape-only. |
 | Other composers | location, contacts, reactions, buttons, lists, CTA, catalog, mark-read, typing | Matching helpers on `PhoneNumberClient` and the facade. | shape-only. |
-| One-call media send | file/bytes polymorphism | `PhoneNumberClient.uploadAndSendImage` / `uploadAndSendVideo` / `uploadAndSendAudio` / `uploadAndSendDocument` / `uploadAndSendSticker` upload in-memory `Blob` / `ArrayBuffer` / `Uint8Array` bodies, then send by returned media id. | shape-only for in-memory bodies; filesystem path helpers still planned. |
+| One-call media send | file/bytes polymorphism | `PhoneNumberClient.uploadAndSendImage` / `uploadAndSendVideo` / `uploadAndSendAudio` / `uploadAndSendDocument` / `uploadAndSendSticker` upload in-memory `Blob` / `ArrayBuffer` / `Uint8Array` bodies, then send by returned media id. The Node/Bun-only `@wats/graph/node-media` subpath adds filesystem-path helpers. | shape-only. |
 | Media runtime | media helpers | `uploadMedia`, `downloadMedia`, `downloadMediaBytes`, `deleteMedia`, `decryptEncryptedMedia`, upload sessions. | live-validated — upload/metadata/send/delete passed live; decrypt and sessions shape-only. |
 | Template send | `send_template` | `sendTemplate` with parameter-count validation; `sendMarketingTemplate` for marketing messages. | live-validated — approved-template send produced the full sent/delivered/read chain; marketing send shape-only. |
 | Template management | `create_template` etc. | List/create/get/update/delete callables, component builders, template-group analytics, `compareTemplates`, and `unpauseTemplate`. | live-validated for list reads; mutations/comparison/unpause shape-only. |

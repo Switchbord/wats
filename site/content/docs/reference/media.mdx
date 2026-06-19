@@ -24,7 +24,13 @@ import {
   MediaCryptoError,
   MediaIntegrityError
 } from "@wats/graph";
+import {
+  uploadAndSendImageFromPath,
+  uploadAndSendDocumentFromPath
+} from "@wats/graph/node-media";
 ```
+
+`@wats/graph/node-media` is an explicit Node/Bun-only subpath. It reads local filesystem paths and therefore is never exported from the root `@wats/graph` browser-safe entrypoint.
 
 ## Webhook media ID retention
 
@@ -43,6 +49,20 @@ console.log(result.id);
 ```
 
 Builds one `multipart/form-data` request, sends `POST /{phoneNumberId}/media` through `GraphClient.request`, adds a generated safe boundary to the `content-type` header, and preserves the Graph error taxonomy for non-2xx responses.
+
+## `@wats/graph/node-media` path helpers
+
+```ts
+const sent = await uploadAndSendImageFromPath(phoneNumberClient, {
+  to: "15551230000",
+  path: "./photo.jpg",
+  caption: "sent from disk"
+});
+```
+
+The Node/Bun-only subpath reads a local file, infers a MIME type from the extension, calls the existing in-memory `uploadAndSend*` helper, then sends by returned media id. The helpers perform exactly two Graph requests: media upload, then message send. They reject empty/control/NUL paths, `..` path segments, directories, unsupported extensions, over-large files, and missing files before transport. Error messages never echo the full filesystem path.
+
+Supported path helpers: `uploadAndSendImageFromPath`, `uploadAndSendVideoFromPath`, `uploadAndSendAudioFromPath`, `uploadAndSendDocumentFromPath`, `uploadAndSendStickerFromPath`.
 
 Supported file bodies for single-post upload:
 
