@@ -51,6 +51,10 @@
       "types": "./dist/transport.d.ts",
       "import": "./dist/transport.js"
     },
+    "./node-media": {
+      "types": "./dist/nodeMedia.d.ts",
+      "import": "./dist/nodeMedia.js"
+    },
     "./testing": {
       "types": "./dist/createMockTransport.d.ts",
       "import": "./dist/createMockTransport.js"
