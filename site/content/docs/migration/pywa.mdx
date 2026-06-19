@@ -91,7 +91,7 @@ Migration notes:
 | pywa `send_template` | `PhoneNumberClient.sendTemplate` or `WhatsApp.sendTemplate`; `PhoneNumberClient.sendMarketingTemplate` for Meta `/marketing_messages` | live-validated (approved-template send); marketing send shape-only | Parameter-count validation runs locally. Marketing Messages status webhooks (`marketing_lite`) are modeled. |
 | pywa template component DSL | WATS component builders such as `buildTemplateHeaderComponent` | shape-only | Core HEADER/BODY/FOOTER/BUTTONS helpers exist; pywa's larger DSL is broader. |
 | template status/category/quality/components handlers | `normalizeWebhookEnvelope` account helpers plus `filtersTyped.template` | shape-only | Synthetic webhook coverage. |
-| `compare_templates`, `unpause_template` | `compareTemplates`, `unpauseTemplate` | shape-only | `migrate_templates`, archive/unarchive, and bulk auth/library helpers remain planned. |
+| `compare_templates`, `unpause_template`, `migrate_templates` | `compareTemplates`, `unpauseTemplate`, `migrateTemplates` | shape-only | Archive/unarchive and bulk auth/library helpers remain planned. `migrateTemplates` normalizes both documented `failed_templates` map responses and pywa-style list responses. |
 
 ## Flows map
 
