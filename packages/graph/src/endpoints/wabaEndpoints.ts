@@ -33,6 +33,7 @@ export {
   getTemplateGroupAnalytics,
   compareTemplates,
   unpauseTemplate,
+  migrateTemplates,
   COMPARE_TEMPLATES_MAX_IDS,
   KNOWN_TEMPLATE_TOP_BLOCK_REASONS,
   validateTemplateParameterCounts
@@ -77,6 +78,10 @@ export type {
   GetTemplateGroupInput,
   UpdateTemplateGroupBody,
   CompareTemplatesInput,
+  FailedTemplateEntry,
+  MigrateTemplatesInput,
+  MigrateTemplatesResponse,
+  MigratedTemplateEntry,
   TemplateTopBlockReason,
   TemplateUnpauseResult,
   TemplatesCompareResult,

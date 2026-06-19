@@ -41,6 +41,7 @@ import {
   getTemplateGroupAnalytics as getTemplateGroupAnalyticsEndpoint,
   compareTemplates as compareTemplatesEndpoint,
   unpauseTemplate as unpauseTemplateEndpoint,
+  migrateTemplates as migrateTemplatesEndpoint,
   listFlows as listFlowsEndpoint,
   getFlow as getFlowEndpoint,
   getFlowMetrics as getFlowMetricsEndpoint,
@@ -81,6 +82,8 @@ import {
   type CompareTemplatesInput,
   type DeleteTemplateGroupInput,
   type GetTemplateGroupInput,
+  type MigrateTemplatesInput,
+  type MigrateTemplatesResponse,
   type TemplatesCompareResult,
   type TemplateUnpauseResult,
   type UnpauseTemplateInput,
@@ -460,6 +463,42 @@ export class WABAClient {
     return unpauseTemplateEndpoint(
       this.#graphClient,
       params,
+      undefined,
+      opts
+    );
+  }
+
+  /**
+   * Graph `POST /{wabaId}/migrate_message_templates?source_waba_id=...`
+   * (WATS-160A). Copies (not moves) message templates from a source WABA
+   * into the bound destination WABA. Mirrors pywa's
+   * `WhatsApp.migrate_templates`. The bound wabaId is used as the
+   * destination and wins over any caller-supplied `destinationWabaId`
+   * (mirrors `migrateFlows`). See REFERENCE-160 / handoff.
+   */
+  async migrateTemplates(
+    params: Omit<MigrateTemplatesInput, "destinationWabaId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<MigrateTemplatesResponse> {
+    if (typeof params !== "object" || params === null || Array.isArray(params)) {
+      throw new GraphRequestValidationError(
+        "Invalid WABAClient.migrateTemplates params: expected an options object."
+      );
+    }
+    const descriptors = Object.getOwnPropertyDescriptors(params);
+    const scopedParams: Record<string, unknown> = {};
+    for (const [key, descriptor] of Object.entries(descriptors)) {
+      if (typeof descriptor.get === "function" || typeof descriptor.set === "function") {
+        throw new GraphRequestValidationError(
+          `Invalid WABAClient.migrateTemplates params: ${key} must not use accessors.`
+        );
+      }
+      if (descriptor.value !== undefined) scopedParams[key] = descriptor.value;
+    }
+    scopedParams.destinationWabaId = this.#wabaId;
+    return migrateTemplatesEndpoint(
+      this.#graphClient,
+      scopedParams as unknown as MigrateTemplatesInput,
       undefined,
       opts
     );
