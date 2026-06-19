@@ -16,6 +16,7 @@ import * as callingSubpath from "@wats/graph/endpoints/calling";
 import * as businessManagementSubpath from "@wats/graph/endpoints/business-management";
 import * as groupsSubpath from "@wats/graph/endpoints/groups";
 import * as transportSubpath from "@wats/graph/transport";
+import * as nodeMediaSubpath from "@wats/graph/node-media";
 import {
   GraphApiError,
   GraphAuthError,
@@ -1360,6 +1361,17 @@ async function verify(): Promise<VerifyReportOk> {
     typeof groupsSubpath.approveGroupJoinRequests === "function" &&
     typeof groupsSubpath.rejectGroupJoinRequests === "function" &&
     typeof groupsSubpath.GROUP_MAX_PARTICIPANTS === "number";
+
+  // WATS-159: Node/Bun-only filesystem-path media helpers, reachable through
+  // the explicit `@wats/graph/node-media` subpath (never the root entry, so
+  // the root stays browser/edge-safe). Importing this subpath must not throw
+  // and must surface the five upload-and-send-from-path functions.
+  checks["WATS-159 node-media subpath exports path upload-and-send helpers"] =
+    typeof nodeMediaSubpath.uploadAndSendImageFromPath === "function" &&
+    typeof nodeMediaSubpath.uploadAndSendVideoFromPath === "function" &&
+    typeof nodeMediaSubpath.uploadAndSendAudioFromPath === "function" &&
+    typeof nodeMediaSubpath.uploadAndSendDocumentFromPath === "function" &&
+    typeof nodeMediaSubpath.uploadAndSendStickerFromPath === "function";
 
   return {
     ok: true,
