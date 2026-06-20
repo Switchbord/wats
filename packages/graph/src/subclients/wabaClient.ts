@@ -44,6 +44,7 @@ import {
   migrateTemplates as migrateTemplatesEndpoint,
   archiveTemplates as archiveTemplatesEndpoint,
   unarchiveTemplates as unarchiveTemplatesEndpoint,
+  upsertAuthenticationTemplate as upsertAuthenticationTemplateEndpoint,
   listFlows as listFlowsEndpoint,
   getFlow as getFlowEndpoint,
   getFlowMetrics as getFlowMetricsEndpoint,
@@ -90,6 +91,8 @@ import {
   type ArchiveTemplatesResponse,
   type UnarchiveTemplatesInput,
   type UnarchiveTemplatesResponse,
+  type UpsertAuthenticationTemplateBody,
+  type UpsertAuthenticationTemplateResponse,
   type TemplatesCompareResult,
   type TemplateUnpauseResult,
   type UnpauseTemplateInput,
@@ -587,6 +590,27 @@ export class WABAClient {
       this.#graphClient,
       scopedParams as unknown as UnarchiveTemplatesInput,
       undefined,
+      opts
+    );
+  }
+
+  /**
+   * `POST /{wabaId}/upsert_message_templates` (WATS-160C). Upserts an
+   * authentication message template (one or more languages) on the bound
+   * WABA. Mirrors pywa's `WhatsApp.upsert_authentication_template`. The
+   * bound wabaId is used in the path and wins over any caller-supplied
+   * `wabaId`. Stricter than `createMessageTemplate`: the body is a fixed
+   * camelCase descriptor translated into the Graph AUTHENTICATION
+   * component layout. See advanced.ts / REFERENCE.
+   */
+  async upsertAuthenticationTemplate(
+    body: UpsertAuthenticationTemplateBody,
+    opts?: EndpointInvokeOptions
+  ): Promise<UpsertAuthenticationTemplateResponse> {
+    return upsertAuthenticationTemplateEndpoint(
+      this.#graphClient,
+      { wabaId: this.#wabaId },
+      body,
       opts
     );
   }

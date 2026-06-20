@@ -36,9 +36,14 @@ export {
   migrateTemplates,
   archiveTemplates,
   unarchiveTemplates,
+  upsertAuthenticationTemplate,
+  buildUpsertAuthenticationTemplateBody,
   COMPARE_TEMPLATES_MAX_IDS,
   ARCHIVE_TEMPLATES_MAX_IDS,
+  UPSERT_AUTH_LANGUAGES_MAX,
+  UPSERT_AUTH_SUPPORTED_APPS_MAX,
   KNOWN_TEMPLATE_TOP_BLOCK_REASONS,
+  KNOWN_UPSERT_AUTH_OTP_TYPES,
   validateTemplateParameterCounts
 } from "./templates/index.js";
 
@@ -92,7 +97,13 @@ export type {
   TemplateTopBlockReason,
   TemplateUnpauseResult,
   TemplatesCompareResult,
-  UnpauseTemplateInput
+  UnpauseTemplateInput,
+  UpsertAuthOtpButtonInput,
+  UpsertAuthOtpType,
+  UpsertAuthSupportedAppInput,
+  UpsertAuthenticationTemplateBody,
+  UpsertAuthenticationTemplateResponse,
+  UpsertedAuthTemplateEntry
 } from "./templates/index.js";
 
 

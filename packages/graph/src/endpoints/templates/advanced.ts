@@ -32,7 +32,8 @@ import {
   assertPlainRecord,
   assertString,
   hasControlChar,
-  validationError
+  validationError,
+  TEMPLATE_SHORT_TEXT_MAX_LENGTH
 } from "./shared.js";
 
 // ---------------------------------------------------------------------------
@@ -1020,3 +1021,368 @@ export async function unarchiveTemplates(
     "unarchivedTemplates"
   ) as Promise<UnarchiveTemplatesResponse>;
 }
+
+// ---------------------------------------------------------------------------
+// upsertAuthenticationTemplate (WATS-160C)
+// ---------------------------------------------------------------------------
+//
+// Mirrors pywa's `WhatsApp.upsert_authentication_template` / Meta's
+// `POST /{wabaId}/upsert_message_templates` with `category: AUTHENTICATION`.
+// Unlike the generic create-template helper, auth upsert:
+//   - sends `languages` (plural array) instead of a single `language`
+//   - pins `category` to `AUTHENTICATION`
+//   - builds a fixed component layout: BODY (with optional
+//     `add_security_recommendation`), optional FOOTER (with
+//     `code_expiration_minutes`), and a single BUTTONS component carrying
+//     exactly one OTP button
+//   - enforces stricter OTP-button rules than the generic builder:
+//       * `text` / `autofillText` are rejected on the otpButton
+//       * COPY_CODE does NOT require `supportedApps`
+//       * ONE_TAP / ZERO_TAP REQUIRE `supportedApps`
+//
+// Wire (see Meta auth-template docs):
+//   POST /{wabaId}/upsert_message_templates
+//   Content-Type: application/json
+//   Body: { name, languages, category:'AUTHENTICATION',
+//           components:[BODY, FOOTER?, BUTTONS], message_send_ttl_seconds? }
+//
+// Response (CreatedTemplates-ish): a `data` array whose entries carry
+// `id` / `status` / `language` plus any unknown fields Meta returns. The
+// raw response is preserved verbatim via an index signature.
+
+const HELPER_UPSERT_AUTH = "upsertAuthenticationTemplate";
+
+/** Finite cap on the number of languages per upsert call (defensive bound). */
+export const UPSERT_AUTH_LANGUAGES_MAX = 100;
+
+/** Finite cap on supportedApps per OTP button (matches generic builder). */
+export const UPSERT_AUTH_SUPPORTED_APPS_MAX = 10;
+
+/** Allowed OTP button types for authentication template upsert. */
+export type UpsertAuthOtpType = "COPY_CODE" | "ONE_TAP" | "ZERO_TAP";
+
+export const KNOWN_UPSERT_AUTH_OTP_TYPES: readonly UpsertAuthOtpType[] = [
+  "COPY_CODE",
+  "ONE_TAP",
+  "ZERO_TAP"
+];
+
+/**
+ * A single supported-app entry on an OTP button. `packageName` /
+ * `signatureHash` are mapped to the Graph wire fields `package_name` /
+ * `signature_hash`. Unknown fields are not forwarded (stricter than the
+ * generic OTP builder).
+ */
+export interface UpsertAuthSupportedAppInput {
+  readonly packageName: string;
+  readonly signatureHash: string;
+}
+
+/**
+ * The OTP button descriptor for auth-template upsert. Stricter than the
+ * generic {@link TemplateButtonInput} OTP variant: `text` and
+ * `autofillText` are NOT permitted here (the upsert auth endpoint rejects
+ * them), and `supportedApps` is required for ONE_TAP / ZERO_TAP but
+ * optional for COPY_CODE.
+ */
+export interface UpsertAuthOtpButtonInput {
+  readonly otpType: UpsertAuthOtpType;
+  readonly supportedApps?: readonly UpsertAuthSupportedAppInput[];
+}
+
+/**
+ * Public camelCase body for {@link upsertAuthenticationTemplate}. Stricter
+ * than {@link CreateMessageTemplateBody}: `languages` is an array, the
+ * OTP button is a single dedicated descriptor, and only the auth-specific
+ * optional fields (`addSecurityRecommendation`, `codeExpirationMinutes`,
+ * `messageSendTtlSeconds`) are exposed.
+ */
+export interface UpsertAuthenticationTemplateBody {
+  readonly name: string;
+  readonly languages: readonly string[];
+  readonly otpButton: UpsertAuthOtpButtonInput;
+  readonly addSecurityRecommendation?: boolean;
+  readonly codeExpirationMinutes?: number;
+  readonly messageSendTtlSeconds?: number;
+}
+
+/**
+ * A single entry in the {@link UpsertAuthenticationTemplateResponse.data}
+ * array. `id`, `status`, and `language` are typed; all other fields Meta
+ * returns are preserved via the index signature.
+ */
+export interface UpsertedAuthTemplateEntry {
+  readonly id?: string;
+  readonly status?: string;
+  readonly language?: string;
+  readonly [key: string]: unknown;
+}
+
+/**
+ * Response of `POST /{wabaId}/upsert_message_templates`. Mirrors the
+ * CreatedTemplates-ish shape: a `data` array of per-language results plus
+ * any unknown top-level fields Meta returns.
+ */
+export interface UpsertAuthenticationTemplateResponse {
+  readonly data?: readonly UpsertedAuthTemplateEntry[];
+  readonly [key: string]: unknown;
+}
+
+function assertUpsertAuthBoolean(
+  value: unknown,
+  fieldName: string
+): boolean {
+  if (typeof value !== "boolean") {
+    throw validationError(
+      `Invalid ${HELPER_UPSERT_AUTH} input: ${fieldName} must be a boolean.`
+    );
+  }
+  return value;
+}
+
+/**
+ * Validate `codeExpirationMinutes`: must be a finite integer in the
+ * documented 1..90 range. Rejects NaN, Infinity, non-integers, and
+ * out-of-range values.
+ */
+function assertCodeExpirationMinutes(value: unknown): number {
+  if (
+    typeof value !== "number" ||
+    !Number.isFinite(value) ||
+    !Number.isInteger(value) ||
+    value < 1 ||
+    value > 90
+  ) {
+    throw validationError(
+      `Invalid ${HELPER_UPSERT_AUTH} input: codeExpirationMinutes must be an integer between 1 and 90.`
+    );
+  }
+  return value;
+}
+
+/**
+ * Validate `messageSendTtlSeconds`: must be a finite non-negative integer.
+ * Mirrors the shared `mapCommonBodyFields` check.
+ */
+function assertNonNegativeInteger(
+  value: unknown,
+  fieldName: string
+): number {
+  if (
+    typeof value !== "number" ||
+    !Number.isFinite(value) ||
+    !Number.isInteger(value) ||
+    value < 0
+  ) {
+    throw validationError(
+      `Invalid ${HELPER_UPSERT_AUTH} input: ${fieldName} must be a non-negative integer.`
+    );
+  }
+  return value;
+}
+
+/**
+ * Normalize `otpButton.supportedApps` into the Graph wire form
+ * (`[{ package_name, signature_hash }]`). Reuses the shared
+ * `assertArray` / `assertPlainRecord` / `assertString` validators so the
+ * full F-6 descriptor-safe / control-char / length taxonomy applies.
+ */
+function normalizeUpsertAuthSupportedApps(
+  value: unknown
+): readonly Record<string, string>[] {
+  const apps = assertArray(
+    value,
+    "otpButton.supportedApps",
+    1,
+    UPSERT_AUTH_SUPPORTED_APPS_MAX,
+    HELPER_UPSERT_AUTH
+  );
+  return apps.map((entry, index) => {
+    const record = assertPlainRecord(
+      entry,
+      HELPER_UPSERT_AUTH,
+      `otpButton.supportedApps[${index}]`
+    );
+    return {
+      package_name: assertString(
+        record.packageName,
+        `otpButton.supportedApps[${index}].packageName`,
+        HELPER_UPSERT_AUTH,
+        TEMPLATE_SHORT_TEXT_MAX_LENGTH
+      ),
+      signature_hash: assertString(
+        record.signatureHash,
+        `otpButton.supportedApps[${index}].signatureHash`,
+        HELPER_UPSERT_AUTH,
+        TEMPLATE_SHORT_TEXT_MAX_LENGTH
+      )
+    };
+  });
+}
+
+/**
+ * Build the Graph request body for auth-template upsert from the public
+ * camelCase {@link UpsertAuthenticationTemplateBody}. Performs all
+ * validation (descriptor-safe via `assertPlainRecord`, finite caps,
+ * otpType enum, OTP-button strictness, codeExpirationMinutes range,
+ * messageSendTtlSeconds non-negative integer) so bad input throws a
+ * `GraphRequestValidationError` before any transport call.
+ */
+export function buildUpsertAuthenticationTemplateBody(
+  input: UpsertAuthenticationTemplateBody
+): Record<string, unknown> {
+  const record = assertPlainRecord(input, HELPER_UPSERT_AUTH);
+
+  const name = assertString(record.name, "name", HELPER_UPSERT_AUTH);
+
+  const langsArr = assertArray(
+    record.languages,
+    "languages",
+    1,
+    UPSERT_AUTH_LANGUAGES_MAX,
+    HELPER_UPSERT_AUTH
+  );
+  const languages = langsArr.map((item, index) =>
+    assertString(item, `languages[${index}]`, HELPER_UPSERT_AUTH, 64)
+  );
+
+  const otpButtonRec = assertPlainRecord(
+    record.otpButton,
+    HELPER_UPSERT_AUTH,
+    "otpButton"
+  );
+  const otpTypeRaw = assertString(
+    otpButtonRec.otpType,
+    "otpButton.otpType",
+    HELPER_UPSERT_AUTH,
+    32
+  );
+  const otpType = otpTypeRaw.toUpperCase();
+  if (
+    !KNOWN_UPSERT_AUTH_OTP_TYPES.includes(otpType as UpsertAuthOtpType)
+  ) {
+    throw validationError(
+      `Invalid ${HELPER_UPSERT_AUTH} input: otpButton.otpType must be one of COPY_CODE, ONE_TAP, ZERO_TAP.`
+    );
+  }
+
+  // Stricter than the generic OTP builder: text / autofillText are not
+  // permitted on the auth-template upsert otpButton.
+  if (otpButtonRec.text !== undefined) {
+    throw validationError(
+      `Invalid ${HELPER_UPSERT_AUTH} input: otpButton.text is not allowed for authentication templates.`
+    );
+  }
+  if (otpButtonRec.autofillText !== undefined) {
+    throw validationError(
+      `Invalid ${HELPER_UPSERT_AUTH} input: otpButton.autofillText is not allowed for authentication templates.`
+    );
+  }
+
+  const button: Record<string, unknown> = { type: "OTP", otp_type: otpType };
+  if (otpType === "COPY_CODE") {
+    // supportedApps is NOT required for COPY_CODE; include only if present.
+    if (otpButtonRec.supportedApps !== undefined) {
+      button.supported_apps = normalizeUpsertAuthSupportedApps(
+        otpButtonRec.supportedApps
+      );
+    }
+  } else {
+    // ONE_TAP / ZERO_TAP require supportedApps.
+    if (otpButtonRec.supportedApps === undefined) {
+      throw validationError(
+        `Invalid ${HELPER_UPSERT_AUTH} input: otpButton.supportedApps is required for ${otpType} buttons.`
+      );
+    }
+    button.supported_apps = normalizeUpsertAuthSupportedApps(
+      otpButtonRec.supportedApps
+    );
+  }
+
+  // BODY component (always present) with optional add_security_recommendation.
+  const bodyComponent: Record<string, unknown> = { type: "BODY" };
+  if (record.addSecurityRecommendation !== undefined) {
+    bodyComponent.add_security_recommendation = assertUpsertAuthBoolean(
+      record.addSecurityRecommendation,
+      "addSecurityRecommendation"
+    );
+  }
+
+  const components: Record<string, unknown>[] = [bodyComponent];
+
+  // Optional FOOTER component carrying code_expiration_minutes.
+  if (record.codeExpirationMinutes !== undefined) {
+    const cem = assertCodeExpirationMinutes(record.codeExpirationMinutes);
+    components.push({ type: "FOOTER", code_expiration_minutes: cem });
+  }
+
+  // BUTTONS component (always present) carrying the single OTP button.
+  components.push({ type: "BUTTONS", buttons: [button] });
+
+  const out: Record<string, unknown> = {
+    name,
+    languages,
+    category: "AUTHENTICATION",
+    components
+  };
+
+  if (record.messageSendTtlSeconds !== undefined) {
+    out.message_send_ttl_seconds = assertNonNegativeInteger(
+      record.messageSendTtlSeconds,
+      "messageSendTtlSeconds"
+    );
+  }
+
+  return out;
+}
+
+const upsertAuthenticationTemplateRaw = defineEndpoint<
+  { wabaId: string },
+  UpsertAuthenticationTemplateBody,
+  UpsertAuthenticationTemplateResponse
+>({
+  method: "POST",
+  pathTemplate: "/{wabaId}/upsert_message_templates",
+  params: { wabaId: { in: "path", required: true } },
+  bodyContentType: "application/json",
+  buildBody: buildUpsertAuthenticationTemplateBody
+});
+
+/**
+ * `POST /{wabaId}/upsert_message_templates` (WATS-160C). Upserts an
+ * authentication message template (one or more languages) on a WABA.
+ * Mirrors pywa's `WhatsApp.upsert_authentication_template`. Stricter than
+ * {@link createMessageTemplate}: the body is a fixed camelCase descriptor
+ * that the helper translates into the Graph AUTHENTICATION component
+ * layout (BODY + optional FOOTER + BUTTONS with a single OTP button).
+ *
+ * All validation (descriptor-safe params/body, finite caps, otpType enum,
+ * OTP-button strictness, codeExpirationMinutes range, messageSendTtlSeconds
+ * non-negative integer) throws a `GraphRequestValidationError` before any
+ * transport call.
+ */
+export const upsertAuthenticationTemplate = Object.assign(
+  async function upsertAuthenticationTemplate(
+    client: GraphClient,
+    params: { readonly wabaId: string },
+    body: UpsertAuthenticationTemplateBody,
+    opts?: EndpointInvokeOptions
+  ): Promise<UpsertAuthenticationTemplateResponse> {
+    const record = assertPlainRecord(params, HELPER_UPSERT_AUTH, "params");
+    return upsertAuthenticationTemplateRaw(
+      client,
+      { wabaId: assertString(record.wabaId, "wabaId", HELPER_UPSERT_AUTH) },
+      body,
+      opts
+    );
+  },
+  { definition: upsertAuthenticationTemplateRaw.definition }
+) as unknown as {
+  (
+    client: GraphClient,
+    params: { readonly wabaId: string },
+    body: UpsertAuthenticationTemplateBody,
+    opts?: EndpointInvokeOptions
+  ): Promise<UpsertAuthenticationTemplateResponse>;
+  readonly definition: typeof upsertAuthenticationTemplateRaw.definition;
+};
