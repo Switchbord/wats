@@ -381,6 +381,69 @@ export interface SubmitDisplayNameForReviewResponse {
   readonly [key: string]: unknown;
 }
 
+export interface CreatePhoneNumberInput {
+  readonly wabaId: string;
+  readonly countryCode: string;
+  readonly phoneNumber: string;
+  readonly verifiedName: string;
+}
+
+export interface CreatePhoneNumberResponse {
+  readonly id?: string;
+  readonly [key: string]: unknown;
+}
+
+export interface RequestVerificationCodeInput {
+  readonly phoneNumberId: string;
+  readonly codeMethod: "SMS" | "VOICE" | string;
+  readonly language: string;
+}
+
+export interface RequestVerificationCodeResponse {
+  readonly success?: boolean;
+  readonly [key: string]: unknown;
+}
+
+export interface VerifyPhoneNumberInput {
+  readonly phoneNumberId: string;
+  readonly code: string;
+}
+
+export interface VerifyPhoneNumberResponse {
+  readonly success?: boolean;
+  readonly [key: string]: unknown;
+}
+
+export interface RegisterPhoneNumberInput {
+  readonly phoneNumberId: string;
+  readonly pin: string;
+  readonly dataLocalizationRegion?: string;
+}
+
+export interface RegisterPhoneNumberResponse {
+  readonly success?: boolean;
+  readonly [key: string]: unknown;
+}
+
+export interface DeregisterPhoneNumberInput {
+  readonly phoneNumberId: string;
+}
+
+export interface DeregisterPhoneNumberResponse {
+  readonly success?: boolean;
+  readonly [key: string]: unknown;
+}
+
+export interface SetTwoStepVerificationPinInput {
+  readonly phoneNumberId: string;
+  readonly pin: string;
+}
+
+export interface SetTwoStepVerificationPinResponse {
+  readonly success?: boolean;
+  readonly [key: string]: unknown;
+}
+
 export interface GetBusinessProfileInput {
   readonly phoneNumberId: string;
   readonly fields?: BusinessManagementFields;
@@ -550,6 +613,95 @@ function normalizeBlockUserList(value: unknown, helperName: string): readonly { 
 function assertBoundedPlainString(value: unknown, fieldName: string, helperName: string, maxLength: number): string {
   const out = assertQueryString(value, fieldName, helperName, maxLength);
   return out;
+}
+
+const CODE_METHOD_VALUES = new Set(["SMS", "VOICE"]);
+
+function assertCodeMethod(value: unknown, helperName: string): string {
+  const str = assertQueryString(value, "codeMethod", helperName, 16).toUpperCase();
+  if (!CODE_METHOD_VALUES.has(str)) {
+    throw validationError(`Invalid ${helperName} input: codeMethod must be one of SMS, VOICE.`);
+  }
+  return str;
+}
+
+function assertLanguage(value: unknown, helperName: string): string {
+  const str = assertQueryString(value, "language", helperName, 8).toLowerCase();
+  if (!/^[a-z]{2}$/u.test(str)) {
+    throw validationError(`Invalid ${helperName} input: language must be a 2-letter language code.`);
+  }
+  return str;
+}
+
+// SECURITY: `value` is a verification code. It MUST NEVER be interpolated
+// into any error message — the message templates below are static and
+// intentionally describe only the validation rule that failed.
+function assertVerificationCode(value: unknown, helperName: string): string {
+  if (typeof value !== "string" || value.length === 0) {
+    throw validationError(`Invalid ${helperName} input: code must be a non-empty string.`);
+  }
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code < 0x20 || code === 0x7f) {
+      throw validationError(`Invalid ${helperName} input: code must not contain control characters.`);
+    }
+  }
+  if (!/^\d{1,32}$/u.test(value)) {
+    throw validationError(`Invalid ${helperName} input: code must be 1-32 digits.`);
+  }
+  return value;
+}
+
+function assertCountryCode(value: unknown, helperName: string): string {
+  const str = assertQueryString(value, "countryCode", helperName, 6);
+  if (!/^\d{1,6}$/u.test(str)) {
+    throw validationError(`Invalid ${helperName} input: countryCode must be 1-6 digits.`);
+  }
+  return str;
+}
+
+function assertNationalPhoneNumber(value: unknown, helperName: string): string {
+  if (typeof value !== "string" || value.length === 0) {
+    throw validationError(`Invalid ${helperName} input: phoneNumber must be a non-empty digits string.`);
+  }
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code < 0x20 || code === 0x7f) {
+      throw validationError(`Invalid ${helperName} input: phoneNumber must not contain control characters.`);
+    }
+  }
+  if (!/^\d{1,15}$/u.test(value)) {
+    throw validationError(`Invalid ${helperName} input: phoneNumber must be 1-15 digits.`);
+  }
+  return value;
+}
+
+// SECURITY: `value` is a registration / two-step verification PIN. It MUST
+// NEVER be interpolated into any error message — the message templates
+// below are static and intentionally describe only the validation rule
+// that failed.
+function assertPin(value: unknown, helperName: string): string {
+  if (typeof value !== "string" || value.length === 0) {
+    throw validationError(`Invalid ${helperName} input: pin must be a non-empty string.`);
+  }
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code < 0x20 || code === 0x7f) {
+      throw validationError(`Invalid ${helperName} input: pin must not contain control characters.`);
+    }
+  }
+  if (!/^\d{6}$/u.test(value)) {
+    throw validationError(`Invalid ${helperName} input: pin must be exactly 6 digits.`);
+  }
+  return value;
+}
+
+function assertDataLocalizationRegion(value: unknown, helperName: string): string {
+  const str = assertBoundedPlainString(value, "dataLocalizationRegion", helperName, 2).toUpperCase();
+  if (!/^[A-Z]{2}$/u.test(str)) {
+    throw validationError(`Invalid ${helperName} input: dataLocalizationRegion must be an ISO 3166-1 alpha-2 country code.`);
+  }
+  return str;
 }
 
 function assertHttpUrl(value: unknown, fieldName: string, helperName: string): string {
@@ -954,6 +1106,83 @@ export function normalizeDisplayNameReviewParams(input: SubmitDisplayNameForRevi
   return { phoneNumberId: assertPathId(ownDataValue(record, "phoneNumberId", helperName, true), "phoneNumberId", helperName) };
 }
 
+export function buildCreatePhoneNumberBody(input: CreatePhoneNumberInput): Record<string, unknown> {
+  const helperName = "createPhoneNumber";
+  const record = assertPlainRecord(input, helperName);
+  return {
+    country_code: assertCountryCode(ownDataValue(record, "countryCode", helperName, true), helperName),
+    phone_number: assertNationalPhoneNumber(ownDataValue(record, "phoneNumber", helperName, true), helperName),
+    verified_name: assertBoundedPlainString(ownDataValue(record, "verifiedName", helperName, true), "verifiedName", helperName, MAX_DISPLAY_NAME_LENGTH)
+  };
+}
+
+export function normalizeCreatePhoneNumberParams(input: CreatePhoneNumberInput): WireParams {
+  const helperName = "createPhoneNumber";
+  const record = assertPlainRecord(input, helperName);
+  return { wabaId: assertPathId(ownDataValue(record, "wabaId", helperName, true), "wabaId", helperName) };
+}
+
+export function normalizeRequestVerificationCodeParams(input: RequestVerificationCodeInput): WireParams {
+  const helperName = "requestVerificationCode";
+  const record = assertPlainRecord(input, helperName);
+  return {
+    phoneNumberId: assertPathId(ownDataValue(record, "phoneNumberId", helperName, true), "phoneNumberId", helperName),
+    code_method: assertCodeMethod(ownDataValue(record, "codeMethod", helperName, true), helperName),
+    language: assertLanguage(ownDataValue(record, "language", helperName, true), helperName)
+  };
+}
+
+export function normalizeVerifyPhoneNumberParams(input: VerifyPhoneNumberInput): WireParams {
+  const helperName = "verifyPhoneNumber";
+  const record = assertPlainRecord(input, helperName);
+  return {
+    phoneNumberId: assertPathId(ownDataValue(record, "phoneNumberId", helperName, true), "phoneNumberId", helperName),
+    code: assertVerificationCode(ownDataValue(record, "code", helperName, true), helperName)
+  };
+}
+
+export function buildRegisterPhoneNumberBody(input: RegisterPhoneNumberInput): Record<string, unknown> {
+  const helperName = "registerPhoneNumber";
+  const record = assertPlainRecord(input, helperName);
+  const out: Record<string, unknown> = {
+    messaging_product: "whatsapp",
+    pin: assertPin(ownDataValue(record, "pin", helperName, true), helperName)
+  };
+  const dataLocalizationRegion = ownDataValue(record, "dataLocalizationRegion", helperName, false);
+  if (dataLocalizationRegion !== undefined) {
+    out.data_localization_region = assertDataLocalizationRegion(dataLocalizationRegion, helperName);
+  }
+  return out;
+}
+
+export function normalizeRegisterPhoneNumberParams(input: RegisterPhoneNumberInput): WireParams {
+  const helperName = "registerPhoneNumber";
+  const record = assertPlainRecord(input, helperName);
+  return { phoneNumberId: assertPathId(ownDataValue(record, "phoneNumberId", helperName, true), "phoneNumberId", helperName) };
+}
+
+export function normalizeDeregisterPhoneNumberParams(input: DeregisterPhoneNumberInput): WireParams {
+  const helperName = "deregisterPhoneNumber";
+  const record = assertPlainRecord(input, helperName);
+  return { phoneNumberId: assertPathId(ownDataValue(record, "phoneNumberId", helperName, true), "phoneNumberId", helperName) };
+}
+
+export function buildSetTwoStepVerificationPinBody(input: SetTwoStepVerificationPinInput): Record<string, unknown> {
+  const helperName = "setTwoStepVerificationPin";
+  const record = assertPlainRecord(input, helperName);
+  return {
+    two_step_verification: {
+      pin: assertPin(ownDataValue(record, "pin", helperName, true), helperName)
+    }
+  };
+}
+
+export function normalizeSetTwoStepVerificationPinParams(input: SetTwoStepVerificationPinInput): WireParams {
+  const helperName = "setTwoStepVerificationPin";
+  const record = assertPlainRecord(input, helperName);
+  return { phoneNumberId: assertPathId(ownDataValue(record, "phoneNumberId", helperName, true), "phoneNumberId", helperName) };
+}
+
 export function normalizeBusinessProfileParams(input: GetBusinessProfileInput): WireParams {
   const helperName = "getBusinessProfile";
   const record = assertPlainRecord(input, helperName);
@@ -1229,6 +1458,75 @@ const updateCommerceSettingsRaw = defineEndpoint<
   buildBody: buildUpdateCommerceSettingsBody
 });
 
+const createPhoneNumberRaw = defineEndpoint<{ wabaId: string }, CreatePhoneNumberInput, CreatePhoneNumberResponse>({
+  method: "POST",
+  pathTemplate: "/{wabaId}/phone_numbers",
+  params: { wabaId: { in: "path", required: true } },
+  bodyContentType: "application/json",
+  buildBody: buildCreatePhoneNumberBody
+});
+
+const requestVerificationCodeRaw = defineEndpoint<
+  { phoneNumberId: string; code_method?: string; language?: string },
+  never,
+  RequestVerificationCodeResponse
+>({
+  method: "POST",
+  pathTemplate: "/{phoneNumberId}/request_code",
+  params: {
+    phoneNumberId: { in: "path", required: true },
+    code_method: { in: "query" },
+    language: { in: "query" }
+  }
+});
+
+const verifyPhoneNumberRaw = defineEndpoint<
+  { phoneNumberId: string; code?: string },
+  never,
+  VerifyPhoneNumberResponse
+>({
+  method: "POST",
+  pathTemplate: "/{phoneNumberId}/verify_code",
+  params: {
+    phoneNumberId: { in: "path", required: true },
+    code: { in: "query" }
+  }
+});
+
+const registerPhoneNumberRaw = defineEndpoint<
+  { phoneNumberId: string },
+  RegisterPhoneNumberInput,
+  RegisterPhoneNumberResponse
+>({
+  method: "POST",
+  pathTemplate: "/{phoneNumberId}/register",
+  params: { phoneNumberId: { in: "path", required: true } },
+  bodyContentType: "application/json",
+  buildBody: buildRegisterPhoneNumberBody
+});
+
+const deregisterPhoneNumberRaw = defineEndpoint<
+  { phoneNumberId: string },
+  never,
+  DeregisterPhoneNumberResponse
+>({
+  method: "POST",
+  pathTemplate: "/{phoneNumberId}/deregister",
+  params: { phoneNumberId: { in: "path", required: true } }
+});
+
+const setTwoStepVerificationPinRaw = defineEndpoint<
+  { phoneNumberId: string },
+  SetTwoStepVerificationPinInput,
+  SetTwoStepVerificationPinResponse
+>({
+  method: "POST",
+  pathTemplate: "/{phoneNumberId}",
+  params: { phoneNumberId: { in: "path", required: true } },
+  bodyContentType: "application/json",
+  buildBody: buildSetTwoStepVerificationPinBody
+});
+
 export const getWabaInfo = Object.assign(
   async function getWabaInfo(client: GraphClient, params: GetWabaInfoInput, body?: never, opts?: EndpointInvokeOptions): Promise<WabaInfo> {
     assertNoBody(body, "getWabaInfo");
@@ -1347,4 +1645,52 @@ export const updateCommerceSettings = Object.assign(
     return updateCommerceSettingsRaw(client, normalizeUpdateCommerceSettingsParams(params) as Parameters<typeof updateCommerceSettingsRaw>[1], params, sanitizeBusinessManagementOptions(opts, "updateCommerceSettings"));
   },
   { definition: updateCommerceSettingsRaw.definition }
+);
+
+export const createPhoneNumber = Object.assign(
+  async function createPhoneNumber(client: GraphClient, params: CreatePhoneNumberInput, body?: never, opts?: EndpointInvokeOptions): Promise<CreatePhoneNumberResponse> {
+    assertNoBody(body, "createPhoneNumber");
+    return createPhoneNumberRaw(client, normalizeCreatePhoneNumberParams(params) as Parameters<typeof createPhoneNumberRaw>[1], params, sanitizeBusinessManagementOptions(opts, "createPhoneNumber"));
+  },
+  { definition: createPhoneNumberRaw.definition }
+);
+
+export const requestVerificationCode = Object.assign(
+  async function requestVerificationCode(client: GraphClient, params: RequestVerificationCodeInput, body?: never, opts?: EndpointInvokeOptions): Promise<RequestVerificationCodeResponse> {
+    assertNoBody(body, "requestVerificationCode");
+    return requestVerificationCodeRaw(client, normalizeRequestVerificationCodeParams(params) as Parameters<typeof requestVerificationCodeRaw>[1], undefined, sanitizeBusinessManagementOptions(opts, "requestVerificationCode"));
+  },
+  { definition: requestVerificationCodeRaw.definition }
+);
+
+export const verifyPhoneNumber = Object.assign(
+  async function verifyPhoneNumber(client: GraphClient, params: VerifyPhoneNumberInput, body?: never, opts?: EndpointInvokeOptions): Promise<VerifyPhoneNumberResponse> {
+    assertNoBody(body, "verifyPhoneNumber");
+    return verifyPhoneNumberRaw(client, normalizeVerifyPhoneNumberParams(params) as Parameters<typeof verifyPhoneNumberRaw>[1], undefined, sanitizeBusinessManagementOptions(opts, "verifyPhoneNumber"));
+  },
+  { definition: verifyPhoneNumberRaw.definition }
+);
+
+export const registerPhoneNumber = Object.assign(
+  async function registerPhoneNumber(client: GraphClient, params: RegisterPhoneNumberInput, body?: never, opts?: EndpointInvokeOptions): Promise<RegisterPhoneNumberResponse> {
+    assertNoBody(body, "registerPhoneNumber");
+    return registerPhoneNumberRaw(client, normalizeRegisterPhoneNumberParams(params) as Parameters<typeof registerPhoneNumberRaw>[1], params, sanitizeBusinessManagementOptions(opts, "registerPhoneNumber"));
+  },
+  { definition: registerPhoneNumberRaw.definition }
+);
+
+export const deregisterPhoneNumber = Object.assign(
+  async function deregisterPhoneNumber(client: GraphClient, params: DeregisterPhoneNumberInput, body?: never, opts?: EndpointInvokeOptions): Promise<DeregisterPhoneNumberResponse> {
+    assertNoBody(body, "deregisterPhoneNumber");
+    return deregisterPhoneNumberRaw(client, normalizeDeregisterPhoneNumberParams(params) as Parameters<typeof deregisterPhoneNumberRaw>[1], undefined, sanitizeBusinessManagementOptions(opts, "deregisterPhoneNumber"));
+  },
+  { definition: deregisterPhoneNumberRaw.definition }
+);
+
+export const setTwoStepVerificationPin = Object.assign(
+  async function setTwoStepVerificationPin(client: GraphClient, params: SetTwoStepVerificationPinInput, body?: never, opts?: EndpointInvokeOptions): Promise<SetTwoStepVerificationPinResponse> {
+    assertNoBody(body, "setTwoStepVerificationPin");
+    return setTwoStepVerificationPinRaw(client, normalizeSetTwoStepVerificationPinParams(params) as Parameters<typeof setTwoStepVerificationPinRaw>[1], params, sanitizeBusinessManagementOptions(opts, "setTwoStepVerificationPin"));
+  },
+  { definition: setTwoStepVerificationPinRaw.definition }
 );
