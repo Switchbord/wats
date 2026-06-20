@@ -21,8 +21,16 @@ export {
   compareTemplates,
   migrateTemplates,
   unpauseTemplate,
+  archiveTemplates,
+  unarchiveTemplates,
+  upsertAuthenticationTemplate,
+  buildUpsertAuthenticationTemplateBody,
+  ARCHIVE_TEMPLATES_MAX_IDS,
   COMPARE_TEMPLATES_MAX_IDS,
-  KNOWN_TEMPLATE_TOP_BLOCK_REASONS
+  UPSERT_AUTH_LANGUAGES_MAX,
+  UPSERT_AUTH_SUPPORTED_APPS_MAX,
+  KNOWN_TEMPLATE_TOP_BLOCK_REASONS,
+  KNOWN_UPSERT_AUTH_OTP_TYPES
 } from "./advanced.js";
 
 export {
@@ -82,6 +90,8 @@ export type {
 } from "./groups.js";
 
 export type {
+  ArchiveTemplatesInput,
+  ArchiveTemplatesResponse,
   CompareTemplatesInput,
   FailedTemplateEntry,
   MigrateTemplatesInput,
@@ -90,5 +100,13 @@ export type {
   TemplateTopBlockReason,
   TemplateUnpauseResult,
   TemplatesCompareResult,
-  UnpauseTemplateInput
+  UnarchiveTemplatesInput,
+  UnarchiveTemplatesResponse,
+  UnpauseTemplateInput,
+  UpsertAuthOtpButtonInput,
+  UpsertAuthOtpType,
+  UpsertAuthSupportedAppInput,
+  UpsertAuthenticationTemplateBody,
+  UpsertAuthenticationTemplateResponse,
+  UpsertedAuthTemplateEntry
 } from "./advanced.js";
