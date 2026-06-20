@@ -6968,8 +6968,9 @@ Migration notes:
 | pywa `get_qr_code` | WATS `PhoneNumberClient.getQrCode` / `getQrCode` from `@wats/graph` | shape-only | `GET /{phoneNumberId}/message_qrdls/{code}`; optional `fields`. Response is `data`-wrapped (per Meta/pywa). |
 | pywa `update_qr_code` | WATS `PhoneNumberClient.updateQrCode` / `updateQrCode` from `@wats/graph` | shape-only | `POST /{phoneNumberId}/message_qrdls` with body `{ code, prefilled_message }` (same path as create, body carries existing `code`). |
 | pywa `delete_qr_code` | WATS `PhoneNumberClient.deleteQrCode` / `deleteQrCode` from `@wats/graph` | shape-only | `DELETE /{phoneNumberId}/message_qrdls/{code}`; no body. |
-| callback overrides, token exchange, remaining profile/commerce updates | No first-class WATS helper yet | planned | Requires explicit operator authorization when it lands. |
-| QR code CRUD, block/unblock users, token exchange | Block API helpers exist (`listBlockedUsers`, `blockUsers`, `unblockUsers`); QR code CRUD exists (`createQrCode`, `listQrCodes`, `getQrCode`, `updateQrCode`, `deleteQrCode` on `PhoneNumberClient`); token exchange is not built | shape-only (Block API + QR codes); token exchange planned | |
+| token exchange | `exchangeBusinessAccessToken` | shape-only | Exchanges Embedded Signup code for a business access token; client secret/code are never echoed in validation errors. |
+| callback overrides, remaining profile/commerce updates | No first-class WATS helper yet | planned | Requires explicit operator authorization when it lands. |
+| QR code CRUD, block/unblock users, token exchange | Block API helpers exist (`listBlockedUsers`, `blockUsers`, `unblockUsers`); QR code CRUD exists (`createQrCode`, `listQrCodes`, `getQrCode`, `updateQrCode`, `deleteQrCode` on `PhoneNumberClient`); token exchange exists as `exchangeBusinessAccessToken` | shape-only | |
 
 ## Groups map
 
@@ -7061,7 +7062,7 @@ Do not migrate code assuming WATS already has pywa parity for:
 - pywa's complete template component DSL, compare/migrate/unpause, library/authentication helper breadth.
 - pywa's full Flow JSON DSL, encrypted Flow request decrypt/encrypt, Flow hosting, metrics, migration.
 - calling permissions, calling settings/SIP mutations, and real call orchestration.
-- mutating admin APIs beyond profile/commerce updates, token flows, callback overrides, and phone registration/deregistration. (QR code CRUD is now shape-only; token exchange and catalog CRUD remain planned.)
+- mutating admin APIs beyond profile/commerce updates, callback overrides, and phone registration/deregistration. (QR code CRUD and token exchange are now shape-only; catalog CRUD remains planned.)
 - full Meta Graph OpenAPI generation and production operator modes beyond the current credential-free `wats init`, `wats doctor`, dry-run `wats serve`, and credential-gated local live `wats serve` tooling.
 
 ## Migration checklist
