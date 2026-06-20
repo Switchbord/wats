@@ -210,6 +210,21 @@ export interface ListSubscribedAppsInput {
   readonly wabaId: string;
 }
 
+export interface SetWabaCallbackOverrideInput {
+  readonly wabaId: string;
+  readonly overrideCallbackUri: string;
+  readonly verifyToken: string;
+}
+
+export interface ClearWabaCallbackOverrideInput {
+  readonly wabaId: string;
+}
+
+export interface WabaCallbackOverrideResponse {
+  readonly success?: boolean;
+  readonly [key: string]: unknown;
+}
+
 export interface ListPhoneNumbersInput {
   readonly wabaId: string;
   readonly fields?: BusinessManagementFields;
@@ -544,6 +559,7 @@ const MAX_RECIPIENT_DIGITS = 15;
 const MAX_DISPLAY_NAME_LENGTH = 128;
 const MAX_OBA_TEXT_LENGTH = 2048;
 const MAX_OBA_URL_LENGTH = 2048;
+const MAX_CALLBACK_VERIFY_TOKEN_LENGTH = 256;
 const MAX_OBA_SUPPORTING_LINKS = 10;
 const MIN_OBA_SUPPORTING_LINKS = 5;
 const MAX_BUSINESS_PROFILE_TEXT_LENGTH = 1024;
@@ -837,6 +853,31 @@ function assertHttpUrl(value: unknown, fieldName: string, helperName: string): s
   return raw;
 }
 
+function assertHttpsCallbackUrl(value: unknown, helperName: string): string {
+  const raw = assertHttpUrl(value, "overrideCallbackUri", helperName);
+  const parsed = new URL(raw);
+  if (parsed.protocol !== "https:") {
+    throw validationError(`Invalid ${helperName} input: overrideCallbackUri must be an https URL.`);
+  }
+  return raw;
+}
+
+function assertCallbackVerifyToken(value: unknown, helperName: string): string {
+  if (typeof value !== "string" || value.length === 0 || value.trim().length === 0) {
+    throw validationError(`Invalid ${helperName} input: verifyToken must be a non-empty string.`);
+  }
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code < 0x20 || code === 0x7f) {
+      throw validationError(`Invalid ${helperName} input: verifyToken must not contain control characters.`);
+    }
+  }
+  if (value.length > MAX_CALLBACK_VERIFY_TOKEN_LENGTH) {
+    throw validationError(`Invalid ${helperName} input: verifyToken length must not exceed ${MAX_CALLBACK_VERIFY_TOKEN_LENGTH}.`);
+  }
+  return value;
+}
+
 function optionalBoundedString(record: Record<string, unknown>, key: keyof RequestOfficialBusinessAccountReviewInput, helperName: string): string | undefined {
   const value = ownDataValue(record, key as string, helperName, false);
   if (value === undefined) return undefined;
@@ -1104,6 +1145,27 @@ export function normalizeListSubscribedAppsParams(input: ListSubscribedAppsInput
   const helperName = "listSubscribedApps";
   const record = assertPlainRecord(input, helperName);
   return { wabaId: assertPathId(ownDataValue(record, "wabaId", helperName, true), "wabaId", helperName) };
+}
+
+export function normalizeSetWabaCallbackOverrideParams(input: SetWabaCallbackOverrideInput): WireParams {
+  const helperName = "setWabaCallbackOverride";
+  const record = assertPlainRecord(input, helperName);
+  return { wabaId: assertPathId(ownDataValue(record, "wabaId", helperName, true), "wabaId", helperName) };
+}
+
+export function normalizeClearWabaCallbackOverrideParams(input: ClearWabaCallbackOverrideInput): WireParams {
+  const helperName = "clearWabaCallbackOverride";
+  const record = assertPlainRecord(input, helperName);
+  return { wabaId: assertPathId(ownDataValue(record, "wabaId", helperName, true), "wabaId", helperName) };
+}
+
+export function buildWabaCallbackOverrideBody(input: SetWabaCallbackOverrideInput): Record<string, unknown> {
+  const helperName = "setWabaCallbackOverride";
+  const record = assertPlainRecord(input, helperName);
+  return {
+    override_callback_uri: assertHttpsCallbackUrl(ownDataValue(record, "overrideCallbackUri", helperName, true), helperName),
+    verify_token: assertCallbackVerifyToken(ownDataValue(record, "verifyToken", helperName, true), helperName)
+  };
 }
 
 export function normalizeListPhoneNumbersParams(input: ListPhoneNumbersInput): WireParams {
@@ -1515,6 +1577,20 @@ const getWabaInfoRaw = defineEndpoint<{ wabaId: string; fields?: string }, never
 
 const listSubscribedAppsRaw = defineEndpoint<{ wabaId: string }, never, SubscribedAppsResponse>({
   method: "GET",
+  pathTemplate: "/{wabaId}/subscribed_apps",
+  params: { wabaId: { in: "path", required: true } }
+});
+
+const setWabaCallbackOverrideRaw = defineEndpoint<{ wabaId: string }, SetWabaCallbackOverrideInput, WabaCallbackOverrideResponse>({
+  method: "POST",
+  pathTemplate: "/{wabaId}/subscribed_apps",
+  params: { wabaId: { in: "path", required: true } },
+  bodyContentType: "application/json",
+  buildBody: buildWabaCallbackOverrideBody
+});
+
+const clearWabaCallbackOverrideRaw = defineEndpoint<{ wabaId: string }, never, WabaCallbackOverrideResponse>({
+  method: "POST",
   pathTemplate: "/{wabaId}/subscribed_apps",
   params: { wabaId: { in: "path", required: true } }
 });
@@ -1943,6 +2019,22 @@ export const listSubscribedApps = Object.assign(
     return listSubscribedAppsRaw(client, normalizeListSubscribedAppsParams(params) as Parameters<typeof listSubscribedAppsRaw>[1], undefined, sanitizeBusinessManagementOptions(opts, "listSubscribedApps"));
   },
   { definition: listSubscribedAppsRaw.definition }
+);
+
+export const setWabaCallbackOverride = Object.assign(
+  async function setWabaCallbackOverride(client: GraphClient, params: SetWabaCallbackOverrideInput, body?: never, opts?: EndpointInvokeOptions): Promise<WabaCallbackOverrideResponse> {
+    assertNoBody(body, "setWabaCallbackOverride");
+    return setWabaCallbackOverrideRaw(client, normalizeSetWabaCallbackOverrideParams(params) as Parameters<typeof setWabaCallbackOverrideRaw>[1], params, sanitizeBusinessManagementOptions(opts, "setWabaCallbackOverride"));
+  },
+  { definition: setWabaCallbackOverrideRaw.definition }
+);
+
+export const clearWabaCallbackOverride = Object.assign(
+  async function clearWabaCallbackOverride(client: GraphClient, params: ClearWabaCallbackOverrideInput, body?: never, opts?: EndpointInvokeOptions): Promise<WabaCallbackOverrideResponse> {
+    assertNoBody(body, "clearWabaCallbackOverride");
+    return clearWabaCallbackOverrideRaw(client, normalizeClearWabaCallbackOverrideParams(params) as Parameters<typeof clearWabaCallbackOverrideRaw>[1], undefined, sanitizeBusinessManagementOptions(opts, "clearWabaCallbackOverride"));
+  },
+  { definition: clearWabaCallbackOverrideRaw.definition }
 );
 
 export const getPhoneNumberInfo = Object.assign(
