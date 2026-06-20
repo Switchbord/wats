@@ -444,6 +444,83 @@ export interface SetTwoStepVerificationPinResponse {
   readonly [key: string]: unknown;
 }
 
+// --- WATS-156 QR code CRUD types ----------------------------------------
+
+/**
+ * Image format for QR code generation. Meta docs: `"SVG"` or `"PNG"`.
+ * WATS accepts case-insensitive input and normalizes to uppercase.
+ */
+export type QrImageFormat = "SVG" | "PNG";
+
+export interface CreateQrCodeInput {
+  readonly phoneNumberId: string;
+  readonly prefilledMessage: string;
+  readonly generateQrImage: QrImageFormat | string;
+}
+
+export interface QrCodeEntry {
+  readonly code?: string;
+  readonly prefilled_message?: string;
+  readonly deep_link_url?: string;
+  readonly qr_image_url?: string;
+  readonly [key: string]: unknown;
+}
+
+export interface CreateQrCodeResponse {
+  readonly code?: string;
+  readonly prefilled_message?: string;
+  readonly deep_link_url?: string;
+  readonly qr_image_url?: string;
+  readonly [key: string]: unknown;
+}
+
+export interface ListQrCodesInput {
+  readonly phoneNumberId: string;
+  readonly fields?: BusinessManagementFields;
+  readonly before?: string;
+  readonly after?: string;
+}
+
+export interface ListQrCodesResponse {
+  readonly data?: readonly QrCodeEntry[];
+  readonly paging?: GraphPaging;
+  readonly [key: string]: unknown;
+}
+
+export interface GetQrCodeInput {
+  readonly phoneNumberId: string;
+  readonly code: string;
+  readonly fields?: BusinessManagementFields;
+}
+
+export interface GetQrCodeResponse {
+  readonly data?: readonly QrCodeEntry[];
+  readonly [key: string]: unknown;
+}
+
+export interface UpdateQrCodeInput {
+  readonly phoneNumberId: string;
+  readonly code: string;
+  readonly prefilledMessage: string;
+}
+
+export interface UpdateQrCodeResponse {
+  readonly code?: string;
+  readonly prefilled_message?: string;
+  readonly deep_link_url?: string;
+  readonly [key: string]: unknown;
+}
+
+export interface DeleteQrCodeInput {
+  readonly phoneNumberId: string;
+  readonly code: string;
+}
+
+export interface DeleteQrCodeResponse {
+  readonly success?: boolean;
+  readonly [key: string]: unknown;
+}
+
 export interface GetBusinessProfileInput {
   readonly phoneNumberId: string;
   readonly fields?: BusinessManagementFields;
@@ -474,6 +551,9 @@ const MAX_BUSINESS_PROFILE_EMAIL_LENGTH = 320;
 const MAX_BUSINESS_PROFILE_WEBSITES = 2;
 const MAX_BUSINESS_PROFILE_WEBSITE_LENGTH = 2048;
 const MAX_PROFILE_PICTURE_HANDLE_LENGTH = 1024;
+const MAX_QR_PREFILLED_MESSAGE_LENGTH = 140;
+const MAX_QR_CODE_LENGTH = 512;
+const QR_IMAGE_FORMAT_VALUES = new Set(["SVG", "PNG"]);
 
 function validationError(message: string, cause?: unknown): GraphRequestValidationError {
   return new GraphRequestValidationError(message, cause);
@@ -702,6 +782,45 @@ function assertDataLocalizationRegion(value: unknown, helperName: string): strin
     throw validationError(`Invalid ${helperName} input: dataLocalizationRegion must be an ISO 3166-1 alpha-2 country code.`);
   }
   return str;
+}
+
+// --- WATS-156 QR code validation helpers --------------------------------
+
+/**
+ * Validate a QR code id used as a path param. Reuses the repeatedly-decoded
+ * safe-path-id sanitizer with a generic fieldName (the `assertPathId` helper
+ * above is typed to only "wabaId" | "phoneNumberId", so we call the
+ * underlying primitive directly).
+ */
+function assertQrCodeId(value: unknown, helperName: string): string {
+  if (typeof value === "string" && value.length > 0 && value.trim().length === 0) {
+    throw validationError(`Invalid ${helperName} input: code must be non-empty.`);
+  }
+  return assertRepeatedlyDecodedSafePathId(value, {
+    helperName,
+    fieldName: "code",
+    maxLength: MAX_QR_CODE_LENGTH,
+    maxDecodeRounds: MAX_PERCENT_DECODE_ROUNDS
+  });
+}
+
+function assertQrPrefilledMessage(value: unknown, helperName: string): string {
+  const str = assertBoundedPlainString(value, "prefilledMessage", helperName, MAX_QR_PREFILLED_MESSAGE_LENGTH);
+  if (str.length === 0) {
+    throw validationError(`Invalid ${helperName} input: prefilledMessage must be a non-empty string.`);
+  }
+  return str;
+}
+
+function assertQrImageFormat(value: unknown, helperName: string): string {
+  if (typeof value !== "string" || value.length === 0) {
+    throw validationError(`Invalid ${helperName} input: generateQrImage must be one of SVG, PNG.`);
+  }
+  const upper = value.toUpperCase();
+  if (!QR_IMAGE_FORMAT_VALUES.has(upper)) {
+    throw validationError(`Invalid ${helperName} input: generateQrImage must be one of SVG, PNG.`);
+  }
+  return upper;
 }
 
 function assertHttpUrl(value: unknown, fieldName: string, helperName: string): string {
@@ -1181,6 +1300,72 @@ export function normalizeSetTwoStepVerificationPinParams(input: SetTwoStepVerifi
   const helperName = "setTwoStepVerificationPin";
   const record = assertPlainRecord(input, helperName);
   return { phoneNumberId: assertPathId(ownDataValue(record, "phoneNumberId", helperName, true), "phoneNumberId", helperName) };
+}
+
+// --- WATS-156 QR code normalize/build functions -------------------------
+
+export function normalizeCreateQrCodeParams(input: CreateQrCodeInput): WireParams {
+  const helperName = "createQrCode";
+  const record = assertPlainRecord(input, helperName);
+  return { phoneNumberId: assertPathId(ownDataValue(record, "phoneNumberId", helperName, true), "phoneNumberId", helperName) };
+}
+
+export function buildCreateQrCodeBody(input: CreateQrCodeInput): Record<string, unknown> {
+  const helperName = "createQrCode";
+  const record = assertPlainRecord(input, helperName);
+  return {
+    prefilled_message: assertQrPrefilledMessage(ownDataValue(record, "prefilledMessage", helperName, true), helperName),
+    generate_qr_image: assertQrImageFormat(ownDataValue(record, "generateQrImage", helperName, true), helperName)
+  };
+}
+
+export function normalizeListQrCodesParams(input: ListQrCodesInput): WireParams {
+  const helperName = "listQrCodes";
+  const record = assertPlainRecord(input, helperName);
+  const out: WireParams = { phoneNumberId: assertPathId(ownDataValue(record, "phoneNumberId", helperName, true), "phoneNumberId", helperName) };
+  const fields = optionalFields(record, helperName);
+  if (fields !== undefined) out.fields = fields;
+  const before = optionalQueryString(record, "before", helperName);
+  if (before !== undefined) out.before = before;
+  const after = optionalQueryString(record, "after", helperName);
+  if (after !== undefined) out.after = after;
+  return out;
+}
+
+export function normalizeGetQrCodeParams(input: GetQrCodeInput): WireParams {
+  const helperName = "getQrCode";
+  const record = assertPlainRecord(input, helperName);
+  const out: WireParams = {
+    phoneNumberId: assertPathId(ownDataValue(record, "phoneNumberId", helperName, true), "phoneNumberId", helperName),
+    code: assertQrCodeId(ownDataValue(record, "code", helperName, true), helperName)
+  };
+  const fields = optionalFields(record, helperName);
+  if (fields !== undefined) out.fields = fields;
+  return out;
+}
+
+export function normalizeUpdateQrCodeParams(input: UpdateQrCodeInput): WireParams {
+  const helperName = "updateQrCode";
+  const record = assertPlainRecord(input, helperName);
+  return { phoneNumberId: assertPathId(ownDataValue(record, "phoneNumberId", helperName, true), "phoneNumberId", helperName) };
+}
+
+export function buildUpdateQrCodeBody(input: UpdateQrCodeInput): Record<string, unknown> {
+  const helperName = "updateQrCode";
+  const record = assertPlainRecord(input, helperName);
+  return {
+    code: assertQrCodeId(ownDataValue(record, "code", helperName, true), helperName),
+    prefilled_message: assertQrPrefilledMessage(ownDataValue(record, "prefilledMessage", helperName, true), helperName)
+  };
+}
+
+export function normalizeDeleteQrCodeParams(input: DeleteQrCodeInput): WireParams {
+  const helperName = "deleteQrCode";
+  const record = assertPlainRecord(input, helperName);
+  return {
+    phoneNumberId: assertPathId(ownDataValue(record, "phoneNumberId", helperName, true), "phoneNumberId", helperName),
+    code: assertQrCodeId(ownDataValue(record, "code", helperName, true), helperName)
+  };
 }
 
 export function normalizeBusinessProfileParams(input: GetBusinessProfileInput): WireParams {
@@ -1676,6 +1861,74 @@ const setTwoStepVerificationPinRaw = defineEndpoint<
   buildBody: buildSetTwoStepVerificationPinBody
 });
 
+// --- WATS-156 QR code endpoint definitions ------------------------------
+
+const createQrCodeRaw = defineEndpoint<
+  { phoneNumberId: string },
+  CreateQrCodeInput,
+  CreateQrCodeResponse
+>({
+  method: "POST",
+  pathTemplate: "/{phoneNumberId}/message_qrdls",
+  params: { phoneNumberId: { in: "path", required: true } },
+  bodyContentType: "application/json",
+  buildBody: buildCreateQrCodeBody
+});
+
+const listQrCodesRaw = defineEndpoint<
+  { phoneNumberId: string; fields?: string; before?: string; after?: string },
+  never,
+  ListQrCodesResponse
+>({
+  method: "GET",
+  pathTemplate: "/{phoneNumberId}/message_qrdls",
+  params: {
+    phoneNumberId: { in: "path", required: true },
+    fields: { in: "query" },
+    before: { in: "query" },
+    after: { in: "query" }
+  }
+});
+
+const getQrCodeRaw = defineEndpoint<
+  { phoneNumberId: string; code: string; fields?: string },
+  never,
+  GetQrCodeResponse
+>({
+  method: "GET",
+  pathTemplate: "/{phoneNumberId}/message_qrdls/{code}",
+  params: {
+    phoneNumberId: { in: "path", required: true },
+    code: { in: "path", required: true },
+    fields: { in: "query" }
+  }
+});
+
+const updateQrCodeRaw = defineEndpoint<
+  { phoneNumberId: string },
+  UpdateQrCodeInput,
+  UpdateQrCodeResponse
+>({
+  method: "POST",
+  pathTemplate: "/{phoneNumberId}/message_qrdls",
+  params: { phoneNumberId: { in: "path", required: true } },
+  bodyContentType: "application/json",
+  buildBody: buildUpdateQrCodeBody
+});
+
+const deleteQrCodeRaw = defineEndpoint<
+  { phoneNumberId: string; code: string },
+  never,
+  DeleteQrCodeResponse
+>({
+  method: "DELETE",
+  pathTemplate: "/{phoneNumberId}/message_qrdls/{code}",
+  params: {
+    phoneNumberId: { in: "path", required: true },
+    code: { in: "path", required: true }
+  }
+});
+
 export const getWabaInfo = Object.assign(
   async function getWabaInfo(client: GraphClient, params: GetWabaInfoInput, body?: never, opts?: EndpointInvokeOptions): Promise<WabaInfo> {
     assertNoBody(body, "getWabaInfo");
@@ -1842,4 +2095,46 @@ export const setTwoStepVerificationPin = Object.assign(
     return setTwoStepVerificationPinRaw(client, normalizeSetTwoStepVerificationPinParams(params) as Parameters<typeof setTwoStepVerificationPinRaw>[1], params, sanitizeBusinessManagementOptions(opts, "setTwoStepVerificationPin"));
   },
   { definition: setTwoStepVerificationPinRaw.definition }
+);
+
+// --- WATS-156 QR code CRUD callables ------------------------------------
+
+export const createQrCode = Object.assign(
+  async function createQrCode(client: GraphClient, params: CreateQrCodeInput, body?: never, opts?: EndpointInvokeOptions): Promise<CreateQrCodeResponse> {
+    assertNoBody(body, "createQrCode");
+    return createQrCodeRaw(client, normalizeCreateQrCodeParams(params) as Parameters<typeof createQrCodeRaw>[1], params, sanitizeBusinessManagementOptions(opts, "createQrCode"));
+  },
+  { definition: createQrCodeRaw.definition }
+);
+
+export const listQrCodes = Object.assign(
+  async function listQrCodes(client: GraphClient, params: ListQrCodesInput, body?: never, opts?: EndpointInvokeOptions): Promise<ListQrCodesResponse> {
+    assertNoBody(body, "listQrCodes");
+    return listQrCodesRaw(client, normalizeListQrCodesParams(params) as Parameters<typeof listQrCodesRaw>[1], undefined, sanitizeBusinessManagementOptions(opts, "listQrCodes"));
+  },
+  { definition: listQrCodesRaw.definition }
+);
+
+export const getQrCode = Object.assign(
+  async function getQrCode(client: GraphClient, params: GetQrCodeInput, body?: never, opts?: EndpointInvokeOptions): Promise<GetQrCodeResponse> {
+    assertNoBody(body, "getQrCode");
+    return getQrCodeRaw(client, normalizeGetQrCodeParams(params) as Parameters<typeof getQrCodeRaw>[1], undefined, sanitizeBusinessManagementOptions(opts, "getQrCode"));
+  },
+  { definition: getQrCodeRaw.definition }
+);
+
+export const updateQrCode = Object.assign(
+  async function updateQrCode(client: GraphClient, params: UpdateQrCodeInput, body?: never, opts?: EndpointInvokeOptions): Promise<UpdateQrCodeResponse> {
+    assertNoBody(body, "updateQrCode");
+    return updateQrCodeRaw(client, normalizeUpdateQrCodeParams(params) as Parameters<typeof updateQrCodeRaw>[1], params, sanitizeBusinessManagementOptions(opts, "updateQrCode"));
+  },
+  { definition: updateQrCodeRaw.definition }
+);
+
+export const deleteQrCode = Object.assign(
+  async function deleteQrCode(client: GraphClient, params: DeleteQrCodeInput, body?: never, opts?: EndpointInvokeOptions): Promise<DeleteQrCodeResponse> {
+    assertNoBody(body, "deleteQrCode");
+    return deleteQrCodeRaw(client, normalizeDeleteQrCodeParams(params) as Parameters<typeof deleteQrCodeRaw>[1], undefined, sanitizeBusinessManagementOptions(opts, "deleteQrCode"));
+  },
+  { definition: deleteQrCodeRaw.definition }
 );
