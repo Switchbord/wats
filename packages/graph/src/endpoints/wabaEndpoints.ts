@@ -34,7 +34,10 @@ export {
   compareTemplates,
   unpauseTemplate,
   migrateTemplates,
+  archiveTemplates,
+  unarchiveTemplates,
   COMPARE_TEMPLATES_MAX_IDS,
+  ARCHIVE_TEMPLATES_MAX_IDS,
   KNOWN_TEMPLATE_TOP_BLOCK_REASONS,
   validateTemplateParameterCounts
 } from "./templates/index.js";
@@ -82,6 +85,10 @@ export type {
   MigrateTemplatesInput,
   MigrateTemplatesResponse,
   MigratedTemplateEntry,
+  ArchiveTemplatesInput,
+  ArchiveTemplatesResponse,
+  UnarchiveTemplatesInput,
+  UnarchiveTemplatesResponse,
   TemplateTopBlockReason,
   TemplateUnpauseResult,
   TemplatesCompareResult,

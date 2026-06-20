@@ -42,6 +42,8 @@ import {
   compareTemplates as compareTemplatesEndpoint,
   unpauseTemplate as unpauseTemplateEndpoint,
   migrateTemplates as migrateTemplatesEndpoint,
+  archiveTemplates as archiveTemplatesEndpoint,
+  unarchiveTemplates as unarchiveTemplatesEndpoint,
   listFlows as listFlowsEndpoint,
   getFlow as getFlowEndpoint,
   getFlowMetrics as getFlowMetricsEndpoint,
@@ -84,6 +86,10 @@ import {
   type GetTemplateGroupInput,
   type MigrateTemplatesInput,
   type MigrateTemplatesResponse,
+  type ArchiveTemplatesInput,
+  type ArchiveTemplatesResponse,
+  type UnarchiveTemplatesInput,
+  type UnarchiveTemplatesResponse,
   type TemplatesCompareResult,
   type TemplateUnpauseResult,
   type UnpauseTemplateInput,
@@ -171,6 +177,41 @@ function splitFlowIdParams(
 ): { readonly flowId: string; readonly rest: Record<string, unknown> } {
   const split = splitRequiredStringDataProp(params, "flowId", helperName);
   return { flowId: split.value, rest: split.rest };
+}
+
+/**
+ * Descriptor-safe scoped-params builder for the WABAClient archive/unarchive
+ * methods. Mirrors the migrateTemplates/migrateFlows pattern: walks own
+ * property descriptors (so accessor-backed params are rejected with a
+ * GraphRequestValidationError rather than triggering a host TypeError), drops
+ * `undefined` values, and returns a mutable record that the caller then
+ * augments with the bound `wabaId`. The caller-supplied `wabaId` (if any) is
+ * intentionally NOT copied here — the bound id always wins.
+ */
+function scopedArchiveParams(
+  params: unknown,
+  helperName: string
+): Record<string, unknown> {
+  if (typeof params !== "object" || params === null || Array.isArray(params)) {
+    throw new GraphRequestValidationError(
+      `Invalid ${helperName} params: expected an options object.`
+    );
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(params);
+  const scopedParams: Record<string, unknown> = {};
+  for (const [key, descriptor] of Object.entries(descriptors)) {
+    if (typeof descriptor.get === "function" || typeof descriptor.set === "function") {
+      throw new GraphRequestValidationError(
+        `Invalid ${helperName} params: ${key} must not use accessors.`
+      );
+    }
+    if (key === "wabaId") {
+      // Bound wabaId always wins; skip caller-supplied value.
+      continue;
+    }
+    if (descriptor.value !== undefined) scopedParams[key] = descriptor.value;
+  }
+  return scopedParams;
 }
 
 export class WABAClient {
@@ -499,6 +540,52 @@ export class WABAClient {
     return migrateTemplatesEndpoint(
       this.#graphClient,
       scopedParams as unknown as MigrateTemplatesInput,
+      undefined,
+      opts
+    );
+  }
+
+  /**
+   * `POST https://api.facebook.com/{wabaId}/message_templates/archive`
+   * (WATS-160B). Bulk-archive up to 100 message templates on the bound WABA.
+   * Mirrors pywa's `WhatsApp.archive_templates`. Uses
+   * `GraphClient.requestRaw` (not `defineEndpoint`) because the endpoint
+   * lives on api.facebook.com, not graph.facebook.com. The bound wabaId is
+   * used in the path and wins over any caller-supplied `wabaId` (mirrors
+   * `migrateTemplates`). See REFERENCE-153.md §5.
+   */
+  async archiveTemplates(
+    params: Omit<ArchiveTemplatesInput, "wabaId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<ArchiveTemplatesResponse> {
+    const scopedParams = scopedArchiveParams(params, "WABAClient.archiveTemplates");
+    scopedParams.wabaId = this.#wabaId;
+    return archiveTemplatesEndpoint(
+      this.#graphClient,
+      scopedParams as unknown as ArchiveTemplatesInput,
+      undefined,
+      opts
+    );
+  }
+
+  /**
+   * `POST https://api.facebook.com/{wabaId}/message_templates/unarchive`
+   * (WATS-160B). Bulk-unarchive up to 100 message templates on the bound
+   * WABA. Mirrors pywa's `WhatsApp.unarchive_templates`. Uses
+   * `GraphClient.requestRaw` (not `defineEndpoint`) because the endpoint
+   * lives on api.facebook.com, not graph.facebook.com. The bound wabaId is
+   * used in the path and wins over any caller-supplied `wabaId` (mirrors
+   * `migrateTemplates`). See REFERENCE-153.md §5.
+   */
+  async unarchiveTemplates(
+    params: Omit<UnarchiveTemplatesInput, "wabaId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<UnarchiveTemplatesResponse> {
+    const scopedParams = scopedArchiveParams(params, "WABAClient.unarchiveTemplates");
+    scopedParams.wabaId = this.#wabaId;
+    return unarchiveTemplatesEndpoint(
+      this.#graphClient,
+      scopedParams as unknown as UnarchiveTemplatesInput,
       undefined,
       opts
     );

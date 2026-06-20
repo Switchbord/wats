@@ -21,6 +21,9 @@ export {
   compareTemplates,
   migrateTemplates,
   unpauseTemplate,
+  archiveTemplates,
+  unarchiveTemplates,
+  ARCHIVE_TEMPLATES_MAX_IDS,
   COMPARE_TEMPLATES_MAX_IDS,
   KNOWN_TEMPLATE_TOP_BLOCK_REASONS
 } from "./advanced.js";
@@ -82,6 +85,8 @@ export type {
 } from "./groups.js";
 
 export type {
+  ArchiveTemplatesInput,
+  ArchiveTemplatesResponse,
   CompareTemplatesInput,
   FailedTemplateEntry,
   MigrateTemplatesInput,
@@ -90,5 +95,7 @@ export type {
   TemplateTopBlockReason,
   TemplateUnpauseResult,
   TemplatesCompareResult,
+  UnarchiveTemplatesInput,
+  UnarchiveTemplatesResponse,
   UnpauseTemplateInput
 } from "./advanced.js";
