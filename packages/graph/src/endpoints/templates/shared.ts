@@ -189,13 +189,16 @@ export function mapCommonBodyFields(record: Record<string, unknown>, helperName:
   for (const [key, value] of Object.entries(record)) {
     if (value === undefined) continue;
     if (key === "parameterFormat") out.parameter_format = assertString(value, "parameterFormat", helperName, 32);
+    else if (key === "libraryTemplateName") out.library_template_name = assertString(value, "libraryTemplateName", helperName);
+    else if (key === "libraryTemplateBodyInputs") out.library_template_body_inputs = safeJsonClone(value, helperName, "libraryTemplateBodyInputs");
+    else if (key === "libraryTemplateButtonInputs") out.library_template_button_inputs = safeJsonClone(value, helperName, "libraryTemplateButtonInputs");
     else if (key === "messageSendTtlSeconds") {
       if (typeof value !== "number" || !Number.isInteger(value) || value < 0) {
         throw validationError(`Invalid ${helperName} input: messageSendTtlSeconds must be a non-negative integer.`);
       }
       out.message_send_ttl_seconds = value;
     } else if (key === "components") {
-      const components = normalizeComponents(value, helperName, helperName === "createMessageTemplate");
+      const components = normalizeComponents(value, helperName, false);
       if (components !== undefined) out.components = components;
     } else {
       out[key] = safeJsonClone(value, helperName, key);

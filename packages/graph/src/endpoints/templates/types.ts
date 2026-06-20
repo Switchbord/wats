@@ -80,7 +80,17 @@ export interface CreateMessageTemplateBody {
   readonly name: string;
   readonly language: TemplateLanguageCode;
   readonly category: TemplateCategory | string;
-  readonly components: readonly TemplateComponent[];
+  /**
+   * Required for normal template creation. Optional when creating from a
+   * WhatsApp Template Library entry via `libraryTemplateName`.
+   */
+  readonly components?: readonly TemplateComponent[];
+  /** Maps to Graph `library_template_name`. */
+  readonly libraryTemplateName?: string;
+  /** Maps to Graph `library_template_body_inputs`. */
+  readonly libraryTemplateBodyInputs?: readonly Record<string, unknown>[];
+  /** Maps to Graph `library_template_button_inputs`. */
+  readonly libraryTemplateButtonInputs?: readonly Record<string, unknown>[];
   readonly parameterFormat?: TemplateParameterFormat;
   readonly messageSendTtlSeconds?: number;
   readonly [key: string]: unknown;

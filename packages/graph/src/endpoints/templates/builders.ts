@@ -30,7 +30,11 @@ export function buildCreateMessageTemplateBody(input: CreateMessageTemplateBody)
   out.name = assertString(record.name, "name", "createMessageTemplate");
   out.language = assertString(record.language, "language", "createMessageTemplate", 64);
   out.category = assertString(record.category, "category", "createMessageTemplate", 64);
-  out.components = normalizeComponents(record.components, "createMessageTemplate", true);
+  if (record.components !== undefined) {
+    out.components = normalizeComponents(record.components, "createMessageTemplate", true);
+  } else if (record.libraryTemplateName === undefined && record.library_template_name === undefined) {
+    throw validationError("Invalid createMessageTemplate input: components must be provided unless libraryTemplateName is set.");
+  }
   return out;
 }
 
