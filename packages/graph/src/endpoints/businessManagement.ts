@@ -1458,6 +1458,155 @@ const updateCommerceSettingsRaw = defineEndpoint<
   buildBody: buildUpdateCommerceSettingsBody
 });
 
+// WATS-157A — public key get/set admin helpers (whatsapp_business_encryption).
+//
+// pywa exposes ONLY a setter (`set_business_public_key`) that POSTs a
+// form-encoded `business_public_key=<PEM>` body. WATS implements BOTH a
+// getter and a setter (the issue title says get/set). The GET response shape
+// is UNVERIFIED live (pywa has no getter and Meta's doc page is
+// client-rendered), so the getter response is typed tolerantly with optional
+// fields + `[key: string]: unknown` — shape-only, do not rely on it without a
+// live confirmation. The setter matches pywa's proven form-encoded wire
+// contract exactly. `business_public_key` is a 2048-bit RSA PUBLIC key (NOT a
+// secret); it is safe to reference in diagnostics, though we still avoid
+// echoing the caller-supplied value in validation-error messages.
+// ---------------------------------------------------------------------------
+
+const MAX_BUSINESS_PUBLIC_KEY_LENGTH = 4096;
+const PEM_BEGIN_MARKER = "-----BEGIN PUBLIC KEY-----";
+const PEM_END_MARKER = "-----END PUBLIC KEY-----";
+
+/**
+ * Response shape for `GET /{phoneNumberId}/whatsapp_business_encryption`.
+ *
+ * NOTE: this GET edge is UNVERIFIED live (pywa does not implement a getter).
+ * `business_public_key` is the symmetric Graph-convention best-guess. All
+ * fields are optional and the `[key: string]: unknown` index provides
+ * tolerance until the live shape is confirmed.
+ */
+export interface BusinessPublicKeyResponse {
+  readonly business_public_key?: string;
+  readonly id?: string;
+  readonly [key: string]: unknown;
+}
+
+/** Response shape for `POST /{phoneNumberId}/whatsapp_business_encryption`. */
+export interface BusinessPublicKeyUpdateResponse {
+  readonly success?: boolean;
+  readonly [key: string]: unknown;
+}
+
+export interface GetBusinessPublicKeyInput {
+  readonly phoneNumberId: string;
+  readonly fields?: BusinessManagementFields;
+}
+
+export interface SetBusinessPublicKeyInput {
+  readonly phoneNumberId: string;
+  readonly businessPublicKey: string;
+}
+
+/**
+ * Validate a `businessPublicKey` PEM string. The value is a PUBLIC key (not a
+ * secret), but the caller-supplied value is never echoed in error messages.
+ * LF (`\n`) is allowed (PEM armor newlines); NUL (`\0`) and CR (`\r`) are
+ * rejected. Length is bounded to `MAX_BUSINESS_PUBLIC_KEY_LENGTH` and the PEM
+ * armor markers must both be present.
+ */
+export function assertBusinessPublicKey(value: unknown, helperName: string): string {
+  if (typeof value !== "string") {
+    throw validationError(`Invalid ${helperName} input: businessPublicKey must be a non-empty PEM string.`);
+  }
+  if (value.length === 0 || value.trim().length === 0) {
+    throw validationError(`Invalid ${helperName} input: businessPublicKey must be a non-empty PEM string.`);
+  }
+  if (value.includes("\0")) {
+    throw validationError(`Invalid ${helperName} input: businessPublicKey must not contain NUL characters.`);
+  }
+  if (value.includes("\r")) {
+    throw validationError(`Invalid ${helperName} input: businessPublicKey must not contain CR characters.`);
+  }
+  if (value.length > MAX_BUSINESS_PUBLIC_KEY_LENGTH) {
+    throw validationError(
+      `Invalid ${helperName} input: businessPublicKey length must not exceed ${MAX_BUSINESS_PUBLIC_KEY_LENGTH} characters.`
+    );
+  }
+  if (!value.includes(PEM_BEGIN_MARKER)) {
+    throw validationError(
+      `Invalid ${helperName} input: businessPublicKey must include the "${PEM_BEGIN_MARKER}" armor marker.`
+    );
+  }
+  if (!value.includes(PEM_END_MARKER)) {
+    throw validationError(
+      `Invalid ${helperName} input: businessPublicKey must include the "${PEM_END_MARKER}" armor marker.`
+    );
+  }
+  return value;
+}
+
+export function normalizeGetBusinessPublicKeyParams(input: GetBusinessPublicKeyInput): WireParams {
+  const helperName = "getBusinessPublicKey";
+  const record = assertPlainRecord(input, helperName);
+  const out: WireParams = { phoneNumberId: assertPathId(ownDataValue(record, "phoneNumberId", helperName, true), "phoneNumberId", helperName) };
+  const fields = optionalFields(record, helperName);
+  if (fields !== undefined) out.fields = fields;
+  return out;
+}
+
+export function normalizeSetBusinessPublicKeyParams(input: SetBusinessPublicKeyInput): WireParams {
+  const helperName = "setBusinessPublicKey";
+  const record = assertPlainRecord(input, helperName);
+  return { phoneNumberId: assertPathId(ownDataValue(record, "phoneNumberId", helperName, true), "phoneNumberId", helperName) };
+}
+
+/**
+ * Build the form-encoded body for the public-key setter. pywa sends the key
+ * as `data={"business_public_key": <PEM>}` (httpx `data=` →
+ * `application/x-www-form-urlencoded`), so WATS mirrors that exactly with a
+ * `URLSearchParams` body rather than JSON.
+ */
+export function buildSetBusinessPublicKeyBody(input: SetBusinessPublicKeyInput): URLSearchParams {
+  const helperName = "setBusinessPublicKey";
+  const record = assertPlainRecord(input, helperName);
+  const businessPublicKey = assertBusinessPublicKey(
+    ownDataValue(record, "businessPublicKey", helperName, true),
+    helperName
+  );
+  const params = new URLSearchParams();
+  params.set("business_public_key", businessPublicKey);
+  return params;
+}
+
+const getBusinessPublicKeyRaw = defineEndpoint<{ phoneNumberId: string; fields?: string }, never, BusinessPublicKeyResponse>({
+  method: "GET",
+  pathTemplate: "/{phoneNumberId}/whatsapp_business_encryption",
+  params: { phoneNumberId: { in: "path", required: true }, fields: { in: "query" } }
+});
+
+const setBusinessPublicKeyRaw = defineEndpoint<{ phoneNumberId: string }, SetBusinessPublicKeyInput, BusinessPublicKeyUpdateResponse>({
+  method: "POST",
+  pathTemplate: "/{phoneNumberId}/whatsapp_business_encryption",
+  params: { phoneNumberId: { in: "path", required: true } },
+  bodyContentType: "application/x-www-form-urlencoded",
+  buildBody: buildSetBusinessPublicKeyBody
+});
+
+export const getBusinessPublicKey = Object.assign(
+  async function getBusinessPublicKey(client: GraphClient, params: GetBusinessPublicKeyInput, body?: never, opts?: EndpointInvokeOptions): Promise<BusinessPublicKeyResponse> {
+    assertNoBody(body, "getBusinessPublicKey");
+    return getBusinessPublicKeyRaw(client, normalizeGetBusinessPublicKeyParams(params) as Parameters<typeof getBusinessPublicKeyRaw>[1], undefined, sanitizeBusinessManagementOptions(opts, "getBusinessPublicKey"));
+  },
+  { definition: getBusinessPublicKeyRaw.definition }
+);
+
+export const setBusinessPublicKey = Object.assign(
+  async function setBusinessPublicKey(client: GraphClient, params: SetBusinessPublicKeyInput, body?: never, opts?: EndpointInvokeOptions): Promise<BusinessPublicKeyUpdateResponse> {
+    assertNoBody(body, "setBusinessPublicKey");
+    return setBusinessPublicKeyRaw(client, normalizeSetBusinessPublicKeyParams(params) as Parameters<typeof setBusinessPublicKeyRaw>[1], params, sanitizeBusinessManagementOptions(opts, "setBusinessPublicKey"));
+  },
+  { definition: setBusinessPublicKeyRaw.definition }
+);
+
 const createPhoneNumberRaw = defineEndpoint<{ wabaId: string }, CreatePhoneNumberInput, CreatePhoneNumberResponse>({
   method: "POST",
   pathTemplate: "/{wabaId}/phone_numbers",

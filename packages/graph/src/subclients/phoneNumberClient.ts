@@ -27,6 +27,8 @@ import {
   getCommerceSettings as getCommerceSettingsEndpoint,
   updateBusinessProfile as updateBusinessProfileEndpoint,
   updateCommerceSettings as updateCommerceSettingsEndpoint,
+  getBusinessPublicKey as getBusinessPublicKeyEndpoint,
+  setBusinessPublicKey as setBusinessPublicKeyEndpoint,
   getPhoneNumberInfo as getPhoneNumberInfoEndpoint,
   getPhoneNumberSettings as getPhoneNumberSettingsEndpoint,
   updatePhoneNumberSettings as updatePhoneNumberSettingsEndpoint,
@@ -45,10 +47,13 @@ import {
   type BlockUsersResponse,
   type BlockedUsersResponse,
   type BusinessProfileResponse,
+  type BusinessPublicKeyResponse,
+  type BusinessPublicKeyUpdateResponse,
   type CommerceSettingsResponse,
   type DeregisterPhoneNumberInput,
   type DeregisterPhoneNumberResponse,
   type GetBusinessProfileInput,
+  type GetBusinessPublicKeyInput,
   type GetCommerceSettingsInput,
   type GetOfficialBusinessAccountStatusInput,
   type GetPhoneNumberInfoInput,
@@ -59,6 +64,7 @@ import {
   type RequestVerificationCodeResponse,
   type SetTwoStepVerificationPinInput,
   type SetTwoStepVerificationPinResponse,
+  type SetBusinessPublicKeyInput,
   type UpdateBusinessProfileInput,
   type UpdateCommerceSettingsInput,
   type BusinessProfileUpdateResponse,
@@ -391,6 +397,51 @@ export class PhoneNumberClient {
     return getBusinessProfileEndpoint(
       this.#graphClient,
       scopedParams as unknown as GetBusinessProfileInput,
+      undefined,
+      opts
+    );
+  }
+
+  /**
+   * Graph `GET /{phoneNumberId}/whatsapp_business_encryption`.
+   *
+   * NOTE: the GET response shape is UNVERIFIED live (pywa has no getter); the
+   * returned `BusinessPublicKeyResponse` is shape-only with tolerant indexing.
+   */
+  async getBusinessPublicKey(
+    params?: Omit<GetBusinessPublicKeyInput, "phoneNumberId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<BusinessPublicKeyResponse> {
+    const scopedParams: Record<string, unknown> = copyOptionalParamsObject(
+      params,
+      "PhoneNumberClient.getBusinessPublicKey"
+    );
+    scopedParams.phoneNumberId = this.#phoneNumberId;
+    return getBusinessPublicKeyEndpoint(
+      this.#graphClient,
+      scopedParams as unknown as GetBusinessPublicKeyInput,
+      undefined,
+      opts
+    );
+  }
+
+  /**
+   * Graph `POST /{phoneNumberId}/whatsapp_business_encryption` — sets the
+   * business public key. The body is form-encoded
+   * (`business_public_key=<PEM>`) to match pywa's proven wire contract.
+   */
+  async setBusinessPublicKey(
+    params: Omit<SetBusinessPublicKeyInput, "phoneNumberId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<BusinessPublicKeyUpdateResponse> {
+    const scopedParams: Record<string, unknown> = copyOptionalParamsObject(
+      params,
+      "PhoneNumberClient.setBusinessPublicKey"
+    );
+    scopedParams.phoneNumberId = this.#phoneNumberId;
+    return setBusinessPublicKeyEndpoint(
+      this.#graphClient,
+      scopedParams as unknown as SetBusinessPublicKeyInput,
       undefined,
       opts
     );
