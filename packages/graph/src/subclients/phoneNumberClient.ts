@@ -36,16 +36,29 @@ import {
   getOfficialBusinessAccountStatus as getOfficialBusinessAccountStatusEndpoint,
   requestOfficialBusinessAccountReview as requestOfficialBusinessAccountReviewEndpoint,
   submitDisplayNameForReview as submitDisplayNameForReviewEndpoint,
+  requestVerificationCode as requestVerificationCodeEndpoint,
+  verifyPhoneNumber as verifyPhoneNumberEndpoint,
+  registerPhoneNumber as registerPhoneNumberEndpoint,
+  deregisterPhoneNumber as deregisterPhoneNumberEndpoint,
+  setTwoStepVerificationPin as setTwoStepVerificationPinEndpoint,
   type BlockUsersInput,
   type BlockUsersResponse,
   type BlockedUsersResponse,
   type BusinessProfileResponse,
   type CommerceSettingsResponse,
+  type DeregisterPhoneNumberInput,
+  type DeregisterPhoneNumberResponse,
   type GetBusinessProfileInput,
   type GetCommerceSettingsInput,
   type GetOfficialBusinessAccountStatusInput,
   type GetPhoneNumberInfoInput,
   type GetPhoneNumberSettingsInput,
+  type RegisterPhoneNumberInput,
+  type RegisterPhoneNumberResponse,
+  type RequestVerificationCodeInput,
+  type RequestVerificationCodeResponse,
+  type SetTwoStepVerificationPinInput,
+  type SetTwoStepVerificationPinResponse,
   type UpdateBusinessProfileInput,
   type UpdateCommerceSettingsInput,
   type BusinessProfileUpdateResponse,
@@ -61,7 +74,9 @@ import {
   type SubmitDisplayNameForReviewResponse,
   type UnblockUsersInput,
   type UnblockUsersResponse,
-  type UpdatePhoneNumberSettingsInput
+  type UpdatePhoneNumberSettingsInput,
+  type VerifyPhoneNumberInput,
+  type VerifyPhoneNumberResponse
 } from "../endpoints/businessManagement.js";
 import {
   acceptCall as acceptCallEndpoint,
@@ -534,6 +549,92 @@ export class PhoneNumberClient {
     return submitDisplayNameForReviewEndpoint(
       this.#graphClient,
       scopedParams as unknown as SubmitDisplayNameForReviewInput,
+      undefined,
+      opts
+    );
+  }
+
+  /** Graph `POST /{phoneNumberId}/request_code?code_method=...&language=...` (WATS-155). */
+  async requestVerificationCode(
+    params: Omit<RequestVerificationCodeInput, "phoneNumberId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<RequestVerificationCodeResponse> {
+    const scopedParams: Record<string, unknown> = copyOptionalParamsObject(
+      params,
+      "PhoneNumberClient.requestVerificationCode"
+    );
+    scopedParams.phoneNumberId = this.#phoneNumberId;
+    return requestVerificationCodeEndpoint(
+      this.#graphClient,
+      scopedParams as unknown as RequestVerificationCodeInput,
+      undefined,
+      opts
+    );
+  }
+
+  /** Graph `POST /{phoneNumberId}/verify_code?code=...` (WATS-155). */
+  async verifyPhoneNumber(
+    params: Omit<VerifyPhoneNumberInput, "phoneNumberId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<VerifyPhoneNumberResponse> {
+    const scopedParams: Record<string, unknown> = copyOptionalParamsObject(
+      params,
+      "PhoneNumberClient.verifyPhoneNumber"
+    );
+    scopedParams.phoneNumberId = this.#phoneNumberId;
+    return verifyPhoneNumberEndpoint(
+      this.#graphClient,
+      scopedParams as unknown as VerifyPhoneNumberInput,
+      undefined,
+      opts
+    );
+  }
+
+  /** Graph `POST /{phoneNumberId}/register` (WATS-155). */
+  async registerPhoneNumber(
+    params: Omit<RegisterPhoneNumberInput, "phoneNumberId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<RegisterPhoneNumberResponse> {
+    const scopedParams: Record<string, unknown> = copyOptionalParamsObject(
+      params,
+      "PhoneNumberClient.registerPhoneNumber"
+    );
+    scopedParams.phoneNumberId = this.#phoneNumberId;
+    return registerPhoneNumberEndpoint(
+      this.#graphClient,
+      scopedParams as unknown as RegisterPhoneNumberInput,
+      undefined,
+      opts
+    );
+  }
+
+  /** Graph `POST /{phoneNumberId}/deregister` (WATS-155). */
+  async deregisterPhoneNumber(
+    params?: Omit<DeregisterPhoneNumberInput, "phoneNumberId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<DeregisterPhoneNumberResponse> {
+    copyOptionalParamsObject(params, "PhoneNumberClient.deregisterPhoneNumber");
+    return deregisterPhoneNumberEndpoint(
+      this.#graphClient,
+      { phoneNumberId: this.#phoneNumberId },
+      undefined,
+      opts
+    );
+  }
+
+  /** Graph `POST /{phoneNumberId}` with Graph `two_step_verification.pin` (WATS-155). */
+  async setTwoStepVerificationPin(
+    params: Omit<SetTwoStepVerificationPinInput, "phoneNumberId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<SetTwoStepVerificationPinResponse> {
+    const scopedParams: Record<string, unknown> = copyOptionalParamsObject(
+      params,
+      "PhoneNumberClient.setTwoStepVerificationPin"
+    );
+    scopedParams.phoneNumberId = this.#phoneNumberId;
+    return setTwoStepVerificationPinEndpoint(
+      this.#graphClient,
+      scopedParams as unknown as SetTwoStepVerificationPinInput,
       undefined,
       opts
     );
