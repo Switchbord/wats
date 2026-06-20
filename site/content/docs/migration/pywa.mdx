@@ -122,10 +122,16 @@ Migration notes:
 | pywa `get_business_account` | `WABAClient.getInfo` / `getWabaInfo` | live-validated | |
 | pywa `get_business_phone_numbers` | `WABAClient.listPhoneNumbers` | live-validated | Supports `fields`, `limit`, `after`, `before`. |
 | pywa `get_business_phone_number_settings` | `PhoneNumberClient.getSettings` | shape-only | `includeSipCredentials` is sensitive. |
-| pywa phone local-storage settings update | `PhoneNumberClient.updateSettings({ storageConfiguration })` / `updatePhoneNumberSettings` | shape-only | Emits `storage_configuration`; WATS does not emit the removed register field `data_localization_region`. |
+| pywa phone local-storage settings update | `PhoneNumberClient.updateSettings({ storageConfiguration })` / `updatePhoneNumberSettings` | shape-only | Emits `storage_configuration`; WATS does not emit the removed register field `data_localization_region` on settings updates (it IS accepted on `registerPhoneNumber`). |
 | pywa `get_business_profile` / `get_commerce_settings` | WATS `PhoneNumberClient.getBusinessProfile` / `.getCommerceSettings` | live-validated | |
 | pywa profile/commerce updates | WATS `PhoneNumberClient.updateBusinessProfile` / `.updateCommerceSettings`, also direct `updateBusinessProfile` / `updateCommerceSettings` from `@wats/graph/endpoints/business-management` | shape-only | Profile updates map camelCase `profilePictureHandle` to Graph `profile_picture_handle`; commerce updates map `isCartEnabled` / `isCatalogVisible` to `is_cart_enabled` / `is_catalog_visible`. |
-| register/deregister phone, callback overrides, public key, remaining profile/commerce updates | No first-class WATS helper yet | planned | Requires explicit operator authorization when it lands. |
+| pywa `create_phone_number` | WATS `WABAClient.createPhoneNumber` / `createPhoneNumber` from `@wats/graph` | shape-only | Mirrors pywa `WhatsApp.create_phone_number`; body fields `countryCode` / `phoneNumber` / `verifiedName` map to Graph `country_code` / `phone_number` / `verified_name`. |
+| pywa `request_verification_code` | WATS `PhoneNumberClient.requestVerificationCode` / `requestVerificationCode` from `@wats/graph` | shape-only | Sends `code_method` and `language` as URL query params (matches pywa + Meta), not a body. |
+| pywa `verify_phone_number` | WATS `PhoneNumberClient.verifyPhoneNumber` / `verifyPhoneNumber` from `@wats/graph` | shape-only | Sends `code` as a URL query param; the code is never echoed in validation error messages. |
+| pywa `register_phone_number` | WATS `PhoneNumberClient.registerPhoneNumber` / `registerPhoneNumber` from `@wats/graph` | shape-only | Body includes `messaging_product: "whatsapp"`, `pin`, and optional `data_localization_region`; the pin is never echoed in validation error messages. |
+| pywa `deregister_phone_number` | WATS `PhoneNumberClient.deregisterPhoneNumber` / `deregisterPhoneNumber` from `@wats/graph` | shape-only | No body, no query params. |
+| (no pywa equivalent) Meta two-step verification PIN | WATS `PhoneNumberClient.setTwoStepVerificationPin` / `setTwoStepVerificationPin` from `@wats/graph` | shape-only | `POST /{phoneNumberId}` with body `{ two_step_verification: { pin } }`; the pin is never echoed in validation error messages. |
+| callback overrides, public key, remaining profile/commerce updates | No first-class WATS helper yet | planned | Requires explicit operator authorization when it lands. |
 | QR code CRUD, block/unblock users, token exchange | Block API helpers exist (`listBlockedUsers`, `blockUsers`, `unblockUsers`); the rest is not built | shape-only (Block API); rest planned | |
 
 ## Groups map

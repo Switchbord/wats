@@ -18,6 +18,9 @@ import { copyOptionalParamsObject, splitRequiredStringDataProp } from "../intern
 import {
   getWabaInfo as getWabaInfoEndpoint,
   listSubscribedApps as listSubscribedAppsEndpoint,
+  createPhoneNumber as createPhoneNumberEndpoint,
+  type CreatePhoneNumberInput,
+  type CreatePhoneNumberResponse,
   type GetWabaInfoInput,
   type SubscribedAppsResponse,
   type WabaInfo
@@ -287,6 +290,25 @@ export class WABAClient {
       undefined,
       opts
     );
+  }
+
+  /**
+   * Graph `POST /{wabaId}/phone_numbers` (WATS-155) — registers a new
+   * phone number against the bound WABA. Mirrors pywa's
+   * `WhatsApp.create_phone_number`. The bound wabaId is injected into the
+   * params object and wins over any caller-supplied `wabaId`; body fields
+   * (countryCode / phoneNumber / verifiedName) are passed through to the
+   * endpoint callable's body builder.
+   */
+  async createPhoneNumber(
+    body: Omit<CreatePhoneNumberInput, "wabaId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<CreatePhoneNumberResponse> {
+    const input = {
+      ...copyOptionalParamsObject(body, "WABAClient.createPhoneNumber"),
+      wabaId: this.#wabaId
+    } as CreatePhoneNumberInput;
+    return createPhoneNumberEndpoint(this.#graphClient, input, undefined, opts);
   }
 
   /** Graph `GET /{wabaId}/message_templates`. */
