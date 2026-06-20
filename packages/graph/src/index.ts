@@ -5,6 +5,7 @@ export * from "./errorSubclasses.js";
 export * from "./endpoints/messages.js";
 export * from "./endpoints/calling.js";
 export * from "./endpoints/businessManagement.js";
+export * from "./endpoints/oauth.js";
 export * from "./endpoints/groups.js";
 export * from "./endpoints/wabaEndpoints.js";
 export * from "./endpoint.js";
