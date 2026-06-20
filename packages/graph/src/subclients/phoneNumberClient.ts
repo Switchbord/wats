@@ -43,6 +43,11 @@ import {
   registerPhoneNumber as registerPhoneNumberEndpoint,
   deregisterPhoneNumber as deregisterPhoneNumberEndpoint,
   setTwoStepVerificationPin as setTwoStepVerificationPinEndpoint,
+  createQrCode as createQrCodeEndpoint,
+  listQrCodes as listQrCodesEndpoint,
+  getQrCode as getQrCodeEndpoint,
+  updateQrCode as updateQrCodeEndpoint,
+  deleteQrCode as deleteQrCodeEndpoint,
   type BlockUsersInput,
   type BlockUsersResponse,
   type BlockedUsersResponse,
@@ -50,6 +55,10 @@ import {
   type BusinessPublicKeyResponse,
   type BusinessPublicKeyUpdateResponse,
   type CommerceSettingsResponse,
+  type CreateQrCodeInput,
+  type CreateQrCodeResponse,
+  type DeleteQrCodeInput,
+  type DeleteQrCodeResponse,
   type DeregisterPhoneNumberInput,
   type DeregisterPhoneNumberResponse,
   type GetBusinessProfileInput,
@@ -58,6 +67,15 @@ import {
   type GetOfficialBusinessAccountStatusInput,
   type GetPhoneNumberInfoInput,
   type GetPhoneNumberSettingsInput,
+  type GetQrCodeInput,
+  type GetQrCodeResponse,
+  type ListQrCodesInput,
+  type ListQrCodesResponse,
+  type OfficialBusinessAccountReviewResponse,
+  type OfficialBusinessAccountStatusResponse,
+  type PhoneNumberInfo,
+  type PhoneNumberSettingsResponse,
+  type PhoneNumberSettingsUpdateResponse,
   type RegisterPhoneNumberInput,
   type RegisterPhoneNumberResponse,
   type RequestVerificationCodeInput,
@@ -70,17 +88,15 @@ import {
   type BusinessProfileUpdateResponse,
   type CommerceSettingsUpdateResponse,
   type ListBlockedUsersInput,
-  type OfficialBusinessAccountReviewResponse,
-  type OfficialBusinessAccountStatusResponse,
-  type PhoneNumberInfo,
-  type PhoneNumberSettingsResponse,
-  type PhoneNumberSettingsUpdateResponse,
+  type QrCodeEntry,
   type RequestOfficialBusinessAccountReviewInput,
   type SubmitDisplayNameForReviewInput,
   type SubmitDisplayNameForReviewResponse,
   type UnblockUsersInput,
   type UnblockUsersResponse,
   type UpdatePhoneNumberSettingsInput,
+  type UpdateQrCodeInput,
+  type UpdateQrCodeResponse,
   type VerifyPhoneNumberInput,
   type VerifyPhoneNumberResponse
 } from "../endpoints/businessManagement.js";
@@ -686,6 +702,117 @@ export class PhoneNumberClient {
     return setTwoStepVerificationPinEndpoint(
       this.#graphClient,
       scopedParams as unknown as SetTwoStepVerificationPinInput,
+      undefined,
+      opts
+    );
+  }
+
+  /**
+   * Graph `POST /{phoneNumberId}/message_qrdls` (WATS-156) — creates a QR
+   * code / short link with a prefilled message and image format. The bound
+   * phoneNumberId is injected and wins over any caller-supplied value.
+   */
+  async createQrCode(
+    params: Omit<CreateQrCodeInput, "phoneNumberId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<CreateQrCodeResponse> {
+    const scopedParams: Record<string, unknown> = copyOptionalParamsObject(
+      params,
+      "PhoneNumberClient.createQrCode"
+    );
+    scopedParams.phoneNumberId = this.#phoneNumberId;
+    return createQrCodeEndpoint(
+      this.#graphClient,
+      scopedParams as unknown as CreateQrCodeInput,
+      undefined,
+      opts
+    );
+  }
+
+  /**
+   * Graph `GET /{phoneNumberId}/message_qrdls` (WATS-156) — lists all QR
+   * codes / short links for the bound phone number. Supports optional
+   * `fields` and cursor pagination (`before` / `after`).
+   */
+  async listQrCodes(
+    params?: Omit<ListQrCodesInput, "phoneNumberId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<ListQrCodesResponse> {
+    const scopedParams: Record<string, unknown> = copyOptionalParamsObject(
+      params,
+      "PhoneNumberClient.listQrCodes"
+    );
+    scopedParams.phoneNumberId = this.#phoneNumberId;
+    return listQrCodesEndpoint(
+      this.#graphClient,
+      scopedParams as unknown as ListQrCodesInput,
+      undefined,
+      opts
+    );
+  }
+
+  /**
+   * Graph `GET /{phoneNumberId}/message_qrdls/{code}` (WATS-156) — gets a
+   * single QR code / short link by code. The bound phoneNumberId is
+   * injected; `code` and optional `fields` come from the caller.
+   */
+  async getQrCode(
+    params: Omit<GetQrCodeInput, "phoneNumberId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<GetQrCodeResponse> {
+    const scopedParams: Record<string, unknown> = copyOptionalParamsObject(
+      params,
+      "PhoneNumberClient.getQrCode"
+    );
+    scopedParams.phoneNumberId = this.#phoneNumberId;
+    return getQrCodeEndpoint(
+      this.#graphClient,
+      scopedParams as unknown as GetQrCodeInput,
+      undefined,
+      opts
+    );
+  }
+
+  /**
+   * Graph `POST /{phoneNumberId}/message_qrdls` (WATS-156) — updates an
+   * existing QR code's prefilled message. Same path as create but body
+   * carries the existing `code` plus the new `prefilledMessage`. The bound
+   * phoneNumberId is injected.
+   */
+  async updateQrCode(
+    params: Omit<UpdateQrCodeInput, "phoneNumberId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<UpdateQrCodeResponse> {
+    const scopedParams: Record<string, unknown> = copyOptionalParamsObject(
+      params,
+      "PhoneNumberClient.updateQrCode"
+    );
+    scopedParams.phoneNumberId = this.#phoneNumberId;
+    return updateQrCodeEndpoint(
+      this.#graphClient,
+      scopedParams as unknown as UpdateQrCodeInput,
+      undefined,
+      opts
+    );
+  }
+
+  /**
+   * Graph `DELETE /{phoneNumberId}/message_qrdls/{code}` (WATS-156) —
+   * deletes a QR code / short link by code. The bound phoneNumberId is
+   * injected; `code` comes from the caller.
+   */
+  async deleteQrCode(
+    params: Omit<DeleteQrCodeInput, "phoneNumberId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<DeleteQrCodeResponse> {
+    const scopedParams: Record<string, unknown> = copyOptionalParamsObject(
+      params,
+      "PhoneNumberClient.deleteQrCode"
+    );
+    scopedParams.phoneNumberId = this.#phoneNumberId;
+    return deleteQrCodeEndpoint(
+      this.#graphClient,
+      scopedParams as unknown as DeleteQrCodeInput,
       undefined,
       opts
     );
