@@ -16,9 +16,10 @@ import {
   type PersistenceStore
 } from "@wats/persistence";
 import { createSqlitePersistence } from "@wats/persistence/sqlite";
+import { createPostgresPersistence } from "@wats/persistence/postgres";
 ```
 
-The SQLite adapter is for local and single-instance testing — not a production or multi-replica recommendation.
+The SQLite adapter is for local and single-instance testing. The Postgres adapter is optional and lives behind `@wats/persistence/postgres`; install `pg` yourself when you use it. SQLite users do not need Postgres installed.
 
 ## SQLite quickstart
 
@@ -30,6 +31,21 @@ await store.close();
 ```
 
 Use a local path or `:memory:`. Database paths are operationally sensitive; diagnostics report only `[REDACTED_SQLITE_DATABASE]`.
+
+
+## Postgres adapter
+
+```ts
+import { createPostgresPersistence } from "@wats/persistence/postgres";
+
+const store = await createPostgresPersistence({
+  connectionString: process.env.DATABASE_URL ?? ""
+});
+await store.migrate();
+await store.close();
+```
+
+`pg` is an optional peer dependency. The subpath is importable without `pg`; the driver is loaded only when `createPostgresPersistence(...)` runs. Postgres diagnostics report `[REDACTED_POSTGRES_DATABASE]` and never echo the connection string. The adapter implements the same `PersistenceStore` contract and schema version as SQLite, including the message projection added in schema v3.
 
 ## Schema and migrations
 
@@ -137,7 +153,7 @@ The CLI has no database navigation commands yet.
 
 ## Non-goals
 
-Not implemented yet: a Postgres adapter (it must satisfy the same root contract, keep database URLs secret, and never be required by default CI), CLI thread/message navigation, delivery/read status UI, raw webhook body storage, automatic service send enqueueing, production hosting guarantees, and live Meta validation.
+Not implemented yet: CLI thread/message navigation, delivery/read status UI, raw webhook body storage, automatic service send enqueueing, production hosting guarantees, and live Meta validation. The Postgres adapter is shape-only and tested with a mock client; it is not live-validated against a running Postgres service in default CI.
 
 ## Related docs
 

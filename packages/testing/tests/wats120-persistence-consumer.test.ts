@@ -39,7 +39,8 @@ describe("WATS-120 @wats/persistence consumer fixture", () => {
     expect(manifest.private).toBe(false);
     expect(manifest.exports).toEqual({
       ".": { types: "./dist/index.d.ts", import: "./dist/index.js" },
-      "./sqlite": { types: "./dist/sqlite.d.ts", import: "./dist/sqlite.js" }
+      "./sqlite": { types: "./dist/sqlite.d.ts", import: "./dist/sqlite.js" },
+      "./postgres": { types: "./dist/postgres.d.ts", import: "./dist/postgres.js" }
     });
   });
 
