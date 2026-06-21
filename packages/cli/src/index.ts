@@ -1,5 +1,6 @@
 import { ConfigValidationError, loadConfig, parseConfig, redactConfig, type WatsConfig, type WatsProfileConfig } from "@wats/config";
 import { createWatsServiceApp, createWatsServiceOpenApiDocument, WatsServiceError } from "@wats/service";
+import { formatMessagesStatusSummaryLine } from "./status-renderer.js";
 
 export type CliCommandResult = Readonly<{
   exitCode: number;
@@ -1542,6 +1543,10 @@ function processEnv(): Record<string, string | undefined> {
   return (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
 }
 
+function stderrIsTty(): boolean {
+  return (globalThis as { process?: { stderr?: { isTTY?: boolean } } }).process?.stderr?.isTTY === true;
+}
+
 function mergeEnvValues(base: Record<string, string | undefined>, overlay: Record<string, string>): Record<string, string | undefined> {
   return { ...base, ...overlay };
 }
@@ -2424,7 +2429,10 @@ async function runMessagesListCommand(args: readonly string[]): Promise<CliComma
     }
     const body = result.body as MessagesListResponseWire;
     const formatted = formatMessagesListText(body);
-    return Object.freeze({ exitCode: 0, stdout: formatted.stdout, stderr: formatted.stderr });
+    const statusSummary = processEnv().WATS_CLI_STATUS_UI === "1" && stderrIsTty()
+      ? formatMessagesStatusSummaryLine({ records: body.items, fetchedAt: new Date().toISOString() })
+      : "";
+    return Object.freeze({ exitCode: 0, stdout: formatted.stdout, stderr: `${formatted.stderr}${statusSummary}` });
   } catch {
     return fail(safeGenericError("wats messages list --help"));
   }
