@@ -125,7 +125,7 @@ describe("WATS-44 pywa migration docs", () => {
     // the campaign by its site route instead of the source path; the WATS-44
     // ticket label was stripped from public docs. The surviving guard is that
     // the matrix carries the live-validated taxonomy and links the campaign log.
-    expect(matrix).toContain('lastReviewed="2026-06-10"');
+    expect(matrix).toContain('lastReviewed="2026-06-21"');
     expect(matrix).toContain("live-validated");
     expect(matrix).toContain("/docs/parity/live-campaign");
 
