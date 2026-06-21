@@ -4,6 +4,10 @@
 // this suite runs under `bun test` unchanged.
 
 import { createWebCryptoProvider } from "../src/adapters/webcrypto/index";
-import { registerAdapterContractSuite } from "./adapter-contract";
+import {
+  registerAdapterContractSuite,
+  registerAdapterShaCbcSuite
+} from "./adapter-contract";
 
 registerAdapterContractSuite("webcrypto-adapter", createWebCryptoProvider);
+registerAdapterShaCbcSuite("webcrypto-adapter", createWebCryptoProvider);

@@ -102,6 +102,22 @@ export type {
   HandleFlowRequestOptions
 } from "./dataChannel.js";
 
+// WATS-151 Flow media-upload (PhotoPicker / DocumentPicker) AES-256-CBC +
+// HMAC-SHA256 + PKCS#7 decryption runtime.
+export {
+  FLOW_MEDIA_MAX_BYTES,
+  FlowMediaCryptoUnavailableError,
+  FlowMediaDecryptionError,
+  decryptFlowMedia,
+  decryptFlowMediaFile
+} from "./flowMediaUpload.js";
+
+export type {
+  DecryptedFlowMedia,
+  FlowMediaEncryptedFile,
+  FlowMediaEncryptionMetadata
+} from "./flowMediaUpload.js";
+
 // WATS-154 Flow metrics & migration helpers (slice 1).
 export {
   buildFlowMetricField,

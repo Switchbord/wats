@@ -5,6 +5,10 @@
 // `node:crypto` specifier natively so this suite runs under `bun test`.
 
 import { createNodeCryptoProvider } from "../src/adapters/node/index";
-import { registerAdapterContractSuite } from "./adapter-contract";
+import {
+  registerAdapterContractSuite,
+  registerAdapterShaCbcSuite
+} from "./adapter-contract";
 
 registerAdapterContractSuite("node-adapter", createNodeCryptoProvider);
+registerAdapterShaCbcSuite("node-adapter", createNodeCryptoProvider);

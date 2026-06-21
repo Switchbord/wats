@@ -400,3 +400,241 @@ export function registerAdapterContractSuite(
   void hexToBytes;
   void bytesToHex;
 }
+
+// ── sha256 + aesCbcDecrypt shared contract (WATS-151) ────────────────────────
+//
+// Both adapters must agree on the SHA-256 empty-string KAT and the AES-CBC
+// round-trip / rejection matrix. The AES-CBC round-trip uses node:crypto to
+// ENCRYPT (tests may use node:crypto directly) and the provider under test to
+// DECRYPT — proving the provider reproduces the exact scheme.
+
+import { createCipheriv } from "node:crypto";
+
+function aesCbcEncryptWithNode(
+  key: Uint8Array,
+  iv: Uint8Array,
+  plaintext: Uint8Array
+): Uint8Array {
+  const algo = key.byteLength === 16 ? "aes-128-cbc" : "aes-256-cbc";
+  const cipher = createCipheriv(algo, key, iv);
+  // Node's Cipheriv has PKCS#7 auto-padding enabled by default. Do not pad
+  // manually here, or decryptors will correctly remove only one padding layer.
+  const head = cipher.update(plaintext);
+  const tail = cipher.final();
+  const out = new Uint8Array(head.byteLength + tail.byteLength);
+  out.set(head, 0);
+  out.set(tail, head.byteLength);
+  return out;
+}
+
+export function registerAdapterShaCbcSuite(
+  adapterLabel: string,
+  factory: () => Promise<CryptoProvider>
+): void {
+  describe(`${adapterLabel} — sha256`, () => {
+    test("empty-string KAT: e3b0c442...b855", async () => {
+      const provider = await factory();
+      const digest = await provider.sha256!(new Uint8Array(0));
+      expect(digest).toBeInstanceOf(Uint8Array);
+      expect(digest.byteLength).toBe(32);
+      expect(bytesToHex(digest)).toBe(
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      );
+    });
+
+    test("abc KAT: ba7816bf...f20015ad", async () => {
+      const provider = await factory();
+      const digest = await provider.sha256!(
+        new TextEncoder().encode("abc")
+      );
+      expect(bytesToHex(digest)).toBe(
+        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+      );
+    });
+
+    test("rejects non-Uint8Array input with CryptoProviderError (not raw TypeError)", async () => {
+      const provider = await factory();
+      await expect(
+        provider.sha256!("nope" as unknown as Uint8Array)
+      ).rejects.toBeInstanceOf(CryptoProviderError);
+    });
+
+    test("rejects null input with CryptoProviderError", async () => {
+      const provider = await factory();
+      await expect(
+        provider.sha256!(null as unknown as Uint8Array)
+      ).rejects.toBeInstanceOf(CryptoProviderError);
+    });
+  });
+
+  describe(`${adapterLabel} — aesCbcDecrypt round-trip`, () => {
+    for (const keyLen of [16, 32] as const) {
+      test(`AES-${keyLen * 8}: node-encrypted ciphertext decrypts to plaintext`, async () => {
+        const provider = await factory();
+        const key = new Uint8Array(keyLen).fill(keyLen);
+        const iv = new Uint8Array(16).fill(7);
+        const plaintext = new TextEncoder().encode(`hello cbc ${keyLen}`);
+        const ciphertext = aesCbcEncryptWithNode(key, iv, plaintext);
+        const recovered = await provider.aesCbcDecrypt!(key, iv, ciphertext);
+        expect(bytesToHex(recovered)).toBe(bytesToHex(plaintext));
+      });
+    }
+
+    test("round-trips a 16-byte plaintext (one full block → 2 padded blocks)", async () => {
+      const provider = await factory();
+      const key = new Uint8Array(32).fill(1);
+      const iv = new Uint8Array(16).fill(2);
+      const plaintext = new Uint8Array(16).fill(0xab);
+      const ciphertext = aesCbcEncryptWithNode(key, iv, plaintext);
+      expect(ciphertext.byteLength).toBe(32); // 16 + 16 padding block
+      const recovered = await provider.aesCbcDecrypt!(key, iv, ciphertext);
+      expect(bytesToHex(recovered)).toBe(bytesToHex(plaintext));
+    });
+
+    test("round-trips a 17-byte plaintext (needs 2 ciphertext blocks)", async () => {
+      const provider = await factory();
+      const key = new Uint8Array(32).fill(3);
+      const iv = new Uint8Array(16).fill(4);
+      const plaintext = new TextEncoder().encode("1234567890abcdefX"); // 17 bytes
+      expect(plaintext.byteLength).toBe(17);
+      const ciphertext = aesCbcEncryptWithNode(key, iv, plaintext);
+      expect(ciphertext.byteLength).toBe(32);
+      const recovered = await provider.aesCbcDecrypt!(key, iv, ciphertext);
+      expect(bytesToHex(recovered)).toBe(bytesToHex(plaintext));
+    });
+
+    test("round-trips an empty plaintext (one full padding block)", async () => {
+      const provider = await factory();
+      const key = new Uint8Array(32).fill(5);
+      const iv = new Uint8Array(16).fill(6);
+      const ciphertext = aesCbcEncryptWithNode(key, iv, new Uint8Array(0));
+      expect(ciphertext.byteLength).toBe(16);
+      const recovered = await provider.aesCbcDecrypt!(key, iv, ciphertext);
+      expect(recovered.byteLength).toBe(0);
+    });
+
+    test("cross-adapter parity: node-encrypted decrypts under this adapter", async () => {
+      const provider = await factory();
+      const key = new Uint8Array(32).fill(0x2a);
+      const iv = new Uint8Array(16).fill(0x10);
+      const plaintext = new TextEncoder().encode("cross cbc parity");
+      const ciphertext = aesCbcEncryptWithNode(key, iv, plaintext);
+      const recovered = await provider.aesCbcDecrypt!(key, iv, ciphertext);
+      expect(bytesToHex(recovered)).toBe(bytesToHex(plaintext));
+    });
+  });
+
+  describe(`${adapterLabel} — aesCbcDecrypt failure modes (typed errors, no raw host errors)`, () => {
+    test("rejects 24-byte key with InvalidKeyError (192-bit not supported)", async () => {
+      const provider = await factory();
+      await expect(
+        provider.aesCbcDecrypt!(
+          new Uint8Array(24).fill(1),
+          new Uint8Array(16),
+          new Uint8Array(16)
+        )
+      ).rejects.toBeInstanceOf(InvalidKeyError);
+    });
+
+    test("rejects 15-byte IV with InvalidLengthError (CBC needs 16-byte IV)", async () => {
+      const provider = await factory();
+      await expect(
+        provider.aesCbcDecrypt!(
+          new Uint8Array(32).fill(1),
+          new Uint8Array(15),
+          new Uint8Array(16)
+        )
+      ).rejects.toBeInstanceOf(InvalidLengthError);
+    });
+
+    test("rejects 17-byte IV with InvalidLengthError", async () => {
+      const provider = await factory();
+      await expect(
+        provider.aesCbcDecrypt!(
+          new Uint8Array(32).fill(1),
+          new Uint8Array(17),
+          new Uint8Array(16)
+        )
+      ).rejects.toBeInstanceOf(InvalidLengthError);
+    });
+
+    test("rejects empty ciphertext with InvalidLengthError", async () => {
+      const provider = await factory();
+      await expect(
+        provider.aesCbcDecrypt!(
+          new Uint8Array(32).fill(1),
+          new Uint8Array(16),
+          new Uint8Array(0)
+        )
+      ).rejects.toBeInstanceOf(InvalidLengthError);
+    });
+
+    test("rejects non-block-aligned ciphertext (17 bytes) with InvalidLengthError", async () => {
+      const provider = await factory();
+      await expect(
+        provider.aesCbcDecrypt!(
+          new Uint8Array(32).fill(1),
+          new Uint8Array(16),
+          new Uint8Array(17)
+        )
+      ).rejects.toBeInstanceOf(InvalidLengthError);
+    });
+
+    test("rejects tampered PKCS#7 padding with InvalidBodyError", async () => {
+      const provider = await factory();
+      const key = new Uint8Array(32).fill(9);
+      const iv = new Uint8Array(16).fill(8);
+      const ciphertext = aesCbcEncryptWithNode(
+        key,
+        iv,
+        new TextEncoder().encode("pad me")
+      );
+      // Corrupt the final block so PKCS#7 unpadding fails.
+      ciphertext[ciphertext.byteLength - 1] ^= 0xff;
+      await expect(
+        provider.aesCbcDecrypt!(key, iv, ciphertext)
+      ).rejects.toBeInstanceOf(InvalidBodyError);
+    });
+
+    test("decrypt under the WRONG key yields InvalidBodyError (bad padding, not raw error)", async () => {
+      const provider = await factory();
+      const iv = new Uint8Array(16).fill(6);
+      const ciphertext = aesCbcEncryptWithNode(
+        new Uint8Array(32).fill(1),
+        iv,
+        new TextEncoder().encode("secret")
+      );
+      try {
+        await provider.aesCbcDecrypt!(
+          new Uint8Array(32).fill(2),
+          iv,
+          ciphertext
+        );
+        throw new Error("expected rejection");
+      } catch (err) {
+        expect(err).toBeInstanceOf(CryptoProviderError);
+        expect(err).toBeInstanceOf(InvalidBodyError);
+        expect(err).not.toBeInstanceOf(InvalidKeyError);
+      }
+    });
+
+    test("rejects non-Uint8Array key with InvalidKeyError", async () => {
+      const provider = await factory();
+      await expect(
+        provider.aesCbcDecrypt!(
+          "not-a-key" as unknown as Uint8Array,
+          new Uint8Array(16),
+          new Uint8Array(16)
+        )
+      ).rejects.toBeInstanceOf(InvalidKeyError);
+    });
+  });
+
+  describe(`${adapterLabel} — sha256/aesCbcDecrypt capability wiring`, () => {
+    test("both new methods are functions", async () => {
+      const provider = await factory();
+      expect(typeof provider.sha256).toBe("function");
+      expect(typeof provider.aesCbcDecrypt).toBe("function");
+    });
+  });
+}
