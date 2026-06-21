@@ -728,22 +728,33 @@ class SqlitePersistenceStore implements PersistenceStore {
   async listMessages(input: ListMessagesInput): Promise<ListMessagesResult> {
     this.#assertOpen();
     const query = validateListMessages(input);
-    const rows = query.beforeRowId === null
-      ? this.#database.query<MessageRow>(
+    const fetchLimit = query.limit + 1;
+    let rows: MessageRow[];
+    if (query.beforeRowId === null) {
+      rows = this.#database.query<MessageRow>(
         `SELECT row_id, wa_message_id, direction, from_phone, to_phone, type, status, graph_message_id, created_at, updated_at
          FROM wats_messages
          ORDER BY created_at DESC, row_id DESC
          LIMIT ?`
-      ).all(query.limit)
-      : this.#database.query<MessageRow>(
+      ).all(fetchLimit);
+    } else {
+      const cursor = this.#database.query<{ row_id: string; created_at: string }>(
+        "SELECT row_id, created_at FROM wats_messages WHERE row_id = ?"
+      ).get(query.beforeRowId);
+      if (cursor === null) {
+        return Object.freeze({ items: Object.freeze([]), nextCursor: null });
+      }
+      rows = this.#database.query<MessageRow>(
         `SELECT row_id, wa_message_id, direction, from_phone, to_phone, type, status, graph_message_id, created_at, updated_at
          FROM wats_messages
-         WHERE row_id < ?
+         WHERE created_at < ? OR (created_at = ? AND row_id < ?)
          ORDER BY created_at DESC, row_id DESC
          LIMIT ?`
-      ).all(query.beforeRowId, query.limit);
-    const items = Object.freeze(rows.map((row) => messageRowToRecord(row)));
-    const nextCursor = items.length === query.limit ? items[items.length - 1]?.rowId ?? null : null;
+      ).all(cursor.created_at, cursor.created_at, cursor.row_id, fetchLimit);
+    }
+    const pageRows = rows.slice(0, query.limit);
+    const items = Object.freeze(pageRows.map((row) => messageRowToRecord(row)));
+    const nextCursor = rows.length > query.limit ? items[items.length - 1]?.rowId ?? null : null;
     return Object.freeze({ items, nextCursor });
   }
 

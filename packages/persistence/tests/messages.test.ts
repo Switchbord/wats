@@ -159,6 +159,39 @@ describe("WATS-122 message projection", () => {
     }
   });
 
+  test("listMessages paginates by created_at + row_id ordering, not row_id alone", async () => {
+    const store = await createSqlitePersistence({ filename: tempDb() });
+    await store.migrate();
+    try {
+      const rows = [
+        ["aaa", "2026-06-21T00:00:03.000Z"],
+        ["mmm", "2026-06-21T00:00:02.000Z"],
+        ["yyy", "2026-06-21T00:00:01.000Z"],
+        ["zzz", "2026-06-21T00:00:00.000Z"]
+      ] as const;
+      for (const [rowId, ts] of rows) {
+        await store.recordMessage({
+          rowId,
+          waMessageId: `wamid.${rowId}`,
+          direction: "outbound",
+          type: "text",
+          status: "sent",
+          createdAt: ts,
+          updatedAt: ts
+        });
+      }
+      const first = await store.listMessages({ limit: 2 });
+      expect(first.items.map((item) => item.rowId)).toEqual(["aaa", "mmm"]);
+      expect(first.nextCursor).toBe("mmm");
+
+      const second = await store.listMessages({ limit: 2, beforeRowId: first.nextCursor! });
+      expect(second.items.map((item) => item.rowId)).toEqual(["yyy", "zzz"]);
+      expect(second.nextCursor).toBeNull();
+    } finally {
+      await store.close();
+    }
+  });
+
   test("listMessages returns null nextCursor when fewer than limit remain", async () => {
     const store = await createSqlitePersistence({ filename: tempDb() });
     await store.migrate();
