@@ -1,0 +1,15 @@
+{
+  "name": "async-wats-contract-consumer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "verify-imports": "bun verify-imports.ts"
+  },
+  "dependencies": {
+    "@wats/core": "workspace:*",
+    "@wats/graph": "workspace:*",
+    "@wats/http": "workspace:*",
+    "@wats/types": "workspace:*",
+    "@wats/config": "workspace:*"
+  }
+}

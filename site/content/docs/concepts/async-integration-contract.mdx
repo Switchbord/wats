@@ -1,0 +1,78 @@
+---
+title: "Async integration contract"
+description: "Stable WATS import surface for app-side queues, workers, idempotency, throttling, and media offload."
+---
+
+<DocMeta status="experimental" lastReviewed="2026-06-21" />
+
+WATS core stays dependency-light. Redis, BullMQ, S3/R2, and worker orchestration belong in an app-side layer that composes WATS packages through published imports only.
+
+This page pins the imports that an app-side async layer may use. If a future async worker needs a WATS capability not listed here, add a public export first. Do not import from `packages/*/src`, `@wats/*/dist`, or unpublished internals.
+
+## Allowed package roots
+
+Allowed roots for app-side async code:
+
+- `@wats/http`
+- `@wats/core`
+- `@wats/core/filtersTyped`
+- `@wats/graph`
+- `@wats/graph/testing` for tests only
+- `@wats/graph/transport`
+- `@wats/types`
+- `@wats/config`
+
+Do not build distributed state on `@wats/persistence`; it is experimental and local-service oriented. Redis/BullMQ idempotency and queue state should live in the app-side async layer.
+
+## Ingestion edge
+
+The ingestion edge should depend on `@wats/http` for signature/challenge handling and raw-body safety:
+
+- `createWebhookAdapter`
+- `createFetchWebhookHandler`
+- `validateWebhookSignature`
+- `verifyWebhookChallenge`
+
+The edge may normalize with `@wats/core` before enqueueing when the deployment runtime can afford it:
+
+- `normalizeWebhookEnvelope`
+- `WebhookNormalizationError`
+- `TypedUpdate`
+- family types such as `TypedMessageUpdate` and `TypedStatusUpdate`
+
+The producer-side idempotency key must be derived from the normalized update identity when available. Do not key every update on `message.id`; status, group, template, and account events may not have one.
+
+## Worker side
+
+Workers may use `@wats/core` routing and listener primitives:
+
+- `TypedRouter`
+- `WhatsApp`
+- `createListenerRegistry`
+- `createTypedFilter`
+- `message`, `status`, `template`, `account`, `call`, `system`, `unknown`
+
+Workers may use `@wats/graph` to send replies or media through a normal `GraphClient`:
+
+- `GraphClient`
+- `PhoneNumberClient`
+- `WABAClient`
+- message/media/template/Flow/calling/business-management helpers exported from the root package
+- `createReliableTransport` from `@wats/graph/transport` when retry behavior is explicitly configured
+
+## Tests
+
+Tests may use `@wats/graph/testing` and `createMockTransport`. Do not use package source paths as a shortcut in tests; that hides public API gaps.
+
+## Out of scope for WATS core
+
+The app-side layer owns:
+
+- Redis/BullMQ clients or Upstash/HTTP producers
+- producer-side and worker-side idempotency keys
+- dead-letter queues and replay tools
+- outbound throttling queues
+- S3/R2 media storage
+- worker deployment topology and metrics
+
+Those dependencies should not become hard dependencies of WATS packages.

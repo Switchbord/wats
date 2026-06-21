@@ -79,6 +79,12 @@
     "packages/persistence": {
       "name": "@wats/persistence",
       "version": "0.3.26",
+      "peerDependencies": {
+        "pg": "^8.11.0",
+      },
+      "optionalPeers": [
+        "pg",
+      ],
     },
     "packages/service": {
       "name": "@wats/service",
@@ -101,6 +107,16 @@
         "@wats/http": "workspace:*",
         "@wats/internal-utils": "workspace:*",
         "@wats/service": "workspace:*",
+      },
+    },
+    "packages/testing/fixtures/async-wats-contract": {
+      "name": "async-wats-contract-consumer",
+      "dependencies": {
+        "@wats/config": "workspace:*",
+        "@wats/core": "workspace:*",
+        "@wats/graph": "workspace:*",
+        "@wats/http": "workspace:*",
+        "@wats/types": "workspace:*",
       },
     },
     "packages/testing/fixtures/cli-consumer": {
@@ -793,6 +809,8 @@
     "aria-hidden": ["aria-hidden@1.2.6", "", { "dependencies": { "tslib": "^2.0.0" } }, "sha512-ik3ZgC9dY/lYVVM++OISsaYDeg1tb0VtP5uL3ouh1koGOaUMDPpbFIei4JkFimWUFPn90sbMNMXQAIVOlnYKJA=="],
 
     "astring": ["astring@1.9.0", "", { "bin": { "astring": "bin/astring" } }, "sha512-LElXdjswlqjWrPpJFg1Fx4wpkOCxj1TDHlSV4PlaRxHGWko024xICaa97ZkMfs6DRKlCguiAI+rbXv5GWwXIkg=="],
+
+    "async-wats-contract-consumer": ["async-wats-contract-consumer@workspace:packages/testing/fixtures/async-wats-contract"],
 
     "babel-dead-code-elimination": ["babel-dead-code-elimination@1.0.12", "", { "dependencies": { "@babel/core": "^7.23.7", "@babel/parser": "^7.23.6", "@babel/traverse": "^7.23.7", "@babel/types": "^7.23.6" } }, "sha512-GERT7L2TiYcYDtYk1IpD+ASAYXjKbLTDPhBtYj7X1NuRMDTMtAx9kyBenub1Ev41lo91OHCKdmP+egTDmfQ7Ig=="],
 

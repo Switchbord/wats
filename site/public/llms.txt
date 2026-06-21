@@ -19,6 +19,7 @@ Playground (runs the real SDK in-browser, no credentials): https://wats.sh/playg
 - [Deploying a WATS webhook on Node](https://wats.sh/docs/guides/deploy-node): Deploy a WATS webhook server under Node.js using createNodeWebhookHandler and node:http.
 - [Groups quickstart](https://wats.sh/docs/guides/groups-quickstart): The credential-free Groups flow WATS supports today — create, read the lifecycle webhook, send the invite, approve joins, and message the group.
 - [Transport and Testing](https://wats.sh/docs/guides/transport-and-testing): The @wats/graph Transport seam — testing with MockTransport, opt-in reliable transport, and the interceptor primer.
+- [Async integration contract](https://wats.sh/docs/concepts/async-integration-contract): Stable WATS import surface for app-side queues, workers, idempotency, throttling, and media offload.
 - [Architecture Overview](https://wats.sh/docs/concepts/overview): How the WATS packages, Graph request flow, and webhook flow fit together.
 - [WATS Package Map](https://wats.sh/docs/concepts/package-map): Canonical dependency map and per-package status for the WATS workspace.
 - [WATS Public API Surface](https://wats.sh/docs/concepts/public-api-surface): The public package surfaces that ship today versus planned parity work.
