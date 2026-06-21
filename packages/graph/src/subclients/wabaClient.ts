@@ -18,11 +18,16 @@ import { copyOptionalParamsObject, splitRequiredStringDataProp } from "../intern
 import {
   getWabaInfo as getWabaInfoEndpoint,
   listSubscribedApps as listSubscribedAppsEndpoint,
+  setWabaCallbackOverride as setWabaCallbackOverrideEndpoint,
+  clearWabaCallbackOverride as clearWabaCallbackOverrideEndpoint,
   createPhoneNumber as createPhoneNumberEndpoint,
   type CreatePhoneNumberInput,
   type CreatePhoneNumberResponse,
+  type ClearWabaCallbackOverrideInput,
   type GetWabaInfoInput,
+  type SetWabaCallbackOverrideInput,
   type SubscribedAppsResponse,
+  type WabaCallbackOverrideResponse,
   type WabaInfo
 } from "../endpoints/businessManagement.js";
 import {
@@ -263,6 +268,38 @@ export class WABAClient {
   ): Promise<SubscribedAppsResponse> {
     copyOptionalParamsObject(params, "WABAClient.listSubscribedApps");
     return listSubscribedAppsEndpoint(
+      this.#graphClient,
+      { wabaId: this.#wabaId },
+      undefined,
+      opts
+    );
+  }
+
+  /** Graph `POST /{wabaId}/subscribed_apps` — sets a WABA alternate callback URL. */
+  async setCallbackOverride(
+    params: Omit<SetWabaCallbackOverrideInput, "wabaId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<WabaCallbackOverrideResponse> {
+    const scopedParams: Record<string, unknown> = copyOptionalParamsObject(
+      params,
+      "WABAClient.setCallbackOverride"
+    );
+    scopedParams.wabaId = this.#wabaId;
+    return setWabaCallbackOverrideEndpoint(
+      this.#graphClient,
+      scopedParams as unknown as SetWabaCallbackOverrideInput,
+      undefined,
+      opts
+    );
+  }
+
+  /** Graph `POST /{wabaId}/subscribed_apps` with no body — clears the override. */
+  async clearCallbackOverride(
+    params?: Omit<ClearWabaCallbackOverrideInput, "wabaId">,
+    opts?: EndpointInvokeOptions
+  ): Promise<WabaCallbackOverrideResponse> {
+    copyOptionalParamsObject(params, "WABAClient.clearCallbackOverride");
+    return clearWabaCallbackOverrideEndpoint(
       this.#graphClient,
       { wabaId: this.#wabaId },
       undefined,
