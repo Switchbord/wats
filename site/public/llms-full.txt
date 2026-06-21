@@ -2288,6 +2288,8 @@ createdAt	direction	waMessageId	type	status	from	to
 
 The next-page cursor prints to stderr as `nextCursor: <row-id>` so stdout remains parseable. With `--json`, stdout is the raw `{ items, nextCursor }` response from the service. `show` prints one `key: value` line per field by default, or the raw message JSON with `--json`.
 
+Set `WATS_CLI_STATUS_UI=1` to add an observed-status summary to stderr when stderr is a TTY. The summary is evidence-only: it prints the statuses recorded by the local service, and never infers delivered/read from send success.
+
 Errors are folded into safe CLI output: missing token, unreachable local service, `401 unauthorized`, `404 not_found`, and malformed arguments never print token values, config paths, or stack traces.
 
 ### `wats webhook token`

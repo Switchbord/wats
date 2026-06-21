@@ -11,13 +11,23 @@ type FetchCall = {
 
 const tempDirs: string[] = [];
 const ORIGINAL_FETCH = globalThis.fetch;
+const ORIGINAL_STATUS_UI = process.env.WATS_CLI_STATUS_UI;
+const ORIGINAL_STDERR_IS_TTY = Object.getOwnPropertyDescriptor(process.stderr, "isTTY");
 const TOKEN = "TOKEN_SENTINEL_DO_NOT_PRINT_1234567890";
 const CONFIG_SENTINEL = "wats-test-config-sentinel";
 
 afterEach(() => {
   globalThis.fetch = ORIGINAL_FETCH;
+  if (ORIGINAL_STATUS_UI === undefined) delete process.env.WATS_CLI_STATUS_UI;
+  else process.env.WATS_CLI_STATUS_UI = ORIGINAL_STATUS_UI;
+  if (ORIGINAL_STDERR_IS_TTY === undefined) delete (process.stderr as { isTTY?: boolean }).isTTY;
+  else Object.defineProperty(process.stderr, "isTTY", ORIGINAL_STDERR_IS_TTY);
   for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
+
+function setStderrIsTty(value: boolean): void {
+  Object.defineProperty(process.stderr, "isTTY", { value, configurable: true });
+}
 
 function makeTempDir(): string {
   const dir = mkdtempSync(join(tmpdir(), "wats-cli-messages-"));
@@ -221,6 +231,31 @@ describe("wats messages CLI commands", () => {
     expect(result.stderr).toContain("WATS_SERVICE_TOKEN");
     expect(result.stderr).not.toContain(TOKEN);
     expect(calls.length).toBe(0);
+  });
+
+  test("WATS_CLI_STATUS_UI=1 adds observed status summary to stderr only when stderr is a TTY", async () => {
+    const dir = makeTempDir();
+    const config = writeConfig(dir, 19008);
+    writeEnvFile(dir);
+    process.env.WATS_CLI_STATUS_UI = "1";
+    setStderrIsTty(false);
+    mockFetch(() => jsonResponse({ items: [RECORD], nextCursor: null }));
+
+    const nonTty = await runCli(["messages", "list", "--config", config, "--env-file", ".env.local"]);
+
+    expect(nonTty.exitCode).toBe(0);
+    expect(nonTty.stdout).toContain("createdAt\tdirection\twaMessageId");
+    expect(nonTty.stderr).toBe("nextCursor: (none)\n");
+
+    setStderrIsTty(true);
+    const tty = await runCli(["messages", "list", "--config", config, "--env-file", ".env.local"]);
+
+    expect(tty.exitCode).toBe(0);
+    expect(tty.stdout).toBe(nonTty.stdout);
+    expect(tty.stderr).toContain("nextCursor: (none)");
+    expect(tty.stderr).toContain("wats messages: 1 outbound record(s)");
+    expect(tty.stderr).toContain("observed at ");
+    expectNoLeaks(tty.stdout + tty.stderr, config);
   });
 
   test("service 404/401 and network failures are folded into safe CLI errors", async () => {
