@@ -1164,7 +1164,7 @@ async function setupCommand(args: readonly string[], context: CliCommandContext 
 
 
 function hasRawUrlWhitespace(value: string): boolean {
-  return /[\s\x00-]/u.test(value);
+  return /[\s\x00-\x1f\x7f]/u.test(value);
 }
 
 function safeDecodeURIComponent(value: string): string | null {
@@ -1194,7 +1194,7 @@ function isSafeWebhookPath(value: string): boolean {
   if (decoded === null || (decoded !== value && /[\/?#]/u.test(decoded))) return false;
   const decodedSegments = decoded.split("/").filter((segment) => segment.length > 0);
   if (decodedSegments.length === 0) return false;
-  return decodedSegments.every((segment) => segment !== "." && segment !== ".." && !/[\x00-]/u.test(segment));
+  return decodedSegments.every((segment) => segment !== "." && segment !== ".." && !/[\x00-\x1f\x7f]/u.test(segment));
 }
 
 function rawUrlPath(value: string): string | null {
@@ -2188,7 +2188,7 @@ async function openApiCommand(args: readonly string[]): Promise<CliCommandResult
 
 // WATS-123: arg parsers for `wats messages list/show`.
 function isMessagesLimitInteger(value: string): boolean {
-  return /^(?:0|[1-9][0-9]*)$/u.test(value);
+  return /^[1-9][0-9]*$/u.test(value);
 }
 
 function parseMessagesListArgs(args: readonly string[]): MessagesListArgs {
