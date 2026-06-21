@@ -249,6 +249,10 @@ function validatePersistence(value: unknown): PersistenceStore | undefined {
     typeof value.claimOutboxItems !== "function" ||
     typeof value.markOutboxItemFailed !== "function" ||
     typeof value.markOutboxItemSucceeded !== "function" ||
+    typeof value.recordMessage !== "function" ||
+    typeof value.appendMessageStatus !== "function" ||
+    typeof value.getMessage !== "function" ||
+    typeof value.listMessages !== "function" ||
     typeof value.close !== "function"
   ) {
     throw new WatsServiceError("invalid_persistence", "persistence must be a PersistenceStore.");

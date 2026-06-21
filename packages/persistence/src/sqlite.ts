@@ -2,6 +2,12 @@ import {
   CURRENT_SCHEMA_VERSION,
   PersistenceError,
   REDACTED_SQLITE_LOCATION,
+  type ListMessagesInput,
+  type ListMessagesResult,
+  type MessageDirection,
+  type MessageRecord,
+  type MessageRecordInput,
+  type MessageStatusEventInput,
   type MigrationReport,
   type OutboxClaimInput,
   type OutboxEnqueueInput,
@@ -542,6 +548,22 @@ class SqlitePersistenceStore implements PersistenceStore {
     if (result.changes !== 1) {
       throw new PersistenceError("outbox_failed", "SQLite outbox success lease is stale.");
     }
+  }
+
+  async recordMessage(_input: MessageRecordInput): Promise<void> {
+    throw new PersistenceError("invalid_record", "recordMessage is not implemented.");
+  }
+
+  async appendMessageStatus(_input: MessageStatusEventInput): Promise<void> {
+    throw new PersistenceError("invalid_record", "appendMessageStatus is not implemented.");
+  }
+
+  async getMessage(_input: { waMessageId: string }): Promise<MessageRecord | null> {
+    throw new PersistenceError("invalid_record", "getMessage is not implemented.");
+  }
+
+  async listMessages(_input: ListMessagesInput): Promise<ListMessagesResult> {
+    throw new PersistenceError("invalid_record", "listMessages is not implemented.");
   }
 
   async close(): Promise<void> {
