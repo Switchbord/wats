@@ -57,8 +57,17 @@ Then point Meta App Dashboard > WhatsApp > Configuration at:
 
 - Stateless: no persistence is wired into `serve` yet, so webhook dedup and
   idempotency are not active out of the box (tracked in WATS-87).
-- No transport retry/backoff/timeout primitives yet (WATS-86).
-- SQLite-only persistence package; no Postgres/HA (WATS-125).
+- Reliable-transport primitives (retry, bounded exponential full-jitter
+  backoff, `Retry-After`, per-attempt timeout) ship opt-in via
+  `createReliableTransport(inner, options?)` in `@wats/graph` (since 0.3.10) but
+  are not wired into the default `serve` transport; `GraphClient` still uses
+  the bare fetch transport unless a caller passes the decorator. The decorator
+  exposes an `onRetry(ctx)` hook as the redacted-telemetry primitive surface —
+  the caller controls what (if anything) to record and is responsible for
+  redaction. WATS ships no built-in redacted telemetry sink and no per-endpoint
+  concurrency cap; both remain deferred under WATS-86, pending live-campaign
+  evidence and the WATS-111 no-maintainer-owned-telemetry-by-default stance.
+- `@wats/persistence` now ships SQLite plus an optional Postgres adapter subpath, but `wats serve` still needs explicit operator wiring for durable/HA production persistence; no automatic HA topology is enabled by this Railway scaffold.
 
 ## Inbound webhook observability
 
