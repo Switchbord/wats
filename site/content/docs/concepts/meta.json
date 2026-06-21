@@ -1,4 +1,4 @@
 {
   "title": "Concepts",
-  "pages": ["overview", "package-map", "public-api-surface"]
+  "pages": ["overview", "package-map", "public-api-surface", "async-integration-contract"]
 }

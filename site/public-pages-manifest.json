@@ -6,6 +6,7 @@
     "/docs/concepts/overview",
     "/docs/concepts/package-map",
     "/docs/concepts/public-api-surface",
+    "/docs/concepts/async-integration-contract",
     "/docs/guide",
     "/docs/guides/cli-init",
     "/docs/guides/community-examples",
@@ -50,6 +51,6 @@
   ],
   "notes": {
     "/404": "noindex: static fallback page (public/404.html) served by Vercel on unknown URLs; not a user-facing route",
-    "/playground/runner": "noindex: static sandbox iframe document (public/playground/runner.html), not a route — loaded as the playground's sandboxed execution frame"
+    "/playground/runner": "noindex: static sandbox iframe document (public/playground/runner.html), not a route \u2014 loaded as the playground's sandboxed execution frame"
   }
 }
