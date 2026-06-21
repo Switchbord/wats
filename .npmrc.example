@@ -1,0 +1,47 @@
+# WATS npm publish configuration example.
+#
+# This file is a reference template, not an active config. Copy to `.npmrc`
+# only on a publisher machine or in the `npm-publish` CI environment. Never
+# commit a real `.npmrc` containing a token. The repository must stay
+# credential-free: no NPM_TOKEN, no access token, no bearer value.
+
+# --- Provenance --------------------------------------------------------------
+# Require a Sigstore provenance attestation on every publish. Provenance binds
+# each published tarball to the exact GitHub workflow run / commit that built
+# it. `--provenance` on the CLI also requires `id-token: write` in CI, or a
+# web-authenticated publisher session for a human publish.
+provenance=true
+
+# --- Human publisher auth ----------------------------------------------------
+# Human publishers authenticate with a 2FA-enabled account via the browser flow.
+# Do not store a static token in `.npmrc` for human publishes.
+# `auth-type=web` makes `npm login` open a browser challenge instead of
+# accepting a password or token inline.
+auth-type=web
+
+# --- CI / OIDC auth ----------------------------------------------------------
+# In CI (the `npm-publish` GitHub environment), prefer OIDC publishing: the
+# `release.yml` workflow uses `permissions: id-token: write` and the npm org's
+# GitHub Actions trust configuration to mint a short-lived publish token. With
+# OIDC configured there is NO `NPM_TOKEN` secret and NO token line here.
+#
+# If OIDC is unavailable and a long-lived automation token is the only fallback,
+# store it as the `NPM_TOKEN` environment secret in the `npm-publish`
+# environment and reference it via the environment (never commit the value):
+#
+#   //registry.npmjs.org/:_authToken=${NPM_TOKEN}
+#
+# Treat this fallback as a temporary deviation and document rotation in the
+# private operator channel. The preferred state is OIDC with no token line.
+
+# --- Scope access ------------------------------------------------------------
+# Public scoped packages publish with `--access public` on the CLI (also set in
+# each package's `publishConfig.access: "public"`). No `.npmrc` access line is
+# required for public scoped publishes.
+
+# --- What NEVER goes in a committed .npmrc -----------------------------------
+# - Real `_authToken` values or `${NPM_TOKEN}` expansions that resolve to a
+#   secret outside the protected CI environment.
+# - `always-auth=true` paired with a stored token.
+# - Any URL containing credentials.
+# - Any value that `npm whoami` would refuse to redact.
