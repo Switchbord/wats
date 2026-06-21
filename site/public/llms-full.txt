@@ -6933,7 +6933,8 @@ Migration notes:
 | delete / deprecate / assets | `deleteFlow`, `deprecateFlow`, `getFlowAssets` | shape-only | Delete/deprecate only resources created by the test run. |
 | Flow response builders | `buildFlowScreenResponse`, `buildFlowCloseResponse`, `buildFlowErrorResponse` | shape-only | Local data-exchange response construction only. |
 | pywa FlowJSON dataclasses | typed DSL builders (`flowJson`, `screen`, `singleColumnLayout`, `form`, every component + action builder) | shape-only | camelCase builders serialize to the hyphenated FlowJSON wire shape; output passes `validateFlowJson`. |
-| encrypted Flow request decrypt/encrypt | `decryptRequest` / `encryptResponse` / `handleFlowRequest` (RSA-OAEP + AES-GCM, IV-flip response), backed by `@wats/crypto` | shape-only | Local crypto round-trip; no hosted endpoint. Media-upload (CBC+HMAC) decryption still planned. |
+| encrypted Flow request decrypt/encrypt | `decryptRequest` / `encryptResponse` / `handleFlowRequest` (RSA-OAEP + AES-GCM, IV-flip response), backed by `@wats/crypto` | shape-only | Local crypto round-trip; no hosted endpoint. |
+| Flow media-upload decryption | `decryptFlowMedia`, `decryptFlowMediaFile` | shape-only | PhotoPicker/DocumentPicker uploads use AES-CBC + HMAC-SHA256; WATS verifies encrypted hash, HMAC, and plaintext hash. |
 | Flow metrics / migration | `getFlowMetrics` and `migrateFlows` | shape-only | Credentialed and account-dependent; Meta marks Metrics API deprecated after 2026-04-30, replacement unverified. |
 
 ## Calling map
