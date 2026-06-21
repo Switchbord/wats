@@ -101,6 +101,8 @@ wats openapi --help
 wats serve --config <path> --dry-run
 wats serve --config <path> --dry-run --print-routes
 wats serve --help
+wats messages list --config <path> --env-file .env.local
+wats messages show <message-id> --config <path> --env-file .env.local
 wats onboarding --public-url <https URL>
 wats onboarding --public-url <https URL> --webhook-path /webhooks/whatsapp
 wats webhook token
@@ -2264,6 +2266,30 @@ wats serve --config wats.config.yaml --live --yes-live --env-file .env.local --p
 
 This removes the need for a container entrypoint shim mapping `$PORT`/`0.0.0.0` onto static flags. `wats serve --help` prints usage and exits 0.
 
+### `wats messages list` / `wats messages show`
+
+Read local message projections from a running WATS service. These commands call the read-only local service message routes; they do not call Meta Graph.
+
+```bash
+wats messages list --config wats.config.yaml --env-file .env.local
+wats messages list --config wats.config.yaml --env-file .env.local --limit 25 --cursor <row-id>
+wats messages list --config wats.config.yaml --env-file .env.local --json
+wats messages show wamid.HBgM... --config wats.config.yaml --env-file .env.local
+wats messages show wamid.HBgM... --config wats.config.yaml --env-file .env.local --json
+```
+
+Both commands read the service bearer token from `WATS_SERVICE_TOKEN` (or the env var named by `profile.service.bearerToken.env`). The token is sent as an `Authorization: Bearer` header and is never printed. `--config` is required. `--profile` selects a profile. `--env-file` may point at a local `.env.local` next to the config.
+
+`list` prints TSV by default:
+
+```text
+createdAt	direction	waMessageId	type	status	from	to
+```
+
+The next-page cursor prints to stderr as `nextCursor: <row-id>` so stdout remains parseable. With `--json`, stdout is the raw `{ items, nextCursor }` response from the service. `show` prints one `key: value` line per field by default, or the raw message JSON with `--json`.
+
+Errors are folded into safe CLI output: missing token, unreachable local service, `401 unauthorized`, `404 not_found`, and malformed arguments never print token values, config paths, or stack traces.
+
 ### `wats webhook token`
 
 Prints one freshly generated verify token (prefix `wats_wh_`, Web Crypto random bytes with a `crypto.randomUUID()` fallback) and exits 0. Stdout only — no files touched. `--help` prints usage and exits 0.
@@ -2274,7 +2300,7 @@ Unknown commands and unsupported flags fail closed with exit code 1 and a generi
 
 Error families: `CliUsageError`, `CliConfigError`, `ConfigValidationError`, `SecretResolutionError`, `LiveGuardError`, `OutputError`, `DoctorError`, `ServeError`, `WatsServiceError`.
 
-Not implemented yet: production hosting/deployment wrappers, `wats config print --redacted`, `wats config paths`, and optional live checks behind explicit credential-gated flags — meaning both a live flag and an operator acknowledgement before any live check runs. Planned commands keep the no-live-credentials default.
+Not implemented yet: production hosting/deployment wrappers, `wats config print --redacted`, `wats config paths`, optional live checks behind explicit credential-gated flags, and richer conversation navigation. `wats messages` is local-service-only and reads only the service bearer token.
 
 ---
 

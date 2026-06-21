@@ -79,7 +79,8 @@ describe("wats CLI help skeleton", () => {
       "wats doctor",
       "wats openapi",
       "wats onboarding",
-      "wats webhook token"
+      "wats webhook token",
+      "wats messages"
     ]);
   });
 
