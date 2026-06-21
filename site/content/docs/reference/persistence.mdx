@@ -3,7 +3,7 @@ title: "Persistence Reference"
 description: "The experimental @wats/persistence package: durable runtime state, SQLite adapter, migrations, idempotency, and the outbox."
 ---
 
-<DocMeta status="experimental" lastReviewed="2026-05-25" />
+<DocMeta status="experimental" lastReviewed="2026-06-21" />
 
 ```ts
 import {
@@ -40,8 +40,10 @@ The migration runner creates:
 - `wats_webhook_events`
 - `wats_service_requests`
 - `wats_outbox`
+- `wats_messages`
+- `wats_message_status_events`
 
-Migrations are forward-only for alpha. Already-applied migration checksums must match the package migration definitions; checksum drift fails closed with `PersistenceError`. `001_initial` keeps its originally shipped checksum; `002_outbox_lease_id` upgrades existing v1 databases with the `leaseId` outbox column. A held migration lock fails closed with `PersistenceError` code `migration_lock_failed`.
+Migrations are forward-only for alpha. Already-applied migration checksums must match the package migration definitions; checksum drift fails closed with `PersistenceError`. `001_initial` keeps its originally shipped checksum; `002_outbox_lease_id` upgrades existing v1 databases with the `leaseId` outbox column; `003_message_projection` adds the message projection tables and indexes. A held migration lock fails closed with `PersistenceError` code `migration_lock_failed`.
 
 ## Runtime contract
 
@@ -57,11 +59,42 @@ Migrations are forward-only for alpha. Already-applied migration checksums must 
 - `claimOutboxItems(...)`
 - `markOutboxItemFailed(...)`
 - `markOutboxItemSucceeded(...)`
+- `recordMessage(...)`
+- `appendMessageStatus(...)`
+- `getMessage(...)`
+- `listMessages(...)`
 - `close(): Promise<void>`
 
 Webhook event records store safe event keys and hashes, not raw webhook bodies. Duplicate event keys return `"duplicate"`, so the service can acknowledge Meta retries without dispatching the same update twice.
 
 Service request idempotency stores an idempotency key, request hash, and response JSON. A matching key/body hash replays the stored response; the same key with a different body hash conflicts.
+
+## Message projection
+
+The `wats_messages` table records outbound send attempts (and, in future slices, inbound messages). Each row is keyed by a caller-generated local `row_id`, carries the WhatsApp message id (`wa_message_id`), direction, optional phone fields, Graph type, current status, and created/updated timestamps. `wats_message_status_events` is an append-only log of status transitions per `wa_message_id`.
+
+```ts
+await store.recordMessage({
+  rowId: "wats-msg-...",
+  waMessageId: "wamid.HBgM...",
+  direction: "outbound",
+  toPhone: "15551230000",
+  type: "text",
+  status: "sent",
+  graphMessageId: "wamid.HBgM...",
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString()
+});
+
+await store.appendMessageStatus({ waMessageId: "wamid.HBgM...", status: "delivered", timestamp: new Date().toISOString() });
+
+const record = await store.getMessage({ waMessageId: "wamid.HBgM..." });
+const page = await store.listMessages({ limit: 50 });
+```
+
+`recordMessage` is idempotent on `row_id` (`INSERT OR IGNORE`): re-recording the same `rowId` is a no-op. `appendMessageStatus` inserts an event row and best-effort updates the matching message's `status` and `updated_at` (no-op if no matching message). `listMessages` returns rows newest-first (`created_at DESC, row_id DESC`), with `limit` (1..100) and an optional `beforeRowId` cursor for paging; `nextCursor` is the last item's `rowId` when more rows may exist, otherwise `null`.
+
+The service records outbound projections automatically after a successful Graph send and exposes them read-only through `GET /messages` and `GET /messages/{messageId}` (see the Service Reference). Projection failures are swallowed and never break the send response.
 
 ## Outbox
 
