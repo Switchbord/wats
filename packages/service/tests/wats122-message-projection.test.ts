@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { WatsProfileConfig } from "@wats/config";
-import type { OutboxItem } from "@wats/persistence";
+import type { MessageRecordInput, OutboxItem } from "@wats/persistence";
 import {
   createWatsServiceApp,
   createWatsServiceOpenApiDocument,
@@ -23,7 +23,7 @@ type StoredMessage = {
 type MemoryStore = {
   readonly backend: "sqlite";
   messages: Map<string, StoredMessage>;
-  recordMessage(input: StoredMessage): Promise<void>;
+  recordMessage(input: MessageRecordInput): Promise<void>;
   appendMessageStatus(input: { waMessageId: string; status: string; timestamp: string }): Promise<void>;
   getMessage(input: { waMessageId: string }): Promise<StoredMessage | null>;
   listMessages(input: { limit: number; beforeRowId?: string }): Promise<{ items: StoredMessage[]; nextCursor: string | null }>;
@@ -53,7 +53,12 @@ function memoryStore(): MemoryStore {
     async markOutboxItemFailed() {},
     async markOutboxItemSucceeded() {},
     async recordMessage(input) {
-      this.messages.set(input.waMessageId, input);
+      this.messages.set(input.waMessageId, {
+        ...input,
+        fromPhone: input.fromPhone ?? null,
+        toPhone: input.toPhone ?? null,
+        graphMessageId: input.graphMessageId ?? null
+      });
     },
     async appendMessageStatus(input) {
       const existing = this.messages.get(input.waMessageId);
