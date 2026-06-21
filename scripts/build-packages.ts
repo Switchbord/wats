@@ -73,7 +73,7 @@ const packageEntrypoints: Record<PackageName, readonly string[]> = {
   ],
   "internal-utils": ["index", "isRecord"],
   config: ["index"],
-  persistence: ["index", "sqlite"],
+  persistence: ["index", "sqlite", "postgres"],
   service: ["index"],
   cli: ["index", "bin"]
 };

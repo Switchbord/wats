@@ -43,7 +43,8 @@ describe("WATS 0.3.0 packed export-map smoke contract", () => {
     }, 0);
     // 46 + 1 for the WATS-131 @wats/types/groups subpath
     // + 1 for the WATS-132 @wats/graph/endpoints/groups subpath
-    // + 1 for the WATS-159 @wats/graph/node-media subpath.
-    expect(specifierCount).toBe(49);
+    // + 1 for the WATS-159 @wats/graph/node-media subpath
+    // + 1 for the WATS-125 @wats/persistence/postgres subpath.
+    expect(specifierCount).toBe(50);
   });
 });
