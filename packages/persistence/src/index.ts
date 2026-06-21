@@ -129,7 +129,7 @@ export interface MessageStatusEventRecord {
 
 export interface ListMessagesInput {
   readonly limit: number;          // 1..100
-  readonly beforeRowId?: string;   // cursor: rows with row_id < beforeRowId (older)
+  readonly beforeRowId?: string;   // cursor: rows after this row in createdAt DESC, rowId DESC order
 }
 
 export interface ListMessagesResult {
