@@ -62,7 +62,12 @@ export {
   updateDataAction,
   updateFlowJson,
   updateFlowMetadata,
-  validateFlowJson
+  validateFlowJson,
+  FLOW_MEDIA_MAX_BYTES,
+  FlowMediaCryptoUnavailableError,
+  FlowMediaDecryptionError,
+  decryptFlowMedia,
+  decryptFlowMediaFile
 } from "./flows/index.js";
 
 export type {
@@ -94,5 +99,8 @@ export type {
   ScreenProps,
   SwitchProps,
   UpdateFlowJsonBody,
-  UpdateFlowMetadataBody
+  UpdateFlowMetadataBody,
+  DecryptedFlowMedia,
+  FlowMediaEncryptedFile,
+  FlowMediaEncryptionMetadata
 } from "./flows/index.js";

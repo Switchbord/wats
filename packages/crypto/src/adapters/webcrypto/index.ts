@@ -12,7 +12,10 @@ import {
   InvalidKeyError,
   UnsupportedCapabilityError,
   GCM_TAG_LENGTH,
+  assertAesCbcKey,
   assertAesGcmKey,
+  assertCbcCiphertext,
+  assertCbcIv,
   assertFiniteLength,
   assertGcmIv,
   assertOptionalAad,
@@ -266,6 +269,70 @@ export async function createWebCryptoProvider(): Promise<CryptoProvider> {
     }
   }
 
+  async function sha256(data: Uint8Array): Promise<Uint8Array> {
+    assertUint8Array(data, "sha256 `data`");
+    try {
+      const digest = await subtle.digest("SHA-256", data as BufferSource);
+      return new Uint8Array(digest);
+    } catch (err) {
+      if (err instanceof CryptoProviderError) throw err;
+      throw new CryptoProviderError(
+        "invalid_body",
+        `sha256 failed: ${stringifyError(err)}`,
+        { cause: err }
+      );
+    }
+  }
+
+  // Import a raw AES-CBC key for decryption. WebCrypto selects AES-128 vs
+  // AES-256-CBC from the raw key length (already validated by assertAesCbcKey).
+  async function importAesCbcKey(
+    key: Uint8Array,
+    usage: "encrypt" | "decrypt"
+  ): Promise<CryptoKey> {
+    try {
+      return await subtle.importKey(
+        "raw",
+        key as BufferSource,
+        { name: "AES-CBC" },
+        false,
+        [usage]
+      );
+    } catch (err) {
+      throw new InvalidKeyError(
+        `aesCbc importKey failed: ${stringifyError(err)}`,
+        { cause: err }
+      );
+    }
+  }
+
+  async function aesCbcDecrypt(
+    key: Uint8Array,
+    iv: Uint8Array,
+    ciphertext: Uint8Array
+  ): Promise<Uint8Array> {
+    assertAesCbcKey(key);
+    assertCbcIv(iv);
+    assertCbcCiphertext(ciphertext);
+    const cryptoKey = await importAesCbcKey(key, "decrypt");
+    try {
+      // WebCrypto's AES-CBC decrypt performs PKCS#7 unpadding automatically
+      // and throws on bad padding — mapped to InvalidBodyError below.
+      const plain = await subtle.decrypt(
+        { name: "AES-CBC", iv: iv as BufferSource },
+        cryptoKey,
+        ciphertext as BufferSource
+      );
+      return new Uint8Array(plain);
+    } catch (err) {
+      if (err instanceof CryptoProviderError) throw err;
+      throw new InvalidBodyError(
+        "aesCbcDecrypt failed: decryption or padding error",
+        { cause: err }
+      );
+    }
+  }
+
   return {
     name: "webcrypto",
     hmacSha256,
@@ -273,7 +340,9 @@ export async function createWebCryptoProvider(): Promise<CryptoProvider> {
     randomBytes,
     rsaOaepDecrypt,
     aesGcmDecrypt,
-    aesGcmEncrypt
+    aesGcmEncrypt,
+    sha256,
+    aesCbcDecrypt
   };
 }
 

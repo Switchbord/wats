@@ -6,7 +6,9 @@ export type CryptoProviderCapability =
   | "randomBytes"
   | "rsaOaepDecrypt"
   | "aesGcmDecrypt"
-  | "aesGcmEncrypt";
+  | "aesGcmEncrypt"
+  | "sha256"
+  | "aesCbcDecrypt";
 
 export interface CryptoValidationErrorShape {
   readonly code:
@@ -64,6 +66,27 @@ export interface CryptoProvider {
     plaintext: Uint8Array,
     aad?: Uint8Array
   ): Promise<{ ciphertext: Uint8Array; authTag: Uint8Array }>;
+  // sha256: SHA-256 digest. Returns a fresh 32-byte Uint8Array. Rejects with
+  // CryptoProviderError (invalid_body) for a non-Uint8Array input — never a
+  // raw TypeError. Used by the Flow media-upload scheme (WATS-151) for the
+  // encrypted_hash and plaintext_hash integrity checks.
+  sha256?(data: Uint8Array): Promise<Uint8Array>;
+  // aesCbcDecrypt: AES-CBC decryption with automatic PKCS#7 unpadding
+  // (16-byte block size, matching the Flow media-upload scheme, WATS-151).
+  // CONTRACT — AES-128-CBC vs AES-256-CBC is selected by key length
+  // (16 → 128, 32 → 256); the IV must be exactly 16 bytes; PKCS#7 unpadding
+  // is automatic (Node `setAutoPadding(true)` default / WebCrypto native) and
+  // the returned Uint8Array is the unpadded plaintext. Rejects with
+  // InvalidKeyError (bad key length), InvalidLengthError (bad IV length /
+  // ciphertext not a multiple of 16 / ciphertext empty), and InvalidBodyError
+  // (bad PKCS#7 padding / decryption failure). No AAD — CBC has no auth tag;
+  // callers MUST verify an external MAC (e.g. HMAC-SHA256) BEFORE trusting
+  // the plaintext.
+  aesCbcDecrypt?(
+    key: Uint8Array,
+    iv: Uint8Array,
+    ciphertext: Uint8Array
+  ): Promise<Uint8Array>;
 }
 
 // Sentinel runtime export so consumer fixtures / importability tests can

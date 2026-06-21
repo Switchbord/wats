@@ -16,7 +16,10 @@ import {
   InvalidKeyError,
   UnsupportedCapabilityError,
   GCM_TAG_LENGTH,
+  assertAesCbcKey,
   assertAesGcmKey,
+  assertCbcCiphertext,
+  assertCbcIv,
   assertFiniteLength,
   assertGcmIv,
   assertOptionalAad,
@@ -47,6 +50,7 @@ interface NodeCipher {
 
 interface NodeCryptoModule {
   createHmac(algorithm: string, key: Uint8Array | string): NodeHmac;
+  createHash(algorithm: string): NodeHash;
   timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean;
   randomBytes(size: number): Uint8Array;
   privateDecrypt(
@@ -69,6 +73,10 @@ interface NodeCryptoModule {
     iv: Uint8Array
   ): NodeCipher;
   readonly constants: { readonly RSA_PKCS1_OAEP_PADDING: number };
+}
+
+interface NodeHash {
+  update(data: Uint8Array): { digest(): Uint8Array };
 }
 
 const MAX_RANDOM_BYTES = 1_048_576;
@@ -201,6 +209,59 @@ export async function createNodeCryptoProvider(): Promise<CryptoProvider> {
     return bits === 128 ? "aes-128-gcm" : "aes-256-gcm";
   }
 
+  function cbcAlgoForBits(bits: 128 | 256): string {
+    return bits === 128 ? "aes-128-cbc" : "aes-256-cbc";
+  }
+
+  async function sha256(data: Uint8Array): Promise<Uint8Array> {
+    assertUint8Array(data, "sha256 `data`");
+    try {
+      const digest = nodeCrypto.createHash("sha256").update(data).digest();
+      // Sever Buffer identity so the returned value is a plain Uint8Array.
+      return new Uint8Array(
+        digest.buffer,
+        digest.byteOffset,
+        digest.byteLength
+      ).slice();
+    } catch (err) {
+      if (err instanceof CryptoProviderError) throw err;
+      throw new CryptoProviderError(
+        "invalid_body",
+        `sha256 failed: ${stringifyError(err)}`,
+        { cause: err }
+      );
+    }
+  }
+
+  async function aesCbcDecrypt(
+    key: Uint8Array,
+    iv: Uint8Array,
+    ciphertext: Uint8Array
+  ): Promise<Uint8Array> {
+    const bits = assertAesCbcKey(key);
+    assertCbcIv(iv);
+    assertCbcCiphertext(ciphertext);
+    try {
+      // setAutoPadding(true) is the Node default → PKCS#7 unpadding is
+      // automatic. We do NOT disable it; a bad-padding block surfaces as a
+      // final() throw, mapped to InvalidBodyError below.
+      const decipher = nodeCrypto.createDecipheriv(
+        cbcAlgoForBits(bits),
+        key,
+        iv
+      );
+      const head = decipher.update(ciphertext);
+      const tail = decipher.final();
+      return concatBytes(head, tail);
+    } catch (err) {
+      if (err instanceof CryptoProviderError) throw err;
+      throw new InvalidBodyError(
+        "aesCbcDecrypt failed: decryption or padding error",
+        { cause: err }
+      );
+    }
+  }
+
   async function aesGcmDecrypt(
     key: Uint8Array,
     iv: Uint8Array,
@@ -273,7 +334,9 @@ export async function createNodeCryptoProvider(): Promise<CryptoProvider> {
     randomBytes,
     rsaOaepDecrypt,
     aesGcmDecrypt,
-    aesGcmEncrypt
+    aesGcmEncrypt,
+    sha256,
+    aesCbcDecrypt
   };
 }
 

@@ -198,3 +198,70 @@ export function assertOptionalAad(aad: unknown): asserts aad is Uint8Array | und
     );
   }
 }
+
+// --- AES-CBC shared validation -------------------------------------------
+//
+// CBC requires a full 16-byte (128-bit) block IV (unlike GCM, which accepts
+// 12- or 16-byte nonces). Ciphertext must be a whole number of 16-byte blocks
+// (CBC has no partial final block — PKCS#7 padding always produces a full
+// final block, including a full extra block when the plaintext is already a
+// multiple of 16). Both adapters share these helpers so their public contracts
+// stay identical: AES-128-CBC vs AES-256-CBC is selected purely by key byte
+// length, mirroring assertAesGcmKey.
+
+/**
+ * Validate an AES-CBC key and return its strength in bits (128 or 256).
+ * Throws InvalidKeyError for anything other than a 16- or 32-byte Uint8Array.
+ */
+export function assertAesCbcKey(key: unknown): 128 | 256 {
+  if (!(key instanceof Uint8Array)) {
+    throw new InvalidKeyError(
+      `AES-CBC key must be a Uint8Array; got ${describeType(key)}`
+    );
+  }
+  if (key.byteLength === 16) return 128;
+  if (key.byteLength === 32) return 256;
+  throw new InvalidKeyError(
+    `AES-CBC key must be 16 bytes (AES-128) or 32 bytes (AES-256); got ${key.byteLength}`
+  );
+}
+
+/**
+ * Validate an AES-CBC IV. CBC requires a full 16-byte (128-bit) block IV —
+ * unlike GCM, anything other than exactly 16 bytes is rejected with
+ * InvalidLengthError. Also rejects non-Uint8Array inputs.
+ */
+export function assertCbcIv(iv: unknown): asserts iv is Uint8Array {
+  if (!(iv instanceof Uint8Array)) {
+    throw new InvalidLengthError(
+      `AES-CBC iv must be a Uint8Array; got ${describeType(iv)}`
+    );
+  }
+  if (iv.byteLength !== 16) {
+    throw new InvalidLengthError(
+      `AES-CBC iv must be exactly 16 bytes; got ${iv.byteLength}`
+    );
+  }
+}
+
+/**
+ * Validate AES-CBC ciphertext. CBC ciphertext must be non-empty and a whole
+ * number of 16-byte blocks (the 10-byte hmac10 trailer is stripped by the
+ * caller BEFORE invoking aesCbcDecrypt, so this helper only checks block
+ * alignment). Throws InvalidLengthError for empty or misaligned ciphertext.
+ */
+export function assertCbcCiphertext(ciphertext: unknown): asserts ciphertext is Uint8Array {
+  if (!(ciphertext instanceof Uint8Array)) {
+    throw new InvalidLengthError(
+      `AES-CBC ciphertext must be a Uint8Array; got ${describeType(ciphertext)}`
+    );
+  }
+  if (ciphertext.byteLength === 0) {
+    throw new InvalidLengthError("AES-CBC ciphertext must be non-empty");
+  }
+  if (ciphertext.byteLength % 16 !== 0) {
+    throw new InvalidLengthError(
+      `AES-CBC ciphertext must be a whole number of 16-byte blocks; got ${ciphertext.byteLength}`
+    );
+  }
+}
