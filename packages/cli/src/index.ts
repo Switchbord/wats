@@ -170,6 +170,66 @@ type OnboardingArgs = Readonly<{
   reason: "help" | "usage";
 }>;
 
+// WATS-123: local wire types for the read-only /api/messages service API.
+// These mirror @wats/persistence's MessageRecord/ListMessagesResult shapes
+// without adding @wats/persistence as a CLI workspace dependency.
+interface MessageRecordWire {
+  readonly rowId: string;
+  readonly waMessageId: string;
+  readonly direction: "inbound" | "outbound";
+  readonly fromPhone: string | null;
+  readonly toPhone: string | null;
+  readonly type: string;
+  readonly status: string;
+  readonly graphMessageId: string | null;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+interface MessagesListResponseWire {
+  readonly items: readonly MessageRecordWire[];
+  readonly nextCursor: string | null;
+}
+
+interface ServiceErrorBody {
+  readonly error: { readonly code: string; readonly message?: string };
+}
+
+type MessagesListArgs = Readonly<{
+  ok: true;
+  configPath: string;
+  profileName?: string;
+  envFilePath?: string;
+  json: boolean;
+  limit?: number;
+  cursor?: string;
+}> | Readonly<{
+  ok: false;
+  reason: "help" | "usage";
+}>;
+
+type MessagesShowArgs = Readonly<{
+  ok: true;
+  configPath: string;
+  profileName?: string;
+  envFilePath?: string;
+  json: boolean;
+  messageId: string;
+}> | Readonly<{
+  ok: false;
+  reason: "help" | "usage";
+}>;
+
+interface ServiceClientOptions {
+  readonly baseUrl: string;
+  readonly token: string;
+}
+
+type FetchServiceJsonResult =
+  | Readonly<{ ok: true; status: number; body: unknown }>
+  | Readonly<{ ok: false; kind: "http"; status: number; body: ServiceErrorBody }>
+  | Readonly<{ ok: false; kind: "network"; message: string }>;
+
 const NO_LIVE_CREDENTIALS = "No live credentials are read or required by this command.";
 
 const ROOT_HELP = `WATS CLI
@@ -190,6 +250,7 @@ Implemented commands:
   wats openapi --config <path>             Print WATS service OpenAPI JSON.
   wats serve --config <path> --dry-run     Start the local dry-run service process.
   wats webhook token [--help]              Print a local webhook verify token.
+  wats messages list/show [--config <path>] Inspect local messages via the service API.
 
 ${NO_LIVE_CREDENTIALS}
 Commands do not call Graph APIs or resolve env-secret values.
@@ -294,6 +355,67 @@ Current implementation: generates a local random token and writes it to stdout o
 ${NO_LIVE_CREDENTIALS}
 `;
 
+const MESSAGES_LIVE_CREDENTIALS_NOTE = "Reads WATS_SERVICE_TOKEN from the environment and calls the local service. The token is never printed.";
+
+const MESSAGES_HELP = `Usage: wats messages <command> [options]
+
+Inspect local messages via the service API. These commands call a running local
+'wats serve' process over HTTP and require the service bearer token.
+
+Commands:
+  wats messages list [options]    List recent messages (newest first).
+  wats messages show <message-id> Show a single message record.
+
+Common options:
+  --config <path>     WATS JSON/YAML config file (required).
+  --profile <name>    Select a config profile (default: config defaultProfile).
+  --env-file <path>   Local env file providing WATS_SERVICE_TOKEN (e.g. .env.local).
+  --help, -h          Show this help.
+
+${MESSAGES_LIVE_CREDENTIALS_NOTE}
+`;
+
+const MESSAGES_LIST_HELP = `Usage: wats messages list [--config <path>] [--profile <name>] [--env-file <path>] [--limit N] [--cursor <rowId>] [--json]
+
+Lists recent messages from the local service /api/messages endpoint, newest first.
+
+Options:
+  --config <path>     WATS JSON/YAML config file (required).
+  --profile <name>    Select a config profile (default: config defaultProfile).
+  --env-file <path>   Local env file providing WATS_SERVICE_TOKEN (e.g. .env.local).
+  --limit N           Integer page size (1..100); the service enforces the range.
+  --cursor <rowId>    Opaque cursor (last item's rowId) for manual pagination.
+  --json              Print the raw service JSON response to stdout.
+  --help, -h          Show this help.
+
+In text mode stdout is a TSV with a header row; the next-page cursor is printed
+to stderr as 'nextCursor: <rowId>' (or 'nextCursor: (none)') so stdout stays a
+clean TSV. With --json the full response object (including nextCursor) is printed
+to stdout.
+
+${MESSAGES_LIVE_CREDENTIALS_NOTE}
+`;
+
+const MESSAGES_SHOW_HELP = `Usage: wats messages show <message-id> [--config <path>] [--profile <name>] [--env-file <path>] [--json]
+
+Shows a single message record from the local service /api/messages/{id} endpoint.
+
+Arguments:
+  <message-id>        WhatsApp message id (waMessageId, e.g. wamid.*).
+
+Options:
+  --config <path>     WATS JSON/YAML config file (required).
+  --profile <name>    Select a config profile (default: config defaultProfile).
+  --env-file <path>   Local env file providing WATS_SERVICE_TOKEN (e.g. .env.local).
+  --json              Print the raw service JSON record to stdout.
+  --help, -h          Show this help.
+
+In text mode stdout is one 'key: value' line per field (nulls printed as 'null').
+With --json the full record object is printed to stdout.
+
+${MESSAGES_LIVE_CREDENTIALS_NOTE}
+`;
+
 
 const ONBOARDING_HELP = `Usage: wats onboarding --public-url <https URL> [--webhook-path /webhooks/whatsapp]
 
@@ -334,6 +456,10 @@ const UPGRADE_ALLOWED_FLAGS = ["--dry-run"] as const;
 const PUBLIC_WATS_UPGRADE_PACKAGES = ["@wats/cli", "@wats/core", "@wats/graph", "@wats/http", "@wats/config", "@wats/service"] as const;
 const SERVE_VALUE_FLAGS = ["--config", "--profile", "--host", "--port", "--env-file"] as const;
 const SERVE_ALLOWED_FLAGS = ["--config", "--profile", "--host", "--port", "--dry-run", "--print-routes", "--live", "--yes-live", "--env-file", "--paas"] as const;
+const MESSAGES_LIST_VALUE_FLAGS = ["--config", "--profile", "--env-file", "--limit", "--cursor"] as const;
+const MESSAGES_LIST_ALLOWED_FLAGS = ["--config", "--profile", "--env-file", "--limit", "--cursor", "--json", "--help", "-h"] as const;
+const MESSAGES_SHOW_VALUE_FLAGS = ["--config", "--profile", "--env-file"] as const;
+const MESSAGES_SHOW_ALLOWED_FLAGS = ["--config", "--profile", "--env-file", "--json", "--help", "-h"] as const;
 const LIVE_MISSING_ERROR = "Live serve requires --live --yes-live and --env-file. Run `wats serve --help` for usage.\n";
 const ENV_FILE_MAX_BYTES = 65_536;
 const ENV_FILE_ALLOWED_KEYS = new Set([
@@ -1038,7 +1164,7 @@ async function setupCommand(args: readonly string[], context: CliCommandContext 
 
 
 function hasRawUrlWhitespace(value: string): boolean {
-  return /[\s -]/u.test(value);
+  return /[\s\x00-\x1f\x7f]/u.test(value);
 }
 
 function safeDecodeURIComponent(value: string): string | null {
@@ -1068,7 +1194,7 @@ function isSafeWebhookPath(value: string): boolean {
   if (decoded === null || (decoded !== value && /[\/?#]/u.test(decoded))) return false;
   const decodedSegments = decoded.split("/").filter((segment) => segment.length > 0);
   if (decodedSegments.length === 0) return false;
-  return decodedSegments.every((segment) => segment !== "." && segment !== ".." && !/[ -]/u.test(segment));
+  return decodedSegments.every((segment) => segment !== "." && segment !== ".." && !/[\x00-\x1f\x7f]/u.test(segment));
 }
 
 function rawUrlPath(value: string): string | null {
@@ -2060,6 +2186,306 @@ async function openApiCommand(args: readonly string[]): Promise<CliCommandResult
   }
 }
 
+// WATS-123: arg parsers for `wats messages list/show`.
+function isMessagesLimitInteger(value: string): boolean {
+  return /^[1-9][0-9]*$/u.test(value);
+}
+
+function parseMessagesListArgs(args: readonly string[]): MessagesListArgs {
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index] ?? "";
+    if (arg.trim().length === 0) return { ok: false, reason: "usage" };
+    if (!arg.startsWith("-")) return { ok: false, reason: "usage" };
+    const flagName = arg.includes("=") ? arg.slice(0, arg.indexOf("=")) : arg;
+    if (ROOT_HELP_FLAGS.has(flagName)) {
+      const unknownHelpSidecar = args.find((sidecar) => {
+        if (!sidecar.startsWith("-")) return false;
+        const sidecarName = sidecar.includes("=") ? sidecar.slice(0, sidecar.indexOf("=")) : sidecar;
+        return !ROOT_HELP_FLAGS.has(sidecarName);
+      });
+      return unknownHelpSidecar === undefined ? { ok: false, reason: "help" } : { ok: false, reason: "usage" };
+    }
+    if (!MESSAGES_LIST_ALLOWED_FLAGS.includes(flagName as typeof MESSAGES_LIST_ALLOWED_FLAGS[number])) return { ok: false, reason: "usage" };
+    if (flagName === "--json") {
+      if (arg.includes("=") || hasFlagName(args.slice(index + 1), flagName)) return { ok: false, reason: "usage" };
+      continue;
+    }
+    if (!arg.includes("=")) {
+      const next = args[index + 1];
+      if (next === undefined || next.startsWith("-")) return { ok: false, reason: "usage" };
+      index += 1;
+    }
+  }
+
+  const valueArgs = args.filter((arg) => arg !== "--json");
+  const configFlag = parseFlagValue(valueArgs, ["--config"], MESSAGES_LIST_VALUE_FLAGS);
+  const profileFlag = parseFlagValue(valueArgs, ["--profile"], MESSAGES_LIST_VALUE_FLAGS);
+  const envFileFlag = parseFlagValue(valueArgs, ["--env-file"], MESSAGES_LIST_VALUE_FLAGS);
+  const limitFlag = parseFlagValue(valueArgs, ["--limit"], MESSAGES_LIST_VALUE_FLAGS);
+  const cursorFlag = parseFlagValue(valueArgs, ["--cursor"], MESSAGES_LIST_VALUE_FLAGS);
+  if (!configFlag.ok || !profileFlag.ok || !envFileFlag.ok || !limitFlag.ok || !cursorFlag.ok
+      || !configFlag.present || configFlag.value === undefined) {
+    return { ok: false, reason: "usage" };
+  }
+  const positionals = nonFlagArgs(valueArgs, MESSAGES_LIST_VALUE_FLAGS);
+  if (positionals === null || positionals.some((arg) => arg.trim().length > 0)) return { ok: false, reason: "usage" };
+
+  if (profileFlag.value !== undefined && !isSafeProfileName(profileFlag.value)) return { ok: false, reason: "usage" };
+  if (envFileFlag.value !== undefined && !isSafeServeEnvFile(envFileFlag.value)) return { ok: false, reason: "usage" };
+  if (limitFlag.value !== undefined && !isMessagesLimitInteger(limitFlag.value)) return { ok: false, reason: "usage" };
+  if (cursorFlag.value !== undefined && !isNonEmptyArg(cursorFlag.value)) return { ok: false, reason: "usage" };
+
+  return {
+    ok: true,
+    configPath: configFlag.value,
+    json: hasFlagName(args, "--json"),
+    ...(profileFlag.value !== undefined ? { profileName: profileFlag.value } : {}),
+    ...(envFileFlag.value !== undefined ? { envFilePath: envFileFlag.value } : {}),
+    ...(limitFlag.value !== undefined ? { limit: Number.parseInt(limitFlag.value, 10) } : {}),
+    ...(cursorFlag.value !== undefined ? { cursor: cursorFlag.value } : {})
+  };
+}
+
+function parseMessagesShowArgs(args: readonly string[]): MessagesShowArgs {
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index] ?? "";
+    if (arg.trim().length === 0) return { ok: false, reason: "usage" };
+    if (!arg.startsWith("-")) continue;
+    const flagName = arg.includes("=") ? arg.slice(0, arg.indexOf("=")) : arg;
+    if (ROOT_HELP_FLAGS.has(flagName)) {
+      const unknownHelpSidecar = args.find((sidecar) => {
+        if (!sidecar.startsWith("-")) return false;
+        const sidecarName = sidecar.includes("=") ? sidecar.slice(0, sidecar.indexOf("=")) : sidecar;
+        return !ROOT_HELP_FLAGS.has(sidecarName);
+      });
+      return unknownHelpSidecar === undefined ? { ok: false, reason: "help" } : { ok: false, reason: "usage" };
+    }
+    if (!MESSAGES_SHOW_ALLOWED_FLAGS.includes(flagName as typeof MESSAGES_SHOW_ALLOWED_FLAGS[number])) return { ok: false, reason: "usage" };
+    if (flagName === "--json") {
+      if (arg.includes("=") || hasFlagName(args.slice(index + 1), flagName)) return { ok: false, reason: "usage" };
+      continue;
+    }
+    if (!arg.includes("=")) {
+      const next = args[index + 1];
+      if (next === undefined || next.startsWith("-")) return { ok: false, reason: "usage" };
+      index += 1;
+    }
+  }
+
+  const valueArgs = args.filter((arg) => arg !== "--json");
+  const configFlag = parseFlagValue(valueArgs, ["--config"], MESSAGES_SHOW_VALUE_FLAGS);
+  const profileFlag = parseFlagValue(valueArgs, ["--profile"], MESSAGES_SHOW_VALUE_FLAGS);
+  const envFileFlag = parseFlagValue(valueArgs, ["--env-file"], MESSAGES_SHOW_VALUE_FLAGS);
+  if (!configFlag.ok || !profileFlag.ok || !envFileFlag.ok
+      || !configFlag.present || configFlag.value === undefined) {
+    return { ok: false, reason: "usage" };
+  }
+  const positionals = nonFlagArgs(valueArgs, MESSAGES_SHOW_VALUE_FLAGS);
+  if (positionals === null) return { ok: false, reason: "usage" };
+  const cleanPositionals = positionals.filter((arg) => arg.trim().length > 0);
+  if (cleanPositionals.length !== 1 || !isNonEmptyArg(cleanPositionals[0])) return { ok: false, reason: "usage" };
+
+  if (profileFlag.value !== undefined && !isSafeProfileName(profileFlag.value)) return { ok: false, reason: "usage" };
+  if (envFileFlag.value !== undefined && !isSafeServeEnvFile(envFileFlag.value)) return { ok: false, reason: "usage" };
+
+  return {
+    ok: true,
+    configPath: configFlag.value,
+    messageId: cleanPositionals[0],
+    json: hasFlagName(args, "--json"),
+    ...(profileFlag.value !== undefined ? { profileName: profileFlag.value } : {}),
+    ...(envFileFlag.value !== undefined ? { envFilePath: envFileFlag.value } : {})
+  };
+}
+
+async function fetchServiceJson(opts: ServiceClientOptions, pathAndQuery: string): Promise<FetchServiceJsonResult> {
+  const url = `${opts.baseUrl}${pathAndQuery}`;
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${opts.token}`, Accept: "application/json" }
+    });
+  } catch (error) {
+    const rawMessage = error instanceof Error ? error.message : String(error);
+    return { ok: false, kind: "network", message: rawMessage };
+  }
+
+  if (!response.ok) {
+    let body: ServiceErrorBody;
+    try {
+      const parsed = await response.json() as unknown;
+      if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+          && typeof (parsed as { error?: unknown }).error === "object"
+          && (parsed as { error?: unknown }).error !== null) {
+        const err = (parsed as { error: { code?: unknown; message?: unknown } }).error;
+        body = {
+          error: {
+            code: typeof err.code === "string" ? err.code : `http_${response.status}`,
+            ...(typeof err.message === "string" ? { message: err.message } : {})
+          }
+        };
+      } else {
+        throw new Error("non-standard error body");
+      }
+    } catch {
+      let snippet = "";
+      try {
+        snippet = (await response.text()).slice(0, 200);
+      } catch {
+        snippet = "";
+      }
+      body = { error: { code: `http_${response.status}`, ...(snippet.length > 0 ? { message: snippet } : {}) } };
+    }
+    return { ok: false, kind: "http", status: response.status, body };
+  }
+
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch (error) {
+    const rawMessage = error instanceof Error ? error.message : String(error);
+    return { ok: false, kind: "network", message: rawMessage };
+  }
+  return { ok: true, status: response.status, body };
+}
+
+function formatMessageRecordText(record: MessageRecordWire): string {
+  const lines = [
+    `rowId: ${record.rowId}`,
+    `waMessageId: ${record.waMessageId}`,
+    `direction: ${record.direction}`,
+    `fromPhone: ${record.fromPhone === null ? "null" : record.fromPhone}`,
+    `toPhone: ${record.toPhone === null ? "null" : record.toPhone}`,
+    `type: ${record.type}`,
+    `status: ${record.status}`,
+    `graphMessageId: ${record.graphMessageId === null ? "null" : record.graphMessageId}`,
+    `createdAt: ${record.createdAt}`,
+    `updatedAt: ${record.updatedAt}`
+  ];
+  return `${lines.join("\n")}\n`;
+}
+
+function formatMessagesListText(body: MessagesListResponseWire): { stdout: string; stderr: string } {
+  const header = "createdAt\tdirection\twaMessageId\ttype\tstatus\tfrom\tto";
+  const rows = body.items.map((item) => [
+    item.createdAt,
+    item.direction,
+    item.waMessageId,
+    item.type,
+    item.status,
+    item.fromPhone ?? "",
+    item.toPhone ?? ""
+  ].join("\t"));
+  const stdout = `${[header, ...rows].join("\n")}\n`;
+  const stderr = `nextCursor: ${body.nextCursor === null ? "(none)" : body.nextCursor}\n`;
+  return { stdout, stderr };
+}
+
+async function runMessagesListCommand(args: readonly string[]): Promise<CliCommandResult> {
+  const parsed = parseMessagesListArgs(args);
+  if (!parsed.ok) {
+    if (parsed.reason === "help") return ok(MESSAGES_LIST_HELP);
+    return cliUsageError("wats messages list --help");
+  }
+
+  try {
+    const config = await loadConfig(parsed.configPath);
+    const profile = selectProfile(config, parsed.profileName);
+    if (profile === null) return fail("Requested profile not found in config.\n");
+
+    let env = processEnv();
+    if (parsed.envFilePath !== undefined) {
+      const file = await readServeEnvFile(parsed.configPath, parsed.envFilePath);
+      if (!file.ok) return fail("Env file could not be read. Run `wats messages list --help` for usage.\n");
+      env = mergeEnvValues(env, file.values);
+    }
+    const token = secretFromEnv(env, profile.service.bearerToken.env);
+    if (token === null) {
+      return fail(`Service bearer token is not set. Set the ${profile.service.bearerToken.env} environment variable (or provide --env-file).\n`);
+    }
+
+    const baseUrl = `http://${profile.service.host}:${profile.service.port}${profile.service.apiPrefix}`;
+    let pathAndQuery = `/messages?limit=${parsed.limit ?? 50}`;
+    if (parsed.cursor !== undefined) pathAndQuery += `&cursor=${encodeURIComponent(parsed.cursor)}`;
+
+    const result = await fetchServiceJson({ baseUrl, token }, pathAndQuery);
+    if (!result.ok) {
+      if (result.kind === "network") {
+        return fail(`Could not reach the local service at ${profile.service.host}:${profile.service.port}. Is 'wats serve' running? (${result.message})\n`);
+      }
+      const errCode = result.body.error.code;
+      const errMsg = result.body.error.message !== undefined ? `: ${result.body.error.message}` : "";
+      return fail(`Service responded ${result.status} ${errCode}${errMsg}.\n`);
+    }
+
+    if (parsed.json) {
+      return ok(`${JSON.stringify(result.body, null, 2)}\n`);
+    }
+    const body = result.body as MessagesListResponseWire;
+    const formatted = formatMessagesListText(body);
+    return Object.freeze({ exitCode: 0, stdout: formatted.stdout, stderr: formatted.stderr });
+  } catch {
+    return fail(safeGenericError("wats messages list --help"));
+  }
+}
+
+async function runMessagesShowCommand(args: readonly string[]): Promise<CliCommandResult> {
+  const parsed = parseMessagesShowArgs(args);
+  if (!parsed.ok) {
+    if (parsed.reason === "help") return ok(MESSAGES_SHOW_HELP);
+    return cliUsageError("wats messages show --help");
+  }
+
+  try {
+    const config = await loadConfig(parsed.configPath);
+    const profile = selectProfile(config, parsed.profileName);
+    if (profile === null) return fail("Requested profile not found in config.\n");
+
+    let env = processEnv();
+    if (parsed.envFilePath !== undefined) {
+      const file = await readServeEnvFile(parsed.configPath, parsed.envFilePath);
+      if (!file.ok) return fail("Env file could not be read. Run `wats messages show --help` for usage.\n");
+      env = mergeEnvValues(env, file.values);
+    }
+    const token = secretFromEnv(env, profile.service.bearerToken.env);
+    if (token === null) {
+      return fail(`Service bearer token is not set. Set the ${profile.service.bearerToken.env} environment variable (or provide --env-file).\n`);
+    }
+
+    const baseUrl = `http://${profile.service.host}:${profile.service.port}${profile.service.apiPrefix}`;
+    const pathAndQuery = `/messages/${encodeURIComponent(parsed.messageId)}`;
+
+    const result = await fetchServiceJson({ baseUrl, token }, pathAndQuery);
+    if (!result.ok) {
+      if (result.kind === "network") {
+        return fail(`Could not reach the local service at ${profile.service.host}:${profile.service.port}. Is 'wats serve' running? (${result.message})\n`);
+      }
+      const errCode = result.body.error.code;
+      const errMsg = result.body.error.message !== undefined ? `: ${result.body.error.message}` : "";
+      return fail(`Service responded ${result.status} ${errCode}${errMsg}.\n`);
+    }
+
+    if (parsed.json) {
+      return ok(`${JSON.stringify(result.body, null, 2)}\n`);
+    }
+    return ok(formatMessageRecordText(result.body as MessageRecordWire));
+  } catch {
+    return fail(safeGenericError("wats messages show --help"));
+  }
+}
+
+async function runMessagesCommand(args: readonly string[]): Promise<CliCommandResult> {
+  const [subcommand, ...rest] = args;
+
+  if (subcommand === undefined || ROOT_HELP_FLAGS.has(subcommand)) {
+    return ok(MESSAGES_HELP);
+  }
+  if (subcommand === "list") return runMessagesListCommand(rest);
+  if (subcommand === "show") return runMessagesShowCommand(rest);
+  return fail("Unknown command. Run `wats --help` for usage.\n");
+}
+
 async function runWebhookCommand(args: readonly string[]): Promise<CliCommandResult> {
   const [subcommand, ...rest] = args;
 
@@ -2152,6 +2578,9 @@ export async function runCli(argv: readonly string[] = [], context: CliCommandCo
 
     case "webhook":
       return runWebhookCommand(rest);
+
+    case "messages":
+      return runMessagesCommand(rest);
 
     default:
       return fail(`Unknown command ${sanitizeCommandLabel(args)}. Run \`wats --help\` for usage.\n`);
