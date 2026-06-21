@@ -444,6 +444,31 @@ function responseToJsonText(payload: unknown): string | null {
   }
 }
 
+/**
+ * Defensively read `result.messages[0].id` from a Graph send response. The
+ * transport/mock result is `unknown`; this returns null on any shape miss so
+ * projection can be skipped without affecting the send response.
+ */
+function extractGraphMessageId(result: unknown): string | null {
+  if (!isRecord(result)) return null;
+  const messages = (result as { messages?: unknown }).messages;
+  if (!Array.isArray(messages) || messages.length === 0) return null;
+  const first = messages[0];
+  if (!isRecord(first)) return null;
+  const id = (first as { id?: unknown }).id;
+  return typeof id === "string" && id.length > 0 ? id : null;
+}
+
+/**
+ * Dependency-free caller-generated local row id. Prefers WebCrypto randomUUID
+ * when available; falls back to a timestamp+random composite.
+ */
+function cryptoRandomId(): string {
+  const uuid = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto?.randomUUID?.();
+  if (typeof uuid === "string" && uuid.length > 0) return uuid;
+  return `wats-msg-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 function jsonTextResponse(status: number, payloadText: string): Response {
   return new Response(payloadText, { status, headers: { "content-type": JSON_CONTENT_TYPE } });
 }
@@ -866,6 +891,43 @@ function createOpenApiSchemas(enableGroupRoutes = false): Record<string, Record<
       type: "object",
       additionalProperties: true,
       description: "Webhook adapter response envelope for accepted signed webhook payloads."
+    },
+    MessageRecord: {
+      type: "object",
+      additionalProperties: false,
+      required: ["rowId", "waMessageId", "direction", "fromPhone", "toPhone", "type", "status", "graphMessageId", "createdAt", "updatedAt"],
+      properties: {
+        rowId: { type: "string", minLength: 1, description: "Caller-generated local row id." },
+        waMessageId: { type: "string", minLength: 1, description: "WhatsApp message id (wamid.*) from the Graph response." },
+        direction: { type: "string", enum: ["inbound", "outbound"] },
+        fromPhone: { type: "string", nullable: true, description: "Sender phone or wa_id when known; null when absent." },
+        toPhone: { type: "string", nullable: true, description: "Recipient phone or wa_id when known; null when absent." },
+        type: { type: "string", description: "Graph message type (text, image, ...)." },
+        status: { type: "string", description: "Last known status (sent, delivered, read, failed, ...)." },
+        graphMessageId: { type: "string", nullable: true, description: "Same as waMessageId for outbound; null when absent." },
+        createdAt: { type: "string", description: "ISO 8601 timestamp (ms precision)." },
+        updatedAt: { type: "string", description: "ISO 8601 timestamp (ms precision)." }
+      }
+    },
+    MessageListResponse: {
+      type: "object",
+      additionalProperties: false,
+      required: ["items", "nextCursor"],
+      properties: {
+        items: { type: "array", items: schemaRef("MessageRecord") },
+        nextCursor: { type: "string", nullable: true, description: "rowId of the last returned item when more rows may exist; null otherwise." }
+      }
+    },
+    MessageStatusEvent: {
+      type: "object",
+      additionalProperties: false,
+      required: ["id", "waMessageId", "status", "timestamp"],
+      properties: {
+        id: { type: "integer", description: "Autoincrement event id." },
+        waMessageId: { type: "string", minLength: 1 },
+        status: { type: "string" },
+        timestamp: { type: "string", description: "ISO 8601 timestamp (ms precision)." }
+      }
     }
   };
   if (!enableGroupRoutes) {
@@ -964,7 +1026,41 @@ export function createWatsServiceOpenApiDocument(
           ? "Send a supported text, media, location, reaction, contacts, group pin, or interactive message body"
           : "Send a supported text, media, location, reaction, contacts, or interactive message body",
         "SupportedMessageBody"
-      )
+      ),
+      get: {
+        tags: ["messages"],
+        summary: "List projected outbound messages",
+        security: [{ serviceBearerAuth: [] }],
+        parameters: [
+          { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 100, default: 50 }, description: "Maximum number of items to return (1..100, default 50)." },
+          { name: "cursor", in: "query", required: false, schema: { type: "string", minLength: 1 }, description: "Opaque cursor: the rowId of the last item from the previous page. Returns older rows." }
+        ],
+        responses: {
+          "200": okResponseSpec("Newest-first projected message page.", "MessageListResponse"),
+          "400": errorResponseSpec("Malformed limit or cursor query."),
+          "401": errorResponseSpec("Missing or invalid service bearer token."),
+          "405": errorResponseSpec("Method not allowed."),
+          "503": errorResponseSpec("No persistence store is configured.")
+        }
+      }
+    },
+    [`${messagesPath}/{messageId}`]: {
+      get: {
+        tags: ["messages"],
+        summary: "Get a single projected message",
+        security: [{ serviceBearerAuth: [] }],
+        parameters: [
+          { name: "messageId", in: "path", required: true, schema: { type: "string", minLength: 1 }, description: "WhatsApp message id (wamid.*)." }
+        ],
+        responses: {
+          "200": okResponseSpec("Projected message record.", "MessageRecord"),
+          "400": errorResponseSpec("Malformed message id."),
+          "401": errorResponseSpec("Missing or invalid service bearer token."),
+          "404": errorResponseSpec("Message not found."),
+          "405": errorResponseSpec("Method not allowed."),
+          "503": errorResponseSpec("No persistence store is configured.")
+        }
+      }
     },
     [OPENAPI_PATH]: {
       get: {
@@ -1429,6 +1525,39 @@ function buildSupportedMessageBody(body: unknown, enableGroupRoutes = false): Gr
   }
 }
 
+async function recordOutboundProjection(
+  ctx: RuntimeConfig,
+  result: unknown,
+  toPhone: string | undefined,
+  messageType: string
+): Promise<void> {
+  if (ctx.persistence === undefined) return;
+  const waMessageId = extractGraphMessageId(result);
+  if (waMessageId === null) return;
+  const now = new Date().toISOString();
+  const rowId = cryptoRandomId();
+  try {
+    await ctx.persistence.recordMessage({
+      rowId,
+      waMessageId,
+      direction: "outbound",
+      ...(toPhone !== undefined ? { toPhone } : {}),
+      type: messageType,
+      status: "sent",
+      graphMessageId: waMessageId,
+      createdAt: now,
+      updatedAt: now
+    });
+  } catch {
+    // Projection failure must not break the send response.
+  }
+  try {
+    await ctx.persistence.appendMessageStatus({ waMessageId, status: "sent", timestamp: now });
+  } catch {
+    // Best-effort; projection failure must not break the send response.
+  }
+}
+
 async function handleTextMessage(ctx: RuntimeConfig, request: Request): Promise<Response> {
   const rawBody = await readRequestText(request);
   if (rawBody === "malformed") return errorResponse(400, "malformed_json", "Request body must be valid JSON.");
@@ -1466,6 +1595,7 @@ async function handleTextMessage(ctx: RuntimeConfig, request: Request): Promise<
         await ctx.persistence.recordServiceRequest({ idempotencyKey, requestHash, responseJson, createdAt: new Date().toISOString() });
       }
     }
+    await recordOutboundProjection(ctx, result, input.to, "text");
     return jsonResponse(200, result);
   } catch (error) {
     return graphFailureResponse(error);
@@ -1502,6 +1632,9 @@ async function handleGenericMessage(ctx: RuntimeConfig, request: Request): Promi
         await ctx.persistence.recordServiceRequest({ idempotencyKey, requestHash, responseJson, createdAt: new Date().toISOString() });
       }
     }
+    const genericTo = typeof (body as { to?: unknown }).to === "string" ? (body as { to: string }).to : undefined;
+    const genericType = typeof (body as { type?: unknown }).type === "string" ? (body as { type: string }).type : "unknown";
+    await recordOutboundProjection(ctx, result, genericTo, genericType);
     return jsonResponse(200, result);
   } catch (error) {
     return graphFailureResponse(error);
@@ -1513,6 +1646,63 @@ function readQueryString(url: URL, name: string, maxLength = 4096): string | und
   if (value === null) return undefined;
   if (!isNonEmptyString(value) || value.length > maxLength) return "invalid";
   return value;
+}
+
+function parseListLimit(url: URL): number | "invalid" {
+  const raw = url.searchParams.get("limit");
+  if (raw === null) return 50;
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed)) return "invalid";
+  return Math.min(100, Math.max(1, parsed));
+}
+
+async function handleListMessages(ctx: RuntimeConfig, request: Request, url: URL): Promise<Response> {
+  if (!isAuthorized(request, ctx.secrets.serviceBearerToken)) return unauthorized();
+  if (ctx.persistence === undefined) {
+    return errorResponse(503, "persistence_not_configured", "Message projections require a persistence store.");
+  }
+  const limit = parseListLimit(url);
+  if (limit === "invalid") return errorResponse(400, "malformed_query", "limit must be an integer from 1 to 100.");
+  const cursorRaw = url.searchParams.get("cursor");
+  let beforeRowId: string | undefined;
+  if (cursorRaw !== null) {
+    if (!isNonEmptyString(cursorRaw) || cursorRaw.length > 1024 || hasControlChars(cursorRaw)) {
+      return errorResponse(400, "malformed_query", "cursor must be a safe non-empty string.");
+    }
+    beforeRowId = cursorRaw;
+  }
+  try {
+    const result = await ctx.persistence.listMessages(
+      beforeRowId === undefined ? { limit } : { limit, beforeRowId }
+    );
+    return jsonResponse(200, { items: result.items, nextCursor: result.nextCursor });
+  } catch {
+    return errorResponse(503, "persistence_not_configured", "Message projections require a persistence store.");
+  }
+}
+
+async function handleGetMessage(ctx: RuntimeConfig, request: Request, path: string): Promise<Response> {
+  if (!isAuthorized(request, ctx.secrets.serviceBearerToken)) return unauthorized();
+  if (ctx.persistence === undefined) {
+    return errorResponse(503, "persistence_not_configured", "Message projections require a persistence store.");
+  }
+  const segment = path.slice(ctx.messagesPath.length + 1);
+  let waMessageId: string;
+  try {
+    waMessageId = decodeURIComponent(segment);
+  } catch {
+    return errorResponse(400, "malformed_path", "Message id segment is invalid.");
+  }
+  if (!isNonEmptyString(waMessageId) || waMessageId.length > 1024 || hasControlChars(waMessageId)) {
+    return errorResponse(400, "malformed_path", "Message id must be a safe non-empty string.");
+  }
+  try {
+    const record = await ctx.persistence.getMessage({ waMessageId });
+    if (record === null) return errorResponse(404, "not_found", "Message not found.");
+    return jsonResponse(200, record);
+  } catch {
+    return errorResponse(404, "not_found", "Message not found.");
+  }
 }
 
 function matchGroupRoute(ctx: RuntimeConfig, path: string): ServiceRouteMatch | null {
@@ -1816,9 +2006,14 @@ export function createWatsServiceApp(config: WatsServiceConfig): WatsServiceApp 
       }
 
       if (path === ctx.messagesPath) {
-        if (method !== "POST") return methodNotAllowed("POST");
-        if (!isAuthorized(request, ctx.secrets.serviceBearerToken)) return unauthorized();
-        return handleGenericMessage(ctx, request);
+        if (method === "POST") {
+          if (!isAuthorized(request, ctx.secrets.serviceBearerToken)) return unauthorized();
+          return handleGenericMessage(ctx, request);
+        }
+        if (method === "GET") {
+          return handleListMessages(ctx, request, url);
+        }
+        return methodNotAllowed("GET, POST");
       }
 
       if (ctx.enableGroupRoutes) {
@@ -1827,6 +2022,11 @@ export function createWatsServiceApp(config: WatsServiceConfig): WatsServiceApp 
           if (!isAuthorized(request, ctx.secrets.serviceBearerToken)) return unauthorized();
           return handleGroupRoute(ctx, request, url, groupMatch);
         }
+      }
+
+      if (path.startsWith(`${ctx.messagesPath}/`)) {
+        if (method !== "GET") return methodNotAllowed("GET");
+        return handleGetMessage(ctx, request, path);
       }
 
       return errorResponse(404, "not_found", "Route not found.");

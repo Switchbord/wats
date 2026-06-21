@@ -165,12 +165,12 @@ describe("WATS-120 SQLite persistence", () => {
     const store = await createSqlitePersistence({ filename });
     try {
       const report = await store.migrate();
-      expect(report.currentVersion).toBe(2);
-      expect(report.appliedMigrations).toEqual(["002_outbox_lease_id"]);
+      expect(report.currentVersion).toBe(3);
+      expect(report.appliedMigrations).toEqual(["002_outbox_lease_id", "003_message_projection"]);
       expect(report.alreadyCurrent).toBe(false);
       expect(outboxColumns(filename)).toContain("lease_id");
       const health = await store.health();
-      expect(health.currentVersion).toBe(2);
+      expect(health.currentVersion).toBe(3);
     } finally {
       await store.close();
     }
@@ -181,8 +181,8 @@ describe("WATS-120 SQLite persistence", () => {
     const store = await createSqlitePersistence({ filename });
     try {
       const report = await store.migrate();
-      expect(report.currentVersion).toBe(2);
-      expect(report.appliedMigrations).toEqual(["001_initial", "002_outbox_lease_id"]);
+      expect(report.currentVersion).toBe(3);
+      expect(report.appliedMigrations).toEqual(["001_initial", "002_outbox_lease_id", "003_message_projection"]);
       const database = new Database(filename, { readonly: true });
       try {
         const first = database.query<{ checksum: string; version: number }, [string]>(

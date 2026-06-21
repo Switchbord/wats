@@ -110,6 +110,34 @@ const MIGRATIONS: readonly MigrationDefinition[] = Object.freeze([
     statements: Object.freeze([
       "ALTER TABLE wats_outbox ADD COLUMN lease_id INTEGER NOT NULL DEFAULT 0"
     ])
+  },
+  {
+    id: "003_message_projection",
+    version: 3,
+    checksum: "sha256:wats-persistence-003-message-projection-v1",
+    statements: Object.freeze([
+      `CREATE TABLE IF NOT EXISTS wats_messages (
+        row_id TEXT PRIMARY KEY,
+        wa_message_id TEXT NOT NULL,
+        direction TEXT NOT NULL,
+        from_phone TEXT,
+        to_phone TEXT,
+        type TEXT NOT NULL,
+        status TEXT NOT NULL,
+        graph_message_id TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS wats_messages_wa_message_id_idx ON wats_messages (wa_message_id)`,
+      `CREATE INDEX IF NOT EXISTS wats_messages_created_at_idx ON wats_messages (created_at DESC, row_id DESC)`,
+      `CREATE TABLE IF NOT EXISTS wats_message_status_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        wa_message_id TEXT NOT NULL,
+        status TEXT NOT NULL,
+        timestamp TEXT NOT NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS wats_message_status_events_wa_message_id_idx ON wats_message_status_events (wa_message_id, id)`
+    ])
   }
 ]);
 
@@ -306,6 +334,98 @@ function outboxRowToItem(row: {
     leaseId: row.lease_id,
     payloadHash: row.payload_hash,
     nextAttemptAt: row.next_attempt_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  });
+}
+
+function validateMessageDirection(value: unknown): MessageDirection {
+  if (value !== "inbound" && value !== "outbound") {
+    throw new PersistenceError("invalid_record", "direction must be \"inbound\" or \"outbound\".");
+  }
+  return value;
+}
+
+function validateOptionalRecordString(value: unknown, label: string): string | null {
+  if (value === undefined || value === null) return null;
+  return validateRecordString(value, label);
+}
+
+function validateMessageRecord(input: MessageRecordInput): {
+  rowId: string;
+  waMessageId: string;
+  direction: MessageDirection;
+  fromPhone: string | null;
+  toPhone: string | null;
+  type: string;
+  status: string;
+  graphMessageId: string | null;
+  createdAt: string;
+  updatedAt: string;
+} {
+  const record = validateRecordInput(input, "message record");
+  return Object.freeze({
+    rowId: validateRecordString(record.rowId, "rowId"),
+    waMessageId: validateRecordString(record.waMessageId, "waMessageId"),
+    direction: validateMessageDirection(record.direction),
+    fromPhone: validateOptionalRecordString(record.fromPhone, "fromPhone"),
+    toPhone: validateOptionalRecordString(record.toPhone, "toPhone"),
+    type: validateRecordString(record.type, "type"),
+    status: validateRecordString(record.status, "status"),
+    graphMessageId: validateOptionalRecordString(record.graphMessageId, "graphMessageId"),
+    createdAt: validateTimestamp(record.createdAt, "createdAt"),
+    updatedAt: validateTimestamp(record.updatedAt, "updatedAt")
+  });
+}
+
+function validateMessageStatusEvent(input: MessageStatusEventInput): {
+  waMessageId: string;
+  status: string;
+  timestamp: string;
+} {
+  const record = validateRecordInput(input, "message status event");
+  return Object.freeze({
+    waMessageId: validateRecordString(record.waMessageId, "waMessageId"),
+    status: validateRecordString(record.status, "status"),
+    timestamp: validateTimestamp(record.timestamp, "timestamp")
+  });
+}
+
+function validateListMessages(input: ListMessagesInput): {
+  limit: number;
+  beforeRowId: string | null;
+} {
+  const record = validateRecordInput(input, "message list");
+  if (typeof record.limit !== "number" || !Number.isInteger(record.limit) || record.limit < 1 || record.limit > 100) {
+    throw new PersistenceError("invalid_record", "limit must be an integer from 1 to 100.");
+  }
+  const beforeRowId = validateOptionalRecordString(record.beforeRowId, "beforeRowId");
+  return Object.freeze({ limit: record.limit, beforeRowId });
+}
+
+interface MessageRow {
+  row_id: string;
+  wa_message_id: string;
+  direction: string;
+  from_phone: string | null;
+  to_phone: string | null;
+  type: string;
+  status: string;
+  graph_message_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+function messageRowToRecord(row: MessageRow): MessageRecord {
+  return Object.freeze({
+    rowId: row.row_id,
+    waMessageId: row.wa_message_id,
+    direction: row.direction as MessageDirection,
+    fromPhone: row.from_phone,
+    toPhone: row.to_phone,
+    type: row.type,
+    status: row.status,
+    graphMessageId: row.graph_message_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   });
@@ -550,20 +670,81 @@ class SqlitePersistenceStore implements PersistenceStore {
     }
   }
 
-  async recordMessage(_input: MessageRecordInput): Promise<void> {
-    throw new PersistenceError("invalid_record", "recordMessage is not implemented.");
+  async recordMessage(input: MessageRecordInput): Promise<void> {
+    this.#assertOpen();
+    const record = validateMessageRecord(input);
+    this.#database.run(
+      `INSERT OR IGNORE INTO wats_messages
+        (row_id, wa_message_id, direction, from_phone, to_phone, type, status, graph_message_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      record.rowId,
+      record.waMessageId,
+      record.direction,
+      record.fromPhone,
+      record.toPhone,
+      record.type,
+      record.status,
+      record.graphMessageId,
+      record.createdAt,
+      record.updatedAt
+    );
   }
 
-  async appendMessageStatus(_input: MessageStatusEventInput): Promise<void> {
-    throw new PersistenceError("invalid_record", "appendMessageStatus is not implemented.");
+  async appendMessageStatus(input: MessageStatusEventInput): Promise<void> {
+    this.#assertOpen();
+    const event = validateMessageStatusEvent(input);
+    this.#database.exec("BEGIN IMMEDIATE");
+    try {
+      this.#database.run(
+        "INSERT INTO wats_message_status_events (wa_message_id, status, timestamp) VALUES (?, ?, ?)",
+        event.waMessageId,
+        event.status,
+        event.timestamp
+      );
+      this.#database.run(
+        "UPDATE wats_messages SET status = ?, updated_at = ? WHERE wa_message_id = ?",
+        event.status,
+        event.timestamp,
+        event.waMessageId
+      );
+      this.#database.exec("COMMIT");
+    } catch (cause) {
+      this.#database.exec("ROLLBACK");
+      throw new PersistenceError("invalid_record", "SQLite message status append failed.", { cause });
+    }
   }
 
-  async getMessage(_input: { waMessageId: string }): Promise<MessageRecord | null> {
-    throw new PersistenceError("invalid_record", "getMessage is not implemented.");
+  async getMessage(input: { waMessageId: string }): Promise<MessageRecord | null> {
+    this.#assertOpen();
+    const record = validateRecordInput(input, "message lookup");
+    const waMessageId = validateRecordString(record.waMessageId, "waMessageId");
+    const row = this.#database.query<MessageRow>(
+      `SELECT row_id, wa_message_id, direction, from_phone, to_phone, type, status, graph_message_id, created_at, updated_at
+       FROM wats_messages WHERE wa_message_id = ?`
+    ).get(waMessageId);
+    return row === null ? null : messageRowToRecord(row);
   }
 
-  async listMessages(_input: ListMessagesInput): Promise<ListMessagesResult> {
-    throw new PersistenceError("invalid_record", "listMessages is not implemented.");
+  async listMessages(input: ListMessagesInput): Promise<ListMessagesResult> {
+    this.#assertOpen();
+    const query = validateListMessages(input);
+    const rows = query.beforeRowId === null
+      ? this.#database.query<MessageRow>(
+        `SELECT row_id, wa_message_id, direction, from_phone, to_phone, type, status, graph_message_id, created_at, updated_at
+         FROM wats_messages
+         ORDER BY created_at DESC, row_id DESC
+         LIMIT ?`
+      ).all(query.limit)
+      : this.#database.query<MessageRow>(
+        `SELECT row_id, wa_message_id, direction, from_phone, to_phone, type, status, graph_message_id, created_at, updated_at
+         FROM wats_messages
+         WHERE row_id < ?
+         ORDER BY created_at DESC, row_id DESC
+         LIMIT ?`
+      ).all(query.beforeRowId, query.limit);
+    const items = Object.freeze(rows.map((row) => messageRowToRecord(row)));
+    const nextCursor = items.length === query.limit ? items[items.length - 1]?.rowId ?? null : null;
+    return Object.freeze({ items, nextCursor });
   }
 
   async close(): Promise<void> {
