@@ -1,0 +1,118 @@
+# WATS real release workflow — npm publish with provenance.
+#
+# This workflow publishes every public `@wats/*` package to the npm registry
+# with a Sigstore provenance attestation. It is INTENTIONALLY gated:
+#   - trigger is manual dispatch only (never push/PR/schedule);
+#   - it runs in the protected `npm-publish` GitHub environment, which
+#     maintainers must create with required reviewers (human action);
+#   - it requires `id-token: write` for the Sigstore OIDC token;
+#   - it relies on npm org OIDC trust configured between the `wats` npm org
+#     and `Switchbord/wats` (human/npm-org action).
+#
+# Until the `npm-publish` environment exists and npm OIDC trust is configured,
+# this workflow cannot complete a publish. Do not weaken these gates to make it
+# runnable from a branch. See maintainers/npm-publishing.md.
+#
+# This workflow performs real side effects (npm publish). It is distinct from
+# .github/workflows/release-dry-run.yml, which stays credential-free and never
+# publishes.
+
+name: Release (npm publish with provenance)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version to publish (must match root package.json and all @wats/* package.json versions)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  # id-token: write is required for npm provenance (Sigstore OIDC attestation).
+  id-token: write
+
+concurrency:
+  group: npm-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish @wats/* with provenance
+    runs-on: ubuntu-latest
+    environment:
+      name: npm-publish
+      # Restrict to the release tag's commit on main. Maintainers must create
+      # the `npm-publish` environment with required reviewers in repo settings.
+      url: https://github.com/Switchbord/wats/releases/tag/v${{ inputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Verify manual dispatch runs from main
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_REF_NAME}" != "main" ]; then
+            echo "Real npm publication must be dispatched from main after the release commit is merged. Current ref: ${GITHUB_REF_NAME}"
+            exit 1
+          fi
+
+      - name: Verify requested version matches manifests
+        run: |
+          set -euo pipefail
+          root_version=$(node -p "require('./package.json').version")
+          if [ "$root_version" != "${{ inputs.version }}" ]; then
+            echo "Requested version ${{ inputs.version }} does not match root package.json version $root_version"
+            exit 1
+          fi
+          for pkg in types crypto graph core http internal-utils config persistence service cli; do
+            pkg_version=$(node -p "require('./packages/$pkg/package.json').version")
+            if [ "$pkg_version" != "${{ inputs.version }}" ]; then
+              echo "packages/$pkg version $pkg_version does not match ${{ inputs.version }}"
+              exit 1
+            fi
+          done
+
+      - name: Run credential-free release gates before publishing
+        run: bun run check-publish
+
+      - name: Build dist artifacts
+        run: bun run build:packages
+
+      - name: Configure npm registry (OIDC, no static token)
+        run: |
+          # With npm org OIDC trust configured, npm publish --provenance uses
+          # GitHub's OIDC token exchange at publish time. No NPM_TOKEN secret is
+          # used on the preferred path. If a long-lived NPM_TOKEN fallback is
+          # configured in the protected environment, npm reads it from the env;
+          # do not echo it.
+          echo "registry=https://registry.npmjs.org/" >> "$HOME/.npmrc"
+
+      - name: Publish packages in dependency order with provenance
+        run: |
+          set -euo pipefail
+          for pkg in types crypto graph core http internal-utils config persistence service cli; do
+            echo "Publishing @wats/$pkg@${{ inputs.version }} with provenance"
+            (cd "packages/$pkg" && npm publish --provenance --access public)
+          done
+
+      - name: Verify every package is visible and provenance-attested
+        run: |
+          set -euo pipefail
+          for pkg in types crypto graph core http internal-utils config persistence service cli; do
+            echo "Verifying @wats/$pkg@${{ inputs.version }}"
+            npm view "@wats/$pkg@${{ inputs.version }}" version
+            npm view "@wats/$pkg@${{ inputs.version }}" --json | node -e \
+              'const d=JSON.parse(require("fs").readFileSync(0,"utf8")); if(!d.dist||!d.dist.attestations){console.error("MISSING provenance attestation for @wats/'"$pkg"'@${{ inputs.version }}"); process.exit(1);} else {console.log("provenance OK for @wats/'"$pkg"'");}'
+          done
