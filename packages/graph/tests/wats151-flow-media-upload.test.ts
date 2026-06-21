@@ -88,7 +88,10 @@ describe("WATS-151 Flow media-upload decryption", () => {
 
     const tamperedMac = new Uint8Array(cdnFile);
     tamperedMac[tamperedMac.byteLength - 1] ^= 0xff;
-    await expect(decryptFlowMedia(crypto, tamperedMac, metadata)).rejects.toBeInstanceOf(FlowMediaDecryptionError);
+    // Recompute encrypted_hash so this case reaches the dedicated HMAC branch
+    // instead of failing earlier on the full-file SHA-256 check.
+    const tamperedMacMetadata = { ...metadata, encrypted_hash: b64(sha256(tamperedMac)) };
+    await expect(decryptFlowMedia(crypto, tamperedMac, tamperedMacMetadata)).rejects.toBeInstanceOf(FlowMediaDecryptionError);
 
     await expect(decryptFlowMedia(crypto, cdnFile, { ...metadata, plaintext_hash: b64(new Uint8Array(32).fill(2)) })).rejects.toBeInstanceOf(FlowMediaDecryptionError);
   });

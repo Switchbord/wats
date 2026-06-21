@@ -410,14 +410,6 @@ export function registerAdapterContractSuite(
 
 import { createCipheriv } from "node:crypto";
 
-function pkcs7Pad(plaintext: Uint8Array, blockSize = 16): Uint8Array {
-  const padLen = blockSize - (plaintext.byteLength % blockSize);
-  const out = new Uint8Array(plaintext.byteLength + padLen);
-  out.set(plaintext, 0);
-  out.fill(padLen, plaintext.byteLength);
-  return out;
-}
-
 function aesCbcEncryptWithNode(
   key: Uint8Array,
   iv: Uint8Array,
