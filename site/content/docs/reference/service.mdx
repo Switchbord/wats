@@ -3,7 +3,7 @@ title: "Service Reference (`@wats/service`)"
 description: "The @wats/service runtime-neutral standalone webhook/API service and its public API."
 ---
 
-<DocMeta status="experimental" lastReviewed="2026-06-02" />
+<DocMeta status="experimental" lastReviewed="2026-06-21" />
 
 `@wats/service` exposes a runtime-neutral `Request -> Response` app composing the Graph client, webhook adapter, config profile shape, and WhatsApp facade. It is not a production server by itself: the CLI provides dry-run and credential-gated live `wats serve` wrappers, and a generated OpenAPI 3.1 document covers the routes below. Not implemented yet: Node/Docker packaging, metrics, production hosting.
 
@@ -62,6 +62,8 @@ interface WatsServiceConfig {
 | `profile.webhook.path` | POST | Meta signature | Delegates to `createWebhookAdapter`. |
 | `${profile.service.apiPrefix}/messages/text` | POST | service bearer | Sends a text message through Graph. |
 | `${profile.service.apiPrefix}/messages` | POST | service bearer | Sends a supported generic text, media, location, reaction, contacts, or interactive message body through Graph; group text/pin bodies are accepted only when `enableGroupRoutes` is true. |
+| `${profile.service.apiPrefix}/messages` | GET | service bearer | Lists the projected outbound message send-attempt page (newest-first) when a `PersistenceStore` is injected. |
+| `${profile.service.apiPrefix}/messages/{messageId}` | GET | service bearer | Returns a single projected message record by WhatsApp message id (`wamid.*`) when a `PersistenceStore` is injected. |
 | `${profile.service.apiPrefix}/groups` | GET, POST | service bearer | Opt-in (`enableGroupRoutes`) list/create Groups using the configured business phone-number id. |
 | `${profile.service.apiPrefix}/groups/{groupId}` | GET, POST, DELETE | service bearer | Opt-in get/update/delete a Group. |
 | `${profile.service.apiPrefix}/groups/{groupId}/invite-link` | GET, POST | service bearer | Opt-in get/reset a Group invite link. |
@@ -139,6 +141,45 @@ Location bodies use `type: "location"`, finite `latitude`/`longitude` in Graph-s
 
 The route preserves the bearer boundary: the service bearer token authorizes the local route, is never forwarded to Graph, and builder/validation failures return `400` without echoing tokens or request secrets.
 
+## Message projection routes
+
+When a `PersistenceStore` is injected, every successful outbound send (text and generic) records a local projection of the Graph send attempt: a `MessageRecord` keyed by the returned WhatsApp message id, plus an initial `sent` status event. Projection failures are swallowed and never break the send response — the caller still receives the Graph result.
+
+### `GET /messages`
+
+Returns a newest-first page of projected messages. Query parameters:
+
+- `limit` — integer `1..100`, default `50`.
+- `cursor` — opaque cursor: the `rowId` of the last item from the previous page. Passing it returns older rows.
+
+```json
+{
+  "items": [
+    {
+      "rowId": "wats-msg-...",
+      "waMessageId": "wamid.HBgM...",
+      "direction": "outbound",
+      "fromPhone": null,
+      "toPhone": "15551230000",
+      "type": "text",
+      "status": "sent",
+      "graphMessageId": "wamid.HBgM...",
+      "createdAt": "2026-06-21T00:00:00.000Z",
+      "updatedAt": "2026-06-21T00:00:00.000Z"
+    }
+  ],
+  "nextCursor": null
+}
+```
+
+`nextCursor` is the `rowId` of the last returned item when more rows may exist, otherwise `null`.
+
+### `GET /messages/{messageId}`
+
+Returns a single `MessageRecord` by WhatsApp message id (`wamid.*`). Unknown ids return `404 not_found`; unsafe id segments return `400`.
+
+Both routes return `503 persistence_not_configured` when no `PersistenceStore` is injected. A `GET /messages/text` request is treated as the message-id lookup segment `text` only by method — the `POST /messages/text` route takes precedence for POST, and a `GET` to that exact path returns `405` (the `text` segment is reserved by the text-send route).
+
 ## Groups routes (opt-in)
 
 Pass `enableGroupRoutes: true` to expose Groups routes. Groups hang off `profile.whatsapp.phoneNumberId`, not the WABA id. Route inputs stay camelCase; mapping to Meta snake_case happens only at the Graph boundary.
@@ -205,6 +246,10 @@ Example:
 - `claimOutboxItems(...)`
 - `markOutboxItemFailed(...)`
 - `markOutboxItemSucceeded(...)`
+- `recordMessage(...)`
+- `appendMessageStatus(...)`
+- `getMessage(...)`
+- `listMessages(...)`
 - `close()`
 
 Missing any method fails construction with `WatsServiceError` code `invalid_persistence`.
@@ -212,7 +257,8 @@ Missing any method fails construction with `WatsServiceError` code `invalid_pers
 When persistence is injected:
 
 - signed webhook POSTs are recorded by event key/hash and duplicate deliveries are acknowledged without redispatching the same update;
-- message send routes honor `Idempotency-Key`: a matching key/body hash replays the stored response; the same key with a different body returns `409 idempotency_conflict`.
+- message send routes honor `Idempotency-Key`: a matching key/body hash replays the stored response; the same key with a different body returns `409 idempotency_conflict`;
+- successful outbound sends record a local message projection and an initial `sent` status event, exposed read-only through `GET /messages` and `GET /messages/{messageId}`.
 
 The outbox APIs are part of the accepted contract even though current message routes still send synchronously. `claimOutboxItems(...)` returns `OutboxItem` records with `leaseId`; pass that same `leaseId` to `markOutboxItemFailed(...)` / `markOutboxItemSucceeded(...)` so stale workers cannot complete a newer reclaimed lease.
 

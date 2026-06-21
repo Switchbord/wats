@@ -3,7 +3,7 @@ title: pywa Parity Matrix
 description: Capability-by-capability status of WATS against pywa, tagged live-validated, shape-only, or planned.
 ---
 
-<DocMeta status="active" lastReviewed="2026-06-10" />
+<DocMeta status="active" lastReviewed="2026-06-21" />
 
 Every row carries one of three tags. **live-validated**: exercised against live
 Meta Graph/webhooks in the June 2026 campaign. **shape-only**: implemented and
@@ -48,6 +48,7 @@ accepts the request and WATS parses the live response.
 | Config | constructor args | `@wats/config`: versioned YAML/JSON profiles with env-secret references, never raw secrets. | shape-only — local-only by design. |
 | CLI | n/a | `wats init/setup/doctor/openapi/serve/onboarding/upgrade`; credential-safe by default. | shape-only — local tooling; live serve is the operator's opt-in. |
 | Service | n/a | `createWatsServiceApp`: health/readiness, webhook delegation, authenticated message routes, Graph-failure diagnostics. | live-validated for webhook ingress and text send; other routes shape-only. |
+| Message event-store projection (outbound) | n/a | `@wats/persistence` `wats_messages` + `wats_message_status_events` tables and `recordMessage` / `appendMessageStatus` / `getMessage` / `listMessages` APIs; read-only `GET /messages` and `GET /messages/{messageId}` service routes. | shape-only — local SQLite + MockTransport only; no live Meta calls this slice. |
 | OpenAPI document | n/a | OpenAPI 3.1 for WATS service routes, served at `/openapi.json`. | shape-only. |
 | Internal utilities | n/a | `@wats/internal-utils` shared helpers. | shape-only — never leaves the process. |
 | OpenTelemetry observability | n/a | Not built; router/adapter observer hooks exist as seams. | planned. |

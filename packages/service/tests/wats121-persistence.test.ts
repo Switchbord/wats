@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import type { WatsProfileConfig } from "@wats/config";
-import type { OutboxItem } from "@wats/persistence";
+import type { MessageRecord, MessageRecordInput, OutboxItem } from "@wats/persistence";
 import { createWatsServiceApp, type WatsServiceConfig } from "../src/index";
 
 type MemoryStore = {
@@ -16,6 +16,10 @@ type MemoryStore = {
   claimOutboxItems(input: { now: string; limit: number }): Promise<readonly OutboxItem[]>;
   markOutboxItemFailed(input: { id: string; leaseId: number; nextAttemptAt: string; updatedAt: string }): Promise<void>;
   markOutboxItemSucceeded(input: { id: string; leaseId: number; updatedAt: string }): Promise<void>;
+  recordMessage(input: MessageRecordInput): Promise<void>;
+  appendMessageStatus(input: { waMessageId: string; status: string; timestamp: string }): Promise<void>;
+  getMessage(input: { waMessageId: string }): Promise<MessageRecord | null>;
+  listMessages(input: { limit: number; beforeRowId?: string }): Promise<{ items: readonly MessageRecord[]; nextCursor: string | null }>;
   close(): Promise<void>;
 };
 
@@ -46,6 +50,10 @@ function memoryStore(): MemoryStore {
     async claimOutboxItems() { return []; },
     async markOutboxItemFailed() {},
     async markOutboxItemSucceeded() {},
+    async recordMessage() {},
+    async appendMessageStatus() {},
+    async getMessage() { return null; },
+    async listMessages() { return { items: [], nextCursor: null }; },
     async close() {}
   };
 }

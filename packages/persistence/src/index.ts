@@ -1,4 +1,4 @@
-export const CURRENT_SCHEMA_VERSION = 2 as const;
+export const CURRENT_SCHEMA_VERSION = 3 as const;
 export const REDACTED_SQLITE_LOCATION = "[REDACTED_SQLITE_DATABASE]" as const;
 
 export type PersistenceBackend = "sqlite" | "postgres";
@@ -86,6 +86,57 @@ export interface OutboxSucceededInput {
   readonly updatedAt: string;
 }
 
+export type MessageDirection = "inbound" | "outbound";
+
+export interface MessageRecordInput {
+  readonly rowId: string;          // UUID-ish local id (caller-generated)
+  readonly waMessageId: string;    // wamid.* from Graph response
+  readonly direction: MessageDirection;
+  readonly fromPhone?: string;     // optional, omit when unknown
+  readonly toPhone?: string;
+  readonly type: string;           // "text" | "image" | ... (Graph type)
+  readonly status: string;         // "sent" | "delivered" | "read" | "failed" | ...
+  readonly graphMessageId?: string;// same as waMessageId for outbound; nullable
+  readonly createdAt: string;      // strict ISO ms (see validateTimestamp)
+  readonly updatedAt: string;      // strict ISO ms
+}
+
+export interface MessageRecord {
+  readonly rowId: string;
+  readonly waMessageId: string;
+  readonly direction: MessageDirection;
+  readonly fromPhone: string | null;
+  readonly toPhone: string | null;
+  readonly type: string;
+  readonly status: string;
+  readonly graphMessageId: string | null;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export interface MessageStatusEventInput {
+  readonly waMessageId: string;
+  readonly status: string;
+  readonly timestamp: string;      // strict ISO ms
+}
+
+export interface MessageStatusEventRecord {
+  readonly id: number;
+  readonly waMessageId: string;
+  readonly status: string;
+  readonly timestamp: string;
+}
+
+export interface ListMessagesInput {
+  readonly limit: number;          // 1..100
+  readonly beforeRowId?: string;   // cursor: rows after this row in createdAt DESC, rowId DESC order
+}
+
+export interface ListMessagesResult {
+  readonly items: readonly MessageRecord[];
+  readonly nextCursor: string | null;  // rowId of last item if more may exist, else null
+}
+
 export interface PersistenceStore {
   readonly backend: PersistenceBackend;
   migrate(): Promise<MigrationReport>;
@@ -97,6 +148,10 @@ export interface PersistenceStore {
   claimOutboxItems(input: OutboxClaimInput): Promise<readonly OutboxItem[]>;
   markOutboxItemFailed(input: OutboxFailedInput): Promise<void>;
   markOutboxItemSucceeded(input: OutboxSucceededInput): Promise<void>;
+  recordMessage(input: MessageRecordInput): Promise<void>;
+  appendMessageStatus(input: MessageStatusEventInput): Promise<void>;
+  getMessage(input: { waMessageId: string }): Promise<MessageRecord | null>;
+  listMessages(input: ListMessagesInput): Promise<ListMessagesResult>;
   close(): Promise<void>;
 }
 
