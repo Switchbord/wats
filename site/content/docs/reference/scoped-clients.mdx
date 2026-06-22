@@ -212,10 +212,19 @@ Validation rejects with `GraphRequestValidationError` before any transport call:
 `PhoneNumberClient` exposes the credential-free Calling API lifecycle over the bound phone-number scope:
 
 ```ts
+// Phone-number (wa_id) recipient — the classic `to` form:
 await phone.initiateCall({
   to: "+155****0000",
   session: { sdpType: "offer", sdp: "v=0\r\n..." },
   bizOpaqueCallbackData: "tracker-optional"
+});
+
+// BSUID / parent BSUID recipient — Meta's `recipient` form for
+// business-initiated call connect. At least one of `to` or `recipient`
+// is required; supplying both emits both and Meta routes by `to`:
+await phone.initiateCall({
+  recipient: "BSUID-parent-abc",
+  session: { sdpType: "offer", sdp: "v=0\r\n..." }
 });
 
 await phone.acceptCall({
@@ -227,9 +236,11 @@ await phone.terminateCall({ callId: "wacid.ABGG..." });
 
 Direct callables are also exported from `@wats/graph`: `initiateCall`, `preAcceptCall`, `acceptCall`, `rejectCall`, `terminateCall`. All five delegate to `POST /{phoneNumberId}/calls`; only the Graph body `action` differs (`connect`, `pre_accept`, `accept`, `reject`, `terminate`).
 
+`initiateCall` accepts either `to` (a phone number / `wa_id`) or `recipient` (a Meta BSUID / parent BSUID) as the call target. At least one of the two is required. When both are supplied, both are emitted in the Graph body and Meta resolves the call to `to` (i.e. `to` takes precedence); supply both only when you intend to mirror that wire contract. `recipient` follows the same safety policy as `to`.
+
 Validation rejects with `GraphRequestValidationError` before any transport call:
 
-- `phoneNumberId`, `to`, and `callId` must be non-empty strings with no control characters, dot segments, slashes, query/fragment markers, malformed percent encoding, or encoded/double-encoded dot-segments.
+- `phoneNumberId`, `to`, `recipient`, and `callId` must be non-empty strings with no control characters, dot segments, slashes, query/fragment markers, malformed percent encoding, or encoded/double-encoded dot-segments. For `initiateCall`, at least one of `to` or `recipient` must be provided.
 - `bizOpaqueCallbackData`, when provided, must be a non-empty string no longer than `CALL_BIZ_OPAQUE_CALLBACK_DATA_MAX_LENGTH` (`512`) and free of control characters.
 - `session` must be a descriptor-safe plain object. WATS clones it before transport, maps `sdpType` to Graph `sdp_type`, and rejects accessors, `toJSON`, custom prototypes, cycles, unsafe prototype keys (`__proto__`, `constructor`, `prototype`), non-finite numbers, functions, symbols, empty/oversized strings, NUL/DEL-bearing SDP text, and serialized bodies over `CALL_SESSION_MAX_BYTES` (`65_536`).
 - Undefined optional fields are omitted from the Graph JSON body.

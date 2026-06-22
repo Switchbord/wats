@@ -356,9 +356,8 @@ describe("WATS-168 initiateCall recipient BSUID support", () => {
   });
 
   test("invalid recipient rejects with GraphRequestValidationError and sends no request", async () => {
-    const { client, handle } = clientWith(ok());
     for (const bad of [null, undefined, "", "   ", 123, {}, [], true, "bad\r", "bad\n", "bad\u0000", ".", "..", "a/b", "a\\b", "a?b", "a#b", "%2e%2e", "%252e%252e"]) {
-      handle.requests.length = 0;
+      const { client, handle } = clientWith(ok());
       await expect(
         initiateCall(client, { phoneNumberId: "555" }, { recipient: bad as never, session } as never)
       ).rejects.toThrow(GraphRequestValidationError);
@@ -367,9 +366,8 @@ describe("WATS-168 initiateCall recipient BSUID support", () => {
   });
 
   test("recipient still validated when to is also supplied (both-invalid and recipient-invalid paths)", async () => {
-    const { client, handle } = clientWith(ok());
     // Valid to, invalid recipient -> rejects on recipient, no request sent.
-    handle.requests.length = 0;
+    const { client, handle } = clientWith(ok());
     await expect(
       initiateCall(client, { phoneNumberId: "555" }, { to: "15551234567", recipient: "bad\u0000", session } as never)
     ).rejects.toThrow(GraphRequestValidationError);
