@@ -248,6 +248,29 @@ Validation rejects with `GraphRequestValidationError` before any transport call:
 
 Calling tests use `createMockTransport`; live call sessions remain credential-gated and are not performed in CI.
 
+
+### Calling operator notes
+
+Meta documents three media/signaling modes for WhatsApp Calling:
+
+| Mode | Signaling | Media |
+| --- | --- | --- |
+| Graph APIs + webhooks + WebRTC | HTTPS Graph requests and `calls` webhooks | WebRTC with ICE, DTLS, and SRTP |
+| SIP + WebRTC | SIP over TLS to your SIP edge | WebRTC media |
+| SIP + SDES SRTP | SIP over TLS to your SIP edge | SRTP keys negotiated with SDES |
+
+Audio support is negotiated by the media stack. The current Meta reference examples include OPUS and G.711 codecs (`PCMA` and `PCMU`) in SDP. WATS passes SDP through the Calling request helpers and validates the envelope; it does not choose codecs or run media negotiation for you.
+
+Operator constraints remain platform-side:
+
+- The business must be calling-eligible and normally needs a 2,000 daily messaging limit before production calling access.
+- Business-initiated calling is not available for phone numbers from USA, Canada, Egypt, Vietnam, Nigeria.
+- Calling requires App Review and the WhatsApp Business Messaging permission.
+- Calling sandbox/test-number access is limited; Meta documents Tech Partner sandbox flows separately.
+- WATS has no SIP server implementation and cannot provision calling access. Bring your WebRTC/SIP edge, then use WATS for the Graph request and webhook shapes.
+
+Status: shape-only. These helpers are covered by MockTransport and synthetic webhook tests; real call sessions remain campaign-gated.
+
 ### Bound-id path substitution
 
 `PhoneNumberClient.sendMessage(body, opts?)` is a pure delegation to the `sendMessage` endpoint-registry callable with `{ phoneNumberId: this.phoneNumberId }` injected. `sendText` and the media helpers build typed bodies and then use that same path. The wire-level result is byte-identical to calling `sendMessage(graphClient, { phoneNumberId }, body, opts)` directly — the consumer fixture asserts this equivalence.
