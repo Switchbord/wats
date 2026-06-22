@@ -5359,6 +5359,28 @@ Validation rejects with `GraphRequestValidationError` before any transport call:
 
 Calling tests use `createMockTransport`; live call sessions remain credential-gated and are not performed in CI.
 
+### Calling operator notes
+
+Meta documents three media/signaling modes for WhatsApp Calling:
+
+| Mode | Signaling | Media |
+| --- | --- | --- |
+| Graph APIs + webhooks + WebRTC | HTTPS Graph requests and `calls` webhooks | WebRTC with ICE, DTLS, and SRTP |
+| SIP + WebRTC | SIP over TLS to your SIP edge | WebRTC media |
+| SIP + SDES SRTP | SIP over TLS to your SIP edge | SRTP keys negotiated with SDES |
+
+Audio support is negotiated by the media stack. The current Meta reference examples include OPUS and G.711 codecs (`PCMA` and `PCMU`) in SDP. WATS passes SDP through the Calling request helpers and validates the envelope; it does not choose codecs or run media negotiation for you.
+
+Operator constraints remain platform-side:
+
+- The business must be calling-eligible and normally needs a 2,000 daily messaging limit before production calling access.
+- Business-initiated calling is not available for phone numbers from USA, Canada, Egypt, Vietnam, Nigeria.
+- Calling requires App Review and the WhatsApp Business Messaging permission.
+- Calling sandbox/test-number access is limited; Meta documents Tech Partner sandbox flows separately.
+- WATS has no SIP server implementation and cannot provision calling access. Bring your WebRTC/SIP edge, then use WATS for the Graph request and webhook shapes.
+
+Status: shape-only. These helpers are covered by MockTransport and synthetic webhook tests; real call sessions remain campaign-gated.
+
 ### Bound-id path substitution
 
 `PhoneNumberClient.sendMessage(body, opts?)` is a pure delegation to the `sendMessage` endpoint-registry callable with `{ phoneNumberId: this.phoneNumberId }` injected. `sendText` and the media helpers build typed bodies and then use that same path. The wire-level result is byte-identical to calling `sendMessage(graphClient, { phoneNumberId }, body, opts)` directly — the consumer fixture asserts this equivalence.
@@ -7183,7 +7205,7 @@ Migration notes:
 | call connect/status/terminate handlers | `normalizeWebhookEnvelope` calling variants plus `filtersTyped.call` | shape-only | Synthetic payloads only. Calling webhook normalization surfaces the full Meta field set in camelCase: connect/terminate `toUserId`/`toParentUserId`/`contacts[]`, terminate `status`/`startTime`/`endTime`/`duration`/`bizOpaqueCallbackData`, call status `recipientUserId`/`recipientParentUserId`/`bizOpaqueCallbackData`, and `call_permission_reply` message `fromUserId`/`fromParentUserId`. Wire snake_case keys are translated and never leak outside `raw`. |
 | call permission request/update | `getCallPermissions` typed permission/action/limit models; `call_permission_reply` webhook carries `isPermanent`/`responseSource`, plus `fromUserId`/`fromParentUserId` | shape-only | Waiters still planned; pywa also exposes permission waiters. |
 | calling settings/SIP models | Read via `getPhoneNumberSettings`; writes via the `calling` sub-object on `updatePhoneNumberSettings` (status, call hours, call icons, callback permission, SIP servers) | shape-only | `includeSipCredentials` may return secret-bearing SIP material as camelCase `sipUserPassword`; `sip_user_password` is never serialized into update bodies. WABA `health_status.can_receive_call_sip` is exposed as `healthStatus.canReceiveCallSip`. |
-| live WebRTC/media orchestration | No first-class WATS equivalent yet | planned | Requires real calling-enabled phone numbers and explicit authorization. |
+| live WebRTC/media orchestration | No first-class WATS equivalent yet | planned | Requires real calling-enabled phone numbers and explicit authorization. Meta modes include Graph APIs + webhooks + WebRTC, SIP + WebRTC, and SIP + SDES SRTP; SDP may negotiate OPUS or G.711 (`PCMA`/`PCMU`). WATS has no SIP server implementation. |
 
 ## Business and admin map
 
@@ -7355,7 +7377,7 @@ accepts the request and WATS parses the live response.
 | Template management | `create_template` etc. | List/create/get/update/delete callables, component builders, template-group analytics, `compareTemplates`, `unpauseTemplate`, `migrateTemplates`, archive/unarchive helpers, auth-template upsert, and library-template create fields. | live-validated for list reads; mutations/comparison/unpause/migration/archive/auth-upsert/library-template fields shape-only. |
 | Flows | Flow management | List/get/create/update/publish/delete/deprecate/assets callables, bounded Flow JSON validation, typed FlowJSON DSL builders (screens/components/actions), metrics, migration, response builders. | shape-only — live read returned empty; mutations/metrics/migration never exercised. |
 | Flow encrypted data-channel | richer Flow runtime | `decryptRequest`/`encryptResponse` (RSA-OAEP + AES-GCM, IV-flip response) and a framework-agnostic `handleFlowRequest` dispatch (ping/error-ack/close), backed by `@wats/crypto`. | shape-only — local crypto round-trip; no hosted endpoint or live publish. Media-upload (CBC+HMAC) decryption is implemented shape-only. |
-| Calling | `initiate_call` etc. | Initiate/pre-accept/accept/reject/terminate callables, typed calling webhooks and filters. Calling webhook normalization surfaces the full Meta field set in camelCase: connect/terminate `toUserId`/`toParentUserId`/`contacts[]`, terminate `status`/`startTime`/`endTime`/`duration`/`bizOpaqueCallbackData`, call status `recipientUserId`/`recipientParentUserId`/`bizOpaqueCallbackData`, and `call_permission_reply` message `fromUserId`/`fromParentUserId`. | shape-only — no live call sessions yet. |
+| Calling | `initiate_call` etc. | Initiate/pre-accept/accept/reject/terminate callables, typed calling webhooks and filters. Operator docs cover Graph APIs + webhooks + WebRTC, SIP + WebRTC, SIP + SDES SRTP, OPUS, G.711 (`PCMA`/`PCMU`), App Review, geo restrictions, and the no SIP server implementation boundary. Calling webhook normalization surfaces the full Meta field set in camelCase: connect/terminate `toUserId`/`toParentUserId`/`contacts[]`, terminate `status`/`startTime`/`endTime`/`duration`/`bizOpaqueCallbackData`, call status `recipientUserId`/`recipientParentUserId`/`bizOpaqueCallbackData`, and `call_permission_reply` message `fromUserId`/`fromParentUserId`. | shape-only — no live call sessions yet. |
 | Call permissions + calling-settings mutation | permission models, SIP/settings writes | `getCallPermissions` (typed permission/action/limit models), `calling` settings sub-object on `updatePhoneNumberSettings` (status, call hours, call icons, callback permission, SIP servers), `call_permission_reply` webhook fields (`isPermanent`, `responseSource`, plus `fromUserId`/`fromParentUserId`). | shape-only — no live calls; WebRTC/media orchestration still planned. |
 | Business/admin reads | `get_business_account` etc. | `getWabaInfo`, `listSubscribedApps`, `listPhoneNumbers`, `getPhoneNumberInfo`, `getBusinessProfile`, `getCommerceSettings`. | live-validated — all parsed live Graph v25.0. |
 | Phone-number settings read | settings getter | `getPhoneNumberSettings` (storage config, optional SIP credentials as `sipUserPassword`) plus `getWabaInfo` calling health as `healthStatus.canReceiveCallSip`. | shape-only — not exercised in the live campaign. |
@@ -7485,6 +7507,16 @@ Read-only before side-effecting before destructive.
    prefixed draft. Publish only with the publish flag and explicit acceptance
    of the state-transition risk. Delete only this run's drafts; treat
    deprecate as irreversible.
+
+Calling operator facts from Meta docs before any live attempt:
+
+- Supported media/signaling modes are Graph APIs + webhooks + WebRTC, SIP + WebRTC, and SIP + SDES SRTP.
+- SDP examples include OPUS and G.711 codecs (`PCMA`, `PCMU`); WATS validates and forwards SDP but does not negotiate media.
+- Business-initiated calling is not available for numbers from USA, Canada, Egypt, Vietnam, Nigeria.
+- Production access is platform-gated: App Review, WhatsApp Business Messaging permission, and calling eligibility, normally including a 2,000 daily messaging limit.
+- Sandbox flows are limited and may require Tech Partner access.
+- WATS has no SIP server implementation and cannot provision calling access.
+
 7. **Calling** (flag-gated). Confirm the phone is calling-enabled, initiate a
    minimal test call, reject or terminate quickly. Accept/WebRTC flows need
    their own flag and separate confirmation.

@@ -105,6 +105,17 @@ Read-only before side-effecting before destructive.
    prefixed draft. Publish only with the publish flag and explicit acceptance
    of the state-transition risk. Delete only this run's drafts; treat
    deprecate as irreversible.
+
+
+Calling operator facts from Meta docs before any live attempt:
+
+- Supported media/signaling modes are Graph APIs + webhooks + WebRTC, SIP + WebRTC, and SIP + SDES SRTP.
+- SDP examples include OPUS and G.711 codecs (`PCMA`, `PCMU`); WATS validates and forwards SDP but does not negotiate media.
+- Business-initiated calling is not available for numbers from USA, Canada, Egypt, Vietnam, Nigeria.
+- Production access is platform-gated: App Review, WhatsApp Business Messaging permission, and calling eligibility, normally including a 2,000 daily messaging limit.
+- Sandbox flows are limited and may require Tech Partner access.
+- WATS has no SIP server implementation and cannot provision calling access.
+
 7. **Calling** (flag-gated). Confirm the phone is calling-enabled, initiate a
    minimal test call, reject or terminate quickly. Accept/WebRTC flows need
    their own flag and separate confirmation.
