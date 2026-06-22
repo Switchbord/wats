@@ -300,6 +300,105 @@ describe("WATS-41 Calling error taxonomy", () => {
   });
 });
 
+describe("WATS-168 initiateCall recipient BSUID support", () => {
+  test("request body with to only is unchanged (no recipient emitted)", async () => {
+    const { client, handle } = clientWith(ok({ id: "call-to-only" }));
+    const response = await initiateCall(client, { phoneNumberId: "555" }, { to: "15551234567", session });
+    expect(response.id).toBe("call-to-only");
+    const body = parseBody(handle.requests[0]?.body);
+    expect(body).toEqual({
+      messaging_product: "whatsapp",
+      to: "15551234567",
+      action: "connect",
+      session: { sdp_type: "offer", sdp: session.sdp }
+    });
+    expect(body.recipient).toBeUndefined();
+    expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v25.0/555/calls");
+  });
+
+  test("request body with recipient only emits recipient and no to", async () => {
+    const { client, handle } = clientWith(ok({ id: "call-recipient-only" }));
+    await initiateCall(client, { phoneNumberId: "555" }, { recipient: "BSUID-parent-abc", session });
+    const body = parseBody(handle.requests[0]?.body);
+    expect(body).toEqual({
+      messaging_product: "whatsapp",
+      recipient: "BSUID-parent-abc",
+      action: "connect",
+      session: { sdp_type: "offer", sdp: session.sdp }
+    });
+    expect(body.to).toBeUndefined();
+  });
+
+  test("request body with both to and recipient emits both (Meta: to takes precedence)", async () => {
+    const { client, handle } = clientWith(ok());
+    await initiateCall(
+      client,
+      { phoneNumberId: "555" },
+      { to: "15551234567", recipient: "BSUID-parent-abc", session, bizOpaqueCallbackData: "trk" }
+    );
+    const body = parseBody(handle.requests[0]?.body);
+    expect(body).toEqual({
+      messaging_product: "whatsapp",
+      to: "15551234567",
+      recipient: "BSUID-parent-abc",
+      action: "connect",
+      session: { sdp_type: "offer", sdp: session.sdp },
+      biz_opaque_callback_data: "trk"
+    });
+  });
+
+  test("rejects when neither to nor recipient is supplied", async () => {
+    const { client, handle } = clientWith(ok());
+    await expect(
+      initiateCall(client, { phoneNumberId: "555" }, { session } as never)
+    ).rejects.toThrow(GraphRequestValidationError);
+    expect(handle.requests.length).toBe(0);
+  });
+
+  test("invalid recipient rejects with GraphRequestValidationError and sends no request", async () => {
+    for (const bad of [null, undefined, "", "   ", 123, {}, [], true, "bad\r", "bad\n", "bad\u0000", ".", "..", "a/b", "a\\b", "a?b", "a#b", "%2e%2e", "%252e%252e"]) {
+      const { client, handle } = clientWith(ok());
+      await expect(
+        initiateCall(client, { phoneNumberId: "555" }, { recipient: bad as never, session } as never)
+      ).rejects.toThrow(GraphRequestValidationError);
+      expect(handle.requests.length).toBe(0);
+    }
+  });
+
+  test("recipient still validated when to is also supplied (both-invalid and recipient-invalid paths)", async () => {
+    // Valid to, invalid recipient -> rejects on recipient, no request sent.
+    const { client, handle } = clientWith(ok());
+    await expect(
+      initiateCall(client, { phoneNumberId: "555" }, { to: "15551234567", recipient: "bad\u0000", session } as never)
+    ).rejects.toThrow(GraphRequestValidationError);
+    expect(handle.requests.length).toBe(0);
+  });
+
+  test("PhoneNumberClient bound-id behavior works with recipient-only input", async () => {
+    const { client, handle } = clientWith(ok({ id: "scoped-recipient" }));
+    const phone = new PhoneNumberClient({ graphClient: client, phoneNumberId: "BOUND" });
+    const response = await phone.initiateCall({ recipient: "BSUID-x", session } as never);
+    expect(response.id).toBe("scoped-recipient");
+    expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v25.0/BOUND/calls");
+    const body = parseBody(handle.requests[0]?.body);
+    expect(body.recipient).toBe("BSUID-x");
+    expect(body.to).toBeUndefined();
+  });
+
+  test("recipient-only with bizOpaqueCallbackData still emits tracker", async () => {
+    const { client, handle } = clientWith(ok());
+    await initiateCall(
+      client,
+      { phoneNumberId: "555" },
+      { recipient: "BSUID-y", session, bizOpaqueCallbackData: "tracker-z" }
+    );
+    const body = parseBody(handle.requests[0]?.body);
+    expect(body.recipient).toBe("BSUID-y");
+    expect(body.biz_opaque_callback_data).toBe("tracker-z");
+    expect(body.to).toBeUndefined();
+  });
+});
+
 const permissionsWire = {
   messaging_product: "whatsapp",
   permission: { status: "temporary", expiration_time: 1745343479 },
