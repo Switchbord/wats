@@ -63,5 +63,11 @@ export interface InteractiveMessage {
   timestamp: string;
   interactive: InteractiveReply;
   context?: MessageContext;
+  /**
+   * WATS-167: caller identity fields surfaced on call_permission_reply
+   * inbound messages. Only populated when Meta includes them.
+   */
+  fromUserId?: string;
+  fromParentUserId?: string;
   raw?: unknown;
 }
