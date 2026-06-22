@@ -141,6 +141,59 @@ describe("WATS-42A read-only business/admin endpoint callables", () => {
     ]);
   });
 
+
+
+  test("WATS-169 getPhoneNumberSettings exposes SIP credential response aliases in camelCase", async () => {
+    const { client, handle } = clientWith(ok({
+      data: [
+        {
+          calling: {
+            sip: {
+              servers: [
+                {
+                  hostname: "sip.example.com",
+                  port: 5061,
+                  request_uri_user_params: { transport: "tls" },
+                  sip_user_password: "SECRET_SIP_PASSWORD_DO_NOT_LOG",
+                  app_id: 12345
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }));
+
+    const settings = await getPhoneNumberSettings(client, {
+      phoneNumberId: "pn-1",
+      fields: "calling",
+      includeSipCredentials: true
+    });
+
+    const server = settings.data?.[0]?.calling?.sip?.servers?.[0];
+    expect(handle.requests[0]?.url).toBe("https://graph.facebook.com/v25.0/pn-1/settings?fields=calling&include_sip_credentials=true");
+    expect(server?.sipUserPassword).toBe("SECRET_SIP_PASSWORD_DO_NOT_LOG");
+    expect(server?.appId).toBe(12345);
+    expect(server?.sip_user_password).toBeUndefined();
+    expect(server?.app_id).toBeUndefined();
+  });
+
+  test("WATS-169 getWabaInfo exposes calling SIP health status in camelCase", async () => {
+    const { client } = clientWith(ok({
+      id: "waba-1",
+      health_status: {
+        can_receive_call_sip: true,
+        entities: [{ entity_type: "PHONE_NUMBER", can_receive_call_sip: false }]
+      }
+    }));
+
+    const info = await getWabaInfo(client, { wabaId: "waba-1", fields: ["health_status"] });
+
+    expect(info.healthStatus?.canReceiveCallSip).toBe(true);
+    expect(info.healthStatus?.entities?.[0]?.canReceiveCallSip).toBe(false);
+    expect(info.health_status).toBeUndefined();
+  });
+
   test("getPhoneNumberSettings omits include_sip_credentials by default and serializes false only when provided", async () => {
     const { client, handle } = clientWith([ok({ data: [] }), ok({ data: [] })]);
     await getPhoneNumberSettings(client, { phoneNumberId: "pn-1" });
