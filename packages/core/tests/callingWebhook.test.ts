@@ -301,7 +301,7 @@ describe("WATS-167 complete Calling webhook field normalization", () => {
     ]);
   });
 
-  test("connect call payload surfaces toUserId/toParentUserId/contacts/bizOpaqueCallbackData", () => {
+  test("connect call payload surfaces toUserId/toParentUserId/contacts/bizOpaqueCallbackData and WATS-170 button/deep-link payloads", () => {
     const result = normalizeWebhookEnvelope(envelope({
       messaging_product: "whatsapp",
       metadata: baseMetadata,
@@ -314,6 +314,8 @@ describe("WATS-167 complete Calling webhook field normalization", () => {
           to_user_id: "to-uid-c",
           to_parent_user_id: "to-puid-c",
           biz_opaque_callback_data: "opaque-connect",
+          cta_payload: "button-payload",
+          deeplink_payload: "deep-payload",
           contacts: [{ wa_id: "wa-c" }]
         }
       ]
@@ -323,6 +325,10 @@ describe("WATS-167 complete Calling webhook field normalization", () => {
     expect(call.toUserId).toBe("to-uid-c");
     expect(call.toParentUserId).toBe("to-puid-c");
     expect(call.bizOpaqueCallbackData).toBe("opaque-connect");
+    expect(call.ctaPayload).toBe("button-payload");
+    expect(call.deeplinkPayload).toBe("deep-payload");
+    expect(call.cta_payload).toBeUndefined();
+    expect(call.deeplink_payload).toBeUndefined();
     const contacts = call.contacts as ReadonlyArray<Record<string, unknown>>;
     expect(contacts.length).toBe(1);
     expect(contacts[0].waId).toBe("wa-c");
