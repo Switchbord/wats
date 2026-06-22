@@ -25,6 +25,18 @@ import type { GraphPaging } from "./waba/types.js";
 export type BusinessManagementFields = string | readonly string[];
 
 
+export interface WabaHealthStatusEntity {
+  readonly entityType?: string;
+  readonly canReceiveCallSip?: boolean;
+  readonly [key: string]: unknown;
+}
+
+export interface WabaHealthStatus {
+  readonly canReceiveCallSip?: boolean;
+  readonly entities?: readonly WabaHealthStatusEntity[];
+  readonly [key: string]: unknown;
+}
+
 export interface WabaInfo {
   readonly id?: string;
   readonly name?: string;
@@ -38,7 +50,8 @@ export interface WabaInfo {
   /** WATS-91 / Graph v24+ portfolio-level messaging limit. */
   readonly whatsapp_business_manager_messaging_limit?: string;
   readonly ownership_type?: string;
-  readonly health_status?: unknown;
+  /** Calling health status normalized from Graph `health_status.can_receive_call_sip`. */
+  readonly healthStatus?: WabaHealthStatus;
   readonly currency?: string;
   readonly country?: string;
   readonly subscribed_apps?: unknown;
@@ -78,15 +91,15 @@ export interface PhoneNumberInfo {
   readonly [key: string]: unknown;
 }
 
-/** Read-side `calling.sip.servers[]` entry. `sip_user_password`/`app_id` are GET-only. */
+/** Read-side `calling.sip.servers[]` entry. `sipUserPassword` / `appId` are GET-only. */
 export interface SipServerSettings {
   readonly hostname?: string;
   readonly port?: number;
-  readonly request_uri_user_params?: Record<string, string>;
-  /** Response-only; present on read only when `include_sip_credentials=true`. Never sent in updates. */
-  readonly sip_user_password?: string;
+  readonly requestUriUserParams?: Record<string, string>;
+  /** Response-only; present on read only when `includeSipCredentials=true`. Treat as secret material. */
+  readonly sipUserPassword?: string;
   /** Response-only; never sent in updates. */
-  readonly app_id?: number;
+  readonly appId?: number;
   readonly [key: string]: unknown;
 }
 
@@ -1838,6 +1851,92 @@ export function buildSetBusinessPublicKeyBody(input: SetBusinessPublicKeyInput):
   return params;
 }
 
+function isResponseRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function normalizeHealthStatusEntity(value: unknown): WabaHealthStatusEntity | unknown {
+  if (!isResponseRecord(value)) return value;
+  const out: Record<string, unknown> = { ...value };
+  if (typeof value.entity_type === "string") {
+    out.entityType = value.entity_type;
+    delete out.entity_type;
+  }
+  if (typeof value.can_receive_call_sip === "boolean") {
+    out.canReceiveCallSip = value.can_receive_call_sip;
+    delete out.can_receive_call_sip;
+  }
+  return out as WabaHealthStatusEntity;
+}
+
+function normalizeWabaHealthStatus(value: unknown): WabaHealthStatus | undefined {
+  if (!isResponseRecord(value)) return undefined;
+  const out: Record<string, unknown> = { ...value };
+  if (typeof value.can_receive_call_sip === "boolean") {
+    out.canReceiveCallSip = value.can_receive_call_sip;
+    delete out.can_receive_call_sip;
+  }
+  if (Array.isArray(value.entities)) {
+    out.entities = value.entities.map(normalizeHealthStatusEntity);
+  }
+  return out as WabaHealthStatus;
+}
+
+function normalizeWabaInfoResponse(response: WabaInfo): WabaInfo {
+  if (!isResponseRecord(response)) return response;
+  const out: Record<string, unknown> = { ...response };
+  const healthStatus = normalizeWabaHealthStatus(response.health_status);
+  if (healthStatus !== undefined) out.healthStatus = healthStatus;
+  delete out.health_status;
+  return out as WabaInfo;
+}
+
+function normalizeSipServerSettings(value: unknown): unknown {
+  if (!isResponseRecord(value)) return value;
+  const out: Record<string, unknown> = { ...value };
+  if (isResponseRecord(value.request_uri_user_params)) {
+    out.requestUriUserParams = value.request_uri_user_params;
+    delete out.request_uri_user_params;
+  }
+  if (typeof value.sip_user_password === "string") {
+    out.sipUserPassword = value.sip_user_password;
+    delete out.sip_user_password;
+  }
+  if (typeof value.app_id === "number") {
+    out.appId = value.app_id;
+    delete out.app_id;
+  }
+  return out;
+}
+
+function normalizeCallingSettingsResponseEntry(value: unknown): unknown {
+  if (!isResponseRecord(value)) return value;
+  const out: Record<string, unknown> = { ...value };
+  const calling = value.calling;
+  if (isResponseRecord(calling)) {
+    const callingOut: Record<string, unknown> = { ...calling };
+    const sip = calling.sip;
+    if (isResponseRecord(sip)) {
+      const sipOut: Record<string, unknown> = { ...sip };
+      if (Array.isArray(sip.servers)) {
+        sipOut.servers = sip.servers.map(normalizeSipServerSettings);
+      }
+      callingOut.sip = sipOut;
+    }
+    out.calling = callingOut;
+  }
+  return out;
+}
+
+function normalizePhoneNumberSettingsResponse(response: PhoneNumberSettingsResponse): PhoneNumberSettingsResponse {
+  if (!isResponseRecord(response)) return response;
+  const out: Record<string, unknown> = { ...response };
+  if (Array.isArray(response.data)) {
+    out.data = response.data.map(normalizeCallingSettingsResponseEntry);
+  }
+  return out as PhoneNumberSettingsResponse;
+}
+
 const getBusinessPublicKeyRaw = defineEndpoint<{ phoneNumberId: string; fields?: string }, never, BusinessPublicKeyResponse>({
   method: "GET",
   pathTemplate: "/{phoneNumberId}/whatsapp_business_encryption",
@@ -2008,7 +2107,8 @@ const deleteQrCodeRaw = defineEndpoint<
 export const getWabaInfo = Object.assign(
   async function getWabaInfo(client: GraphClient, params: GetWabaInfoInput, body?: never, opts?: EndpointInvokeOptions): Promise<WabaInfo> {
     assertNoBody(body, "getWabaInfo");
-    return getWabaInfoRaw(client, normalizeWabaInfoParams(params) as Parameters<typeof getWabaInfoRaw>[1], undefined, sanitizeBusinessManagementOptions(opts, "getWabaInfo"));
+    const response = await getWabaInfoRaw(client, normalizeWabaInfoParams(params) as Parameters<typeof getWabaInfoRaw>[1], undefined, sanitizeBusinessManagementOptions(opts, "getWabaInfo"));
+    return normalizeWabaInfoResponse(response);
   },
   { definition: getWabaInfoRaw.definition }
 );
@@ -2048,7 +2148,8 @@ export const getPhoneNumberInfo = Object.assign(
 export const getPhoneNumberSettings = Object.assign(
   async function getPhoneNumberSettings(client: GraphClient, params: GetPhoneNumberSettingsInput, body?: never, opts?: EndpointInvokeOptions): Promise<PhoneNumberSettingsResponse> {
     assertNoBody(body, "getPhoneNumberSettings");
-    return getPhoneNumberSettingsRaw(client, normalizePhoneNumberSettingsParams(params) as Parameters<typeof getPhoneNumberSettingsRaw>[1], undefined, sanitizeBusinessManagementOptions(opts, "getPhoneNumberSettings"));
+    const response = await getPhoneNumberSettingsRaw(client, normalizePhoneNumberSettingsParams(params) as Parameters<typeof getPhoneNumberSettingsRaw>[1], undefined, sanitizeBusinessManagementOptions(opts, "getPhoneNumberSettings"));
+    return normalizePhoneNumberSettingsResponse(response);
   },
   { definition: getPhoneNumberSettingsRaw.definition }
 );
