@@ -139,7 +139,7 @@ See the [Webhook Normalizer](/docs/reference/webhook-normalizer) for the complet
 - `value.calls[].event === "terminate"` → `kind: "callTerminate"`
 - `value.statuses[].status ∈ { "RINGING", "ACCEPTED", "REJECTED" }` → `kind: "callStatus"`
 
-Every emitted calling update carries `updateId`, `wabaId`, `phoneNumberId`, `receivedAt`, `rawChange`, and a `call` or `callStatus` payload with the guarded wire fields. Malformed nested calling objects, missing/unsafe ids, unsafe `metadata.phone_number_id`, unsupported call events, unsupported call statuses, and accessor-backed nested fields are recorded in `skipped[]` with `reason: "malformed_field"`; they do not throw host errors. Live webhook fixtures remain credential-gated.
+Every emitted calling update carries `updateId`, `wabaId`, `phoneNumberId`, `receivedAt`, `rawChange`, and a `call` or `callStatus` payload with the guarded wire fields. Call-button and deep-link payloads surface as camelCase `ctaPayload` and `deeplinkPayload` when Meta sends `cta_payload` / `deeplink_payload`. Malformed nested calling objects, missing/unsafe ids, unsafe `metadata.phone_number_id`, unsupported call events, unsupported call statuses, and accessor-backed nested fields are recorded in `skipped[]` with `reason: "malformed_field"`; they do not throw host errors. Live webhook fixtures remain credential-gated.
 
 ### v24/v25 webhook deltas
 

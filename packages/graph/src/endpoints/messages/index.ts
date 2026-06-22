@@ -24,7 +24,13 @@ export {
   GRAPH_MESSAGES_MAX_LIST_SECTIONS,
   GRAPH_MESSAGES_MAX_LIST_ROWS,
   GRAPH_MESSAGES_MAX_CONTACTS,
-  GRAPH_MESSAGES_MAX_PRODUCT_ITEMS
+  GRAPH_MESSAGES_MAX_PRODUCT_ITEMS,
+  GRAPH_MESSAGES_VOICE_CALL_DISPLAY_TEXT_MAX_LENGTH,
+  GRAPH_MESSAGES_VOICE_CALL_TTL_MINUTES_MIN,
+  GRAPH_MESSAGES_VOICE_CALL_TTL_MINUTES_MAX,
+  GRAPH_MESSAGES_VOICE_CALL_TTL_MINUTES_DEFAULT,
+  GRAPH_MESSAGES_VOICE_CALL_TEMPLATE_TTL_MINUTES_MIN,
+  GRAPH_MESSAGES_VOICE_CALL_PAYLOAD_MAX_LENGTH
 } from "./validation.js";
 export {
   buildSendTextPayload,
@@ -44,6 +50,7 @@ export {
   buildSendListPayload,
   buildSendCtaUrlPayload,
   buildSendCallPermissionRequestPayload,
+  buildSendVoiceCallPayload,
   buildSendProductPayload,
   buildSendProductsPayload,
   buildSendCatalogPayload,
@@ -53,8 +60,13 @@ export {
 } from "./builders-interactive.js";
 export {
   buildSendTemplatePayload,
-  buildSendMarketingTemplatePayload
+  buildSendMarketingTemplatePayload,
+  buildVoiceCallTemplateButtonComponent
 } from "./builders-template.js";
+export {
+  buildWhatsAppCallDeepLink,
+  type WhatsAppCallDeepLinkInput
+} from "./deepLinks.js";
 export {
   buildSendMessagePayload,
   sendMarketingTemplate,

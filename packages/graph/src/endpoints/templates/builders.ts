@@ -24,6 +24,17 @@ import {
   validationError
 } from "./shared.js";
 
+const TEMPLATE_VOICE_CALL_TEXT_MAX_LENGTH = 20;
+const TEMPLATE_VOICE_CALL_TTL_MINUTES_MIN = 1440;
+const TEMPLATE_VOICE_CALL_TTL_MINUTES_MAX = 43200;
+
+function assertIntegerInRange(value: unknown, fieldName: string, helperName: string, min: number, max: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || !Number.isInteger(value) || value < min || value > max) {
+    throw validationError(`Invalid ${helperName} input: ${fieldName} must be an integer between ${min} and ${max}.`);
+  }
+  return value;
+}
+
 export function buildCreateMessageTemplateBody(input: CreateMessageTemplateBody): Record<string, unknown> {
   const record = assertPlainRecord(input, "createMessageTemplate");
   const out = mapCommonBodyFields(record, "createMessageTemplate");
@@ -116,6 +127,11 @@ function normalizeButton(input: unknown, index: number): Record<string, unknown>
       if (record.flowName !== undefined) out.flow_name = assertString(record.flowName, "button.flowName", "buildTemplateButtonComponent", TEMPLATE_SHORT_TEXT_MAX_LENGTH);
       if (record.flowAction !== undefined) out.flow_action = assertString(record.flowAction, "button.flowAction", "buildTemplateButtonComponent", TEMPLATE_SHORT_TEXT_MAX_LENGTH);
       if (record.navigateScreen !== undefined) out.navigate_screen = assertString(record.navigateScreen, "button.navigateScreen", "buildTemplateButtonComponent", TEMPLATE_SHORT_TEXT_MAX_LENGTH);
+      break;
+    case "VOICE_CALL":
+      out.type = "voice_call";
+      if (record.text !== undefined) out.text = assertString(record.text, "button.text", "buildTemplateButtonComponent", TEMPLATE_VOICE_CALL_TEXT_MAX_LENGTH);
+      if (record.ttlMinutes !== undefined) out.ttl_minutes = assertIntegerInRange(record.ttlMinutes, "button.ttlMinutes", "buildTemplateButtonComponent", TEMPLATE_VOICE_CALL_TTL_MINUTES_MIN, TEMPLATE_VOICE_CALL_TTL_MINUTES_MAX);
       break;
     case "OTP":
       if (record.packageName !== undefined || record.signatureHash !== undefined) {

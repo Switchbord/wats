@@ -149,6 +149,19 @@ export interface GraphMessagesSendCallPermissionRequestInput extends GraphMessag
   readonly replyToMessageId?: string;
 }
 
+export interface GraphMessagesSendVoiceCallInput {
+  /** Phone-number / wa_id recipient. If `recipient` is also supplied, Meta routes by `to`. */
+  readonly to?: string;
+  /** Business-scoped user id / parent BSUID recipient. */
+  readonly recipient?: string;
+  readonly recipientType?: "individual";
+  readonly bodyText: string;
+  readonly displayText?: string;
+  readonly ttlMinutes?: number;
+  readonly payload?: string;
+  readonly replyToMessageId?: string;
+}
+
 export interface GraphMessagesSendProductInput extends GraphMessagesRecipientInput {
   readonly catalogId: string;
   readonly productRetailerId: string;
@@ -203,7 +216,17 @@ export interface GraphMessagesTemplateComponentInput {
 
 export type GraphMessagesTemplateCategory = "MARKETING" | "UTILITY" | "AUTHENTICATION";
 
-export interface GraphMessagesSendTemplateInput extends GraphMessagesRecipientInput {
+export interface GraphMessagesVoiceCallTemplateButtonInput {
+  readonly ttlMinutes?: number;
+  readonly payload?: string;
+  readonly index?: string;
+}
+
+export interface GraphMessagesSendTemplateInput {
+  readonly to?: string;
+  /** Business-scoped user id / parent BSUID recipient for templates that support it. */
+  readonly recipient?: string;
+  readonly recipientType?: GraphMessagesRecipientType;
   readonly name: string;
   readonly languageCode: string;
   readonly templateCategory?: GraphMessagesTemplateCategory;
@@ -370,7 +393,8 @@ export type GraphMessagesReactionPayload = {
 export type GraphMessagesInteractivePayload = {
   messaging_product: "whatsapp";
   recipient_type?: GraphMessagesRecipientType;
-  to: string;
+  to?: string;
+  recipient?: string;
   type: "interactive";
   interactive: Record<string, unknown>;
   context?: { message_id: string };
@@ -379,7 +403,8 @@ export type GraphMessagesInteractivePayload = {
 export type GraphMessagesTemplatePayload = {
   messaging_product: "whatsapp";
   recipient_type?: GraphMessagesRecipientType;
-  to: string;
+  to?: string;
+  recipient?: string;
   type: "template";
   template: Record<string, unknown>;
   context?: { message_id: string };

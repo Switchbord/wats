@@ -86,7 +86,7 @@ All implemented methods delegate through the same `POST /{phoneNumberId}/message
 | `sendAudio` | implemented | audio payload; supports `voice?: boolean` |
 | `sendLocation` / `sendContacts` | implemented | location / contacts payloads |
 | `sendReaction` / `removeReaction` | implemented | reaction payload |
-| `sendButtons` / `sendList` / `sendCtaUrl` / `sendCallPermissionRequest` | implemented | interactive button/list/CTA/call-permission payloads |
+| `sendButtons` / `sendList` / `sendCtaUrl` / `sendCallPermissionRequest` / `sendVoiceCall` | implemented | interactive button/list/CTA/call-permission/voice-call payloads |
 | `sendProduct` / `sendProducts` / `sendCatalog` | implemented | commerce interactive payloads |
 | `requestLocation` | implemented | interactive location request payload |
 | `sendTemplate` | implemented | approved template send payload |
@@ -162,6 +162,28 @@ await phone.sendCallPermissionRequest({
 ```
 
 `sendAudio(..., { voice: true })` emits Graph `audio.voice = true`; omitting `voice` preserves the standard audio body. `sendCallPermissionRequest(...)` emits `interactive.type = "call_permission_request"` with `interactive.action.name = "call_permission_request"` and validates unknown or malformed fields before transport.
+
+
+`sendVoiceCall(...)` builds Meta's interactive `voice_call` call-button message. It follows the current Meta call-button/deep-link docs (updated 2026-05-21):
+
+```ts
+await phone.sendVoiceCall({
+  to: "+155****0000",
+  bodyText: "Call us on WhatsApp.",
+  displayText: "Call on WhatsApp",
+  ttlMinutes: 100,
+  payload: "opaque-context"
+});
+
+await phone.sendVoiceCall({
+  recipient: "US.13491208655302741918",
+  bodyText: "Call us."
+});
+```
+
+The wire body is `interactive.type = "voice_call"` and `interactive.action.name = "voice_call"`. Optional parameters map to Graph `display_text`, `ttl_minutes`, and `payload`. `displayText` is capped at 20 characters. `ttlMinutes` must be an integer from 1 to 43200. `payload` is capped at 512 characters and appears in call webhooks as `ctaPayload` when Meta sends `cta_payload`. The helper accepts `to`, `recipient`, or both; Meta routes by `to` when both are present. Calling permissions, App Review, device support, and platform eligibility still apply.
+
+Use `buildWhatsAppCallDeepLink({ phoneNumber, bizPayload? })` for `https://wa.me/call/<BUSINESS_PHONE_NUMBER>` links. `bizPayload` maps to `biz_payload` and appears in call webhooks as `deeplinkPayload` when Meta sends `deeplink_payload`. WhatsApp desktop clients do not support calling deep links.
 
 Validation is runtime-enforced for JavaScript callers and rejects with `GraphRequestValidationError` before any transport call:
 

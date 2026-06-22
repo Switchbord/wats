@@ -12,6 +12,7 @@ import type {
   GraphMessagesSendListInput,
   GraphMessagesSendProductInput,
   GraphMessagesSendProductsInput,
+  GraphMessagesSendVoiceCallInput,
   GraphMessagesStatusPayload,
   GraphMessagesTypingIndicatorInput
 } from "./types.js";
@@ -29,12 +30,19 @@ import {
   GRAPH_MESSAGES_ROW_TITLE_MAX_LENGTH,
   GRAPH_MESSAGES_SECTION_TITLE_MAX_LENGTH,
   GRAPH_MESSAGES_SHORT_LABEL_MAX_LENGTH,
+  GRAPH_MESSAGES_VOICE_CALL_DISPLAY_TEXT_MAX_LENGTH,
+  GRAPH_MESSAGES_VOICE_CALL_PAYLOAD_MAX_LENGTH,
+  GRAPH_MESSAGES_VOICE_CALL_TTL_MINUTES_MAX,
+  GRAPH_MESSAGES_VOICE_CALL_TTL_MINUTES_MIN,
   applyRecipientType,
   assertBoundedArray,
   assertMessageRecipient,
   assertNonEmptyControlFreeString,
   assertOnlyKnownKeys,
+  assertRecipientType,
+  assertValidIntegerInRange,
   assertValidMediaLink,
+  assertValidRecipient,
   asRecordInput,
   rejectGroupRecipient,
   isPlainOptionsObject,
@@ -52,6 +60,25 @@ function interactiveBase(
   rejectGroupRecipient(record, helperName, "interactive messages");
   const { to, recipientType } = assertMessageRecipient(record, helperName);
   return withReplyContext(applyRecipientType({ messaging_product: "whatsapp", to, type: "interactive", interactive }, recipientType), record);
+}
+
+function assertVoiceCallRecipient(record: Record<string, unknown>): {
+  readonly to?: string;
+  readonly recipient?: string;
+  readonly recipientType: "individual";
+} {
+  const recipientType = assertRecipientType(record.recipientType, "sendVoiceCall");
+  if (recipientType === "group") {
+    throw new GraphRequestValidationError("Invalid sendVoiceCall input: voice_call interactive messages are not supported for group recipients.");
+  }
+  const to = record.to === undefined ? undefined : assertValidRecipient(record.to, "sendVoiceCall");
+  const recipient = record.recipient === undefined
+    ? undefined
+    : assertNonEmptyControlFreeString(record.recipient, "recipient", GRAPH_MESSAGES_MEDIA_ID_MAX_LENGTH, "sendVoiceCall");
+  if (to === undefined && recipient === undefined) {
+    throw new GraphRequestValidationError("Invalid sendVoiceCall input: at least one of to or recipient is required.");
+  }
+  return { ...(to !== undefined ? { to } : {}), ...(recipient !== undefined ? { recipient } : {}), recipientType: "individual" };
 }
 
 function addHeaderFooter(target: Record<string, unknown>, record: Record<string, unknown>, helperName: string): void {
@@ -117,6 +144,41 @@ export function buildSendCallPermissionRequestPayload(input: GraphMessagesSendCa
   const footerText = maybeText(record.footerText, "footerText", GRAPH_MESSAGES_SHORT_LABEL_MAX_LENGTH, "sendCallPermissionRequest");
   if (footerText !== undefined) interactive.footer = { text: footerText };
   return interactiveBase(input, "sendCallPermissionRequest", interactive);
+}
+
+/**
+ * Meta Calling interactive voice-call button message.
+ *
+ * Source: Meta Developers, "Send WhatsApp Call Button Messages and Deep Links",
+ * updated 2026-05-21. `payload` is opaque and later appears as
+ * `cta_payload` on connect/terminate call webhooks.
+ */
+export function buildSendVoiceCallPayload(input: GraphMessagesSendVoiceCallInput): GraphMessagesInteractivePayload {
+  const record = asRecordInput(input, "sendVoiceCall");
+  assertOnlyKnownKeys(record, ["to", "recipient", "recipientType", "bodyText", "displayText", "ttlMinutes", "payload", "replyToMessageId"], "sendVoiceCall");
+  const target = assertVoiceCallRecipient(record);
+  const parameters: Record<string, unknown> = {};
+  const displayText = maybeText(record.displayText, "displayText", GRAPH_MESSAGES_VOICE_CALL_DISPLAY_TEXT_MAX_LENGTH, "sendVoiceCall");
+  if (displayText !== undefined) parameters.display_text = displayText;
+  if (record.ttlMinutes !== undefined) {
+    parameters.ttl_minutes = assertValidIntegerInRange(record.ttlMinutes, "ttlMinutes", GRAPH_MESSAGES_VOICE_CALL_TTL_MINUTES_MIN, GRAPH_MESSAGES_VOICE_CALL_TTL_MINUTES_MAX, "sendVoiceCall");
+  }
+  const payload = maybeText(record.payload, "payload", GRAPH_MESSAGES_VOICE_CALL_PAYLOAD_MAX_LENGTH, "sendVoiceCall");
+  if (payload !== undefined) parameters.payload = payload;
+  const action: Record<string, unknown> = { name: "voice_call" };
+  if (Object.keys(parameters).length > 0) action.parameters = parameters;
+  return withReplyContext({
+    messaging_product: "whatsapp",
+    recipient_type: "individual",
+    ...(target.to !== undefined ? { to: target.to } : {}),
+    ...(target.recipient !== undefined ? { recipient: target.recipient } : {}),
+    type: "interactive",
+    interactive: {
+      type: "voice_call",
+      body: { text: assertNonEmptyControlFreeString(record.bodyText, "bodyText", GRAPH_MESSAGES_GENERAL_TEXT_MAX_LENGTH, "sendVoiceCall") },
+      action
+    }
+  }, record);
 }
 
 export function buildSendProductPayload(input: GraphMessagesSendProductInput): GraphMessagesInteractivePayload {

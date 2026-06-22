@@ -22,6 +22,12 @@ export const GRAPH_MESSAGES_MAX_LIST_ROWS = 10;
 export const GRAPH_MESSAGES_MAX_CONTACTS = 257;
 export const GRAPH_MESSAGES_MAX_PRODUCT_ITEMS = 30;
 export const GRAPH_MESSAGES_GROUP_ID_MAX_LENGTH = 256;
+export const GRAPH_MESSAGES_VOICE_CALL_DISPLAY_TEXT_MAX_LENGTH = 20;
+export const GRAPH_MESSAGES_VOICE_CALL_TTL_MINUTES_MIN = 1;
+export const GRAPH_MESSAGES_VOICE_CALL_TTL_MINUTES_MAX = 43200;
+export const GRAPH_MESSAGES_VOICE_CALL_TTL_MINUTES_DEFAULT = 10080;
+export const GRAPH_MESSAGES_VOICE_CALL_TEMPLATE_TTL_MINUTES_MIN = 1440;
+export const GRAPH_MESSAGES_VOICE_CALL_PAYLOAD_MAX_LENGTH = 512;
 
 export function isPlainOptionsObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -274,6 +280,21 @@ export function assertValidNumberInRange(
   if (typeof value !== "number" || !Number.isFinite(value) || value < min || value > max) {
     throw new GraphRequestValidationError(
       `Invalid ${helperName} input: ${fieldName} must be a finite number between ${min} and ${max}.`
+    );
+  }
+  return value;
+}
+
+export function assertValidIntegerInRange(
+  value: unknown,
+  fieldName: string,
+  min: number,
+  max: number,
+  helperName: string
+): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || !Number.isInteger(value) || value < min || value > max) {
+    throw new GraphRequestValidationError(
+      `Invalid ${helperName} input: ${fieldName} must be an integer between ${min} and ${max}.`
     );
   }
   return value;
