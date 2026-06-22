@@ -5,17 +5,22 @@ import type {
   GraphMessagesMarketingTemplatePayload,
   GraphMessagesSendMarketingTemplateInput,
   GraphMessagesSendTemplateInput,
-  GraphMessagesTemplatePayload
+  GraphMessagesTemplatePayload,
+  GraphMessagesVoiceCallTemplateButtonInput
 } from "./types.js";
 import {
   GRAPH_MESSAGES_MEDIA_ID_MAX_LENGTH,
   GRAPH_MESSAGES_SHORT_LABEL_MAX_LENGTH,
+  GRAPH_MESSAGES_VOICE_CALL_PAYLOAD_MAX_LENGTH,
+  GRAPH_MESSAGES_VOICE_CALL_TTL_MINUTES_MAX,
+  GRAPH_MESSAGES_VOICE_CALL_TTL_MINUTES_MIN,
   applyRecipientType,
   assertBoundedArray,
   assertMessageRecipient,
   assertNonEmptyControlFreeString,
   assertOnlyKnownKeys,
   assertRecipientType,
+  assertValidIntegerInRange,
   assertValidRecipient,
   asRecordInput,
   rejectGroupRecipient,
@@ -38,12 +43,56 @@ function assertGroupTemplateCategory(value: unknown): void {
   }
 }
 
+function assertTemplateRecipient(record: Record<string, unknown>): {
+  readonly to?: string;
+  readonly recipient?: string;
+  readonly recipientType?: "individual" | "group";
+} {
+  const recipientType = assertRecipientType(record.recipientType, "sendTemplate");
+  if (recipientType === "group") return assertMessageRecipient(record, "sendTemplate");
+  const to = record.to === undefined ? undefined : assertValidRecipient(record.to, "sendTemplate");
+  const recipient = record.recipient === undefined
+    ? undefined
+    : assertNonEmptyControlFreeString(record.recipient, "recipient", GRAPH_MESSAGES_MEDIA_ID_MAX_LENGTH, "sendTemplate");
+  if (to === undefined && recipient === undefined) {
+    throw new GraphRequestValidationError("Invalid sendTemplate input: at least one of to or recipient is required.");
+  }
+  return {
+    ...(to !== undefined ? { to } : {}),
+    ...(recipient !== undefined ? { recipient } : {}),
+    ...(recipientType !== undefined ? { recipientType } : recipient !== undefined ? { recipientType: "individual" as const } : {})
+  };
+}
+
+export function buildVoiceCallTemplateButtonComponent(input: GraphMessagesVoiceCallTemplateButtonInput): Record<string, unknown> {
+  const record = asRecordInput(input, "buildVoiceCallTemplateButtonComponent");
+  assertOnlyKnownKeys(record, ["ttlMinutes", "payload", "index"], "buildVoiceCallTemplateButtonComponent");
+  const parameters: Record<string, unknown>[] = [];
+  if (record.ttlMinutes !== undefined) {
+    parameters.push({
+      type: "ttl_minutes",
+      ttl_minutes: assertValidIntegerInRange(record.ttlMinutes, "ttlMinutes", GRAPH_MESSAGES_VOICE_CALL_TTL_MINUTES_MIN, GRAPH_MESSAGES_VOICE_CALL_TTL_MINUTES_MAX, "buildVoiceCallTemplateButtonComponent")
+    });
+  }
+  if (record.payload !== undefined) {
+    parameters.push({
+      type: "payload",
+      payload: assertNonEmptyControlFreeString(record.payload, "payload", GRAPH_MESSAGES_VOICE_CALL_PAYLOAD_MAX_LENGTH, "buildVoiceCallTemplateButtonComponent")
+    });
+  }
+  const out: Record<string, unknown> = { type: "button", sub_type: "voice_call" };
+  if (record.index !== undefined) out.index = assertNonEmptyControlFreeString(record.index, "index", 8, "buildVoiceCallTemplateButtonComponent");
+  if (parameters.length > 0) out.parameters = parameters;
+  return out;
+}
+
 function normalizeTemplateComponent(value: unknown, helperName: string): Record<string, unknown> {
   const cloned = sanitizeTemplateParameter(value, helperName, "component", new WeakSet<object>());
   if (!isPlainOptionsObject(cloned)) throw new GraphRequestValidationError(`Invalid ${helperName} input: component entries must be objects.`);
   const component = cloned as Record<string, unknown>;
   const out: Record<string, unknown> = { type: assertNonEmptyControlFreeString(component.type, "component.type", GRAPH_MESSAGES_SHORT_LABEL_MAX_LENGTH, helperName) };
   if (component.subType !== undefined) out.sub_type = assertNonEmptyControlFreeString(component.subType, "component.subType", GRAPH_MESSAGES_SHORT_LABEL_MAX_LENGTH, helperName);
+  else if (component.sub_type !== undefined) out.sub_type = assertNonEmptyControlFreeString(component.sub_type, "component.sub_type", GRAPH_MESSAGES_SHORT_LABEL_MAX_LENGTH, helperName);
   if (component.index !== undefined) out.index = assertNonEmptyControlFreeString(component.index, "component.index", 8, helperName);
   if (component.parameters !== undefined) {
     const parameters = assertBoundedArray(component.parameters, "component.parameters", 0, 100, helperName);
@@ -57,13 +106,20 @@ function normalizeTemplateComponent(value: unknown, helperName: string): Record<
 
 export function buildSendTemplatePayload(input: GraphMessagesSendTemplateInput): GraphMessagesTemplatePayload {
   const record = asRecordInput(input, "sendTemplate");
-  const recipient = assertMessageRecipient(record, "sendTemplate");
+  assertOnlyKnownKeys(record, ["to", "recipient", "recipientType", "name", "languageCode", "templateCategory", "components", "replyToMessageId"], "sendTemplate");
+  const recipient = assertTemplateRecipient(record);
   if (recipient.recipientType === "group") {
     assertGroupTemplateCategory(record.templateCategory);
   }
   const template: Record<string, unknown> = { name: assertNonEmptyControlFreeString(record.name, "name", GRAPH_MESSAGES_MEDIA_ID_MAX_LENGTH, "sendTemplate"), language: { code: assertNonEmptyControlFreeString(record.languageCode, "languageCode", GRAPH_MESSAGES_SHORT_LABEL_MAX_LENGTH, "sendTemplate") } };
   if (record.components !== undefined) template.components = mapValidatedArray(assertBoundedArray(record.components, "components", 0, 100, "sendTemplate"), (c) => normalizeTemplateComponent(c, "sendTemplate"));
-  return withReplyContext(applyRecipientType({ messaging_product: "whatsapp", to: recipient.to, type: "template", template }, recipient.recipientType), record);
+  return withReplyContext(applyRecipientType({
+    messaging_product: "whatsapp",
+    ...(recipient.to !== undefined ? { to: recipient.to } : {}),
+    ...(recipient.recipient !== undefined ? { recipient: recipient.recipient } : {}),
+    type: "template",
+    template
+  }, recipient.recipientType), record);
 }
 
 function assertMarketingRecipient(value: unknown): string | undefined {

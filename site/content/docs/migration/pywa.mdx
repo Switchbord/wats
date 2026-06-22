@@ -67,7 +67,7 @@ Migration notes:
 | `send_location` / `request_location` | `sendLocation` / `requestLocation` | shape-only | |
 | `send_contact` | `sendContacts` | shape-only | WATS uses bounded arrays and strict contact shapes. |
 | `send_reaction` / `remove_reaction` | `sendReaction` / `removeReaction` | shape-only | Reactions route through `POST /{phoneNumberId}/messages`. |
-| pywa buttons / lists / CTA objects | `sendButtons`, `sendList`, `sendCtaUrl` | shape-only | WATS exposes separate helpers rather than pywa's overloaded `send_message(buttons=...)`. |
+| pywa buttons / lists / CTA objects | `sendButtons`, `sendList`, `sendCtaUrl`, `sendVoiceCall` | shape-only | WATS exposes separate helpers rather than pywa's overloaded `send_message(buttons=...)`; `sendVoiceCall` emits Meta `interactive.type = "voice_call"`. |
 | pywa catalog/product sends | `sendCatalog`, `sendProduct`, `sendProducts` | shape-only | Requires commerce/catalog assets for live validation. |
 | `mark_message_as_read` / `indicate_typing` | `markMessageAsRead` / `indicateTyping` | shape-only | Only use on test conversations during live campaigns. |
 | pywa `tracker` | WATS `bizOpaqueCallbackData`-style inputs where supported | shape-only | Check the specific WATS helper; WATS uses camelCase. Not on every composer. |
@@ -111,10 +111,10 @@ Migration notes:
 | pywa usage | WATS usage | Status | Notes |
 | --- | --- | --- | --- |
 | pywa `initiate_call` / `accept_call` / `terminate_call` | WATS `PhoneNumberClient.initiateCall`, `.acceptCall`, `.terminateCall` | shape-only | Also includes `preAcceptCall` and `rejectCall`. |
-| call connect/status/terminate handlers | `normalizeWebhookEnvelope` calling variants plus `filtersTyped.call` | shape-only | Synthetic payloads only. Calling webhook normalization surfaces the full Meta field set in camelCase: connect/terminate `toUserId`/`toParentUserId`/`contacts[]`, terminate `status`/`startTime`/`endTime`/`duration`/`bizOpaqueCallbackData`, call status `recipientUserId`/`recipientParentUserId`/`bizOpaqueCallbackData`, and `call_permission_reply` message `fromUserId`/`fromParentUserId`. Wire snake_case keys are translated and never leak outside `raw`. |
+| call connect/status/terminate handlers | `normalizeWebhookEnvelope` calling variants plus `filtersTyped.call` | shape-only | Synthetic payloads only. Calling webhook normalization surfaces the full Meta field set in camelCase: connect/terminate `toUserId`/`toParentUserId`/`contacts[]`, terminate `status`/`startTime`/`endTime`/`duration`/`bizOpaqueCallbackData`, call status `recipientUserId`/`recipientParentUserId`/`bizOpaqueCallbackData`, call-button/deep-link `ctaPayload`/`deeplinkPayload`, and `call_permission_reply` message `fromUserId`/`fromParentUserId`. Wire snake_case keys are translated and never leak outside `raw`. |
 | call permission request/update | `getCallPermissions` typed permission/action/limit models; `call_permission_reply` webhook carries `isPermanent`/`responseSource`, plus `fromUserId`/`fromParentUserId` | shape-only | Waiters still planned; pywa also exposes permission waiters. |
 | calling settings/SIP models | Read via `getPhoneNumberSettings`; writes via the `calling` sub-object on `updatePhoneNumberSettings` (status, call hours, call icons, callback permission, SIP servers) | shape-only | `includeSipCredentials` may return secret-bearing SIP material as camelCase `sipUserPassword`; `sip_user_password` is never serialized into update bodies. WABA `health_status.can_receive_call_sip` is exposed as `healthStatus.canReceiveCallSip`. |
-| live WebRTC/media orchestration | No first-class WATS equivalent yet | planned | Requires real calling-enabled phone numbers and explicit authorization. Meta modes include Graph APIs + webhooks + WebRTC, SIP + WebRTC, and SIP + SDES SRTP; SDP may negotiate OPUS or G.711 (`PCMA`/`PCMU`). WATS has no SIP server implementation. |
+| live WebRTC/media orchestration | No first-class WATS equivalent yet | planned | Call buttons/deep links can initiate supported client calls, but WATS still has no WebRTC/SIP server implementation. Requires real calling-enabled phone numbers and explicit authorization. Meta modes include Graph APIs + webhooks + WebRTC, SIP + WebRTC, and SIP + SDES SRTP; SDP may negotiate OPUS or G.711 (`PCMA`/`PCMU`). |
 
 ## Business and admin map
 

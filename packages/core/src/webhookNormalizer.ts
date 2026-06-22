@@ -119,6 +119,10 @@ export interface NormalizedCallPayload {
   readonly endTime?: string;
   readonly duration?: number;
   readonly bizOpaqueCallbackData?: string;
+  /** Opaque payload from interactive `voice_call` call-button messages. */
+  readonly ctaPayload?: string;
+  /** Opaque payload from `wa.me/call` deep links. */
+  readonly deeplinkPayload?: string;
   readonly toUserId?: string;
   readonly toParentUserId?: string;
   readonly contacts?: readonly NormalizedCallContact[];
@@ -2156,6 +2160,8 @@ function normalizeCallsChange(
       const endTime = readStringField(item, "end_time");
       const duration = readNumberField(item, "duration");
       const bizOpaqueCallbackData = readStringField(item, "biz_opaque_callback_data");
+      const ctaPayload = readStringField(item, "cta_payload");
+      const deeplinkPayload = readStringField(item, "deeplink_payload");
       const toUserId = readSafeIdField(item, "to_user_id");
       const toParentUserId = readSafeIdField(item, "to_parent_user_id");
       const contacts = normalizeCallContactsArray(readOwnDataField(item, "contacts"));
@@ -2172,6 +2178,8 @@ function normalizeCallsChange(
         ...(endTime !== undefined ? { endTime } : {}),
         ...(duration !== undefined ? { duration } : {}),
         ...(bizOpaqueCallbackData !== undefined ? { bizOpaqueCallbackData } : {}),
+        ...(ctaPayload !== undefined ? { ctaPayload } : {}),
+        ...(deeplinkPayload !== undefined ? { deeplinkPayload } : {}),
         ...(toUserId !== undefined ? { toUserId } : {}),
         ...(toParentUserId !== undefined ? { toParentUserId } : {}),
         ...(contacts !== undefined ? { contacts } : {}),

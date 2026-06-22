@@ -5197,7 +5197,7 @@ All implemented methods delegate through the same `POST /{phoneNumberId}/message
 | `sendAudio` | implemented | audio payload; supports `voice?: boolean` |
 | `sendLocation` / `sendContacts` | implemented | location / contacts payloads |
 | `sendReaction` / `removeReaction` | implemented | reaction payload |
-| `sendButtons` / `sendList` / `sendCtaUrl` / `sendCallPermissionRequest` | implemented | interactive button/list/CTA/call-permission payloads |
+| `sendButtons` / `sendList` / `sendCtaUrl` / `sendCallPermissionRequest` / `sendVoiceCall` | implemented | interactive button/list/CTA/call-permission/voice-call payloads |
 | `sendProduct` / `sendProducts` / `sendCatalog` | implemented | commerce interactive payloads |
 | `requestLocation` | implemented | interactive location request payload |
 | `sendTemplate` | implemented | approved template send payload |
@@ -5273,6 +5273,27 @@ await phone.sendCallPermissionRequest({
 ```
 
 `sendAudio(..., { voice: true })` emits Graph `audio.voice = true`; omitting `voice` preserves the standard audio body. `sendCallPermissionRequest(...)` emits `interactive.type = "call_permission_request"` with `interactive.action.name = "call_permission_request"` and validates unknown or malformed fields before transport.
+
+`sendVoiceCall(...)` builds Meta's interactive `voice_call` call-button message. It follows the current Meta call-button/deep-link docs (updated 2026-05-21):
+
+```ts
+await phone.sendVoiceCall({
+  to: "+155****0000",
+  bodyText: "Call us on WhatsApp.",
+  displayText: "Call on WhatsApp",
+  ttlMinutes: 100,
+  payload: "opaque-context"
+});
+
+await phone.sendVoiceCall({
+  recipient: "US.13491208655302741918",
+  bodyText: "Call us."
+});
+```
+
+The wire body is `interactive.type = "voice_call"` and `interactive.action.name = "voice_call"`. Optional parameters map to Graph `display_text`, `ttl_minutes`, and `payload`. `displayText` is capped at 20 characters. `ttlMinutes` must be an integer from 1 to 43200. `payload` is capped at 512 characters and appears in call webhooks as `ctaPayload` when Meta sends `cta_payload`. The helper accepts `to`, `recipient`, or both; Meta routes by `to` when both are present. Calling permissions, App Review, device support, and platform eligibility still apply.
+
+Use `buildWhatsAppCallDeepLink({ phoneNumber, bizPayload? })` for `https://wa.me/call/<BUSINESS_PHONE_NUMBER>` links. `bizPayload` maps to `biz_payload` and appears in call webhooks as `deeplinkPayload` when Meta sends `deeplink_payload`. WhatsApp desktop clients do not support calling deep links.
 
 Validation is runtime-enforced for JavaScript callers and rejects with `GraphRequestValidationError` before any transport call:
 
@@ -6251,7 +6272,7 @@ See the [Webhook Normalizer](/docs/reference/webhook-normalizer) for the complet
 - `value.calls[].event === "terminate"` → `kind: "callTerminate"`
 - `value.statuses[].status ∈ { "RINGING", "ACCEPTED", "REJECTED" }` → `kind: "callStatus"`
 
-Every emitted calling update carries `updateId`, `wabaId`, `phoneNumberId`, `receivedAt`, `rawChange`, and a `call` or `callStatus` payload with the guarded wire fields. Malformed nested calling objects, missing/unsafe ids, unsafe `metadata.phone_number_id`, unsupported call events, unsupported call statuses, and accessor-backed nested fields are recorded in `skipped[]` with `reason: "malformed_field"`; they do not throw host errors. Live webhook fixtures remain credential-gated.
+Every emitted calling update carries `updateId`, `wabaId`, `phoneNumberId`, `receivedAt`, `rawChange`, and a `call` or `callStatus` payload with the guarded wire fields. Call-button and deep-link payloads surface as camelCase `ctaPayload` and `deeplinkPayload` when Meta sends `cta_payload` / `deeplink_payload`. Malformed nested calling objects, missing/unsafe ids, unsafe `metadata.phone_number_id`, unsupported call events, unsupported call statuses, and accessor-backed nested fields are recorded in `skipped[]` with `reason: "malformed_field"`; they do not throw host errors. Live webhook fixtures remain credential-gated.
 
 ### v24/v25 webhook deltas
 
@@ -7158,7 +7179,7 @@ Migration notes:
 | `send_location` / `request_location` | `sendLocation` / `requestLocation` | shape-only | |
 | `send_contact` | `sendContacts` | shape-only | WATS uses bounded arrays and strict contact shapes. |
 | `send_reaction` / `remove_reaction` | `sendReaction` / `removeReaction` | shape-only | Reactions route through `POST /{phoneNumberId}/messages`. |
-| pywa buttons / lists / CTA objects | `sendButtons`, `sendList`, `sendCtaUrl` | shape-only | WATS exposes separate helpers rather than pywa's overloaded `send_message(buttons=...)`. |
+| pywa buttons / lists / CTA objects | `sendButtons`, `sendList`, `sendCtaUrl`, `sendVoiceCall` | shape-only | WATS exposes separate helpers rather than pywa's overloaded `send_message(buttons=...)`; `sendVoiceCall` emits Meta `interactive.type = "voice_call"`. |
 | pywa catalog/product sends | `sendCatalog`, `sendProduct`, `sendProducts` | shape-only | Requires commerce/catalog assets for live validation. |
 | `mark_message_as_read` / `indicate_typing` | `markMessageAsRead` / `indicateTyping` | shape-only | Only use on test conversations during live campaigns. |
 | pywa `tracker` | WATS `bizOpaqueCallbackData`-style inputs where supported | shape-only | Check the specific WATS helper; WATS uses camelCase. Not on every composer. |
@@ -7202,10 +7223,10 @@ Migration notes:
 | pywa usage | WATS usage | Status | Notes |
 | --- | --- | --- | --- |
 | pywa `initiate_call` / `accept_call` / `terminate_call` | WATS `PhoneNumberClient.initiateCall`, `.acceptCall`, `.terminateCall` | shape-only | Also includes `preAcceptCall` and `rejectCall`. |
-| call connect/status/terminate handlers | `normalizeWebhookEnvelope` calling variants plus `filtersTyped.call` | shape-only | Synthetic payloads only. Calling webhook normalization surfaces the full Meta field set in camelCase: connect/terminate `toUserId`/`toParentUserId`/`contacts[]`, terminate `status`/`startTime`/`endTime`/`duration`/`bizOpaqueCallbackData`, call status `recipientUserId`/`recipientParentUserId`/`bizOpaqueCallbackData`, and `call_permission_reply` message `fromUserId`/`fromParentUserId`. Wire snake_case keys are translated and never leak outside `raw`. |
+| call connect/status/terminate handlers | `normalizeWebhookEnvelope` calling variants plus `filtersTyped.call` | shape-only | Synthetic payloads only. Calling webhook normalization surfaces the full Meta field set in camelCase: connect/terminate `toUserId`/`toParentUserId`/`contacts[]`, terminate `status`/`startTime`/`endTime`/`duration`/`bizOpaqueCallbackData`, call status `recipientUserId`/`recipientParentUserId`/`bizOpaqueCallbackData`, call-button/deep-link `ctaPayload`/`deeplinkPayload`, and `call_permission_reply` message `fromUserId`/`fromParentUserId`. Wire snake_case keys are translated and never leak outside `raw`. |
 | call permission request/update | `getCallPermissions` typed permission/action/limit models; `call_permission_reply` webhook carries `isPermanent`/`responseSource`, plus `fromUserId`/`fromParentUserId` | shape-only | Waiters still planned; pywa also exposes permission waiters. |
 | calling settings/SIP models | Read via `getPhoneNumberSettings`; writes via the `calling` sub-object on `updatePhoneNumberSettings` (status, call hours, call icons, callback permission, SIP servers) | shape-only | `includeSipCredentials` may return secret-bearing SIP material as camelCase `sipUserPassword`; `sip_user_password` is never serialized into update bodies. WABA `health_status.can_receive_call_sip` is exposed as `healthStatus.canReceiveCallSip`. |
-| live WebRTC/media orchestration | No first-class WATS equivalent yet | planned | Requires real calling-enabled phone numbers and explicit authorization. Meta modes include Graph APIs + webhooks + WebRTC, SIP + WebRTC, and SIP + SDES SRTP; SDP may negotiate OPUS or G.711 (`PCMA`/`PCMU`). WATS has no SIP server implementation. |
+| live WebRTC/media orchestration | No first-class WATS equivalent yet | planned | Call buttons/deep links can initiate supported client calls, but WATS still has no WebRTC/SIP server implementation. Requires real calling-enabled phone numbers and explicit authorization. Meta modes include Graph APIs + webhooks + WebRTC, SIP + WebRTC, and SIP + SDES SRTP; SDP may negotiate OPUS or G.711 (`PCMA`/`PCMU`). |
 
 ## Business and admin map
 
@@ -7377,7 +7398,7 @@ accepts the request and WATS parses the live response.
 | Template management | `create_template` etc. | List/create/get/update/delete callables, component builders, template-group analytics, `compareTemplates`, `unpauseTemplate`, `migrateTemplates`, archive/unarchive helpers, auth-template upsert, and library-template create fields. | live-validated for list reads; mutations/comparison/unpause/migration/archive/auth-upsert/library-template fields shape-only. |
 | Flows | Flow management | List/get/create/update/publish/delete/deprecate/assets callables, bounded Flow JSON validation, typed FlowJSON DSL builders (screens/components/actions), metrics, migration, response builders. | shape-only — live read returned empty; mutations/metrics/migration never exercised. |
 | Flow encrypted data-channel | richer Flow runtime | `decryptRequest`/`encryptResponse` (RSA-OAEP + AES-GCM, IV-flip response) and a framework-agnostic `handleFlowRequest` dispatch (ping/error-ack/close), backed by `@wats/crypto`. | shape-only — local crypto round-trip; no hosted endpoint or live publish. Media-upload (CBC+HMAC) decryption is implemented shape-only. |
-| Calling | `initiate_call` etc. | Initiate/pre-accept/accept/reject/terminate callables, typed calling webhooks and filters. Operator docs cover Graph APIs + webhooks + WebRTC, SIP + WebRTC, SIP + SDES SRTP, OPUS, G.711 (`PCMA`/`PCMU`), App Review, geo restrictions, and the no SIP server implementation boundary. Calling webhook normalization surfaces the full Meta field set in camelCase: connect/terminate `toUserId`/`toParentUserId`/`contacts[]`, terminate `status`/`startTime`/`endTime`/`duration`/`bizOpaqueCallbackData`, call status `recipientUserId`/`recipientParentUserId`/`bizOpaqueCallbackData`, and `call_permission_reply` message `fromUserId`/`fromParentUserId`. | shape-only — no live call sessions yet. |
+| Calling | `initiate_call` etc. | Initiate/pre-accept/accept/reject/terminate callables, call-button message and deep-link helpers, typed calling webhooks and filters. Operator docs cover Graph APIs + webhooks + WebRTC, SIP + WebRTC, SIP + SDES SRTP, OPUS, G.711 (`PCMA`/`PCMU`), App Review, geo restrictions, and the no SIP server implementation boundary. Calling webhook normalization surfaces the full Meta field set in camelCase: connect/terminate `toUserId`/`toParentUserId`/`contacts[]`, terminate `status`/`startTime`/`endTime`/`duration`/`bizOpaqueCallbackData`, call status `recipientUserId`/`recipientParentUserId`/`bizOpaqueCallbackData`, call-button/deep-link `ctaPayload`/`deeplinkPayload`, and `call_permission_reply` message `fromUserId`/`fromParentUserId`. | shape-only — no live call sessions yet. |
 | Call permissions + calling-settings mutation | permission models, SIP/settings writes | `getCallPermissions` (typed permission/action/limit models), `calling` settings sub-object on `updatePhoneNumberSettings` (status, call hours, call icons, callback permission, SIP servers), `call_permission_reply` webhook fields (`isPermanent`, `responseSource`, plus `fromUserId`/`fromParentUserId`). | shape-only — no live calls; WebRTC/media orchestration still planned. |
 | Business/admin reads | `get_business_account` etc. | `getWabaInfo`, `listSubscribedApps`, `listPhoneNumbers`, `getPhoneNumberInfo`, `getBusinessProfile`, `getCommerceSettings`. | live-validated — all parsed live Graph v25.0. |
 | Phone-number settings read | settings getter | `getPhoneNumberSettings` (storage config, optional SIP credentials as `sipUserPassword`) plus `getWabaInfo` calling health as `healthStatus.canReceiveCallSip`. | shape-only — not exercised in the live campaign. |
