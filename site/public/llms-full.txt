@@ -6605,6 +6605,34 @@ Three webhook families are promoted out of the `unknown` bucket. These remain cr
 
 Malformed rows in these families are reported through `skipped[]` with `malformed_field`; they do not fall back to `TypedUnknownUpdate` and do not throw host errors for accessor-backed fields.
 
+## Calling webhook normalization
+
+Calling normalization is credential-free and synthetic-only. Meta delivers
+`calls` webhook changes containing `value.calls[]` and `value.statuses[]`
+arrays. WATS emits one typed update per call/status entry:
+
+- `TypedCallUpdate` — `kind: "callConnect"` (event `connect`) or `kind: "callTerminate"` (event `terminate`). The normalized `call` payload surfaces camelCase public fields only:
+  - `id`, `event`, `from`, `to`, `direction` (`"USER_INITIATED" | "BUSINESS_INITIATED"`), `timestamp`, `session`.
+  - terminate-call outcome fields: `status` (Meta documents `"FAILED"` / `"COMPLETED"`; any string is accepted for forward-compat), `startTime`, `endTime`, `duration` (number), `bizOpaqueCallbackData`.
+  - connect/terminate identity fields: `toUserId`, `toParentUserId`, and `contacts` — a readonly array of `{ name?, username?, waId?, userId?, parentUserId?, raw }`. Each contact preserves its original record as `raw`.
+- `TypedCallStatusUpdate` — `kind: "callStatus"`. The normalized `callStatus` payload surfaces `id`, `status` (`"RINGING" | "ACCEPTED" | "REJECTED"`), `recipientId`, `timestamp`, plus `recipientUserId`, `recipientParentUserId`, and `bizOpaqueCallbackData`.
+- `call_permission_reply` inbound messages (an `interactive` message whose interactive sub-type is `call_permission_reply`) surface `message.fromUserId` and `message.fromParentUserId` when Meta includes the caller identity fields.
+
+Wire snake_case keys (`biz_opaque_callback_data`, `start_time`, `end_time`,
+`to_user_id`, `to_parent_user_id`, `recipient_user_id`,
+`recipient_parent_user_id`, `from_user_id`, `from_parent_user_id`,
+`wa_id`, `user_id`, `parent_user_id`, `recipient_id`) are translated to
+camelCase on the public payload and never leak outside `raw`. The original
+record is preserved unchanged as `raw`.
+
+Malformed optional fields are omitted rather than making an otherwise-valid
+update malformed: non-string `status`/`startTime`/`endTime`/`bizOpaqueCallbackData`,
+non-finite `duration`, unsafe (whitespace-only, control-bearing, or oversize)
+id-bearing fields, non-array `contacts`, and non-record contact entries are
+all skipped. Accessor-backed getters on call/status/contact records are never
+executed. These remain credential-free synthetic-envelope checks in CI; live
+calling webhook delivery still belongs to the gated campaign.
+
 ## Input contract
 
 ```ts
@@ -7141,8 +7169,8 @@ Migration notes:
 | pywa usage | WATS usage | Status | Notes |
 | --- | --- | --- | --- |
 | pywa `initiate_call` / `accept_call` / `terminate_call` | WATS `PhoneNumberClient.initiateCall`, `.acceptCall`, `.terminateCall` | shape-only | Also includes `preAcceptCall` and `rejectCall`. |
-| call connect/status/terminate handlers | `normalizeWebhookEnvelope` calling variants plus `filtersTyped.call` | shape-only | Synthetic payloads only. |
-| call permission request/update | `getCallPermissions` typed permission/action/limit models; `call_permission_reply` webhook carries `isPermanent`/`responseSource` | shape-only | Waiters still planned; pywa also exposes permission waiters. |
+| call connect/status/terminate handlers | `normalizeWebhookEnvelope` calling variants plus `filtersTyped.call` | shape-only | Synthetic payloads only. Calling webhook normalization surfaces the full Meta field set in camelCase: connect/terminate `toUserId`/`toParentUserId`/`contacts[]`, terminate `status`/`startTime`/`endTime`/`duration`/`bizOpaqueCallbackData`, call status `recipientUserId`/`recipientParentUserId`/`bizOpaqueCallbackData`, and `call_permission_reply` message `fromUserId`/`fromParentUserId`. Wire snake_case keys are translated and never leak outside `raw`. |
+| call permission request/update | `getCallPermissions` typed permission/action/limit models; `call_permission_reply` webhook carries `isPermanent`/`responseSource`, plus `fromUserId`/`fromParentUserId` | shape-only | Waiters still planned; pywa also exposes permission waiters. |
 | calling settings/SIP models | Read via `getPhoneNumberSettings`; writes via the `calling` sub-object on `updatePhoneNumberSettings` (status, call hours, call icons, callback permission, SIP servers) | shape-only | `includeSipCredentials` may return secret-bearing SIP material; `sip_user_password` is never serialized into update bodies. |
 | live WebRTC/media orchestration | No first-class WATS equivalent yet | planned | Requires real calling-enabled phone numbers and explicit authorization. |
 
@@ -7206,7 +7234,7 @@ Migration differences:
 - WATS filters use function composition (`and`, `or`, `not`, `custom`) rather than Python `&`, `|`, and `~` operators.
 - WATS deep-normalizes common inbound message body families and adds typed filters for media, location, reaction, interactive button/list/nfm Flow-completion replies, and quick-reply buttons. This covers the most common `@wa.on_callback_button`, `@wa.on_callback_selection`, and `@wa.on_flow_completion` migration paths while keeping the update kind as `"message"`.
 - `user_preferences` maps to `TypedUserPreferencesUpdate` plus `filtersTyped.userPreferences`; `system` maps phone/identity changes to `TypedSystemUpdate` plus `filtersTyped.system`; `chat_opened` maps `REQUEST_WELCOME` to `TypedChatOpenedUpdate` plus `filtersTyped.chatOpened`.
-- WATS still has fewer first-class typed update families than pywa for call permission updates and several status/account details.
+- WATS still has fewer first-class typed update families than pywa for call permission updates and several status/account details. Calling webhook fields (connect/terminate/status/`call_permission_reply`) are fully normalized to camelCase, but `call_permission_reply` remains an `interactive` message rather than a dedicated `TypedUpdate` kind.
 
 ## Error handling migration
 
@@ -7316,8 +7344,8 @@ accepts the request and WATS parses the live response.
 | Template management | `create_template` etc. | List/create/get/update/delete callables, component builders, template-group analytics, `compareTemplates`, `unpauseTemplate`, `migrateTemplates`, archive/unarchive helpers, auth-template upsert, and library-template create fields. | live-validated for list reads; mutations/comparison/unpause/migration/archive/auth-upsert/library-template fields shape-only. |
 | Flows | Flow management | List/get/create/update/publish/delete/deprecate/assets callables, bounded Flow JSON validation, typed FlowJSON DSL builders (screens/components/actions), metrics, migration, response builders. | shape-only — live read returned empty; mutations/metrics/migration never exercised. |
 | Flow encrypted data-channel | richer Flow runtime | `decryptRequest`/`encryptResponse` (RSA-OAEP + AES-GCM, IV-flip response) and a framework-agnostic `handleFlowRequest` dispatch (ping/error-ack/close), backed by `@wats/crypto`. | shape-only — local crypto round-trip; no hosted endpoint or live publish. Media-upload (CBC+HMAC) decryption is implemented shape-only. |
-| Calling | `initiate_call` etc. | Initiate/pre-accept/accept/reject/terminate callables, typed calling webhooks and filters. | shape-only — no live call sessions yet. |
-| Call permissions + calling-settings mutation | permission models, SIP/settings writes | `getCallPermissions` (typed permission/action/limit models), `calling` settings sub-object on `updatePhoneNumberSettings` (status, call hours, call icons, callback permission, SIP servers), `call_permission_reply` webhook fields (`isPermanent`, `responseSource`). | shape-only — no live calls; WebRTC/media orchestration still planned. |
+| Calling | `initiate_call` etc. | Initiate/pre-accept/accept/reject/terminate callables, typed calling webhooks and filters. Calling webhook normalization surfaces the full Meta field set in camelCase: connect/terminate `toUserId`/`toParentUserId`/`contacts[]`, terminate `status`/`startTime`/`endTime`/`duration`/`bizOpaqueCallbackData`, call status `recipientUserId`/`recipientParentUserId`/`bizOpaqueCallbackData`, and `call_permission_reply` message `fromUserId`/`fromParentUserId`. | shape-only — no live call sessions yet. |
+| Call permissions + calling-settings mutation | permission models, SIP/settings writes | `getCallPermissions` (typed permission/action/limit models), `calling` settings sub-object on `updatePhoneNumberSettings` (status, call hours, call icons, callback permission, SIP servers), `call_permission_reply` webhook fields (`isPermanent`, `responseSource`, plus `fromUserId`/`fromParentUserId`). | shape-only — no live calls; WebRTC/media orchestration still planned. |
 | Business/admin reads | `get_business_account` etc. | `getWabaInfo`, `listSubscribedApps`, `listPhoneNumbers`, `getPhoneNumberInfo`, `getBusinessProfile`, `getCommerceSettings`. | live-validated — all parsed live Graph v25.0. |
 | Phone-number settings read | settings getter | `getPhoneNumberSettings` (storage config, optional SIP credentials). | shape-only — not exercised in the live campaign. |
 | Business/admin mutations | profile/commerce/settings updates | `updateBusinessProfile`, `updateCommerceSettings`, `updatePhoneNumberSettings`, Block API, OBA/display-name helpers, the phone registration lifecycle (`createPhoneNumber`, `requestVerificationCode`, `verifyPhoneNumber`, `registerPhoneNumber`, `deregisterPhoneNumber`, `setTwoStepVerificationPin`), business public-key helpers (`getBusinessPublicKey`, `setBusinessPublicKey`), and QR code CRUD (`createQrCode`, `listQrCodes`, `getQrCode`, `updateQrCode`, `deleteQrCode`). | shape-only. |
