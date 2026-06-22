@@ -33,7 +33,8 @@ export interface CallSessionDescriptionPayload {
 }
 
 export interface InitiateCallRequest {
-  readonly to: string;
+  readonly to?: string;
+  readonly recipient?: string;
   readonly session: CallSessionDescription | Record<string, unknown>;
   readonly bizOpaqueCallbackData?: string;
 }
@@ -294,13 +295,25 @@ function assertBodyRecord(value: unknown, helperName: string): Record<string, un
 function buildInitiate(body: InitiateCallRequest): WireBody {
   const record = assertBodyRecord(body, "initiateCall");
   const tracker = optionalTracker(record.bizOpaqueCallbackData);
-  return {
+  const hasTo = record.to !== undefined;
+  const hasRecipient = record.recipient !== undefined;
+  if (!hasTo && !hasRecipient) {
+    throw validationError(
+      "Invalid Calling API input: at least one of to or recipient is required."
+    );
+  }
+  const out: WireBody = {
     messaging_product: "whatsapp",
-    to: assertPublicString(record.to, "to"),
     action: "connect",
     session: sanitizeCallSession(record.session),
     ...(tracker !== undefined ? { biz_opaque_callback_data: tracker } : {})
   };
+  // Meta: when both `to` and `recipient` are supplied, `to` takes precedence
+  // (Graph resolves the call target to the `to` phone number). We still emit
+  // both so consumers can mirror the wire contract; the Graph decides routing.
+  if (hasTo) out.to = assertPublicString(record.to, "to");
+  if (hasRecipient) out.recipient = assertPublicString(record.recipient, "recipient");
+  return out;
 }
 
 function buildPreAccept(body: PreAcceptCallRequest): WireBody {
