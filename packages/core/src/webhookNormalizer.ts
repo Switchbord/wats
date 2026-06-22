@@ -93,6 +93,15 @@ export interface TypedStatusUpdate {
   readonly rawChange: WhatsAppWebhookChange;
 }
 
+export interface NormalizedCallContact {
+  readonly name?: string;
+  readonly username?: string;
+  readonly waId?: string;
+  readonly userId?: string;
+  readonly parentUserId?: string;
+  readonly raw: Record<string, unknown>;
+}
+
 export interface NormalizedCallPayload {
   readonly id: string;
   readonly event: CallEvent;
@@ -101,6 +110,18 @@ export interface NormalizedCallPayload {
   readonly direction?: CallDirection;
   readonly timestamp?: string;
   readonly session?: unknown;
+  /**
+   * WATS-167: terminate-call outcome fields. `status` accepts Meta's
+   * documented "FAILED"/"COMPLETED" plus any string for forward-compat.
+   */
+  readonly status?: string;
+  readonly startTime?: string;
+  readonly endTime?: string;
+  readonly duration?: number;
+  readonly bizOpaqueCallbackData?: string;
+  readonly toUserId?: string;
+  readonly toParentUserId?: string;
+  readonly contacts?: readonly NormalizedCallContact[];
   readonly raw: Record<string, unknown>;
 }
 
@@ -109,6 +130,9 @@ export interface NormalizedCallStatusPayload {
   readonly status: CallStatusType;
   readonly recipientId?: string;
   readonly timestamp?: string;
+  readonly recipientUserId?: string;
+  readonly recipientParentUserId?: string;
+  readonly bizOpaqueCallbackData?: string;
   readonly raw: Record<string, unknown>;
 }
 
@@ -602,6 +626,43 @@ function readMetadataPhoneNumberId(value: Record<string, unknown>): string | und
   return isRecord(metadata) ? readSafeIdField(metadata, "phone_number_id") : undefined;
 }
 
+/**
+ * WATS-167: normalize a Meta calling `contacts[]` entry into a
+ * camelCase `NormalizedCallContact`. Uses the shared safe field readers
+ * (which refuse to execute accessor getters) and preserves the original
+ * record as `raw`. Returns undefined when the entry is not a plain
+ * record so the caller can skip it without throwing.
+ */
+function normalizeCallContact(value: unknown): NormalizedCallContact | undefined {
+  if (!isRecord(value)) return undefined;
+  const name = readStringField(value, "name");
+  const username = readStringField(value, "username");
+  const waId = readSafeIdField(value, "wa_id");
+  const userId = readSafeIdField(value, "user_id");
+  const parentUserId = readSafeIdField(value, "parent_user_id");
+  const out: { raw: Record<string, unknown>; name?: string; username?: string; waId?: string; userId?: string; parentUserId?: string } = {
+    raw: value
+  };
+  if (name !== undefined) out.name = name;
+  if (username !== undefined) out.username = username;
+  if (waId !== undefined) out.waId = waId;
+  if (userId !== undefined) out.userId = userId;
+  if (parentUserId !== undefined) out.parentUserId = parentUserId;
+  return out;
+}
+
+function normalizeCallContactsArray(value: unknown): readonly NormalizedCallContact[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const out: NormalizedCallContact[] = [];
+  for (let i = 0; i < value.length; i += 1) {
+    const itemResult = readArrayDataItem(value, i);
+    if (!itemResult.ok) continue;
+    const contact = normalizeCallContact(itemResult.value);
+    if (contact !== undefined) out.push(contact);
+  }
+  return out.length > 0 ? out : undefined;
+}
+
 function isUnsafePrototypeKey(key: string): boolean {
   return key === "__proto__" || key === "constructor" || key === "prototype";
 }
@@ -861,6 +922,15 @@ function normalizeMessagePayload(raw: Record<string, unknown>): GroupMessage | u
   if (type === "interactive") {
     const interactive = normalizeInteractivePayload(readOwnDataField(raw, "interactive"));
     if (interactive !== undefined) base.interactive = interactive;
+    // WATS-167: call_permission_reply messages carry caller identity fields
+    // (wire `from_user_id` / `from_parent_user_id`) at the message envelope
+    // level. Surface them as camelCase only on this reply sub-type.
+    if (interactive !== null && typeof interactive === "object" && (interactive as Record<string, unknown>).type === "call_permission_reply") {
+      const fromUserId = readSafeIdField(raw, "from_user_id");
+      if (fromUserId !== undefined) base.fromUserId = fromUserId;
+      const fromParentUserId = readSafeIdField(raw, "from_parent_user_id");
+      if (fromParentUserId !== undefined) base.fromParentUserId = fromParentUserId;
+    }
     return base as unknown as WhatsAppMessage;
   }
   if (type === "location") {
@@ -2080,6 +2150,15 @@ function normalizeCallsChange(
       const from = readSafeIdField(item, "from");
       const to = readSafeIdField(item, "to");
       const timestamp = readOwnDataField(item, "timestamp");
+      // WATS-167: complete calling webhook fields (camelCase public surface).
+      const status = readStringField(item, "status");
+      const startTime = readStringField(item, "start_time");
+      const endTime = readStringField(item, "end_time");
+      const duration = readNumberField(item, "duration");
+      const bizOpaqueCallbackData = readStringField(item, "biz_opaque_callback_data");
+      const toUserId = readSafeIdField(item, "to_user_id");
+      const toParentUserId = readSafeIdField(item, "to_parent_user_id");
+      const contacts = normalizeCallContactsArray(readOwnDataField(item, "contacts"));
       const call: NormalizedCallPayload = {
         id,
         event,
@@ -2088,6 +2167,14 @@ function normalizeCallsChange(
         ...(direction === "USER_INITIATED" || direction === "BUSINESS_INITIATED" ? { direction } : {}),
         ...(typeof timestamp === "string" ? { timestamp } : {}),
         ...(readOwnDataField(item, "session") !== undefined ? { session: readOwnDataField(item, "session") } : {}),
+        ...(status !== undefined ? { status } : {}),
+        ...(startTime !== undefined ? { startTime } : {}),
+        ...(endTime !== undefined ? { endTime } : {}),
+        ...(duration !== undefined ? { duration } : {}),
+        ...(bizOpaqueCallbackData !== undefined ? { bizOpaqueCallbackData } : {}),
+        ...(toUserId !== undefined ? { toUserId } : {}),
+        ...(toParentUserId !== undefined ? { toParentUserId } : {}),
+        ...(contacts !== undefined ? { contacts } : {}),
         raw: item
       };
       const update: TypedCallUpdate = {
@@ -2122,6 +2209,10 @@ function normalizeCallsChange(
       }
       const timestamp = readOwnDataField(item, "timestamp");
       const recipientId = readSafeIdField(item, "recipient_id");
+      // WATS-167: complete call-status fields (camelCase public surface).
+      const recipientUserId = readSafeIdField(item, "recipient_user_id");
+      const recipientParentUserId = readSafeIdField(item, "recipient_parent_user_id");
+      const bizOpaqueCallbackData = readStringField(item, "biz_opaque_callback_data");
       const update: TypedCallStatusUpdate = {
         kind: "callStatus",
         updateId: id,
@@ -2133,6 +2224,9 @@ function normalizeCallsChange(
           status,
           ...(recipientId !== undefined ? { recipientId } : {}),
           ...(typeof timestamp === "string" ? { timestamp } : {}),
+          ...(recipientUserId !== undefined ? { recipientUserId } : {}),
+          ...(recipientParentUserId !== undefined ? { recipientParentUserId } : {}),
+          ...(bizOpaqueCallbackData !== undefined ? { bizOpaqueCallbackData } : {}),
           raw: item
         },
         rawChange

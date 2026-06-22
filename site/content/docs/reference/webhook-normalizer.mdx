@@ -111,6 +111,34 @@ Three webhook families are promoted out of the `unknown` bucket. These remain cr
 
 Malformed rows in these families are reported through `skipped[]` with `malformed_field`; they do not fall back to `TypedUnknownUpdate` and do not throw host errors for accessor-backed fields.
 
+## Calling webhook normalization
+
+Calling normalization is credential-free and synthetic-only. Meta delivers
+`calls` webhook changes containing `value.calls[]` and `value.statuses[]`
+arrays. WATS emits one typed update per call/status entry:
+
+- `TypedCallUpdate` — `kind: "callConnect"` (event `connect`) or `kind: "callTerminate"` (event `terminate`). The normalized `call` payload surfaces camelCase public fields only:
+  - `id`, `event`, `from`, `to`, `direction` (`"USER_INITIATED" | "BUSINESS_INITIATED"`), `timestamp`, `session`.
+  - terminate-call outcome fields: `status` (Meta documents `"FAILED"` / `"COMPLETED"`; any string is accepted for forward-compat), `startTime`, `endTime`, `duration` (number), `bizOpaqueCallbackData`.
+  - connect/terminate identity fields: `toUserId`, `toParentUserId`, and `contacts` — a readonly array of `{ name?, username?, waId?, userId?, parentUserId?, raw }`. Each contact preserves its original record as `raw`.
+- `TypedCallStatusUpdate` — `kind: "callStatus"`. The normalized `callStatus` payload surfaces `id`, `status` (`"RINGING" | "ACCEPTED" | "REJECTED"`), `recipientId`, `timestamp`, plus `recipientUserId`, `recipientParentUserId`, and `bizOpaqueCallbackData`.
+- `call_permission_reply` inbound messages (an `interactive` message whose interactive sub-type is `call_permission_reply`) surface `message.fromUserId` and `message.fromParentUserId` when Meta includes the caller identity fields.
+
+Wire snake_case keys (`biz_opaque_callback_data`, `start_time`, `end_time`,
+`to_user_id`, `to_parent_user_id`, `recipient_user_id`,
+`recipient_parent_user_id`, `from_user_id`, `from_parent_user_id`,
+`wa_id`, `user_id`, `parent_user_id`, `recipient_id`) are translated to
+camelCase on the public payload and never leak outside `raw`. The original
+record is preserved unchanged as `raw`.
+
+Malformed optional fields are omitted rather than making an otherwise-valid
+update malformed: non-string `status`/`startTime`/`endTime`/`bizOpaqueCallbackData`,
+non-finite `duration`, unsafe (whitespace-only, control-bearing, or oversize)
+id-bearing fields, non-array `contacts`, and non-record contact entries are
+all skipped. Accessor-backed getters on call/status/contact records are never
+executed. These remain credential-free synthetic-envelope checks in CI; live
+calling webhook delivery still belongs to the gated campaign.
+
 ## Input contract
 
 ```ts
