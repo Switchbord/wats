@@ -119,14 +119,14 @@ The facade binds a `GraphClient`, optional `PhoneNumberClient` / `WABAClient`, a
 
 ### `@wats/persistence`
 
-- Purpose: experimental persistence contracts plus the SQLite local adapter, migration runner, webhook/service idempotency records, and outbox record APIs.
-- Runtime targets: Bun for `@wats/persistence/sqlite`; root contracts and `runOutboxWorkerOnce` are TypeScript-only.
+- Purpose: experimental persistence contracts, the SQLite local adapter, and the Postgres adapter, plus the migration runner, webhook/service idempotency records, message projection, and outbox record APIs.
+- Runtime targets: Bun for `@wats/persistence/sqlite`; `@wats/persistence/postgres` runs wherever `pg` does; root contracts and `runOutboxWorkerOnce` are TypeScript-only.
 - Public: yes, experimental.
-- Published subpaths: `@wats/persistence`, `@wats/persistence/sqlite`.
-- Future subpaths: `@wats/persistence/postgres`, `@wats/persistence/testing`.
+- Published subpaths: `@wats/persistence`, `@wats/persistence/sqlite`, `@wats/persistence/postgres`.
+- Future subpaths: `@wats/persistence/testing`.
 - Dependencies out: none.
 - Dependency direction: `@wats/service` consumes `@wats/persistence` through injected stores, not direct env reads.
-- Stability: experimental until outbox/service enqueueing and Postgres semantics settle.
+- Stability: experimental until outbox/service enqueueing and live Postgres validation settle. The Postgres adapter is shape-only, mock-client tested; no default CI runs a live Postgres service.
 
 ### `@wats/internal-utils`
 

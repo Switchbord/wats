@@ -1,9 +1,8 @@
 # Minimal bot example
 
-- status: WATS-113 runnable 60-second offline onramp
 - safety default: offline by default
 
-This example is the smallest runnable WATS bot path for a fresh clone. It uses `@wats/service` with `MockTransport`, synthetic webhook envelope data, and placeholder identifiers only. No live Meta credentials are required.
+The smallest runnable WATS bot path for a fresh clone. It uses `@wats/service` with `MockTransport`, synthetic webhook envelope data, and placeholder identifiers only. No live Meta credentials are required.
 
 ## Run
 

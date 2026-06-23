@@ -1,9 +1,8 @@
 # WATS examples
 
-- status: WATS-52 community examples scaffold
 - safety default: offline by default
 
-This directory contains credential-free community examples for WATS. The WATS-52 alpha launch scaffold is intentionally small: examples should teach public `@wats/*` package usage while avoiding live credentials and live Meta calls.
+Credential-free community examples for WATS. The scaffold is intentionally small: examples teach public `@wats/*` package usage while avoiding live credentials and live Meta calls.
 
 ## Safety rules
 
@@ -17,12 +16,12 @@ This directory contains credential-free community examples for WATS. The WATS-52
 
 ## Available examples
 
-- `examples/config/wats.config.example.yaml` — WATS-51 placeholder YAML config template.
-- `examples/config/wats.config.example.json` — WATS-51 placeholder JSON config template.
+- `examples/config/wats.config.example.yaml` — placeholder YAML config template.
+- `examples/config/wats.config.example.json` — placeholder JSON config template.
 - `.env.example` — placeholder env-name index for local ignored copies.
 - `examples/offline-bot/README.md` — offline MockTransport bot walkthrough with synthetic webhook payloads/envelopes.
-- `examples/minimal-bot/` — WATS-113 runnable 60-second offline minimal bot using `@wats/service`, MockTransport, and `bun run demo`.
-- `examples/groups/` — WATS-138 runnable offline Groups flow using `@wats/graph`, `@wats/core`, MockTransport, and synthetic group webhooks (`bun run examples:groups`).
+- `examples/minimal-bot/` — runnable 60-second offline minimal bot using `@wats/service`, MockTransport, and `bun run demo`.
+- `examples/groups/` — runnable offline Groups flow using `@wats/graph`, `@wats/core`, MockTransport, and synthetic group webhooks (`bun run examples:groups`).
 
 ## How to run local checks
 

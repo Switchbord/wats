@@ -23,16 +23,18 @@ The `0.3.x-alpha-tooling` line ships the substrate:
 - business/admin: read-only WABA and phone-number inventory, profile/commerce reads and updates, Block API, OBA status, display-name review
 - `@wats/config`, `@wats/cli` (`init`, `config validate`, `doctor`, `serve`, `openapi`), `@wats/service` with OpenAPI 3.1
 - SQLite persistence: migrations, idempotency records, outbox APIs
+- Postgres persistence adapter at `@wats/persistence/postgres` (shape-only, mock-client tested; no default CI live Postgres)
+- local message projection (`wats_messages` / `wats_message_status_events`) and read-only `wats messages list/show` CLI inspection
 - pywa migration guide and per-capability parity matrix
 
-Everything above is credential-free and MockTransport-validated unless the [parity matrix](/docs/parity) marks it live-validated.
+Everything above is credential-free and MockTransport-validated unless the [parity matrix](/docs/parity) marks it live-validated. The Postgres adapter is mock-client tested; it is not live-validated against a running Postgres service.
 
 ## Planned
 
 - Live credentialed validation of media, message, template, Flow, and calling paths. The campaign runs in deliberate phases — read-only discovery first, side-effecting tests second, destructive cleanup last, admin mutations only with separate authorization. It is halted until credentials and explicit operator authorization exist.
 - Mutating admin endpoints: WABA CRUD, phone-number registration/configuration, subscribed-app mutations, webhook callback override, public-key mutation.
 - Encrypted Flow data-exchange request decrypt / response encrypt handling.
-- Postgres persistence adapter and service send enqueueing.
+- Live Postgres validation and service send enqueueing.
 - Production deployment artifacts: Dockerfile, Compose, container images, server wrappers for `@wats/service`.
 - Analytics/quality/rate-limit surfaces beyond the current typed alert payloads.
 
