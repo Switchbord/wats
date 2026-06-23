@@ -31,7 +31,7 @@ Current experimental surfaces:
 - Calling endpoint helpers in `@wats/graph/endpoints/calling` and root Graph Calling exports.
 - Endpoint catalog breadth beyond the stable Graph substrate, including new admin/business, template, media, marketing-message, and future parity families.
 - `@wats/config`, `@wats/cli`, `@wats/service`, and `@wats/persistence` operator/application-edge surfaces while live mode, deployment, and persistence are still evolving.
-- `@wats/persistence/sqlite` is experimental local/single-instance persistence; Postgres and service integration are separate follow-up surfaces.
+- `@wats/persistence/sqlite` is experimental local/single-instance persistence; `@wats/persistence/postgres` is an experimental shape-only adapter (mock-client tested, no default CI live Postgres); service integration is a separate follow-up surface.
 - Generated OpenAPI details and docs-site navigation during public alpha.
 
 Experimental exports carry a JSDoc `@experimental` tag on their source barrels or declarations.
@@ -42,7 +42,7 @@ Internal and unsupported surfaces carry no application stability guarantee.
 
 - `@wats/internal-utils` is published internal support for WATS runtime dependency closure. npm must install it; you should not import it.
 - `@wats/testing` is private workspace-only test infrastructure and is not published.
-- Postgres persistence adapter, config persistence schema, raw webhook-body persistence, CLI thread navigation, and observed status UI are not exported yet.
+- Config persistence schema, raw webhook-body persistence, deeper CLI thread/conversation navigation, and observed status UI are not exported yet.
 - Credentialed local live `wats serve` is experimental operator tooling. It requires explicit `--live --yes-live --env-file .env.local` and is not a production hosting contract.
 
 ## Policy for changes
