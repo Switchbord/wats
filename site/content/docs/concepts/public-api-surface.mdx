@@ -149,8 +149,11 @@ Current commands:
 - `wats serve --config <path> --live --yes-live --env-file .env.local [--profile <name>] [--host <host>] [--port <port>]`
 - `wats serve --help`
 - `wats webhook token`
+- `wats messages list [--config <path>] [--profile <name>] [--env-file <path>] [--limit N] [--cursor <rowId>] [--json]`
+- `wats messages show <message-id> [--config <path>] [--profile <name>] [--env-file <path>] [--json]`
+- `wats messages --help`
 
-Status: experimental CLI foundation. It generates config/env placeholder files, validates config files safely, exports service OpenAPI, runs offline diagnostics, starts a dry-run local service, starts a credential-gated local live service behind explicit `--live --yes-live --env-file .env.local`, and generates local webhook verify tokens. It never reads `.env.local` implicitly and never calls Meta Graph unless you start live serve and hit a service route.
+Status: experimental CLI foundation. It generates config/env placeholder files, validates config files safely, exports service OpenAPI, runs offline diagnostics, starts a dry-run local service, starts a credential-gated local live service behind explicit `--live --yes-live --env-file .env.local`, generates local webhook verify tokens, and lists/shows locally projected messages through the service API (`wats messages list/show`). It never reads `.env.local` implicitly and never calls Meta Graph unless you start live serve and hit a service route.
 
 ### `@wats/service`
 
@@ -180,7 +183,7 @@ Status: experimental service foundation. It composes config profile shape, expli
 
 ### `@wats/persistence`
 
-Local persistence contracts and SQLite adapter.
+Local persistence contracts, SQLite adapter, and Postgres adapter.
 
 Primary exports:
 
@@ -192,8 +195,9 @@ Primary exports:
 - outbox record APIs on `PersistenceStore`
 - `runOutboxWorkerOnce`
 - `createSqlitePersistence` from `@wats/persistence/sqlite`
+- `createPostgresPersistence` from `@wats/persistence/postgres` (shape-only, mock-client tested)
 
-Status: experimental local persistence foundation. SQLite migrations, schema metadata, migration locks, webhook-event/request-idempotency/outbox tables, outbox record APIs, a one-tick at-least-once worker helper, redacted health diagnostics, and optional `@wats/service` injection exist. Conversation APIs, CLI navigation, status UI wiring, automatic service send enqueueing, Postgres, and production hosting are later work.
+Status: experimental local persistence foundation. SQLite migrations, schema metadata, migration locks, webhook-event/request-idempotency/outbox tables, outbox record APIs, a one-tick at-least-once worker helper, redacted health diagnostics, and optional `@wats/service` injection exist. The Postgres adapter ships at `@wats/persistence/postgres` as shape-only, mock-client tested; it is not live-validated against a running Postgres service in default CI. Read-only local message projection is reachable through `wats messages list/show`; deeper conversation/thread navigation, status UI wiring, automatic service send enqueueing, and production hosting are later work.
 
 ### Internal support and workspace packages
 
@@ -210,7 +214,7 @@ Not implemented as runtime APIs yet:
 - mutating WABA/phone-number/business-management/admin APIs beyond read-only inventory and the bounded request-shape helpers above; no automatic user-block decisions or policy/appeal automation
 - catalog/product management APIs beyond read-only `getCommerceSettings`
 - full Meta Graph API OpenAPI generation
-- Postgres persistence, config persistence schema, CLI database navigation, conversation APIs, automatic service send enqueueing, and observed status UI
+- config persistence schema, deeper CLI message/thread navigation, conversation APIs, automatic service send enqueueing, and observed status UI
 - supported Dockerfile, Compose file, container image, or container-registry publication
 
 See the [roadmap](/docs/meta/roadmap) for what is planned versus out of scope.

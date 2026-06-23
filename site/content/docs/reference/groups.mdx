@@ -11,6 +11,10 @@ WATS Groups is an official WhatsApp Cloud API v25 surface and a WATS beyond-pywa
 
 Groups hang off the business phone-number id, not the WABA id. Public WATS names stay camelCase; Meta snake_case is emitted only at the Graph wire boundary.
 
+## Live validation status
+
+`listGroups` is live-validated against a real WhatsApp Business number. Group mutations — create, update, delete, participant removal, join-request approve/reject — are shape-only. The June 2026 campaign ran `createGroup` against a test number and Meta rejected it with an entitlement error; the mutation matrix is unproven until a Groups-entitled phone number exists. Treat every mutation helper as request-shape-correct but not Meta-accepted until that blocker clears. See the [parity matrix](/docs/parity) Groups row.
+
 ## Endpoint contracts
 
 | Operation | WATS helper | Wire method/path | Notes |

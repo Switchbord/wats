@@ -1795,14 +1795,14 @@ The facade binds a `GraphClient`, optional `PhoneNumberClient` / `WABAClient`, a
 
 ### `@wats/persistence`
 
-- Purpose: experimental persistence contracts plus the SQLite local adapter, migration runner, webhook/service idempotency records, and outbox record APIs.
-- Runtime targets: Bun for `@wats/persistence/sqlite`; root contracts and `runOutboxWorkerOnce` are TypeScript-only.
+- Purpose: experimental persistence contracts, the SQLite local adapter, and the Postgres adapter, plus the migration runner, webhook/service idempotency records, message projection, and outbox record APIs.
+- Runtime targets: Bun for `@wats/persistence/sqlite`; `@wats/persistence/postgres` runs wherever `pg` does; root contracts and `runOutboxWorkerOnce` are TypeScript-only.
 - Public: yes, experimental.
-- Published subpaths: `@wats/persistence`, `@wats/persistence/sqlite`.
-- Future subpaths: `@wats/persistence/postgres`, `@wats/persistence/testing`.
+- Published subpaths: `@wats/persistence`, `@wats/persistence/sqlite`, `@wats/persistence/postgres`.
+- Future subpaths: `@wats/persistence/testing`.
 - Dependencies out: none.
 - Dependency direction: `@wats/service` consumes `@wats/persistence` through injected stores, not direct env reads.
-- Stability: experimental until outbox/service enqueueing and Postgres semantics settle.
+- Stability: experimental until outbox/service enqueueing and live Postgres validation settle. The Postgres adapter is shape-only, mock-client tested; no default CI runs a live Postgres service.
 
 ### `@wats/internal-utils`
 
@@ -1991,8 +1991,11 @@ Current commands:
 - `wats serve --config <path> --live --yes-live --env-file .env.local [--profile <name>] [--host <host>] [--port <port>]`
 - `wats serve --help`
 - `wats webhook token`
+- `wats messages list [--config <path>] [--profile <name>] [--env-file <path>] [--limit N] [--cursor <rowId>] [--json]`
+- `wats messages show <message-id> [--config <path>] [--profile <name>] [--env-file <path>] [--json]`
+- `wats messages --help`
 
-Status: experimental CLI foundation. It generates config/env placeholder files, validates config files safely, exports service OpenAPI, runs offline diagnostics, starts a dry-run local service, starts a credential-gated local live service behind explicit `--live --yes-live --env-file .env.local`, and generates local webhook verify tokens. It never reads `.env.local` implicitly and never calls Meta Graph unless you start live serve and hit a service route.
+Status: experimental CLI foundation. It generates config/env placeholder files, validates config files safely, exports service OpenAPI, runs offline diagnostics, starts a dry-run local service, starts a credential-gated local live service behind explicit `--live --yes-live --env-file .env.local`, generates local webhook verify tokens, and lists/shows locally projected messages through the service API (`wats messages list/show`). It never reads `.env.local` implicitly and never calls Meta Graph unless you start live serve and hit a service route.
 
 ### `@wats/service`
 
@@ -2022,7 +2025,7 @@ Status: experimental service foundation. It composes config profile shape, expli
 
 ### `@wats/persistence`
 
-Local persistence contracts and SQLite adapter.
+Local persistence contracts, SQLite adapter, and Postgres adapter.
 
 Primary exports:
 
@@ -2034,8 +2037,9 @@ Primary exports:
 - outbox record APIs on `PersistenceStore`
 - `runOutboxWorkerOnce`
 - `createSqlitePersistence` from `@wats/persistence/sqlite`
+- `createPostgresPersistence` from `@wats/persistence/postgres` (shape-only, mock-client tested)
 
-Status: experimental local persistence foundation. SQLite migrations, schema metadata, migration locks, webhook-event/request-idempotency/outbox tables, outbox record APIs, a one-tick at-least-once worker helper, redacted health diagnostics, and optional `@wats/service` injection exist. Conversation APIs, CLI navigation, status UI wiring, automatic service send enqueueing, Postgres, and production hosting are later work.
+Status: experimental local persistence foundation. SQLite migrations, schema metadata, migration locks, webhook-event/request-idempotency/outbox tables, outbox record APIs, a one-tick at-least-once worker helper, redacted health diagnostics, and optional `@wats/service` injection exist. The Postgres adapter ships at `@wats/persistence/postgres` as shape-only, mock-client tested; it is not live-validated against a running Postgres service in default CI. Read-only local message projection is reachable through `wats messages list/show`; deeper conversation/thread navigation, status UI wiring, automatic service send enqueueing, and production hosting are later work.
 
 ### Internal support and workspace packages
 
@@ -2052,7 +2056,7 @@ Not implemented as runtime APIs yet:
 - mutating WABA/phone-number/business-management/admin APIs beyond read-only inventory and the bounded request-shape helpers above; no automatic user-block decisions or policy/appeal automation
 - catalog/product management APIs beyond read-only `getCommerceSettings`
 - full Meta Graph API OpenAPI generation
-- Postgres persistence, config persistence schema, CLI database navigation, conversation APIs, automatic service send enqueueing, and observed status UI
+- config persistence schema, deeper CLI message/thread navigation, conversation APIs, automatic service send enqueueing, and observed status UI
 - supported Dockerfile, Compose file, container image, or container-registry publication
 
 See the [roadmap](/docs/meta/roadmap) for what is planned versus out of scope.
@@ -2118,9 +2122,9 @@ One table per package. Find the surface you need; the contract lives in the link
 | Doc | When to use it |
 | --- | --- |
 | [`reference/config.md`](/docs/reference/config) | `@wats/config` YAML/JSON schema, env-secret refs, validation, redaction. |
-| [`reference/cli.md`](/docs/reference/cli) | `@wats/cli` commands: init, setup, doctor, serve, openapi export. |
+| [`reference/cli.md`](/docs/reference/cli) | `@wats/cli` commands: init, setup, doctor, serve, openapi export, `messages list/show`. |
 | [`reference/service.md`](/docs/reference/service) | `@wats/service` runtime-neutral standalone webhook/API service. |
-| [`reference/persistence.md`](/docs/reference/persistence) | Durable runtime state: SQLite adapter, migrations, idempotency, outbox. |
+| [`reference/persistence.md`](/docs/reference/persistence) | Durable runtime state: SQLite + Postgres adapters, migrations, idempotency, outbox, message projection. |
 | [`reference/openapi.md`](/docs/reference) | Generated OpenAPI 3.1 document and `GET /openapi.json` service route. |
 
 ## Guides
@@ -4049,6 +4053,10 @@ WATS Groups is an official WhatsApp Cloud API v25 surface and a WATS beyond-pywa
 
 Groups hang off the business phone-number id, not the WABA id. Public WATS names stay camelCase; Meta snake_case is emitted only at the Graph wire boundary.
 
+## Live validation status
+
+`listGroups` is live-validated against a real WhatsApp Business number. Group mutations — create, update, delete, participant removal, join-request approve/reject — are shape-only. The June 2026 campaign ran `createGroup` against a test number and Meta rejected it with an entitlement error; the mutation matrix is unproven until a Groups-entitled phone number exists. Treat every mutation helper as request-shape-correct but not Meta-accepted until that blocker clears. See the [parity matrix](/docs/parity) Groups row.
+
 ## Endpoint contracts
 
 | Operation | WATS helper | Wire method/path | Notes |
@@ -4883,11 +4891,11 @@ Persistence diagnostics must not print: access tokens, app secrets, webhook veri
 - service send routes honor `Idempotency-Key` for replay/conflict behavior;
 - injected stores must expose the outbox methods as part of the accepted service persistence contract.
 
-The CLI has no database navigation commands yet.
+The CLI exposes read-only local message navigation through `wats messages list` and `wats messages show`. These call the running local service `/api/messages` endpoint; they do not call Meta and do not require live credentials. Deeper conversation/thread navigation is not built.
 
 ## Non-goals
 
-Not implemented yet: CLI thread/message navigation, delivery/read status UI, raw webhook body storage, automatic service send enqueueing, production hosting guarantees, and live Meta validation. The Postgres adapter is shape-only and tested with a mock client; it is not live-validated against a running Postgres service in default CI.
+Not implemented yet: deeper CLI thread/conversation navigation, delivery/read status UI, raw webhook body storage, automatic service send enqueueing, production hosting guarantees, and live Meta validation. The Postgres adapter is shape-only and tested with a mock client; it is not live-validated against a running Postgres service in default CI.
 
 ## Related docs
 
@@ -7408,7 +7416,7 @@ accepts the request and WATS parses the live response.
 | Config | constructor args | `@wats/config`: versioned YAML/JSON profiles with env-secret references, never raw secrets. | shape-only — local-only by design. |
 | CLI | n/a | `wats init/setup/doctor/openapi/serve/onboarding/upgrade`; credential-safe by default. | shape-only — local tooling; live serve is the operator's opt-in. |
 | Service | n/a | `createWatsServiceApp`: health/readiness, webhook delegation, authenticated message routes, Graph-failure diagnostics. | live-validated for webhook ingress and text send; other routes shape-only. |
-| Message event-store projection (outbound) | n/a | `@wats/persistence` `wats_messages` + `wats_message_status_events` tables and `recordMessage` / `appendMessageStatus` / `getMessage` / `listMessages` APIs; read-only `GET /messages` and `GET /messages/{messageId}` service routes. | shape-only — local SQLite + MockTransport only; no live Meta calls this slice. |
+| Message event-store projection (outbound) | n/a | `@wats/persistence` `wats_messages` + `wats_message_status_events` tables and `recordMessage` / `appendMessageStatus` / `getMessage` / `listMessages` APIs; read-only `GET /messages` and `GET /messages/{messageId}` service routes; `wats messages list/show` CLI inspection; Postgres adapter at `@wats/persistence/postgres` (shape-only, mock-client tested). | shape-only — local SQLite + MockTransport only; Postgres mock-client tested; no live Meta calls this slice. |
 | OpenAPI document | n/a | OpenAPI 3.1 for WATS service routes, served at `/openapi.json`. | shape-only. |
 | Internal utilities | n/a | `@wats/internal-utils` shared helpers. | shape-only — never leaves the process. |
 | OpenTelemetry observability | n/a | Not built; router/adapter observer hooks exist as seams. | planned. |
@@ -7695,7 +7703,7 @@ Current experimental surfaces:
 - Calling endpoint helpers in `@wats/graph/endpoints/calling` and root Graph Calling exports.
 - Endpoint catalog breadth beyond the stable Graph substrate, including new admin/business, template, media, marketing-message, and future parity families.
 - `@wats/config`, `@wats/cli`, `@wats/service`, and `@wats/persistence` operator/application-edge surfaces while live mode, deployment, and persistence are still evolving.
-- `@wats/persistence/sqlite` is experimental local/single-instance persistence; Postgres and service integration are separate follow-up surfaces.
+- `@wats/persistence/sqlite` is experimental local/single-instance persistence; `@wats/persistence/postgres` is an experimental shape-only adapter (mock-client tested, no default CI live Postgres); service integration is a separate follow-up surface.
 - Generated OpenAPI details and docs-site navigation during public alpha.
 
 Experimental exports carry a JSDoc `@experimental` tag on their source barrels or declarations.
@@ -7706,7 +7714,7 @@ Internal and unsupported surfaces carry no application stability guarantee.
 
 - `@wats/internal-utils` is published internal support for WATS runtime dependency closure. npm must install it; you should not import it.
 - `@wats/testing` is private workspace-only test infrastructure and is not published.
-- Postgres persistence adapter, config persistence schema, raw webhook-body persistence, CLI thread navigation, and observed status UI are not exported yet.
+- Config persistence schema, raw webhook-body persistence, deeper CLI thread/conversation navigation, and observed status UI are not exported yet.
 - Credentialed local live `wats serve` is experimental operator tooling. It requires explicit `--live --yes-live --env-file .env.local` and is not a production hosting contract.
 
 ## Policy for changes
@@ -7910,16 +7918,18 @@ The `0.3.x-alpha-tooling` line ships the substrate:
 - business/admin: read-only WABA and phone-number inventory, profile/commerce reads and updates, Block API, OBA status, display-name review
 - `@wats/config`, `@wats/cli` (`init`, `config validate`, `doctor`, `serve`, `openapi`), `@wats/service` with OpenAPI 3.1
 - SQLite persistence: migrations, idempotency records, outbox APIs
+- Postgres persistence adapter at `@wats/persistence/postgres` (shape-only, mock-client tested; no default CI live Postgres)
+- local message projection (`wats_messages` / `wats_message_status_events`) and read-only `wats messages list/show` CLI inspection
 - pywa migration guide and per-capability parity matrix
 
-Everything above is credential-free and MockTransport-validated unless the [parity matrix](/docs/parity) marks it live-validated.
+Everything above is credential-free and MockTransport-validated unless the [parity matrix](/docs/parity) marks it live-validated. The Postgres adapter is mock-client tested; it is not live-validated against a running Postgres service.
 
 ## Planned
 
 - Live credentialed validation of media, message, template, Flow, and calling paths. The campaign runs in deliberate phases — read-only discovery first, side-effecting tests second, destructive cleanup last, admin mutations only with separate authorization. It is halted until credentials and explicit operator authorization exist.
 - Mutating admin endpoints: WABA CRUD, phone-number registration/configuration, subscribed-app mutations, webhook callback override, public-key mutation.
 - Encrypted Flow data-exchange request decrypt / response encrypt handling.
-- Postgres persistence adapter and service send enqueueing.
+- Live Postgres validation and service send enqueueing.
 - Production deployment artifacts: Dockerfile, Compose, container images, server wrappers for `@wats/service`.
 - Analytics/quality/rate-limit surfaces beyond the current typed alert payloads.
 

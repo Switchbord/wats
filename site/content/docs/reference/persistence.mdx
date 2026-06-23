@@ -149,11 +149,11 @@ Persistence diagnostics must not print: access tokens, app secrets, webhook veri
 - service send routes honor `Idempotency-Key` for replay/conflict behavior;
 - injected stores must expose the outbox methods as part of the accepted service persistence contract.
 
-The CLI has no database navigation commands yet.
+The CLI exposes read-only local message navigation through `wats messages list` and `wats messages show`. These call the running local service `/api/messages` endpoint; they do not call Meta and do not require live credentials. Deeper conversation/thread navigation is not built.
 
 ## Non-goals
 
-Not implemented yet: CLI thread/message navigation, delivery/read status UI, raw webhook body storage, automatic service send enqueueing, production hosting guarantees, and live Meta validation. The Postgres adapter is shape-only and tested with a mock client; it is not live-validated against a running Postgres service in default CI.
+Not implemented yet: deeper CLI thread/conversation navigation, delivery/read status UI, raw webhook body storage, automatic service send enqueueing, production hosting guarantees, and live Meta validation. The Postgres adapter is shape-only and tested with a mock client; it is not live-validated against a running Postgres service in default CI.
 
 ## Related docs
 

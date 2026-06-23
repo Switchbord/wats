@@ -97,7 +97,10 @@ describe("WATS-113 getting-started minimal bot", () => {
     );
 
     expect(examplesReadme).toContain("examples/minimal-bot");
-    expect(examplesReadme).toContain("WATS-113");
+    // Tranche 1 stripped WATS-nn ticket archaeology from example READMEs;
+    // guard the substance (runnable offline minimal bot description) instead.
+    expect(examplesReadme).toMatch(/runnable.*offline.*minimal bot/iu);
+    expect(examplesReadme).not.toMatch(/\bWATS-\d+\b/iu);
   });
 
   test("minimal bot package is a complete runnable workspace example", () => {
