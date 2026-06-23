@@ -1,18 +1,15 @@
 ---
 title: Docker Deployment Guide
-description: Container deployment shapes around the implemented wats serve contract — future Dockerfile and Compose patterns, current PaaS support.
+description: Container deployment shapes around the implemented wats serve contract — the shipped Railway Dockerfile, future Compose patterns, current PaaS support.
 ---
 
-<DocMeta status="planned — serve is implemented; container packaging is a documented shape, not a shipped artifact" lastReviewed="2026-06-12" />
+<DocMeta status="shape-only — repo ships a Railway-targeted Dockerfile; production container publication is planned" lastReviewed="2026-06-23" />
 
 `wats serve --config <path> --dry-run` is implemented for local Bun smoke
 checks, and
 `wats serve --config <path> --live --yes-live --env-file .env.local`
 is implemented for local live testing behind a secure HTTPS
-tunnel. There is no supported root Dockerfile, no supported Compose file, no
-container image release, no production hosting contract, and no
-container-registry workflow today. This page documents the shape future Docker
-artifacts should take around the serve contract.
+tunnel. The repo ships a Railway-targeted root `Dockerfile` that wraps the serve contract. There is still no supported Compose file, container image release, production hosting contract, or container-registry workflow.
 
 ## Safety defaults
 

@@ -12,6 +12,11 @@ export {
   createMessageTemplate,
   createTemplateGroup,
   compareTemplates,
+  migrateTemplates,
+  archiveTemplates,
+  unarchiveTemplates,
+  upsertAuthenticationTemplate,
+  buildUpsertAuthenticationTemplateBody,
   deleteMessageTemplate,
   deleteTemplateGroup,
   getMessageTemplate,
@@ -23,8 +28,12 @@ export {
   updateMessageTemplate,
   updateTemplateGroup,
   validateTemplateParameterCounts,
+  ARCHIVE_TEMPLATES_MAX_IDS,
   COMPARE_TEMPLATES_MAX_IDS,
-  KNOWN_TEMPLATE_TOP_BLOCK_REASONS
+  UPSERT_AUTH_LANGUAGES_MAX,
+  UPSERT_AUTH_SUPPORTED_APPS_MAX,
+  KNOWN_TEMPLATE_TOP_BLOCK_REASONS,
+  KNOWN_UPSERT_AUTH_OTP_TYPES
 } from "./templates/index.js";
 
 export type {
@@ -67,9 +76,23 @@ export type {
 } from "./templates/index.js";
 
 export type {
+  ArchiveTemplatesInput,
+  ArchiveTemplatesResponse,
   CompareTemplatesInput,
+  FailedTemplateEntry,
+  MigrateTemplatesInput,
+  MigrateTemplatesResponse,
+  MigratedTemplateEntry,
   TemplateTopBlockReason,
   TemplateUnpauseResult,
   TemplatesCompareResult,
-  UnpauseTemplateInput
+  UnarchiveTemplatesInput,
+  UnarchiveTemplatesResponse,
+  UnpauseTemplateInput,
+  UpsertAuthOtpButtonInput,
+  UpsertAuthOtpType,
+  UpsertAuthSupportedAppInput,
+  UpsertAuthenticationTemplateBody,
+  UpsertAuthenticationTemplateResponse,
+  UpsertedAuthTemplateEntry
 } from "./templates/index.js";

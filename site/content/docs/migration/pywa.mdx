@@ -111,7 +111,7 @@ Migration notes:
 | pywa usage | WATS usage | Status | Notes |
 | --- | --- | --- | --- |
 | pywa `initiate_call` / `accept_call` / `terminate_call` | WATS `PhoneNumberClient.initiateCall`, `.acceptCall`, `.terminateCall` | shape-only | Also includes `preAcceptCall` and `rejectCall`. |
-| call connect/status/terminate handlers | `normalizeWebhookEnvelope` calling variants plus `filtersTyped.call` | shape-only | Synthetic payloads only. Calling webhook normalization surfaces the full Meta field set in camelCase: connect/terminate `toUserId`/`toParentUserId`/`contacts[]`, terminate `status`/`startTime`/`endTime`/`duration`/`bizOpaqueCallbackData`, call status `recipientUserId`/`recipientParentUserId`/`bizOpaqueCallbackData`, call-button/deep-link `ctaPayload`/`deeplinkPayload`, and `call_permission_reply` message `fromUserId`/`fromParentUserId`. Wire snake_case keys are translated and never leak outside `raw`. |
+| call connect/status/terminate handlers | `normalizeWebhookEnvelope` calling variants plus `filtersTyped.call` | shape-only | Synthetic payloads only. Calling webhook fields are normalized to camelCase; see [Calling Reference](/docs/reference/calling) and [Webhook Normalizer](/docs/reference/webhook-normalizer). |
 | call permission request/update | `getCallPermissions` typed permission/action/limit models; `call_permission_reply` webhook carries `isPermanent`/`responseSource`, plus `fromUserId`/`fromParentUserId` | shape-only | Waiters still planned; pywa also exposes permission waiters. |
 | calling settings/SIP models | Read via `getPhoneNumberSettings`; writes via the `calling` sub-object on `updatePhoneNumberSettings` (status, call hours, call icons, callback permission, SIP servers) | shape-only | `includeSipCredentials` may return secret-bearing SIP material as camelCase `sipUserPassword`; `sip_user_password` is never serialized into update bodies. WABA `health_status.can_receive_call_sip` is exposed as `healthStatus.canReceiveCallSip`. |
 | live WebRTC/media orchestration | No first-class WATS equivalent yet | planned | Call buttons/deep links can initiate supported client calls, but WATS still has no WebRTC/SIP server implementation. Requires real calling-enabled phone numbers and explicit authorization. Meta modes include Graph APIs + webhooks + WebRTC, SIP + WebRTC, and SIP + SDES SRTP; SDP may negotiate OPUS or G.711 (`PCMA`/`PCMU`). |
@@ -227,13 +227,11 @@ Migration notes:
 Do not migrate code assuming WATS already has pywa parity for:
 
 - pywa's full decorator and handler taxonomy for callback selections/buttons, Flow request sub-actions, user marketing preferences, phone-number changes, and identity changes.
-- pywa sent-update waiters beyond the process-local `startChat` surface (call permission waits and broader composer helpers).
-- pywa's broad filter catalog: commands, MIME/extension filters, location radius, per-error-code status filters, user marketing filters, call permission filters.
-- one-call local-file/bytes media send polymorphism.
-- pywa's complete template component DSL, compare/migrate/unpause, library/authentication helper breadth.
-- pywa's full Flow JSON DSL, encrypted Flow request decrypt/encrypt, Flow hosting, metrics, migration.
-- calling permissions, calling settings/SIP mutations, and real call orchestration.
-- mutating admin APIs beyond profile/commerce updates and phone registration/deregistration. (QR code CRUD, token exchange, and WABA callback override are now shape-only; catalog CRUD and phone-level callback override remain planned.)
+- pywa sent-update waiters beyond the currently shipped process-local sent-result/click/selection/Flow-completion waiters.
+- pywa's broad filter catalog: commands, MIME/extension filters, location radius, per-error-code status filters, user marketing filters, and call permission filters.
+- Flow hosting and live Flow data-channel validation.
+- real WebRTC/SIP call orchestration beyond WATS request/webhook shapes and call-button/deep-link helpers.
+- catalog/product inventory CRUD and phone-level callback override. WATS already has profile/commerce updates, phone registration/deregistration, QR code CRUD, token exchange, and WABA callback override as shape-only helpers.
 - full Meta Graph OpenAPI generation and production operator modes beyond the current credential-free `wats init`, `wats doctor`, dry-run `wats serve`, and credential-gated local live `wats serve` tooling.
 
 ## Migration checklist

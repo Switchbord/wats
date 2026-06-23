@@ -53,19 +53,19 @@ Primary exports:
 - `defineEndpoint`
 - `sendMessage` for `POST /{phoneNumberId}/messages`
 - `sendMarketingTemplate` / `buildSendMarketingTemplatePayload` for `POST /{phoneNumberId}/marketing_messages`
-- Calling API lifecycle callables: `initiateCall`, `preAcceptCall`, `acceptCall`, `rejectCall`, `terminateCall`
-- outbound message payload builders for text, media, location, contacts, reaction, interactive, template, read, typing, and Marketing Messages sends
-- `PhoneNumberClient` with `.sendMessage(...)`, `.sendText(...)`, `.sendMarketingTemplate(...)`, composer helpers, calling lifecycle helpers, read-only phone inventory/profile helpers (`getInfo`, `getSettings`, `getBusinessProfile`, `getCommerceSettings`), profile/commerce mutation helpers (`updateBusinessProfile`, `updateCommerceSettings`), Block API/OBA/display-name helpers (`listBlockedUsers`, `blockUsers`, `unblockUsers`, `getOfficialBusinessAccountStatus`, `requestOfficialBusinessAccountReview`, `submitDisplayNameForReview`), and Groups helpers (`createGroup`, `listGroups`, `group(groupId)`)
+- Calling API lifecycle and permission callables: `initiateCall`, `preAcceptCall`, `acceptCall`, `rejectCall`, `terminateCall`, `getCallPermissions`
+- outbound message payload builders for text, media, location, contacts, reaction, interactive, template, read, typing, Marketing Messages, call-button, and deep-link sends
+- `PhoneNumberClient` with message composer helpers, one-call media upload/send helpers, calling lifecycle helpers, phone registration lifecycle, QR code CRUD, business public-key helpers, phone inventory/profile/settings helpers, profile/commerce mutation helpers (`updateBusinessProfile`, `updateCommerceSettings`), Block API/OBA/display-name helpers, and Groups helpers (`createGroup`, `listGroups`, `group(groupId)`)
 - `GroupClient` with bound-id Groups methods for `getInfo`, `update`, `delete`, invite links, participants, and join requests
-- `WABAClient` with `.getInfo(...)`, `.listSubscribedApps(...)`, and `.listPhoneNumbers({ fields?, limit?, after?, before? })`
-- business/admin inventory callables/types: `getWabaInfo`, `listSubscribedApps`, `listPhoneNumbers`, `getPhoneNumberInfo`, `getPhoneNumberSettings`, `getBusinessProfile`, `getCommerceSettings`, `updateBusinessProfile`, `updateCommerceSettings`, `listBlockedUsers`, `blockUsers`, `unblockUsers`, `getOfficialBusinessAccountStatus`, `requestOfficialBusinessAccountReview`, and `submitDisplayNameForReview`, exported at root and at `./endpoints/business-management`. WATS maps `profilePictureHandle` to Graph `profile_picture_handle` and `isCartEnabled` / `isCatalogVisible` to `is_cart_enabled` / `is_catalog_visible`
+- `WABAClient` with WABA/phone-number inventory, WABA callback override, phone-number creation, advanced template helpers, Template Groups, and Flow helpers
+- business/admin callables/types: read-only business/admin inventory (`getWabaInfo`, `listSubscribedApps`, `listPhoneNumbers`, `getPhoneNumberInfo`, `getPhoneNumberSettings`, `getBusinessProfile`, `getCommerceSettings`), profile/commerce/settings updates, Block API/OBA/display-name helpers, phone registration lifecycle, QR code CRUD, business public-key helpers, Embedded Signup token exchange, and WABA callback override, exported at root and at `./endpoints/business-management` where applicable. WATS maps public camelCase names to Graph snake_case at the transport boundary.
 - public endpoint subpaths: `@wats/graph/endpoints/messages`, `@wats/graph/endpoints/media`, `@wats/graph/endpoints/templates`, `@wats/graph/endpoints/flows`, `@wats/graph/endpoints/calling`, `@wats/graph/endpoints/business-management`, and `@wats/graph/endpoints/groups`. `bun run api:check` keeps package exports, fixture imports, docs, and changelog mentions aligned
 - Node/Bun-only filesystem media helpers: `@wats/graph/node-media` exports path-based `uploadAndSend*FromPath` helpers. This subpath is deliberately separate from the root entrypoint so browser/edge users never pull `node:fs` transitively.
 - `paginate` / `paginateAll`
 - Graph error classes and pywa-seeded error registry helpers
 - media runtime: `uploadMedia`, `downloadMedia`, `downloadMediaBytes`, `deleteMedia`, `decryptEncryptedMedia`, upload-session helpers, `MediaValidationError`, `MediaCryptoError`, `MediaIntegrityError`, and finite media cap constants
 
-Status: foundations-complete for Graph plumbing; endpoint breadth is expanding. Media runtime, outbound composers, template management, Flow helpers, Calling API lifecycle requests, read-only business/admin inventory, and Block API/OBA/display-name request-shape helpers are complete for credential-free MockTransport-backed behavior. Live Meta checks, automatic user-block decisions, policy/appeal automation, and broader mutating admin APIs remain credential-gated.
+Status: foundations-complete for Graph plumbing. Media runtime, outbound composers, template helpers, Flow helpers, Calling request/webhook shapes, Groups request shapes, and bounded business/admin helpers are complete for credential-free MockTransport-backed behavior. Live Meta checks, automatic user-block decisions, policy/appeal automation, catalog CRUD, and remaining WABA admin APIs remain credential-gated.
 
 ### `@wats/core`
 
@@ -137,6 +137,10 @@ Current commands:
 - `wats --help`
 - `wats init [dir] [--dry-run] [--format yaml|json] [--profile <name>]`
 - `wats init --help`
+- `wats setup`
+- `wats onboarding`
+- `wats --version`
+- `wats upgrade` / `wats update`
 - `wats config validate <path>`
 - `wats config validate --config <path>`
 - `wats doctor --help`
@@ -146,6 +150,7 @@ Current commands:
 - `wats openapi --config <path> --out <path>`
 - `wats openapi --help`
 - `wats serve --config <path> --dry-run [--profile <name>] [--host <host>] [--port <port>] [--print-routes]`
+- `wats serve --config <path> --paas [--profile <name>] [--print-routes]`
 - `wats serve --config <path> --live --yes-live --env-file .env.local [--profile <name>] [--host <host>] [--port <port>]`
 - `wats serve --help`
 - `wats webhook token`
@@ -178,8 +183,11 @@ Current routes:
 - `POST profile.webhook.path`
 - `POST {profile.service.apiPrefix}/messages/text`
 - `POST {profile.service.apiPrefix}/messages`
+- `GET {profile.service.apiPrefix}/messages`
+- `GET {profile.service.apiPrefix}/messages/{messageId}`
+- opt-in Groups routes when `enableGroupRoutes` is true
 
-Status: experimental service foundation. It composes config profile shape, explicit resolved secrets, Graph client, WebhookAdapter, WhatsApp facade, optional PersistenceStore injection, and a generated OpenAPI 3.1 document for the routes above. The CLI dry-run and local live wrappers can serve it locally; production hosting, Docker, and background outbox workers are later work.
+Status: experimental service foundation. It composes config profile shape, explicit resolved secrets, Graph client, WebhookAdapter, WhatsApp facade, optional PersistenceStore injection, optional `enableGroupRoutes`, and a generated OpenAPI 3.1 document for the routes above. The CLI dry-run and local live wrappers can serve it locally; production hosting hardening and background outbox workers are later work.
 
 ### `@wats/persistence`
 
@@ -208,14 +216,13 @@ Status: experimental local persistence foundation. SQLite migrations, schema met
 
 Not implemented as runtime APIs yet:
 
-- live credentialed template mutations/validation and high-level template library/bulk-authentication helpers
-- live Flow mutations, hosting, and encrypted data-exchange APIs beyond the credential-free helpers
+- live credentialed template mutations/validation beyond the shape-only helpers
+- Flow hosting and live Flow data-channel validation beyond credential-free helpers
 - live calling sessions and WebRTC/media signaling beyond the credential-free Calling API request/webhook helpers
-- mutating WABA/phone-number/business-management/admin APIs beyond read-only inventory and the bounded request-shape helpers above; no automatic user-block decisions or policy/appeal automation
-- catalog/product management APIs beyond read-only `getCommerceSettings`
+- remaining WABA/admin APIs such as WABA CRUD, catalog/product inventory CRUD, phone-level callback override, and automatic user-block policy/appeal automation
 - full Meta Graph API OpenAPI generation
-- config persistence schema, deeper CLI message/thread navigation, conversation APIs, automatic service send enqueueing, and observed status UI
-- supported Dockerfile, Compose file, container image, or container-registry publication
+- config persistence schema, deeper CLI message/thread navigation, conversation APIs, and automatic service send enqueueing
+- production Docker/Compose support, container image publication, or container-registry workflow
 
 See the [roadmap](/docs/meta/roadmap) for what is planned versus out of scope.
 

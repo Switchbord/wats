@@ -18,10 +18,11 @@ The `0.3.x-alpha-tooling` line ships the substrate:
 - media runtime: upload, metadata resolution, binary download, delete, encrypted decrypt, resumable upload sessions
 - outbound composers: media, location, contacts, reaction, interactive variants, template send, mark-as-read, typing indicators
 - template management: list/create/get/update/delete, component builders, parameter validation, template webhook filters
-- Flows: metadata/JSON CRUD, publish/deprecate, `buildFlowJson` / `validateFlowJson`, data-exchange response builders
-- calling: initiate/pre-accept/accept/reject/terminate request shapes, call webhook variants, typed call filters
-- business/admin: read-only WABA and phone-number inventory, profile/commerce reads and updates, Block API, OBA status, display-name review
-- `@wats/config`, `@wats/cli` (`init`, `config validate`, `doctor`, `serve`, `openapi`), `@wats/service` with OpenAPI 3.1
+- Flows: metadata/JSON CRUD, publish/deprecate, `buildFlowJson` / `validateFlowJson`, data-exchange response builders, encrypted request decrypt / response encrypt, metrics, migration, and Flow media decrypt helpers
+- calling: initiate/pre-accept/accept/reject/terminate, call permissions, calling settings/SIP request shapes, BSUID recipients, call-button/deep-link helpers, calling webhook variants, typed call filters, and operator codec/signaling docs
+- business/admin: read-only WABA and phone-number inventory, profile/commerce reads and updates, Block API, OBA status, display-name review, phone registration lifecycle, QR CRUD, public-key helpers, token exchange, and WABA callback override
+- template helpers: list/create/get/update/delete, compare, unpause, migrate, archive/unarchive, authentication-template upsert, library-template create fields, component builders, parameter validation, template webhook filters
+- `@wats/config`, `@wats/cli` (`init`, `setup`, `onboarding`, `config validate`, `doctor`, `serve`, `openapi`, `upgrade`, `messages list/show`), `@wats/service` with OpenAPI 3.1
 - SQLite persistence: migrations, idempotency records, outbox APIs
 - Postgres persistence adapter at `@wats/persistence/postgres` (shape-only, mock-client tested; no default CI live Postgres)
 - local message projection (`wats_messages` / `wats_message_status_events`) and read-only `wats messages list/show` CLI inspection
@@ -32,10 +33,9 @@ Everything above is credential-free and MockTransport-validated unless the [pari
 ## Planned
 
 - Live credentialed validation of media, message, template, Flow, and calling paths. The campaign runs in deliberate phases — read-only discovery first, side-effecting tests second, destructive cleanup last, admin mutations only with separate authorization. It is halted until credentials and explicit operator authorization exist.
-- Mutating admin endpoints: WABA CRUD, phone-number registration/configuration, subscribed-app mutations, webhook callback override, public-key mutation.
-- Encrypted Flow data-exchange request decrypt / response encrypt handling.
+- Mutating admin endpoints still remaining: WABA CRUD, catalog/product inventory CRUD, and `subscribeApp`; shipped request-shape helpers remain shape-only until live validation.
 - Live Postgres validation and service send enqueueing.
-- Production deployment artifacts: Dockerfile, Compose, container images, server wrappers for `@wats/service`.
+- Production deployment hardening: Compose, container image publication, registry workflow, and a production hosting contract. The repo ships a Railway-targeted Dockerfile.
 - Analytics/quality/rate-limit surfaces beyond the current typed alert payloads.
 
 ## Out of scope for now
@@ -44,7 +44,6 @@ Everything above is credential-free and MockTransport-validated unless the [pari
 - WebRTC/media session orchestration beyond calling request shapes.
 - Catalog/product inventory CRUD beyond read-only commerce settings.
 - Full Meta Graph API OpenAPI generation.
-- High-level template-library, comparison, migration, unpause, and bulk-authentication helpers — until consumers ask for them.
 
 ## Credential rule
 

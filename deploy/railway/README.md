@@ -55,8 +55,9 @@ Then point Meta App Dashboard > WhatsApp > Configuration at:
 
 ## Known limitations (alpha)
 
-- Stateless: no persistence is wired into `serve` yet, so webhook dedup and
-  idempotency are not active out of the box (tracked in WATS-87).
+- The CLI `wats serve` wrapper does not auto-inject a persistence store. Webhook dedup,
+  idempotency, and local message projection are inactive unless an operator wires a
+  `PersistenceStore` through `createWatsServiceApp(...)` or equivalent service composition.
 - Reliable-transport primitives (retry, bounded exponential full-jitter
   backoff, `Retry-After`, per-attempt timeout) ship opt-in via
   `createReliableTransport(inner, options?)` in `@wats/graph` (since 0.3.10) but

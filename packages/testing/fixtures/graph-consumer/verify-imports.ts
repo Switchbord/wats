@@ -113,6 +113,13 @@ import {
   updateFlowMetadata,
   updateMessageTemplate,
   updateTemplateGroup,
+  migrateTemplates,
+  archiveTemplates,
+  unarchiveTemplates,
+  upsertAuthenticationTemplate,
+  getFlowMetrics,
+  migrateFlows,
+  buildFlowMetricField,
   validateFlowJson,
   validateTemplateParameterCounts,
   uploadMedia,
@@ -514,6 +521,11 @@ async function verify(): Promise<VerifyReportOk> {
     templatesSubpath.updateTemplateGroup === updateTemplateGroup &&
     templatesSubpath.deleteTemplateGroup === deleteTemplateGroup &&
     templatesSubpath.getTemplateGroupAnalytics === getTemplateGroupAnalytics;
+  checks["WATS-160 advanced template helpers are exported from root and subpath"] =
+    templatesSubpath.migrateTemplates === migrateTemplates &&
+    templatesSubpath.archiveTemplates === archiveTemplates &&
+    templatesSubpath.unarchiveTemplates === unarchiveTemplates &&
+    templatesSubpath.upsertAuthenticationTemplate === upsertAuthenticationTemplate;
 
   const templateBody = buildTemplateBodyComponent({ text: "Hi {{1}}" });
   checks["buildTemplateBodyComponent emits Graph BODY component"] =
@@ -567,7 +579,10 @@ async function verify(): Promise<VerifyReportOk> {
     typeof validateFlowJson === "function" &&
     typeof buildFlowScreenResponse === "function" &&
     typeof buildFlowCloseResponse === "function" &&
-    typeof buildFlowErrorResponse === "function";
+    typeof buildFlowErrorResponse === "function" &&
+    typeof getFlowMetrics === "function" &&
+    typeof migrateFlows === "function" &&
+    typeof buildFlowMetricField === "function";
   checks["WATS-53 flows subpath exports runtime surface"] =
     flowsSubpath.listFlows === listFlows &&
     flowsSubpath.getFlow === getFlow &&
@@ -575,6 +590,9 @@ async function verify(): Promise<VerifyReportOk> {
     flowsSubpath.updateFlowJson === updateFlowJson &&
     flowsSubpath.publishFlow === publishFlow &&
     flowsSubpath.buildFlowJson === buildFlowJson &&
+    flowsSubpath.getFlowMetrics === getFlowMetrics &&
+    flowsSubpath.migrateFlows === migrateFlows &&
+    flowsSubpath.buildFlowMetricField === buildFlowMetricField &&
     typeof flowsSubpath.FLOW_JSON_MAX_BYTES === "number" &&
     flowsSubpath.FLOW_JSON_MAX_BYTES > 0;
 

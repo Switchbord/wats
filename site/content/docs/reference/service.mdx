@@ -51,6 +51,17 @@ interface WatsServiceConfig {
 
 `enableGroupRoutes` is an explicit opt-in for Groups management routes. It defaults to `false`, so deployments that do not want Groups keep the pre-Groups route set.
 
+### Opt-in runtime env flags
+
+When the service creates its default `WhatsApp` facade, two optional env flags can add local diagnostics:
+
+| Flag | Effect | Boundary |
+| --- | --- | --- |
+| `WATS_LOG_WEBHOOK_EVENTS=1` | logs normalized webhook update kind plus a PII-safe detail | no message text, raw webhook body, token, phone number, or WAMID |
+| `WATS_ECHO_REPLY=1` | sends a demo text reply for inbound text updates | local testing only; not a bot framework |
+
+If you inject your own `whatsapp` facade, these flags do nothing. The service package still receives explicit secrets; it does not read `.env.local` itself.
+
 ## Routes
 
 | Route | Method | Auth | Behavior |
@@ -282,11 +293,11 @@ For local webhook verification, run the live wrapper behind ngrok or an equivale
 
 ## Deployment
 
-There is no supported Dockerfile, Compose file, or container image yet. Future containers should wrap the implemented `wats serve` contract rather than duplicating service routing — no image publication, no registry credentials.
+The repo ships a Railway-targeted root `Dockerfile` that wraps the implemented `wats serve` contract. There is still no supported Compose file, container image release, registry workflow, or production hosting contract.
 
 ## Non-goals
 
-Not implemented: a full Meta Graph API OpenAPI document, live Meta credential checks, background queue/outbox workers, metrics, Docker, TLS, rate limiting, or message schemas beyond the current text/media/location/contacts/reaction/interactive slices.
+Not implemented: a full Meta Graph API OpenAPI document, live Meta credential checks, background queue/outbox workers, metrics, TLS, rate limiting, production container publication, or message schemas beyond the current text/media/location/contacts/reaction/interactive slices.
 
 ## Related docs
 
