@@ -1,13 +1,14 @@
 {
   "title": "Guides",
   "pages": [
-    "transport-and-testing",
     "cli-init",
+    "live-webhook",
     "groups-quickstart",
+    "transport-and-testing",
     "community-examples",
-    "deploy-docker",
     "deploy-bun",
     "deploy-node",
-    "deploy-cloudflare-workers"
+    "deploy-cloudflare-workers",
+    "deploy-docker"
   ]
 }
