@@ -25,6 +25,7 @@ Playground (runs the real SDK in-browser, no credentials): https://wats.sh/playg
 - [WATS Package Map](https://wats.sh/docs/concepts/package-map): Canonical dependency map and per-package status for the WATS workspace.
 - [WATS Public API Surface](https://wats.sh/docs/concepts/public-api-surface): The public package surfaces that ship today versus planned parity work.
 - [Reference Index](https://wats.sh/docs/reference): Every WATS reference doc and when to reach for it.
+- [Calling Reference](https://wats.sh/docs/reference/calling): WhatsApp Calling: lifecycle endpoints, call permissions, call-button/deep-link helpers, calling webhooks, and operator constraints.
 - [CLI reference](https://wats.sh/docs/reference/cli): The @wats/cli wats command: offline config validation, diagnostics, OpenAPI export, setup, and a local serve wrapper.
 - [Client Reference](https://wats.sh/docs/reference/client): The public GraphClient API surface: configuration types, request lifecycle, and validation rules.
 - [Config Reference (`@wats/config`)](https://wats.sh/docs/reference/config): The @wats/config application config shape: YAML/JSON validation, env-secret references, and redaction.

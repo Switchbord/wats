@@ -137,7 +137,15 @@ or composer bodies converted through the SDK media builders before the Graph req
 
 Supported media `type` values: `image`, `video`, `audio`, `document`, `sticker`. Each media body must provide exactly one of `mediaId` or `link`. `caption` is accepted for image, video, and document bodies; `filename` for document bodies only. `replyToMessageId` maps to Graph `context.message_id`. Audio bodies accept `voice: true`, mapping to Graph `audio.voice = true`; omitting it preserves the standard audio payload.
 
-Location bodies use `type: "location"`, finite `latitude`/`longitude` in Graph-supported ranges, and optional `name`, `address`, `replyToMessageId`. Reaction bodies use `type: "reaction"` with `messageId` and non-empty `emoji`; remove-reaction bodies use `type: "removeReaction"` with `messageId` and map to a reaction payload with an empty emoji. Contacts bodies use `type: "contacts"`, a non-empty `contacts` array, and the same camelCase contact input objects as the SDK composer helper. Interactive bodies support `interactiveButtons`, `interactiveList`, `interactiveCtaUrl`, `callPermissionRequest`, `interactiveProduct`, `interactiveProducts`, `interactiveCatalog`, and `interactiveLocationRequest`, mapping through the corresponding SDK builders. `type: "callPermissionRequest"` emits Graph `interactive.type = "call_permission_request"` and `interactive.action.name = "call_permission_request"`.
+| Body `type` | Required fields | Optional fields | Graph mapping notes |
+| --- | --- | --- | --- |
+| `image` / `video` / `audio` / `document` / `sticker` | exactly one of `mediaId` or `link` | `caption` (image/video/document), `filename` (document), `replyToMessageId` | `replyToMessageId` → `context.message_id`; audio accepts `voice: true` → `audio.voice = true` |
+| `location` | finite `latitude` / `longitude` in Graph-supported ranges | `name`, `address`, `replyToMessageId` | |
+| `reaction` | `messageId`, non-empty `emoji` | | maps to a reaction payload |
+| `removeReaction` | `messageId` | | maps to a reaction payload with an empty emoji |
+| `contacts` | non-empty `contacts` array (same camelCase contact inputs as the SDK composer) | | |
+| `interactiveButtons` / `interactiveList` / `interactiveCtaUrl` / `interactiveProduct` / `interactiveProducts` / `interactiveCatalog` / `interactiveLocationRequest` | see SDK builder inputs | `replyToMessageId` | map through the corresponding SDK builders |
+| `callPermissionRequest` | `to`, `bodyText` | `footerText`, `replyToMessageId` | `type: "callPermissionRequest"` emits `interactive.type = "call_permission_request"` and `interactive.action.name = "call_permission_request"` |
 
 The route preserves the bearer boundary: the service bearer token authorizes the local route, is never forwarded to Graph, and builder/validation failures return `400` without echoing tokens or request secrets.
 
