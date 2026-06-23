@@ -58,12 +58,15 @@ graph requests captured by mock: 1
 # Guide
 URL: https://wats.sh/docs/guide
 
-The full walkthrough is not written yet. Until it lands:
+The end-to-end walkthrough is split across the pages below. Start with the one
+that matches where you are:
 
 - [Quickstart](/docs/quickstart) — a working offline bot in one file.
-- [Transport and testing](/docs/guides/transport-and-testing) — MockTransport,
-  retries, interceptors.
-- [CLI onboarding](/docs/guides/cli-init) — config scaffolding and local serve.
+- [CLI onboarding](/docs/guides/cli-init) — config scaffolding, setup wizard, doctor, dry-run serve.
+- [Live webhook](/docs/guides/live-webhook) — public HTTPS tunnel, live serve, webhook onboarding checklist.
+- [Transport and testing](/docs/guides/transport-and-testing) — MockTransport, retries, interceptors.
+- [Groups quickstart](/docs/guides/groups-quickstart) — the credential-free Groups flow.
+- [Deploy guides](/docs/guides/deploy-bun) — Bun, Node, Cloudflare Workers, Docker shape.
 - [Parity matrix](/docs/parity) — what works against live Meta, with evidence.
 
 ---
@@ -330,41 +333,9 @@ Dry-run loads config, starts the `@wats/service` process wrapper with
 synthetic in-memory secrets, exposes health/readiness/OpenAPI/webhook routes,
 and makes no live Meta calls.
 
-For live webhook testing, Meta needs a public HTTPS callback. Start a secure
-HTTPS tunnel first, then run the live wrapper with an explicit env file:
-
-```bash
-ngrok http 8787
-wats onboarding --public-url https://<your-tunnel-host> --webhook-path /webhooks/whatsapp
-WATS_LIVE_ENABLE=1 WATS_YES_LIVE=1 \
-  wats serve --config wats.config.yaml --live --yes-live --env-file .env.local
-```
-
-`--live` declares live intent. `--yes-live` acknowledges that service routes
-can call Graph when you hit them. `--env-file .env.local` is required; WATS
-does not read `.env.local` implicitly. Keep the env file local and gitignored.
-This is for local live testing behind a secure HTTPS tunnel, not production
-hosting.
-
-Live serve resolves only the four secret keys below; WABA/phone ids and
-live-gate markers can remain in the file:
-
-```ini
-WATS_ACCESS_TOKEN=<copy from Meta>
-WATS_VERIFY_TOKEN=<local verify token>
-WATS_APP_SECRET=<copy from Meta App Dashboard>
-WATS_SERVICE_TOKEN=<local service bearer token>
-```
-
-Output stays status-only: no profile names, config paths, env names, tokens,
-app secrets, verify tokens, service bearer values, or Graph responses.
-
-Verify the service is up before pointing Meta at it:
-
-```bash
-curl -fsS http://127.0.0.1:8787/healthz
-curl -fsS http://127.0.0.1:8787/readyz
-```
+For live webhook testing against Meta — public HTTPS tunnel, `--live --yes-live
+--env-file`, and the webhook onboarding checklist — see
+[Live webhook](/docs/guides/live-webhook).
 
 ## Troubleshooting
 
@@ -376,29 +347,6 @@ curl -fsS http://127.0.0.1:8787/readyz
 | `output_exists` | generated file already exists | inspect the file; the CLI never overwrites |
 | `port_in_use` | service bind port already taken | choose another `--port` or stop the existing process |
 | `live_confirmation_required` | live check/service requested without acknowledgement | rerun only after reviewing side effects and adding `--yes-live` |
-
-## Webhook onboarding checklist
-
-Use `wats onboarding` once you know the public HTTPS URL for your tunnel or
-deployed WATS service:
-
-```bash
-wats onboarding --public-url https://example.test/wats
-wats onboarding --public-url https://example.test --webhook-path /webhooks/whatsapp
-```
-
-The command prints the webhook callback address to paste into Meta App
-Dashboard > WhatsApp > Configuration, plus two locally generated values:
-
-- `WATS_VERIFY_TOKEN` — use as the Meta webhook verify token; store it in your
-  local env/secret manager.
-- `WATS_SERVICE_TOKEN` — use as the bearer token for protected WATS service
-  routes.
-
-You still copy these from Meta yourself: `WATS_ACCESS_TOKEN`,
-`WATS_APP_SECRET`, `WATS_WABA_ID`, `WATS_PHONE_NUMBER_ID`. The command prints
-generated values to stdout only; it does not write files, read `.env.local`,
-resolve existing secrets, or call Meta Graph APIs.
 
 ## Safety defaults
 
@@ -1351,6 +1299,108 @@ It uses MockTransport plus a synthetic `value.groups[]` group webhook and prints
 
 ---
 
+# Live webhook
+URL: https://wats.sh/docs/guides/live-webhook
+
+Live webhook testing runs the real `@wats/service` with the fetch-backed Graph
+transport against Meta. Meta needs a public HTTPS callback — a localhost URL
+will not work. This page covers the tunnel, the live serve wrapper, and the
+webhook onboarding checklist.
+
+For config scaffolding, offline diagnostics, and dry-run serve, see
+[CLI onboarding](/docs/guides/cli-init).
+
+## Start a public HTTPS tunnel
+
+Meta calls your webhook over public HTTPS. Run a secure HTTPS tunnel first:
+
+```bash
+ngrok http 8787
+```
+
+`ngrok` is one option; any HTTPS tunnel that fronts `127.0.0.1:8787` works.
+Note the `https://<your-tunnel-host>` URL it prints.
+
+## Run the live serve wrapper
+
+```bash
+WATS_LIVE_ENABLE=1 WATS_YES_LIVE=1 \
+  wats serve --config wats.config.yaml --live --yes-live --env-file .env.local
+```
+
+- `--live` declares live intent.
+- `--yes-live` acknowledges that service routes can call Graph when you hit them.
+- `--env-file .env.local` is required; WATS does not read `.env.local`
+  implicitly. Keep the env file local and gitignored.
+
+This is for local live testing behind a secure HTTPS tunnel, not production
+hosting.
+
+Live serve resolves only the four secret keys below; WABA/phone ids and
+live-gate markers can remain in the file. Values are placeholder only —
+do not commit real secrets:
+
+```ini
+WATS_ACCESS_TOKEN=***
+WATS_VERIFY_TOKEN=***
+WATS_APP_SECRET=***
+WATS_SERVICE_TOKEN=***
+```
+
+Output stays status-only: no profile names, config paths, env names, tokens,
+app secrets, verify tokens, service bearer values, or Graph responses.
+
+Verify the service is up before pointing Meta at it:
+
+```bash
+curl -fsS http://127.0.0.1:8787/healthz
+curl -fsS http://127.0.0.1:8787/readyz
+```
+
+## Webhook onboarding checklist
+
+Use `wats onboarding` once you know the public HTTPS URL for your tunnel or
+deployed WATS service:
+
+```bash
+wats onboarding --public-url https://example.test/wats
+wats onboarding --public-url https://example.test --webhook-path /webhooks/whatsapp
+```
+
+The command prints the webhook callback address to paste into Meta App
+Dashboard > WhatsApp > Configuration, plus two locally generated values:
+
+- `WATS_VERIFY_TOKEN` — use as the Meta webhook verify token; store it in your
+  local env/secret manager.
+- `WATS_SERVICE_TOKEN` — use as the bearer token for protected WATS service
+  routes.
+
+You still copy these from Meta yourself: `WATS_ACCESS_TOKEN`,
+`WATS_APP_SECRET`, `WATS_WABA_ID`, `WATS_PHONE_NUMBER_ID`. The command prints
+generated values to stdout only; it does not write files, read `.env.local`,
+resolve existing secrets, or call Meta Graph APIs.
+
+## Credential safety
+
+The general CLI safety contract lives in
+[CLI onboarding](/docs/guides/cli-init). Live-specific rules:
+
+- `--env-file` must be a relative local filename; absolute paths, traversal,
+  duplicate flags, and token-looking values fail closed.
+- Keep `.env.local` local and gitignored. Do not commit access tokens, app
+  secrets, webhook verify tokens, service bearer tokens, or WABA/phone-number
+  ids from real accounts.
+- No live Meta calls without explicit opt-in (`--live --yes-live`); no secret
+  values printed.
+
+## Related
+
+- [CLI onboarding](/docs/guides/cli-init) — init, setup wizard, doctor, dry-run serve.
+- [CLI reference](/docs/reference/cli) — `wats serve`, `wats onboarding`, `wats messages`.
+- [Service reference](/docs/reference/service) — the standalone service the wrapper runs.
+
+---
+
 # Transport and Testing
 URL: https://wats.sh/docs/guides/transport-and-testing
 
@@ -2131,7 +2181,8 @@ One table per package. Find the surface you need; the contract lives in the link
 
 | Guide | When to use it |
 | --- | --- |
-| [`../getting-started.md`](/docs/guide) | Start here. |
+| [`../guides/cli-init.md`](/docs/guides/cli-init) | Config scaffolding, setup wizard, doctor, dry-run serve. Start here. |
+| [`../guides/live-webhook.md`](/docs/guides/live-webhook) | Public HTTPS tunnel, live serve, webhook onboarding checklist. |
 | [`../guides/transport-and-testing.md`](/docs/guides/transport-and-testing) | Injecting `MockTransport`; consumer-fixture pattern. |
 | [`../guides/groups-quickstart.md`](/docs/guides/groups-quickstart) | Credential-free Groups flow from create through invite, approval, and group messaging. |
 | [`../guides/deploy-docker.md`](/docs/guides/deploy-docker) | Container deployment design scaffold — not a supported runnable image yet. |
@@ -7955,7 +8006,9 @@ WATS is a Bun-first TypeScript toolkit for the WhatsApp Cloud API. It ships as c
 It is for TypeScript teams who want the WhatsApp Cloud API typed end to end and portable across Bun, Node, Workers, and Deno. Unlike pywa, WATS runs outside Python, types every Graph call and webhook update, and ships a Groups API with no pywa equivalent.
 
 - [Quickstart](/docs/quickstart) — install the packages and send your first message.
-- [Guide](/docs/guide) — the end-to-end walkthrough of clients, webhooks, and handlers.
+- [CLI onboarding](/docs/guides/cli-init) — config scaffolding, setup wizard, doctor, dry-run serve.
+- [Live webhook](/docs/guides/live-webhook) — point Meta at a locally running service behind a public HTTPS tunnel.
+- [Deploy guides](/docs/guides/deploy-bun) — Bun, Node, Cloudflare Workers, and the Docker shape.
 - [Reference](/docs/reference) — per-package API documentation.
 - [Parity](/docs/parity) — what is live-validated, shape-only, or planned against WhatsApp and pywa.
 
