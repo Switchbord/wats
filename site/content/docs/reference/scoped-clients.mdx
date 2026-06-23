@@ -7,7 +7,7 @@ description: "PhoneNumberClient and WABAClient: scoped sub-clients that bind a p
 
 `PhoneNumberClient` and `WABAClient` sit on top of the [endpoint registry](/docs/reference/endpoints) and bind a scope-defining path param (`phoneNumberId` / `wabaId`) at construction so call sites stop threading it through every request. They are thin ergonomic wrappers around the same `defineEndpoint` callables — they never re-implement path construction, sanitization, or error mapping.
 
-Graph endpoints come in two shapes: global / graph-root endpoints with no scope id in the path, and scope-bound endpoints with a leading id (`/{phoneNumberId}/messages`, `/{wabaId}/phone_numbers`, ...). The scope-bound ones are the ones every application repeats a dozen times. Scoped sub-clients bind the id once, validate it with the same sanitizer every endpoint call would apply, and expose endpoint callables as instance methods. `PhoneNumberClient.sendMessage(body)` is byte-identical on the wire to `sendMessage(graphClient, { phoneNumberId }, body)` — a dedicated test asserts the parity.
+Graph endpoints come in two shapes: global / graph-root endpoints with no scope id in the path, and scope-bound endpoints with a leading id (`/{phoneNumberId}/messages`, `/{wabaId}/phone_numbers`, ...). The scope-bound ones are the ones every application repeats a dozen times. Scoped sub-clients bind the id once, validate it with the same sanitizer every endpoint call would apply, and expose endpoint callables as instance methods. `PhoneNumberClient.sendMessage(body)` is byte-identical on the wire to `sendMessage(graphClient, { phoneNumberId }, body)`.
 
 ```text
 new PhoneNumberClient({ graphClient, phoneNumberId })
@@ -90,6 +90,7 @@ All implemented methods delegate through the same `POST /{phoneNumberId}/message
 | `sendProduct` / `sendProducts` / `sendCatalog` | implemented | commerce interactive payloads |
 | `requestLocation` | implemented | interactive location request payload |
 | `sendTemplate` | implemented | approved template send payload |
+| `sendMarketingTemplate` | implemented | `POST /{phoneNumberId}/marketing_messages`; `recipient` supports BSUID routing when `to` is omitted |
 | `markMessageAsRead` / `indicateTyping` | implemented | read status / typing payloads |
 | `getInfo({ fields? })` | implemented | `GET /{phoneNumberId}` |
 | `getSettings({ fields?, includeSipCredentials? })` | implemented | `GET /{phoneNumberId}/settings`; `includeSipCredentials` maps to `include_sip_credentials` and responses may be sensitive |
@@ -164,7 +165,7 @@ await phone.sendCallPermissionRequest({
 `sendAudio(..., { voice: true })` emits Graph `audio.voice = true`; omitting `voice` preserves the standard audio body. `sendCallPermissionRequest(...)` emits `interactive.type = "call_permission_request"` with `interactive.action.name = "call_permission_request"` and validates unknown or malformed fields before transport.
 
 
-`sendVoiceCall(...)` builds Meta's interactive `voice_call` call-button message. It follows the current Meta call-button/deep-link docs (updated 2026-05-21):
+`sendVoiceCall(...)` builds Meta's interactive `voice_call` call-button message:
 
 ```ts
 await phone.sendVoiceCall({
@@ -174,16 +175,11 @@ await phone.sendVoiceCall({
   ttlMinutes: 100,
   payload: "opaque-context"
 });
-
-await phone.sendVoiceCall({
-  recipient: "US.13491208655302741918",
-  bodyText: "Call us."
-});
 ```
 
-The wire body is `interactive.type = "voice_call"` and `interactive.action.name = "voice_call"`. Optional parameters map to Graph `display_text`, `ttl_minutes`, and `payload`. `displayText` is capped at 20 characters. `ttlMinutes` must be an integer from 1 to 43200. `payload` is capped at 512 characters and appears in call webhooks as `ctaPayload` when Meta sends `cta_payload`. The helper accepts `to`, `recipient`, or both; Meta routes by `to` when both are present. Calling permissions, App Review, device support, and platform eligibility still apply.
+The wire body is `interactive.type = "voice_call"` and `interactive.action.name = "voice_call"`. Optional parameters map to Graph `display_text`, `ttl_minutes`, and `payload`; `payload` surfaces in call webhooks as `ctaPayload` when Meta sends `cta_payload`. The helper accepts `to`, `recipient`, or both; Meta routes by `to` when both are present. Field caps, validation, calling webhooks, and operator constraints live on the [Calling Reference](/docs/reference/calling) page.
 
-Use `buildWhatsAppCallDeepLink({ phoneNumber, bizPayload? })` for `https://wa.me/call/<BUSINESS_PHONE_NUMBER>` links. `bizPayload` maps to `biz_payload` and appears in call webhooks as `deeplinkPayload` when Meta sends `deeplink_payload`. WhatsApp desktop clients do not support calling deep links.
+Use `buildWhatsAppCallDeepLink({ phoneNumber, bizPayload? })` for `https://wa.me/call/<BUSINESS_PHONE_NUMBER>` links. `bizPayload` maps to `biz_payload` and surfaces in call webhooks as `deeplinkPayload` when Meta sends `deeplink_payload`. WhatsApp desktop clients do not support calling deep links.
 
 Validation is runtime-enforced for JavaScript callers and rejects with `GraphRequestValidationError` before any transport call:
 
@@ -234,68 +230,18 @@ Validation rejects with `GraphRequestValidationError` before any transport call:
 `PhoneNumberClient` exposes the credential-free Calling API lifecycle over the bound phone-number scope:
 
 ```ts
-// Phone-number (wa_id) recipient — the classic `to` form:
-await phone.initiateCall({
-  to: "+155****0000",
-  session: { sdpType: "offer", sdp: "v=0\r\n..." },
-  bizOpaqueCallbackData: "tracker-optional"
-});
-
-// BSUID / parent BSUID recipient — Meta's `recipient` form for
-// business-initiated call connect. At least one of `to` or `recipient`
-// is required; supplying both emits both and Meta routes by `to`:
-await phone.initiateCall({
-  recipient: "BSUID-parent-abc",
-  session: { sdpType: "offer", sdp: "v=0\r\n..." }
-});
-
-await phone.acceptCall({
-  callId: "wacid.ABGG...",
-  session: { sdpType: "answer", sdp: "v=0\r\n..." }
-});
+await phone.initiateCall({ to: "+155****0000", session: { sdpType: "offer", sdp: "v=0\r\n..." } });
+await phone.acceptCall({ callId: "wacid.ABGG...", session: { sdpType: "answer", sdp: "v=0\r\n..." } });
 await phone.terminateCall({ callId: "wacid.ABGG..." });
 ```
 
-Direct callables are also exported from `@wats/graph`: `initiateCall`, `preAcceptCall`, `acceptCall`, `rejectCall`, `terminateCall`. All five delegate to `POST /{phoneNumberId}/calls`; only the Graph body `action` differs (`connect`, `pre_accept`, `accept`, `reject`, `terminate`).
+`initiateCall` / `preAcceptCall` / `acceptCall` / `rejectCall` / `terminateCall` all delegate to `POST /{phoneNumberId}/calls`; only the Graph body `action` differs (`connect` / `pre_accept` / `accept` / `reject` / `terminate`). `initiateCall` accepts `to` (a `wa_id`) or `recipient` (a Meta BSUID / parent BSUID); at least one is required, and `to` takes precedence when both are supplied.
 
-`initiateCall` accepts either `to` (a phone number / `wa_id`) or `recipient` (a Meta BSUID / parent BSUID) as the call target. At least one of the two is required. When both are supplied, both are emitted in the Graph body and Meta resolves the call to `to` (i.e. `to` takes precedence); supply both only when you intend to mirror that wire contract. `recipient` follows the same safety policy as `to`.
-
-Validation rejects with `GraphRequestValidationError` before any transport call:
-
-- `phoneNumberId`, `to`, `recipient`, and `callId` must be non-empty strings with no control characters, dot segments, slashes, query/fragment markers, malformed percent encoding, or encoded/double-encoded dot-segments. For `initiateCall`, at least one of `to` or `recipient` must be provided.
-- `bizOpaqueCallbackData`, when provided, must be a non-empty string no longer than `CALL_BIZ_OPAQUE_CALLBACK_DATA_MAX_LENGTH` (`512`) and free of control characters.
-- `session` must be a descriptor-safe plain object. WATS clones it before transport, maps `sdpType` to Graph `sdp_type`, and rejects accessors, `toJSON`, custom prototypes, cycles, unsafe prototype keys (`__proto__`, `constructor`, `prototype`), non-finite numbers, functions, symbols, empty/oversized strings, NUL/DEL-bearing SDP text, and serialized bodies over `CALL_SESSION_MAX_BYTES` (`65_536`).
-- Undefined optional fields are omitted from the Graph JSON body.
-- The Graph error taxonomy is preserved after the request reaches transport, including calling subclasses such as `CallingNotEnabledError`, `DuplicateCallError`, and `CallConnectionError`.
-
-Calling tests use `createMockTransport`; live call sessions remain credential-gated and are not performed in CI.
-
-
-### Calling operator notes
-
-Meta documents three media/signaling modes for WhatsApp Calling:
-
-| Mode | Signaling | Media |
-| --- | --- | --- |
-| Graph APIs + webhooks + WebRTC | HTTPS Graph requests and `calls` webhooks | WebRTC with ICE, DTLS, and SRTP |
-| SIP + WebRTC | SIP over TLS to your SIP edge | WebRTC media |
-| SIP + SDES SRTP | SIP over TLS to your SIP edge | SRTP keys negotiated with SDES |
-
-Audio support is negotiated by the media stack. The current Meta reference examples include OPUS and G.711 codecs (`PCMA` and `PCMU`) in SDP. WATS passes SDP through the Calling request helpers and validates the envelope; it does not choose codecs or run media negotiation for you.
-
-Operator constraints remain platform-side:
-
-- The business must be calling-eligible and normally needs a 2,000 daily messaging limit before production calling access.
-- Business-initiated calling is not available for phone numbers from USA, Canada, Egypt, Vietnam, Nigeria.
-- Calling requires App Review and the WhatsApp Business Messaging permission.
-- Calling sandbox/test-number access is limited; Meta documents Tech Partner sandbox flows separately.
-- WATS has no SIP server implementation and cannot provision calling access. Bring your WebRTC/SIP edge, then use WATS for the Graph request and webhook shapes.
-
-Status: shape-only. These helpers are covered by MockTransport and synthetic webhook tests; real call sessions remain campaign-gated.
+Validation, call permissions, call-button/deep-link helpers (`sendVoiceCall`, `buildWhatsAppCallDeepLink`), calling webhooks (`ctaPayload` / `deeplinkPayload`), media/signaling modes, and operator constraints (App Review, 2,000 daily messaging limit, USA/Canada/Egypt/Vietnam/Nigeria restrictions, Tech Partner sandbox, no SIP server implementation) live on the dedicated [Calling Reference](/docs/reference/calling) page. Status: shape-only — MockTransport and synthetic webhook tests only; live call sessions remain credential-gated.
 
 ### Bound-id path substitution
 
-`PhoneNumberClient.sendMessage(body, opts?)` is a pure delegation to the `sendMessage` endpoint-registry callable with `{ phoneNumberId: this.phoneNumberId }` injected. `sendText` and the media helpers build typed bodies and then use that same path. The wire-level result is byte-identical to calling `sendMessage(graphClient, { phoneNumberId }, body, opts)` directly — the consumer fixture asserts this equivalence.
+`PhoneNumberClient.sendMessage(body, opts?)` is a pure delegation to the `sendMessage` endpoint-registry callable with `{ phoneNumberId: this.phoneNumberId }` injected. `sendText` and the media helpers build typed bodies and then use that same path. The wire-level result is byte-identical to calling `sendMessage(graphClient, { phoneNumberId }, body, opts)` directly.
 
 ## WABAClient
 

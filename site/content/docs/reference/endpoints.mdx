@@ -334,6 +334,23 @@ await updatePhoneNumberSettings(client, {
 // => POST /{phoneNumberId}/settings { storage_configuration: { status: "ENABLED" } }
 ```
 
+## Calling lifecycle endpoints
+
+The Calling API lifecycle rides one Graph route — `POST /{phoneNumberId}/calls` — with the `action` field selecting the operation. Call permissions are a separate read.
+
+| Callable | Route | `action` |
+| --- | --- | --- |
+| `initiateCall` | `POST /{phoneNumberId}/calls` | `connect` |
+| `preAcceptCall` | `POST /{phoneNumberId}/calls` | `pre_accept` |
+| `acceptCall` | `POST /{phoneNumberId}/calls` | `accept` |
+| `rejectCall` | `POST /{phoneNumberId}/calls` | `reject` |
+| `terminateCall` | `POST /{phoneNumberId}/calls` | `terminate` |
+| `getCallPermissions` | `GET /{phoneNumberId}/call_permissions` | n/a |
+
+`getCallPermissions` requires exactly one of `userWaId` (Graph `user_wa_id`) or `recipient` (XOR); supplying both or neither rejects with `GraphRequestValidationError` before transport. `initiateCall` requires at least one of `to` (`wa_id`) or `recipient` (BSUID / parent BSUID); when both are supplied, both are emitted and Meta routes by `to`.
+
+Direct callables are exported from root `@wats/graph` and `@wats/graph/endpoints/calling`. `PhoneNumberClient` exposes bound-id variants that inject the configured `phoneNumberId`. See the [Calling Reference](/docs/reference/calling) for validation, call-button/deep-link helpers, calling webhooks, and operator constraints. Status: shape-only — MockTransport and synthetic webhook tests only.
+
 ## Public API summary
 
 - `defineEndpoint(spec): EndpointCallable`
