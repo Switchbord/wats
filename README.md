@@ -2,14 +2,7 @@
 
 [![CI](https://github.com/Switchbord/wats/actions/workflows/ci.yml/badge.svg)](https://github.com/Switchbord/wats/actions/workflows/ci.yml)
 
-The WhatsApp Cloud API, typed end to end. A set of composable TypeScript
-packages for Graph calls, webhook ingestion, typed routing, and a standalone
-service — Bun-first, portable to Node, Workers, and Deno.
-
-WATS is a TypeScript toolkit for the WhatsApp Cloud API. It is for TypeScript
-teams who want every Graph call and webhook update typed, portable across Bun,
-Node, Workers, and Deno. Unlike pywa, it runs outside Python and ships a Groups
-API with no pywa equivalent.
+WATS is a TypeScript toolkit for WhatsApp Cloud API teams who want typed Graph calls, webhook ingestion, routing, and a standalone service across Bun, Node, Workers, and Deno. It also ships a Groups API with no pywa equivalent.
 
 Docs, an interactive playground, and the live parity matrix: **[wats.sh](https://wats.sh)**.
 

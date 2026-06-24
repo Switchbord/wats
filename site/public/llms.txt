@@ -15,7 +15,7 @@ Playground (runs the real SDK in-browser, no credentials): https://wats.sh/playg
 - [Community examples](https://wats.sh/docs/guides/community-examples): Offline-by-default examples for learning the public WATS package APIs without live WhatsApp credentials.
 - [Deploying a WATS webhook on Bun](https://wats.sh/docs/guides/deploy-bun): Deploy a WATS webhook server under the Bun runtime using createBunWebhookServer.
 - [Deploying a WATS webhook on Cloudflare Workers](https://wats.sh/docs/guides/deploy-cloudflare-workers): Deploy a WATS webhook on Cloudflare Workers, Deno, and other WinterCG fetch runtimes using createFetchWebhookHandler.
-- [Docker Deployment Guide](https://wats.sh/docs/guides/deploy-docker): Container deployment shapes around the implemented wats serve contract — future Dockerfile and Compose patterns, current PaaS support.
+- [Docker Deployment Guide](https://wats.sh/docs/guides/deploy-docker): Container deployment shapes around the implemented wats serve contract — the shipped Railway Dockerfile, future Compose patterns, current PaaS support.
 - [Deploying a WATS webhook on Node](https://wats.sh/docs/guides/deploy-node): Deploy a WATS webhook server under Node.js using createNodeWebhookHandler and node:http.
 - [Groups quickstart](https://wats.sh/docs/guides/groups-quickstart): The credential-free Groups flow WATS supports today — create, read the lifecycle webhook, send the invite, approve joins, and message the group.
 - [Live webhook](https://wats.sh/docs/guides/live-webhook): Point Meta at a locally running WATS service behind a public HTTPS tunnel — live serve, webhook onboarding, and the credential-safety contract.

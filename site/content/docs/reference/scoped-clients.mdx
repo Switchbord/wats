@@ -92,6 +92,10 @@ All implemented methods delegate through the same `POST /{phoneNumberId}/message
 | `sendTemplate` | implemented | approved template send payload |
 | `sendMarketingTemplate` | implemented | `POST /{phoneNumberId}/marketing_messages`; `recipient` supports BSUID routing when `to` is omitted |
 | `markMessageAsRead` / `indicateTyping` | implemented | read status / typing payloads |
+| `uploadAndSendImage` / `uploadAndSendVideo` / `uploadAndSendAudio` / `uploadAndSendDocument` / `uploadAndSendSticker` | implemented | upload media, then send the resulting media id |
+| `requestVerificationCode` / `verifyPhoneNumber` / `registerPhoneNumber` / `deregisterPhoneNumber` / `setTwoStepVerificationPin` | implemented | phone registration lifecycle request shapes |
+| `createQrCode` / `listQrCodes` / `getQrCode` / `updateQrCode` / `deleteQrCode` | implemented | phone-number QR code CRUD |
+| `getBusinessPublicKey` / `setBusinessPublicKey` | implemented | business public-key read/update helpers |
 | `getInfo({ fields? })` | implemented | `GET /{phoneNumberId}` |
 | `getSettings({ fields?, includeSipCredentials? })` | implemented | `GET /{phoneNumberId}/settings`; `includeSipCredentials` maps to `include_sip_credentials` and responses may be sensitive |
 | `updateSettings({ storageConfiguration })` | implemented | `POST /{phoneNumberId}/settings`; emits `storage_configuration` and never `data_localization_region` |
@@ -125,7 +129,9 @@ await group.resetInviteLink();
 
 ### `updateSettings({ storageConfiguration })`
 
-Binds the configured phone-number id and POSTs local-storage settings to `/{phoneNumberId}/settings`. Pass camelCase `storageConfiguration`; WATS emits Graph `storage_configuration`. Authentication template OTP buttons use `supported_apps` records with `package_name` and `signature_hash`; the template DSL also maps `autofillText` and `zeroTapTermsAccepted` to Graph `autofill_text` and `zero_tap_terms_accepted`. The removed registration field `data_localization_region` is never emitted by WATS.
+Binds the configured phone-number id and POSTs local-storage settings to `/{phoneNumberId}/settings`. Pass camelCase `storageConfiguration`; WATS emits Graph `storage_configuration`. Registration helpers live separately: `registerPhoneNumber(...)` may emit Graph `data_localization_region` because Meta still accepts it on phone registration, not on settings updates.
+
+Authentication template OTP builders map public camelCase fields to Graph wire names: `supportedApps` becomes `supported_apps` records with `package_name` and `signature_hash`; `autofillText` and `zeroTapTermsAccepted` become `autofill_text` and `zero_tap_terms_accepted`.
 
 ```ts
 await phone.updateSettings({
@@ -279,11 +285,15 @@ Violations throw `GraphRequestValidationError` at construction.
 | `getInfo({ fields? })` | implemented | `GET /{wabaId}` |
 | `listSubscribedApps()` | implemented | `GET /{wabaId}/subscribed_apps` |
 | `listPhoneNumbers({ fields?, limit?, after?, before? })` | implemented | `GET /{wabaId}/phone_numbers` |
+| `createPhoneNumber` | implemented | `POST /{wabaId}/phone_numbers` |
+| `setCallbackOverride` / `clearCallbackOverride` | implemented | `POST /{wabaId}/subscribed_apps`; WABA callback override |
 | `listMessageTemplates` | implemented | `GET /{wabaId}/message_templates` |
 | `createMessageTemplate` | implemented | `POST /{wabaId}/message_templates` |
 | `getMessageTemplate` | implemented | `GET /{templateId}` |
 | `updateMessageTemplate` | implemented | `POST /{templateId}` |
 | `deleteMessageTemplate` | implemented | `DELETE /{wabaId}/message_templates?name=...&hsm_id=...` |
+| `compareTemplates` / `unpauseTemplate` / `migrateTemplates` | implemented | advanced template helpers |
+| `archiveTemplates` / `unarchiveTemplates` / `upsertAuthenticationTemplate` | implemented | archive/unarchive and auth-template upsert helpers |
 | `listTemplateGroups` / `createTemplateGroup` / `getTemplateGroup` / `updateTemplateGroup` / `deleteTemplateGroup` / `getTemplateGroupAnalytics` | implemented | `/{wabaId}/template_groups`, `/{templateGroupId}`, `/{wabaId}/template_group_analytics` |
 | `listFlows` | implemented | `GET /{wabaId}/flows` |
 | `createFlow` | implemented | `POST /{wabaId}/flows` |
@@ -294,6 +304,7 @@ Violations throw `GraphRequestValidationError` at construction.
 | `deleteFlow` | implemented | `DELETE /{flowId}` |
 | `deprecateFlow` | implemented | `POST /{flowId}/deprecate` |
 | `getFlowAssets` | implemented | `GET /{flowId}/assets` |
+| `getFlowMetrics` / `migrateFlows` | implemented | Flow metrics and migration helpers |
 | `subscribeApp` | not implemented yet | `POST /{wabaId}/subscribed_apps` |
 
 The phone-number, template, and Flow endpoint callables are also exported from `@wats/graph` so direct-callable users do not need the sub-client:
