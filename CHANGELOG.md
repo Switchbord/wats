@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.3.27] - 2026-06-24
+
+Patch alpha compatibility and current-surface release. Publishes the post-0.3.26 Calling, persistence/operator-runtime, Flow media, and business-management helper surfaces that were already merged to `main`, plus the docs cleanup that reconciles those surfaces.
+
+### Added
+
+- **WhatsApp Calling completion pass.** Calling webhook normalization now surfaces Meta's connect/terminate/status fields in camelCase, including `toUserId`, `toParentUserId`, `contacts[]`, terminate `status`/`startTime`/`endTime`/`duration`, `bizOpaqueCallbackData`, call-button `ctaPayload`, deep-link `deeplinkPayload`, and call-permission sender ids. `initiateCall(...)` accepts BSUID `recipient`, `getPhoneNumberSettings({ includeSipCredentials: true })` exposes sensitive SIP credentials as `sipUserPassword`, and WABA health exposes `healthStatus.canReceiveCallSip`. `sendVoiceCall(...)`, template voice-call button helpers, and `buildWhatsAppCallDeepLink(...)` cover Meta's documented call-button/deep-link shapes. Live call sessions remain credential-gated and are not run in CI.
+- **Operator-runtime persistence and CLI inspection.** `@wats/persistence` now includes the schema-v3 message projection tables plus the optional `@wats/persistence/postgres` subpath. `@wats/service` exposes read-only projected message routes when a `PersistenceStore` is injected, and `@wats/cli` adds `wats messages list/show` plus opt-in `WATS_CLI_STATUS_UI=1` stderr status summaries.
+- **Business-management and template helper breadth.** `@wats/graph` adds phone registration lifecycle helpers, QR code CRUD, business public-key helpers, Embedded Signup token exchange, WABA callback override helpers, Flow metrics/migration helpers, advanced template helpers (`compareTemplates`, `unpauseTemplate`, `migrateTemplates`, archive/unarchive, authentication-template upsert), and Flow media-upload CBC/HMAC decrypt helpers. Existing `@wats/graph/endpoints/templates` and `@wats/graph/endpoints/flows` subpaths now re-export the post-0.3.26 helper families.
+
+### Fixed
+
+- **Current docs surface reconciliation.** Public docs now reflect shipped Postgres, message projection, CLI messages, Calling, Groups entitlement state, Railway Dockerfile reality, service opt-in env flags, and the current Graph helper surface. The docs home and guide nav now point new operators through quickstart -> CLI onboarding -> live webhook -> deploy guides, and Calling has a dedicated reference page.
+- **Reliable-transport and deployment wording.** Railway deployment notes now describe `createReliableTransport(...)` as the opt-in retry/backoff/timeout primitive and distinguish the shipped Railway Dockerfile from future production container publication.
+
+### Release
+
+- Release metadata is aligned for 0.3.27: all publishable `@wats/*` packages, the service OpenAPI default version, README, and release-contract locks move together. No live Meta validation, Railway deployment, npm provenance attestation, or GitHub release side effect is implied by this changelog entry until the release commands below complete.
+
 ## [0.3.26] - 2026-06-10
 
 ### Fixed
