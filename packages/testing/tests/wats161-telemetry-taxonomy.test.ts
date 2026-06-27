@@ -3,19 +3,20 @@
 // This test pins the design contract before any /metrics, /status, or
 // diagnostics endpoint is implemented. It asserts:
 //   1. A maintainer taxonomy doc exists and covers required decision areas.
-//   2. The doc defines an explicit allowlist of metric names and label keys.
-//   3. The doc defines a PII denylist — fields that must never appear as
-//      metric labels or in diagnostic output.
-//   4. The doc separates telemetry from liveness/readiness (/healthz, /readyz).
-//   5. The doc decides endpoint protection (bearer token vs localhost bind).
-//   6. No PII-looking strings appear in the allowed label keys.
-//   7. Future telemetry issues (WATS-162..166) are referenced as consumers.
+//   2. The doc defines an explicit allowlist of metric names (snake_case only).
+//   3. The doc defines an explicit allowlist of label keys.
+//   4. Every metric row's labels appear in the allowed-label-keys table.
+//   5. The doc defines a PII denylist with all required categories.
+//   6. The doc defines route templating and enum-clamping rules.
+//   7. The doc separates telemetry from liveness/readiness.
+//   8. The doc decides endpoint protection strategy (bearer, opt-in, 404).
+//   9. No /metrics implementation exists anywhere in the service package.
 //
 // No /metrics implementation exists in this slice. This is a docs/test
 // contract only.
 
 import { describe, expect, test } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 function findRepoRoot(startDir: string): string {
@@ -36,6 +37,27 @@ function read(path: string): string {
 
 function expectAll(text: string, needles: readonly string[], label: string): void {
   for (const needle of needles) expect(text, `${label} missing "${needle}"`).toContain(needle);
+}
+
+/** Extract a section between two ## headings. */
+function extractSection(doc: string, heading: string): string {
+  const start = doc.indexOf(`## ${heading}`);
+  expect(start, `section "${heading}" not found`).toBeGreaterThanOrEqual(0);
+  const nextHeading = doc.indexOf("\n## ", start + 1);
+  const end = nextHeading === -1 ? doc.length : nextHeading;
+  return doc.slice(start, end);
+}
+
+/** Collect all .ts files under a directory recursively. */
+function collectTsFiles(dir: string): string[] {
+  const results: string[] = [];
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    const st = statSync(full);
+    if (st.isDirectory()) results.push(...collectTsFiles(full));
+    else if (entry.endsWith(".ts")) results.push(full);
+  }
+  return results;
 }
 
 describe("WATS-161 telemetry privacy model and metric taxonomy", () => {
@@ -61,29 +83,57 @@ describe("WATS-161 telemetry privacy model and metric taxonomy", () => {
     ], "telemetry taxonomy doc");
   });
 
-  test("doc defines an explicit allowlist of metric names", () => {
+  test("doc defines an explicit allowlist of metric names in Prometheus snake_case", () => {
     const doc = read("maintainers/telemetry-taxonomy.md");
-    // The doc must list concrete metric names in a structured section.
     expect(doc).toContain("Allowed metric families");
-    // Each family must have at least one concrete metric name.
-    expect(doc).toMatch(/http_requests_total|http\.requests\.total/iu);
-    expect(doc).toMatch(/webhook_normalization_total|webhook\.normalization\.total/iu);
-    expect(doc).toMatch(/graph_operations_total|graph\.operations\.total/iu);
+    // Concrete metric names — snake_case only, no dotted OTel convention.
+    expect(doc).toContain("http_requests_total");
+    expect(doc).toContain("webhook_normalization_total");
+    expect(doc).toContain("graph_operations_total");
+    expect(doc).toContain("http_request_duration_seconds");
+    expect(doc).toContain("outbox_depth");
   });
 
   test("doc defines an explicit allowlist of label keys", () => {
     const doc = read("maintainers/telemetry-taxonomy.md");
     expect(doc).toContain("Allowed label keys");
-    // Low-cardinality, PII-safe label keys.
     for (const key of [
       "route",
       "method",
       "status_class",
       "update_kind",
       "endpoint_family",
-      "outcome"
+      "outcome",
+      "adapter",
+      "state"
     ]) {
       expect(doc, `label key "${key}" not in allowlist`).toContain(key);
+    }
+  });
+
+  test("every label named in a metric row appears in the allowed-label-keys table", () => {
+    const doc = read("maintainers/telemetry-taxonomy.md");
+    // Extract allowed label keys from the table.
+    const labelSection = extractSection(doc, "Allowed label keys");
+    // Extract metric labels from the metric families table.
+    const metricSection = extractSection(doc, "Allowed metric families");
+    // Collect all label key names mentioned in the allowed-label-keys table.
+    // They appear as `| `key` |` in the first column.
+    const allowedKeys = Array.from(
+      labelSection.matchAll(/\|\s*`([a-z_]+)`\s*\|/gu),
+      (m) => m[1]
+    );
+    expect(allowedKeys.length).toBeGreaterThan(0);
+    // Collect all labels referenced in metric rows: "Labels: `a`, `b`, `c`."
+    // Each label is individually backtick-quoted.
+    const metricLabels = Array.from(
+      metricSection.matchAll(/Labels:\s*(.*?)\.\s*\|/gu),
+      (m) => Array.from(m[1].matchAll(/`([a-z_]+)`/gu), (x) => x[1])
+    ).flat();
+    expect(metricLabels.length).toBeGreaterThan(0);
+    // Every metric label must be in the allowed set.
+    for (const label of metricLabels) {
+      expect(allowedKeys, `metric label "${label}" not in allowed label keys`).toContain(label);
     }
   });
 
@@ -93,21 +143,26 @@ describe("WATS-161 telemetry privacy model and metric taxonomy", () => {
     for (const category of [
       "phone numbers",
       "message text",
+      "media content",
       "tokens",
       "WAMIDs",
       "raw webhook payloads",
       "config paths",
       "stack traces",
-      "env values"
+      "env values",
+      "IP addresses",
+      "location data",
+      "profile and contact names"
     ]) {
       expect(doc, `PII denylist missing "${category}"`).toContain(category);
     }
   });
 
-  test("allowed label keys do not contain PII-bearing names", () => {
+  test("allowed label keys do not contain PII-bearing substrings", () => {
     const doc = read("maintainers/telemetry-taxonomy.md");
-    // Extract the label keys section and assert none look PII-bearing.
-    const piiish = [
+    // Extract only the Allowed label keys section, not the whole doc.
+    const labelSection = extractSection(doc, "Allowed label keys");
+    const piiishSubstrings = [
       "phone",
       "recipient",
       "sender",
@@ -117,16 +172,32 @@ describe("WATS-161 telemetry privacy model and metric taxonomy", () => {
       "secret",
       "wamid",
       "filepath",
-      "env",
       "config_path",
       "stack"
     ];
-    // The doc must explicitly state that none of these are allowed as label keys.
-    for (const word of piiish) {
-      expect(doc, `doc must mention "${word}" as denied or not-allowed`).toMatch(
-        new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "iu")
-      );
+    // Extract the key-name column from the table (first column after header).
+    const tableRows = labelSection.match(/^\|\s*`([a-z_]+)`\s*\|/gmu);
+    expect(tableRows, "no label key rows found in table").not.toBeNull();
+    for (const row of tableRows!) {
+      const key = row.match(/`([a-z_]+)`/u)![1];
+      for (const sub of piiishSubstrings) {
+        expect(
+          key,
+          `label key "${key}" contains denied substring "${sub}"`
+        ).not.toContain(sub);
+      }
     }
+  });
+
+  test("doc defines route templating and enum-clamping rules", () => {
+    const doc = read("maintainers/telemetry-taxonomy.md");
+    expect(doc).toContain("Route templating rule");
+    expect(doc).toContain(":param");
+    expect(doc).toContain(":groupId");
+    expect(doc).toContain("unmatched");
+    expect(doc).toContain("Enum-clamping rule");
+    expect(doc).toMatch(/enum.*unknown|unknown.*enum/iu);
+    expect(doc).toContain("MUST NOT be used as label values verbatim");
   });
 
   test("doc separates telemetry from liveness/readiness", () => {
@@ -139,12 +210,15 @@ describe("WATS-161 telemetry privacy model and metric taxonomy", () => {
 
   test("doc decides endpoint protection strategy", () => {
     const doc = read("maintainers/telemetry-taxonomy.md");
-    // Must pick one: bearer token or localhost/internal bind.
     expect(doc).toMatch(/bearer token|service bearer/iu);
     expect(doc).toMatch(/opt-in/iu);
     // Must not claim endpoints are public by default (affirmative, not negated).
     expect(doc).not.toMatch(/\b(?:are|is)\s+public\s+by\s+default\b/iu);
     expect(doc).not.toMatch(/\bdefault\s+public\b/iu);
+    // Disabled telemetry must fall through to 404.
+    expect(doc).toMatch(/fall.*through|fallthrough|catch-all 404/iu);
+    // 404 body must be byte-identical to catch-all.
+    expect(doc).toMatch(/byte-identical|identical.*404/iu);
   });
 
   test("doc states the three non-goals explicitly", () => {
@@ -154,11 +228,24 @@ describe("WATS-161 telemetry privacy model and metric taxonomy", () => {
     expect(doc).toContain("No raw event logging");
   });
 
-  test("no /metrics implementation exists in this slice", () => {
-    // The service index must not contain a /metrics route handler.
-    const serviceIndex = read("packages/service/src/index.ts");
-    expect(serviceIndex).not.toContain("/metrics");
-    expect(serviceIndex).not.toContain("prometheus");
-    expect(serviceIndex).not.toContain("openmetrics");
+  test("no /metrics implementation exists anywhere in the service package", () => {
+    const serviceDir = join(repoRoot, "packages", "service", "src");
+    const tsFiles = collectTsFiles(serviceDir);
+    expect(tsFiles.length).toBeGreaterThan(0);
+    for (const file of tsFiles) {
+      const content = readFileSync(file, "utf8");
+      expect(
+        content,
+        `${file} contains "/metrics" — implementation must not exist in this slice`
+      ).not.toMatch(/\/metrics/iu);
+      expect(
+        content,
+        `${file} contains "prometheus" — implementation must not exist in this slice`
+      ).not.toMatch(/prometheus/iu);
+      expect(
+        content,
+        `${file} contains "openmetrics" — implementation must not exist in this slice`
+      ).not.toMatch(/openmetrics/iu);
+    }
   });
 });
