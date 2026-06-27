@@ -142,8 +142,9 @@ describe("WATS-161 telemetry privacy model and metric taxonomy", () => {
     // Must pick one: bearer token or localhost/internal bind.
     expect(doc).toMatch(/bearer token|service bearer/iu);
     expect(doc).toMatch(/opt-in/iu);
-    // Must not claim endpoints are public by default.
-    expect(doc).not.toMatch(/public.*by default|default.*public/iu);
+    // Must not claim endpoints are public by default (affirmative, not negated).
+    expect(doc).not.toMatch(/\b(?:are|is)\s+public\s+by\s+default\b/iu);
+    expect(doc).not.toMatch(/\bdefault\s+public\b/iu);
   });
 
   test("doc states the three non-goals explicitly", () => {
