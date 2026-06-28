@@ -228,6 +228,44 @@ describe("WATS-161 telemetry privacy model and metric taxonomy", () => {
     expect(doc).toContain("No raw event logging");
   });
 
+  test("outbox state label values match the real OutboxStatus type in @wats/persistence", () => {
+    // Pin the doc's `state` label values to the actual source-of-truth type so
+    // the contract cannot silently drift from the persistence layer. The prior
+    // draft fabricated `claimed`/`sent`; the real type is the only authority.
+    const persistenceSource = read("packages/persistence/src/index.ts");
+    const typeMatch = persistenceSource.match(/export type OutboxStatus\s*=\s*([^;]+);/u);
+    expect(typeMatch, "OutboxStatus type not found in @wats/persistence source").not.toBeNull();
+    const realStates = Array.from(typeMatch![1].matchAll(/"([a-z_]+)"/gu), (m) => m[1]).sort();
+    expect(realStates.length).toBeGreaterThan(0);
+
+    const doc = read("maintainers/telemetry-taxonomy.md");
+    const labelSection = extractSection(doc, "Allowed label keys");
+    const stateRow = labelSection.match(/^\|\s*`state`\s*\|([^|]+)\|/mu);
+    expect(stateRow, "`state` label row not found in allowed label keys table").not.toBeNull();
+    const docStates = Array.from(stateRow![1].matchAll(/`([a-z_]+)`/gu), (m) => m[1]).sort();
+
+    expect(
+      docStates,
+      `doc state values ${JSON.stringify(docStates)} must equal real OutboxStatus ${JSON.stringify(realStates)}`
+    ).toEqual(realStates);
+  });
+
+  test("bearer-token guidance is well-formed prose, not a garbled/redacted fragment", () => {
+    const doc = read("maintainers/telemetry-taxonomy.md");
+    const protection = extractSection(doc, "Endpoint protection");
+    // No stray triple-asterisk redaction artifacts.
+    expect(protection).not.toContain("***");
+    // The bearer bullet must be a complete sentence (ends with a period before
+    // the next list item), and the Authorization header code span must be
+    // balanced (even number of backticks on the bullet line).
+    const bearerLine = protection.split("\n").find((l) => l.includes("Bearer token"));
+    expect(bearerLine, "bearer-token bullet not found").toBeDefined();
+    const backticks = (bearerLine!.match(/`/gu) ?? []).length;
+    expect(backticks % 2, `unbalanced code span in bearer line: ${bearerLine}`).toBe(0);
+    expect(bearerLine).toMatch(/Authorization: Bearer/u);
+    expect(bearerLine!.trimEnd().endsWith(".")).toBe(true);
+  });
+
   test("no /metrics implementation exists anywhere in the service package", () => {
     const serviceDir = join(repoRoot, "packages", "service", "src");
     const tsFiles = collectTsFiles(serviceDir);

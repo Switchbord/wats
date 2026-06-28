@@ -28,7 +28,7 @@ The following metric families are the only ones WATS service telemetry may expos
 | Graph operations | `graph_operations_total` | counter | Outbound Graph API calls by endpoint family and status class. Labels: `endpoint_family`, `status_class`, `outcome`. |
 | Send outcomes | `send_outcomes_total` | counter | Message send attempts by outcome. Labels: `endpoint_family`, `outcome`. |
 | Persistence operations | `persistence_operations_total` | counter | Persistence store operations by adapter and outcome. Labels: `adapter`, `outcome`. |
-| Outbox depth | `outbox_depth` | gauge | Number of items in the persistence outbox. Labels: `adapter`, `state`. |
+| Outbox depth | `outbox_depth` | gauge | Number of items in the persistence outbox, partitioned by `state`. The `state` label values mirror the `OutboxStatus` type in `@wats/persistence` (`pending`, `processing`, `succeeded`). Labels: `adapter`, `state`. |
 
 ## Allowed label keys
 
@@ -43,7 +43,7 @@ The following low-cardinality, PII-safe label keys are the only ones permitted o
 | `endpoint_family` | `messages`, `media`, `templates`, `groups`, `flows` | bounded by Graph endpoint families |
 | `outcome` | `success`, `error`, `skipped`, `deduped` | fixed |
 | `adapter` | `sqlite`, `postgres` | fixed |
-| `state` | `pending`, `claimed`, `sent`, `failed` | fixed |
+| `state` | `pending`, `processing`, `succeeded` | fixed |
 
 ### Route templating rule
 
@@ -82,7 +82,7 @@ Existing service routes (`/messages`, `/groups/*`) return 401 on auth failure. T
 
 Options for future implementers:
 
-1. Bearer token — `/metrics`, `/status`, and `/debug/diagnostics` require `Authorization: Bearer <token>`. Fail closed with 404 on missing or mismatched token.
+1. Bearer token — `/metrics`, `/status`, and `/debug/diagnostics` require an `Authorization: Bearer <serviceBearerToken>` header. Fail closed with 404 on a missing or mismatched token.
 2. Localhost/internal bind — for operators who want telemetry without a token: bind telemetry routes to a separate listener on `127.0.0.1` or a Unix socket. This is a deployment concern, not a WATS core concern.
 
 WATS-162 (`/metrics`), WATS-163 (`/status`), WATS-164 (OTel hook seams), WATS-165 (`/debug/diagnostics`), and WATS-166 (docs) must implement against this document. If an implementation needs a new metric family, label key, or diagnostic field, amend this doc and its test first.
