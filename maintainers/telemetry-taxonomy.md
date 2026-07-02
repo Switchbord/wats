@@ -39,7 +39,7 @@ The following low-cardinality, PII-safe label keys are the only ones permitted o
 | `route` | `/webhook`, `/messages/:id`, `/groups/:groupId`, `/healthz` | bounded by route template inventory |
 | `method` | `GET`, `POST` | fixed |
 | `status_class` | `2xx`, `4xx`, `5xx` | fixed |
-| `update_kind` | `message`, `status`, `template`, `group_lifecycle_update` | bounded by webhook update types |
+| `update_kind` | `message`, `status`, `account`, `unknown`, `callConnect`, `callTerminate`, `callStatus`, `groupLifecycle`, `groupParticipants`, `groupSettings`, `groupStatus`, `userPreferences`, `system`, `chatOpened` | fixed — mirrors `TypedUpdateKind` in `@wats/core` |
 | `endpoint_family` | `messages`, `media`, `templates`, `groups`, `flows` | bounded by Graph endpoint families |
 | `outcome` | `success`, `error`, `skipped`, `deduped` | fixed |
 | `adapter` | `sqlite`, `postgres` | fixed |

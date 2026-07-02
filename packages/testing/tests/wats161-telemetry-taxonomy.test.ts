@@ -250,6 +250,30 @@ describe("WATS-161 telemetry privacy model and metric taxonomy", () => {
     ).toEqual(realStates);
   });
 
+  test("update_kind label values match the real TypedUpdateKind type in @wats/core", () => {
+    // Pin the doc's `update_kind` label values to the actual webhook normalizer
+    // type so the contract cannot silently drift. The prior draft fabricated
+    // `template` (not a real kind) and `group_lifecycle_update` (a Meta webhook
+    // field name, not the normalized kind value — the real kind is
+    // `groupLifecycle`); TypedUpdateKind is the only authority.
+    const coreSource = read("packages/core/src/webhookNormalizer.ts");
+    const typeMatch = coreSource.match(/export type TypedUpdateKind\s*=\s*([\s\S]+?);/u);
+    expect(typeMatch, "TypedUpdateKind type not found in @wats/core source").not.toBeNull();
+    const realKinds = Array.from(typeMatch![1].matchAll(/"([a-zA-Z]+)"/gu), (m) => m[1]).sort();
+    expect(realKinds.length).toBeGreaterThan(0);
+
+    const doc = read("maintainers/telemetry-taxonomy.md");
+    const labelSection = extractSection(doc, "Allowed label keys");
+    const kindRow = labelSection.match(/^\|\s*`update_kind`\s*\|([^|]+)\|/mu);
+    expect(kindRow, "`update_kind` label row not found in allowed label keys table").not.toBeNull();
+    const docKinds = Array.from(kindRow![1].matchAll(/`([a-zA-Z]+)`/gu), (m) => m[1]).sort();
+
+    expect(
+      docKinds,
+      `doc update_kind values ${JSON.stringify(docKinds)} must equal real TypedUpdateKind ${JSON.stringify(realKinds)}`
+    ).toEqual(realKinds);
+  });
+
   test("bearer-token guidance is well-formed prose, not a garbled/redacted fragment", () => {
     const doc = read("maintainers/telemetry-taxonomy.md");
     const protection = extractSection(doc, "Endpoint protection");
