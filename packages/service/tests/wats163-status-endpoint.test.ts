@@ -102,7 +102,7 @@ function authedStatusReq(): Request {
 
 describe("WATS-163 redacted /status operator endpoint", () => {
   test("authorized GET /status returns 200 with the safe operator schema", async () => {
-    const app = createWatsServiceApp(config({ persistence: memoryStore() as never }));
+    const app = createWatsServiceApp(config({ persistence: memoryStore() as unknown as never }));
     const res = await app.fetch(authedStatusReq());
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("application/json");
@@ -126,7 +126,7 @@ describe("WATS-163 redacted /status operator endpoint", () => {
   });
 
   test("route inventory is templated, never raw ids", async () => {
-    const app = createWatsServiceApp(config({ enableGroupRoutes: true } as never));
+    const app = createWatsServiceApp(config({ enableGroupRoutes: true }));
     const res = await app.fetch(authedStatusReq());
     const body = (await res.json()) as { routes: string[] };
     const routes = body.routes;
@@ -141,7 +141,7 @@ describe("WATS-163 redacted /status operator endpoint", () => {
   });
 
   test("/status payload never leaks secrets, ids, paths, or PII", async () => {
-    const app = createWatsServiceApp(config({ persistence: memoryStore() as never }));
+    const app = createWatsServiceApp(config({ persistence: memoryStore() as unknown as never }));
     const res = await app.fetch(authedStatusReq());
     const text = await res.text();
     // No secret material.
@@ -212,7 +212,7 @@ describe("WATS-163 redacted /status operator endpoint", () => {
   });
 
   test("serviceMode and featureFlags reflect persistence and group-route configuration", async () => {
-    const withGroups = createWatsServiceApp(config({ enableGroupRoutes: true, persistence: memoryStore() as never } as never));
+    const withGroups = createWatsServiceApp(config({ enableGroupRoutes: true, persistence: memoryStore() as unknown as never }));
     const body = (await (await withGroups.fetch(authedStatusReq())).json()) as {
       featureFlags: Record<string, unknown>;
       persistence: unknown;
@@ -229,6 +229,71 @@ describe("WATS-163 redacted /status operator endpoint", () => {
     expect(minimalBody.featureFlags.persistence).toBe(false);
     // No persistence => persistence summary is null, not a fabricated health record.
     expect(minimalBody.persistence).toBeNull();
+  });
+
+  test("persistence health failure yields a redacted unhealthy summary, never an error body", async () => {
+    // health() rejects.
+    const rejecting = { ...memoryStore(), async health() { throw new Error("connect ECONNREFUSED /var/run/wats.sock trace"); } };
+    const rejectingApp = createWatsServiceApp(config({ persistence: rejecting as unknown as never }));
+    const rejectingRes = await rejectingApp.fetch(authedStatusReq());
+    expect(rejectingRes.status).toBe(200);
+    const rejectingText = await rejectingRes.text();
+    expect(rejectingText).not.toContain("ECONNREFUSED");
+    expect(rejectingText).not.toContain("/var/run");
+    const rejectingBody = (await (await rejectingApp.fetch(authedStatusReq())).json()) as { persistence: Record<string, unknown> };
+    expect(rejectingBody.persistence.ok).toBe(false);
+    expect(rejectingBody.persistence.backend).toBe("unknown");
+    expect(rejectingBody.persistence.redactedLocation).toBe("[REDACTED]");
+
+    // health() throws synchronously.
+    const throwing = { ...memoryStore(), health() { throw new Error("boom"); } };
+    const throwingRes = await createWatsServiceApp(config({ persistence: throwing as unknown as never })).fetch(authedStatusReq());
+    expect(throwingRes.status).toBe(200);
+    const throwingBody = (await throwingRes.json()) as { persistence: Record<string, unknown> };
+    expect(throwingBody.persistence.ok).toBe(false);
+  });
+
+  test("a non-conforming adapter cannot leak a real path via redactedLocation", async () => {
+    // A custom adapter returns a filesystem path where a redacted token is expected.
+    const leaky = {
+      ...memoryStore(),
+      async health() {
+        return { ok: true, backend: "sqlite" as const, currentVersion: 1, redactedLocation: "/home/operator/secret/wats.db" };
+      }
+    };
+    const app = createWatsServiceApp(config({ persistence: leaky as unknown as never }));
+    const text = await (await app.fetch(authedStatusReq())).text();
+    expect(text).not.toContain("/home/operator");
+    expect(text).not.toContain("secret/wats.db");
+    const body = (await (await app.fetch(authedStatusReq())).json()) as { persistence: Record<string, unknown> };
+    // Clamped to the safe token because it was not already in [REDACTED...] form.
+    expect(body.persistence.redactedLocation).toBe("[REDACTED]");
+  });
+
+  test("404 for /status is byte-identical to the catch-all across the auth-failure matrix", async () => {
+    const app = createWatsServiceApp(config());
+    const catchAll = await app.fetch(new Request("https://svc.test/no-such-route", { method: "GET" }));
+    const catchAllText = await catchAll.text();
+    const catchAllType = catchAll.headers.get("content-type");
+
+    const cases: RequestInit[] = [
+      { method: "GET" }, // missing header
+      { method: "GET", headers: { authorization: "Bearer" } }, // malformed (no token)
+      { method: "GET", headers: { authorization: "Basic abc" } }, // wrong scheme
+      { method: "GET", headers: { authorization: "Bearer wrong-token" } }, // wrong token
+      { method: "POST" }, // anonymous non-GET
+      { method: "HEAD" },
+      { method: "OPTIONS" }
+    ];
+    for (const init of cases) {
+      const res = await app.fetch(new Request("https://svc.test/status", init));
+      expect(res.status, `status for ${JSON.stringify(init)}`).toBe(404);
+      // HEAD responses carry no body by spec; compare body only for non-HEAD.
+      if ((init.method ?? "GET") !== "HEAD") {
+        expect(await res.text(), `body for ${JSON.stringify(init)}`).toBe(catchAllText);
+      }
+      expect(res.headers.get("content-type"), `content-type for ${JSON.stringify(init)}`).toBe(catchAllType);
+    }
   });
 });
 

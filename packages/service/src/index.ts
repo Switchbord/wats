@@ -426,17 +426,30 @@ function deriveServiceMode(ctx: RuntimeConfig): string {
 // WATS-163: assemble the redacted /status payload. Only safe operator fields
 // are included. The persistence summary reuses PersistenceHealth, which is
 // already redaction-safe (ok / backend / currentVersion / redactedLocation).
+//
+// Defense in depth: an in-tree adapter always returns a bracketed
+// `[REDACTED_*]` location constant, but a non-conforming custom adapter could
+// resolve `health()` to a malformed object or a real filesystem path. We
+// therefore coerce every field to its expected type and clamp any
+// redactedLocation that is not already in the safe `[REDACTED...]` form, so a
+// path can never leak through /status regardless of adapter behavior.
+function sanitizePersistenceHealth(health: unknown): Record<string, unknown> {
+  const record = (typeof health === "object" && health !== null ? health : {}) as Record<string, unknown>;
+  const rawLocation = typeof record.redactedLocation === "string" ? record.redactedLocation : "";
+  const safeLocation = /^\[REDACTED/u.test(rawLocation) ? rawLocation : "[REDACTED]";
+  return {
+    ok: record.ok === true,
+    backend: typeof record.backend === "string" ? record.backend : "unknown",
+    currentVersion: Number.isInteger(record.currentVersion) ? (record.currentVersion as number) : 0,
+    redactedLocation: safeLocation
+  };
+}
+
 async function buildStatusPayload(ctx: RuntimeConfig): Promise<Record<string, unknown>> {
   let persistence: Record<string, unknown> | null = null;
   if (ctx.persistence !== undefined) {
     try {
-      const health = await ctx.persistence.health();
-      persistence = {
-        ok: health.ok,
-        backend: health.backend,
-        currentVersion: health.currentVersion,
-        redactedLocation: health.redactedLocation
-      };
+      persistence = sanitizePersistenceHealth(await ctx.persistence.health());
     } catch {
       // Never surface a persistence error body; report a redacted unhealthy
       // summary so /status stays diagnosable without leaking error detail.
