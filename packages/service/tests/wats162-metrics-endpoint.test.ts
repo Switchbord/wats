@@ -112,6 +112,10 @@ async function signature(secret: string, body: string): Promise<string> {
 describe("WATS-162 Prometheus/OpenMetrics /metrics endpoint", () => {
   test("authorized GET /metrics returns 200 text/plain exposition format", async () => {
     const app = createWatsServiceApp(config());
+    // /metrics reports on requests already completed before the scrape; the
+    // scrape request itself is recorded after its own response is rendered,
+    // so drive at least one prior request to populate the registry.
+    await app.fetch(new Request("https://svc.test/healthz"));
     const res = await app.fetch(authedMetricsReq());
     expect(res.status).toBe(200);
     const contentType = res.headers.get("content-type") ?? "";
@@ -150,7 +154,7 @@ describe("WATS-162 Prometheus/OpenMetrics /metrics endpoint", () => {
       expect(allowedMetricNames, `unexpected metric name in exposition: ${name}`).toContain(baseName);
     }
 
-    const allowedLabelKeys = ["route", "method", "status_class", "update_kind", "endpoint_family", "outcome", "adapter"];
+    const allowedLabelKeys = ["route", "method", "status_class", "update_kind", "endpoint_family", "outcome", "adapter", "le"];
     const labelBlocks = Array.from(text.matchAll(/\{([^}]*)\}/gu), (m) => m[1]);
     for (const block of labelBlocks) {
       const keys = Array.from(block.matchAll(/([a-z_]+)=/gu), (m) => m[1]);
@@ -233,7 +237,7 @@ describe("WATS-162 Prometheus/OpenMetrics /metrics endpoint", () => {
     await app.fetch(new Request("https://svc.test/healthz"));
     await app.fetch(new Request("https://svc.test/healthz"));
     const text = await (await app.fetch(authedMetricsReq())).text();
-    const match = text.match(/http_requests_total\{route="\/healthz",method="GET",status_class="2xx"\}\s+(\d+)/u);
+    const match = text.match(/http_requests_total\{method="GET",route="\/healthz",status_class="2xx"\}\s+(\d+)/u);
     expect(match, "http_requests_total for /healthz not found").not.toBeNull();
     expect(Number(match![1])).toBeGreaterThanOrEqual(2);
     expect(text).toMatch(/http_request_duration_seconds_count\{route="\/healthz",status_class="2xx"\}\s+\d+/u);
@@ -262,21 +266,21 @@ describe("WATS-162 Prometheus/OpenMetrics /metrics endpoint", () => {
     }));
     expect(res.status).toBe(200);
     const text = await (await app.fetch(authedMetricsReq())).text();
-    expect(text).toMatch(/webhook_normalization_total\{update_kind="message",outcome="success"\}\s+1/u);
+    expect(text).toMatch(/webhook_normalization_total\{outcome="success",update_kind="message"\}\s+1/u);
   });
 
   test("graph_operations_total and send_outcomes_total increment on message send success and failure", async () => {
     const okApp = createWatsServiceApp(config());
     await okApp.fetch(new Request("https://svc.test/api/messages/text", authed({ to: "15550001111", text: "hi" })));
     const okText = await (await okApp.fetch(authedMetricsReq())).text();
-    expect(okText).toMatch(/graph_operations_total\{endpoint_family="messages",status_class="2xx",outcome="success"\}\s+1/u);
+    expect(okText).toMatch(/graph_operations_total\{endpoint_family="messages",outcome="success",status_class="2xx"\}\s+1/u);
     expect(okText).toMatch(/send_outcomes_total\{endpoint_family="messages",outcome="success"\}\s+1/u);
 
     const failMock = createMockTransport({ defaultResponse: { status: 500, body: { error: { message: "boom", type: "OAuthException", code: 1 } } } });
     const failApp = createWatsServiceApp(config({ transport: failMock.transport }));
     await failApp.fetch(new Request("https://svc.test/api/messages/text", authed({ to: "15550001111", text: "hi" })));
     const failText = await (await failApp.fetch(authedMetricsReq())).text();
-    expect(failText).toMatch(/graph_operations_total\{endpoint_family="messages",status_class="5xx",outcome="error"\}\s+1/u);
+    expect(failText).toMatch(/graph_operations_total\{endpoint_family="messages",outcome="error",status_class="5xx"\}\s+1/u);
     expect(failText).toMatch(/send_outcomes_total\{endpoint_family="messages",outcome="error"\}\s+1/u);
   });
 
