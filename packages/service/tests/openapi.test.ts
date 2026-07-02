@@ -94,6 +94,7 @@ describe("WATS-35 OpenAPI document generator", () => {
       "/healthz",
       "/openapi.json",
       "/readyz",
+      "/status",
       "/webhooks/whatsapp"
     ]);
 
@@ -196,6 +197,7 @@ describe("WATS-35 OpenAPI document generator", () => {
       "/hooks/custom",
       "/openapi.json",
       "/readyz",
+      "/status",
       "/v1/internal/messages",
       "/v1/internal/messages/text",
       "/v1/internal/messages/{messageId}"

@@ -146,6 +146,8 @@ interface ServiceRouteMatch {
 const JSON_CONTENT_TYPE = "application/json; charset=utf-8";
 const SERVICE_NAME = "wats";
 const OPENAPI_PATH = "/openapi.json";
+const STATUS_PATH = "/status";
+const SERVER_START_MS = Date.now();
 const DEFAULT_OPENAPI_TITLE = "WATS Service API";
 const DEFAULT_OPENAPI_VERSION = "0.3.27";
 
@@ -377,6 +379,86 @@ function unauthorized(): Response {
   return errorResponse(401, "unauthorized", "Missing or invalid bearer token.");
 }
 
+// The catch-all 404 for unknown routes. Telemetry endpoints fail closed to
+// this exact response (byte-identical body + status) so a missing/mismatched
+// bearer token is indistinguishable from a non-existent route — per the
+// WATS-161 telemetry taxonomy "Endpoint protection" contract.
+function notFound(): Response {
+  return errorResponse(404, "not_found", "Route not found.");
+}
+
+// WATS-163: templated route inventory for the /status operator endpoint. Path
+// parameters are rendered as :param tokens (never raw ids) and dynamic-id
+// routes are only listed when their feature is enabled, so the inventory can
+// never leak a WABA id, phone-number id, or message id.
+function buildRouteInventory(ctx: RuntimeConfig): string[] {
+  const routes = [
+    "/healthz",
+    "/readyz",
+    OPENAPI_PATH,
+    STATUS_PATH,
+    ctx.webhookPath,
+    ctx.textPath,
+    ctx.messagesPath,
+    `${ctx.messagesPath}/:id`
+  ];
+  if (ctx.enableGroupRoutes) {
+    routes.push(
+      ctx.groupsPath,
+      `${ctx.groupsPath}/:groupId`,
+      `${ctx.groupsPath}/:groupId/invite-link`,
+      `${ctx.groupsPath}/:groupId/participants`,
+      `${ctx.groupsPath}/:groupId/join-requests`
+    );
+  }
+  return routes;
+}
+
+// WATS-163: derive a coarse, low-cardinality service mode label. No PII, no
+// ids — only the shape of what is enabled.
+function deriveServiceMode(ctx: RuntimeConfig): string {
+  const parts: string[] = ["webhook"];
+  if (ctx.persistence !== undefined) parts.push("persistence");
+  if (ctx.enableGroupRoutes) parts.push("groups");
+  return parts.join("+");
+}
+
+// WATS-163: assemble the redacted /status payload. Only safe operator fields
+// are included. The persistence summary reuses PersistenceHealth, which is
+// already redaction-safe (ok / backend / currentVersion / redactedLocation).
+async function buildStatusPayload(ctx: RuntimeConfig): Promise<Record<string, unknown>> {
+  let persistence: Record<string, unknown> | null = null;
+  if (ctx.persistence !== undefined) {
+    try {
+      const health = await ctx.persistence.health();
+      persistence = {
+        ok: health.ok,
+        backend: health.backend,
+        currentVersion: health.currentVersion,
+        redactedLocation: health.redactedLocation
+      };
+    } catch {
+      // Never surface a persistence error body; report a redacted unhealthy
+      // summary so /status stays diagnosable without leaking error detail.
+      persistence = { ok: false, backend: "unknown", currentVersion: 0, redactedLocation: "[REDACTED]" };
+    }
+  }
+  return {
+    service: SERVICE_NAME,
+    version: DEFAULT_OPENAPI_VERSION,
+    uptimeSeconds: Math.max(0, Math.floor((Date.now() - SERVER_START_MS) / 1000)),
+    graphApiVersion: ctx.profile.graph.apiVersion,
+    serviceMode: deriveServiceMode(ctx),
+    routes: buildRouteInventory(ctx),
+    featureFlags: {
+      groupRoutes: ctx.enableGroupRoutes,
+      persistence: ctx.persistence !== undefined
+    },
+    persistence
+  };
+}
+
+
 function timingSafeStringEqual(a: string, b: string): boolean {
   const encoder = new TextEncoder();
   const left = encoder.encode(a);
@@ -522,7 +604,7 @@ function assertNoRouteCollisions(webhookPath: string, apiPrefix: string, enableG
   const textPath = `${apiPrefix}/messages/text`;
   const messagesPath = `${apiPrefix}/messages`;
   const groupsPath = `${apiPrefix}/groups`;
-  const reservedStaticPaths = new Set(["/healthz", "/readyz", OPENAPI_PATH]);
+  const reservedStaticPaths = new Set(["/healthz", "/readyz", STATUS_PATH, OPENAPI_PATH]);
   const webhookCollidesWithGroups = enableGroupRoutes && (webhookPath === groupsPath || webhookPath.startsWith(`${groupsPath}/`));
   if (reservedStaticPaths.has(webhookPath) || webhookPath === textPath || webhookPath === messagesPath || webhookCollidesWithGroups) {
     throw new WatsServiceError("invalid_path", "profile.webhook.path must not collide with service routes.");
@@ -643,6 +725,39 @@ function createOpenApiSchemas(enableGroupRoutes = false): Record<string, Record<
       properties: {
         ok: { type: "boolean", const: true },
         service: { type: "string", const: SERVICE_NAME }
+      }
+    },
+    StatusResponse: {
+      type: "object",
+      additionalProperties: false,
+      required: ["service", "version", "uptimeSeconds", "graphApiVersion", "serviceMode", "routes", "featureFlags", "persistence"],
+      properties: {
+        service: { type: "string", const: SERVICE_NAME },
+        version: { type: "string" },
+        uptimeSeconds: { type: "integer", minimum: 0 },
+        graphApiVersion: { type: "string" },
+        serviceMode: { type: "string" },
+        routes: { type: "array", items: { type: "string" } },
+        featureFlags: {
+          type: "object",
+          additionalProperties: false,
+          required: ["groupRoutes", "persistence"],
+          properties: {
+            groupRoutes: { type: "boolean" },
+            persistence: { type: "boolean" }
+          }
+        },
+        persistence: {
+          type: ["object", "null"],
+          additionalProperties: false,
+          required: ["ok", "backend", "currentVersion", "redactedLocation"],
+          properties: {
+            ok: { type: "boolean" },
+            backend: { type: "string" },
+            currentVersion: { type: "integer" },
+            redactedLocation: { type: "string" }
+          }
+        }
       }
     },
     ErrorEnvelope: {
@@ -978,6 +1093,19 @@ export function createWatsServiceOpenApiDocument(
         summary: "Readiness check",
         responses: {
           "200": okResponseSpec("Service dependencies were constructed.", "ReadyResponse"),
+          "405": errorResponseSpec("Method not allowed.")
+        }
+      }
+    },
+    [STATUS_PATH]: {
+      get: {
+        tags: ["status"],
+        summary: "Redacted operator status",
+        description: "Returns a redacted operator status snapshot (version, uptime, Graph API version, service mode, templated route inventory, persistence health summary, feature flags). Requires the service bearer token. On a missing or mismatched token the service returns 404 (not 401) so the endpoint's existence is not leaked.",
+        security: [{ serviceBearerAuth: [] }],
+        responses: {
+          "200": okResponseSpec("Redacted operator status snapshot.", "StatusResponse"),
+          "404": errorResponseSpec("Route not found, or bearer token missing/invalid (existence hidden)."),
           "405": errorResponseSpec("Method not allowed.")
         }
       }
@@ -1989,6 +2117,16 @@ export function createWatsServiceApp(config: WatsServiceConfig): WatsServiceApp 
         return jsonResponse(200, { ok: true, service: SERVICE_NAME });
       }
 
+      if (path === STATUS_PATH) {
+        // Telemetry endpoints fail closed to the catch-all 404 on missing or
+        // mismatched auth (and for any method) so their existence is not
+        // leaked to anonymous callers — per the WATS-161 taxonomy. Auth is
+        // checked before method so an unauthenticated POST is a 404, not a 405.
+        if (!isAuthorized(request, ctx.secrets.serviceBearerToken)) return notFound();
+        if (method !== "GET") return methodNotAllowed("GET");
+        return jsonResponse(200, await buildStatusPayload(ctx));
+      }
+
       if (path === OPENAPI_PATH) {
         if (method !== "GET") return methodNotAllowed("GET");
         return jsonResponse(200, createWatsServiceOpenApiDocument(ctx.profile, { serverUrl: url.origin, enableGroupRoutes: ctx.enableGroupRoutes }));
@@ -2029,7 +2167,7 @@ export function createWatsServiceApp(config: WatsServiceConfig): WatsServiceApp 
         return handleGetMessage(ctx, request, path);
       }
 
-      return errorResponse(404, "not_found", "Route not found.");
+      return notFound();
     }
   };
 }

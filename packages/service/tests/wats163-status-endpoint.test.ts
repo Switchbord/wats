@@ -196,6 +196,21 @@ describe("WATS-163 redacted /status operator endpoint", () => {
     expect(health.headers.get("content-type")).toContain("application/json");
   });
 
+  test("/status is published in the OpenAPI document behind bearer security", async () => {
+    const app = createWatsServiceApp(config());
+    const doc = (await (await app.fetch(new Request("https://svc.test/openapi.json"))).json()) as {
+      paths: Record<string, { get?: { security?: unknown; responses?: Record<string, unknown> } }>;
+      components: { schemas: Record<string, unknown> };
+    };
+    expect(Object.keys(doc.paths)).toContain("/status");
+    const statusGet = doc.paths["/status"].get;
+    expect(statusGet?.security).toEqual([{ serviceBearerAuth: [] }]);
+    // 404 (existence-hiding) is documented; 401 is intentionally absent.
+    expect(Object.keys(statusGet?.responses ?? {})).toContain("404");
+    expect(Object.keys(statusGet?.responses ?? {})).not.toContain("401");
+    expect(doc.components.schemas.StatusResponse).toBeDefined();
+  });
+
   test("serviceMode and featureFlags reflect persistence and group-route configuration", async () => {
     const withGroups = createWatsServiceApp(config({ enableGroupRoutes: true, persistence: memoryStore() as never } as never));
     const body = (await (await withGroups.fetch(authedStatusReq())).json()) as {
