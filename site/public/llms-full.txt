@@ -5825,7 +5825,7 @@ The sibling-NOT language matters: an `instanceof UnsupportedMessageTypeError` on
 # Service Reference (`@wats/service`)
 URL: https://wats.sh/docs/reference/service
 
-`@wats/service` exposes a runtime-neutral `Request -> Response` app composing the Graph client, webhook adapter, config profile shape, and WhatsApp facade. It is not a production server by itself: the CLI provides dry-run and credential-gated live `wats serve` wrappers, and a generated OpenAPI 3.1 document covers the routes below. Not implemented yet: Node/Docker packaging, metrics, production hosting.
+`@wats/service` exposes a runtime-neutral `Request -> Response` app composing the Graph client, webhook adapter, config profile shape, and WhatsApp facade. It is not a production server by itself: the CLI provides dry-run and credential-gated live `wats serve` wrappers, and a generated OpenAPI 3.1 document covers the routes below. Not implemented yet: Node/Docker packaging, production hosting.
 
 ## Public API
 
@@ -6167,7 +6167,7 @@ The repo ships a Railway-targeted root `Dockerfile` that wraps the implemented `
 
 ## Non-goals
 
-Not implemented: a full Meta Graph API OpenAPI document, live Meta credential checks, background queue/outbox workers, metrics, TLS, rate limiting, production container publication, or message schemas beyond the current text/media/location/contacts/reaction/interactive slices.
+Not implemented: a full Meta Graph API OpenAPI document, live Meta credential checks, background queue/outbox workers, TLS, rate limiting, production container publication, or message schemas beyond the current text/media/location/contacts/reaction/interactive slices.
 
 ## Related docs
 
