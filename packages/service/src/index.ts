@@ -535,14 +535,6 @@ function clampToEnum<T extends string>(value: string, allowed: readonly T[]): T 
   return (allowed as readonly string[]).includes(value) ? (value as T) : "unknown";
 }
 
-function graphEndpointFamilyOf(path: string): MetricEndpointFamily {
-  if (path.includes("/media")) return "media";
-  if (path.includes("/message_templates") || path.includes("/templates")) return "templates";
-  if (path.includes("/groups")) return "groups";
-  if (path.includes("/flows")) return "flows";
-  return "messages";
-}
-
 interface HistogramState {
   readonly bucketCounts: number[];
   sum: number;
@@ -639,10 +631,21 @@ class MetricsRegistry {
 
 // Stable, sorted label-key serialization so the same label set always
 // produces the same series key regardless of the order fields were passed.
+//
+// Escape a label value per the Prometheus text exposition format: backslash
+// and double-quote must be escaped, and a literal newline must be escaped to
+// \n. Defense in depth — every current label value flows from an enum-
+// clamped or literal closed set, so this never fires in practice, but a
+// future call site that passes an un-clamped string must not be able to
+// corrupt the exposition format.
+function escapeLabelValue(value: string): string {
+  return value.replace(/\\/gu, "\\\\").replace(/"/gu, '\\"').replace(/\n/gu, "\\n");
+}
+
 function labelKey(labels: Readonly<Record<string, string>>): string {
   const keys = Object.keys(labels).sort();
   if (keys.length === 0) return "";
-  const rendered = keys.map((k) => `${k}="${labels[k]}"`).join(",");
+  const rendered = keys.map((k) => `${k}="${escapeLabelValue(labels[k]!)}"`).join(",");
   return `{${rendered}}`;
 }
 
@@ -1868,12 +1871,30 @@ async function handleWebhook(ctx: RuntimeConfig, request: Request): Promise<Resp
   const response = await createFetchWebhookHandler(webhookAdapter)(request);
   if (response.status !== 200 || dispatches.length === 0) return response;
 
-  const record = await ctx.persistence.recordWebhookEvent({
-    eventKey: event.eventKey,
-    eventHash: event.eventHash,
-    receivedAt: new Date().toISOString()
-  });
+  let record: "recorded" | "duplicate";
+  try {
+    record = await ctx.persistence.recordWebhookEvent({
+      eventKey: event.eventKey,
+      eventHash: event.eventHash,
+      receivedAt: new Date().toISOString()
+    });
+    recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "success");
+  } catch (error) {
+    // Record the metric, then preserve the pre-instrumentation behavior
+    // exactly: this call was never wrapped in a try/catch before, so a
+    // thrown error propagated uncaught. Re-throw rather than failing open.
+    recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "error");
+    throw error;
+  }
   if (record === "duplicate") {
+    // WATS-162: normalization already happened (the adapter parsed and
+    // normalized every update into `dispatches`), but the update is not
+    // re-dispatched. Record "deduped" per update so webhook_normalization_total
+    // reflects that normalization occurred even though dispatch was skipped.
+    for (const update of dispatches) {
+      const kind = isRecord(update) && typeof update.kind === "string" ? update.kind : "unknown";
+      recordWebhookNormalization(ctx.metrics, kind, "deduped");
+    }
     return jsonResponse(200, { status: "ok", received: dispatches.length, dispatched: 0, skipped: dispatches.length });
   }
 
@@ -1938,13 +1959,17 @@ async function recordOutboundProjection(
       createdAt: now,
       updatedAt: now
     });
+    recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "success");
   } catch {
     // Projection failure must not break the send response.
+    recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "error");
   }
   try {
     await ctx.persistence.appendMessageStatus({ waMessageId, status: "sent", timestamp: now });
+    recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "success");
   } catch {
     // Best-effort; projection failure must not break the send response.
+    recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "error");
   }
 }
 
@@ -1960,7 +1985,14 @@ async function handleTextMessage(ctx: RuntimeConfig, request: Request): Promise<
   if (idempotencyKey === "invalid") return errorResponse(400, "invalid_idempotency_key", "Idempotency-Key is invalid.");
   const requestHash = idempotencyKey !== null && ctx.persistence !== undefined ? `sha256:${await sha256Hex(rawBody)}` : null;
   if (idempotencyKey !== null && requestHash !== null && ctx.persistence !== undefined) {
-    const existing = await ctx.persistence.getServiceRequest({ idempotencyKey, requestHash });
+    let existing: Awaited<ReturnType<PersistenceStore["getServiceRequest"]>>;
+    try {
+      existing = await ctx.persistence.getServiceRequest({ idempotencyKey, requestHash });
+      recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "success");
+    } catch (error) {
+      recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "error");
+      throw error;
+    }
     if (existing === "conflict") return errorResponse(409, "idempotency_conflict", "Idempotency-Key conflicts with a different request body.");
     if (existing !== null) return jsonTextResponse(200, existing.responseJson);
   }
@@ -1984,7 +2016,11 @@ async function handleTextMessage(ctx: RuntimeConfig, request: Request): Promise<
     if (idempotencyKey !== null && requestHash !== null && ctx.persistence !== undefined) {
       const responseJson = responseToJsonText(result);
       if (responseJson !== null) {
+        // Note: a persistence failure here is caught by the outer catch below
+        // and reported as a Graph-operation error too — a pre-existing
+        // conflation in the original control flow, not introduced here.
         await ctx.persistence.recordServiceRequest({ idempotencyKey, requestHash, responseJson, createdAt: new Date().toISOString() });
+        recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "success");
       }
     }
     await recordOutboundProjection(ctx, result, input.to, "text");
@@ -2008,7 +2044,14 @@ async function handleGenericMessage(ctx: RuntimeConfig, request: Request): Promi
   if (idempotencyKey === "invalid") return errorResponse(400, "invalid_idempotency_key", "Idempotency-Key is invalid.");
   const requestHash = idempotencyKey !== null && ctx.persistence !== undefined ? `sha256:${await sha256Hex(rawBody)}` : null;
   if (idempotencyKey !== null && requestHash !== null && ctx.persistence !== undefined) {
-    const existing = await ctx.persistence.getServiceRequest({ idempotencyKey, requestHash });
+    let existing: Awaited<ReturnType<PersistenceStore["getServiceRequest"]>>;
+    try {
+      existing = await ctx.persistence.getServiceRequest({ idempotencyKey, requestHash });
+      recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "success");
+    } catch (error) {
+      recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "error");
+      throw error;
+    }
     if (existing === "conflict") return errorResponse(409, "idempotency_conflict", "Idempotency-Key conflicts with a different request body.");
     if (existing !== null) return jsonTextResponse(200, existing.responseJson);
   }
@@ -2025,7 +2068,11 @@ async function handleGenericMessage(ctx: RuntimeConfig, request: Request): Promi
     if (idempotencyKey !== null && requestHash !== null && ctx.persistence !== undefined) {
       const responseJson = responseToJsonText(result);
       if (responseJson !== null) {
+        // Note: a persistence failure here is caught by the outer catch below
+        // and reported as a Graph-operation error too — a pre-existing
+        // conflation in the original control flow, not introduced here.
         await ctx.persistence.recordServiceRequest({ idempotencyKey, requestHash, responseJson, createdAt: new Date().toISOString() });
+        recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "success");
       }
     }
     const genericTo = typeof (body as { to?: unknown }).to === "string" ? (body as { to: string }).to : undefined;
@@ -2262,6 +2309,7 @@ function makeRuntimeConfig(config: WatsServiceConfig): RuntimeConfig {
     baseUrl: profile.graph.baseUrl,
     ...(transport !== undefined ? { transport } : {})
   });
+  const metricsRegistry = createMetricsRegistry();
   let whatsapp: WebhookFacadeLike;
   if (suppliedWhatsapp !== undefined) {
     whatsapp = suppliedWhatsapp;
@@ -2326,6 +2374,8 @@ function makeRuntimeConfig(config: WatsServiceConfig): RuntimeConfig {
               to: from,
               text: "Received by WATS. (automated echo — live deployment test)"
             });
+            recordGraphOperation(metricsRegistry, "messages", 200, "success");
+            recordSendOutcome(metricsRegistry, "messages", "success");
             const sentId = (result as { messages?: ReadonlyArray<{ id?: string }> }).messages?.[0]?.id;
             // eslint-disable-next-line no-console
             console.log(JSON.stringify({
@@ -2339,6 +2389,8 @@ function makeRuntimeConfig(config: WatsServiceConfig): RuntimeConfig {
             // SDK mapped one) so a failed auto-reply is observable instead of
             // silently swallowed. Never re-throw: a send failure must not break
             // webhook acknowledgement.
+            recordGraphOperation(metricsRegistry, "messages", graphErrorStatus(error), "error");
+            recordSendOutcome(metricsRegistry, "messages", "error");
             const e = (error ?? undefined) as { code?: number; errorSubcode?: number } | undefined;
             const code = e?.code;
             const subcode = e?.errorSubcode;
@@ -2358,7 +2410,6 @@ function makeRuntimeConfig(config: WatsServiceConfig): RuntimeConfig {
     }
     whatsapp = facade;
   }
-  const metricsRegistry = createMetricsRegistry();
   // WATS-162: webhook_normalization_total wraps the single choke point both
   // webhook-handling paths converge on. handleWebhook's persistence-staged
   // path calls ctx.whatsapp.dispatch() explicitly in its own loop; the

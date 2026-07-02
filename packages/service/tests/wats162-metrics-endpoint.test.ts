@@ -17,11 +17,25 @@
 // endpoint slice. All other allowlisted families are implemented.
 
 import { describe, expect, test } from "bun:test";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import type { WatsProfileConfig } from "@wats/config";
 import { createCryptoProvider } from "@wats/crypto";
 import { createMockTransport } from "@wats/graph/testing";
 import type { MessageRecord, MessageRecordInput, OutboxItem } from "@wats/persistence";
 import { createWatsServiceApp, type WatsServiceConfig } from "../src/index";
+
+function findRepoRoot(startDir: string): string {
+  let current = resolve(startDir);
+  for (;;) {
+    if (existsSync(join(current, "package.json")) && existsSync(join(current, "packages"))) return current;
+    const parent = dirname(current);
+    if (parent === current) throw new Error(`Could not locate repo root from ${startDir}`);
+    current = parent;
+  }
+}
+
+const repoRoot = findRepoRoot(import.meta.dir);
 
 function memoryStore() {
   return {
@@ -295,5 +309,198 @@ describe("WATS-162 Prometheus/OpenMetrics /metrics endpoint", () => {
     const app = createWatsServiceApp(config());
     const text = await (await app.fetch(authedMetricsReq())).text();
     expect(text).not.toMatch(/persistence_operations_total\{/u);
+  });
+
+  test("persistence_operations_total covers write-side call sites (webhook recording, projection)", async () => {
+    // WATS-162 review M3: persistence_operations_total must cover all store
+    // operations, not just the two message-query read routes. Drive a
+    // webhook dispatch (recordWebhookEvent) and a text send with an
+    // idempotency key (getServiceRequest + recordServiceRequest) plus its
+    // outbound projection (recordMessage + appendMessageStatus), then assert
+    // the aggregate success count reflects more than the two read routes
+    // alone would produce.
+    const app = createWatsServiceApp(config({ persistence: memoryStore() as unknown as never }));
+
+    const rawBody = JSON.stringify({
+      object: "whatsapp_business_account",
+      entry: [{
+        id: WABA_ID,
+        changes: [{
+          field: "messages",
+          value: {
+            messaging_product: "whatsapp",
+            metadata: { phone_number_id: PHONE_NUMBER_ID },
+            messages: [{ id: "wamid.PERSIST1", from: "15550009999", type: "text", text: { body: "hi" } }]
+          }
+        }]
+      }]
+    });
+    const webhookRes = await app.fetch(new Request("https://svc.test/webhooks/whatsapp", {
+      method: "POST",
+      headers: { "x-hub-signature-256": await signature(SECRETS.webhookAppSecret, rawBody), "content-type": "application/json" },
+      body: rawBody
+    }));
+    expect(webhookRes.status).toBe(200);
+
+    await app.fetch(new Request("https://svc.test/api/messages/text", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${SECRETS.serviceBearerToken}`,
+        "content-type": "application/json",
+        "idempotency-key": "test-key-1"
+      },
+      body: JSON.stringify({ to: "15550001111", text: "hi" })
+    }));
+
+    const text = await (await app.fetch(authedMetricsReq())).text();
+    const match = text.match(/persistence_operations_total\{adapter="sqlite",outcome="success"\}\s+(\d+)/u);
+    expect(match, "persistence_operations_total success series not found").not.toBeNull();
+    // Two read-route calls (list not called here) would be 0; webhook
+    // recording + service-request lookup/record + message projection
+    // (recordMessage + appendMessageStatus) is at least 4 successful ops.
+    expect(Number(match![1])).toBeGreaterThanOrEqual(4);
+  });
+
+  test("METRIC_UPDATE_KINDS exactly matches the real TypedUpdateKind in @wats/core", () => {
+    // WATS-162 review M1: the hardcoded METRIC_UPDATE_KINDS literal list in
+    // service/src/index.ts must never drift from the actual normalizer type.
+    // clampToEnum() silently maps any kind missing from this list to
+    // "unknown", so a stale copy loses cardinality with no visible failure
+    // anywhere else — this test is the only thing that can catch that.
+    const serviceSource = readFileSync(join(repoRoot, "packages", "service", "src", "index.ts"), "utf8");
+    const constMatch = serviceSource.match(/const METRIC_UPDATE_KINDS = \[([\s\S]*?)\] as const;/u);
+    expect(constMatch, "METRIC_UPDATE_KINDS constant not found in @wats/service source").not.toBeNull();
+    const codeKinds = Array.from(constMatch![1].matchAll(/"([a-zA-Z]+)"/gu), (m) => m[1]).sort();
+    expect(codeKinds.length).toBeGreaterThan(0);
+
+    const coreSource = readFileSync(join(repoRoot, "packages", "core", "src", "webhookNormalizer.ts"), "utf8");
+    const typeMatch = coreSource.match(/export type TypedUpdateKind\s*=\s*([\s\S]+?);/u);
+    expect(typeMatch, "TypedUpdateKind type not found in @wats/core source").not.toBeNull();
+    const realKinds = Array.from(typeMatch![1].matchAll(/"([a-zA-Z]+)"/gu), (m) => m[1]).sort();
+
+    expect(
+      codeKinds,
+      `METRIC_UPDATE_KINDS ${JSON.stringify(codeKinds)} must equal real TypedUpdateKind ${JSON.stringify(realKinds)}`
+    ).toEqual(realKinds);
+  });
+
+  test("update_kind values from real webhook traffic never fall outside the known enum", async () => {
+    // WATS-162 review L3: the real webhook normalizer only ever produces a
+    // TypedUpdateKind value, so this cannot force clampToEnum's "unknown"
+    // fallback through the public HTTP path (there is no legitimate way to
+    // get an out-of-enum kind past normalization). What this test DOES
+    // verify: real traffic's update_kind values are always a subset of the
+    // allowlist the exposition format promises — the invariant the
+    // taxonomy actually cares about.
+    const app = createWatsServiceApp(config());
+    const rawBody = JSON.stringify({
+      object: "whatsapp_business_account",
+      entry: [{
+        id: WABA_ID,
+        changes: [{
+          field: "messages",
+          value: {
+            messaging_product: "whatsapp",
+            metadata: { phone_number_id: PHONE_NUMBER_ID },
+            messages: [{ id: "wamid.UNKNOWNKIND", from: "15550009999", type: "text", text: { body: "hi" } }]
+          }
+        }]
+      }]
+    });
+    const res = await app.fetch(new Request("https://svc.test/webhooks/whatsapp", {
+      method: "POST",
+      headers: { "x-hub-signature-256": await signature(SECRETS.webhookAppSecret, rawBody), "content-type": "application/json" },
+      body: rawBody
+    }));
+    expect(res.status).toBe(200);
+    const text = await (await app.fetch(authedMetricsReq())).text();
+    const kinds = Array.from(text.matchAll(/update_kind="([a-zA-Z]+)"/gu), (m) => m[1]);
+    expect(kinds.length).toBeGreaterThan(0);
+    const allowedKinds = ["message", "status", "account", "unknown", "callConnect", "callTerminate", "callStatus", "groupLifecycle", "groupParticipants", "groupSettings", "groupStatus", "userPreferences", "system", "chatOpened"];
+    for (const kind of kinds) {
+      expect(allowedKinds, `update_kind "${kind}" not in the allowed enum`).toContain(kind);
+    }
+  });
+
+  test("histogram buckets are monotonically non-decreasing and +Inf equals the total count", async () => {
+    // WATS-162 review L3: verify the exposition's histogram semantics, not
+    // just substring presence. Drive several requests with different
+    // durations (best-effort — real timings vary, so this asserts structural
+    // invariants rather than exact bucket boundaries).
+    const app = createWatsServiceApp(config());
+    for (let i = 0; i < 5; i += 1) {
+      await app.fetch(new Request("https://svc.test/healthz"));
+    }
+    const text = await (await app.fetch(authedMetricsReq())).text();
+    const bucketLines = Array.from(
+      text.matchAll(/http_request_duration_seconds_bucket\{route="\/healthz",status_class="2xx",le="([^"]+)"\}\s+(\d+)/gu),
+      (m) => ({ le: m[1], count: Number(m[2]) })
+    );
+    expect(bucketLines.length).toBeGreaterThan(0);
+
+    // Monotonically non-decreasing as le increases (numeric buckets only;
+    // "+Inf" is parsed separately below).
+    const numericBuckets = bucketLines.filter((b) => b.le !== "+Inf");
+    for (let i = 1; i < numericBuckets.length; i += 1) {
+      expect(numericBuckets[i]!.count).toBeGreaterThanOrEqual(numericBuckets[i - 1]!.count);
+    }
+
+    const infBucket = bucketLines.find((b) => b.le === "+Inf");
+    expect(infBucket, "+Inf bucket not found").toBeDefined();
+    const countMatch = text.match(/http_request_duration_seconds_count\{route="\/healthz",status_class="2xx"\}\s+(\d+)/u);
+    expect(countMatch, "http_request_duration_seconds_count not found").not.toBeNull();
+    expect(infBucket!.count).toBe(Number(countMatch![1]));
+
+    const sumMatch = text.match(/http_request_duration_seconds_sum\{route="\/healthz",status_class="2xx"\}\s+([\d.]+)/u);
+    expect(sumMatch, "http_request_duration_seconds_sum not found").not.toBeNull();
+    expect(Number.isFinite(Number(sumMatch![1]))).toBe(true);
+    expect(Number(sumMatch![1])).toBeGreaterThanOrEqual(0);
+  });
+
+  test("a duplicate webhook delivery records webhook_normalization_total with outcome=deduped", async () => {
+    // WATS-162 review M2: normalization occurs even when the persistence
+    // layer detects a duplicate event and skips re-dispatch. The metric
+    // must reflect "deduped", not silently omit the event.
+    const store = memoryStore();
+    const seen = new Set<string>();
+    const dedupingStore = {
+      ...store,
+      async recordWebhookEvent(input: { eventKey: string }) {
+        if (seen.has(input.eventKey)) return "duplicate" as const;
+        seen.add(input.eventKey);
+        return "recorded" as const;
+      }
+    };
+    const app = createWatsServiceApp(config({ persistence: dedupingStore as unknown as never }));
+    const rawBody = JSON.stringify({
+      object: "whatsapp_business_account",
+      entry: [{
+        id: WABA_ID,
+        changes: [{
+          field: "messages",
+          value: {
+            messaging_product: "whatsapp",
+            metadata: { phone_number_id: PHONE_NUMBER_ID },
+            messages: [{ id: "wamid.DEDUPE1", from: "15550009999", type: "text", text: { body: "hi" } }]
+          }
+        }]
+      }]
+    });
+    const sig = await signature(SECRETS.webhookAppSecret, rawBody);
+    const first = await app.fetch(new Request("https://svc.test/webhooks/whatsapp", {
+      method: "POST",
+      headers: { "x-hub-signature-256": sig, "content-type": "application/json" },
+      body: rawBody
+    }));
+    expect(first.status).toBe(200);
+    const second = await app.fetch(new Request("https://svc.test/webhooks/whatsapp", {
+      method: "POST",
+      headers: { "x-hub-signature-256": sig, "content-type": "application/json" },
+      body: rawBody
+    }));
+    expect(second.status).toBe(200);
+
+    const text = await (await app.fetch(authedMetricsReq())).text();
+    expect(text).toMatch(/webhook_normalization_total\{outcome="deduped",update_kind="message"\}\s+1/u);
   });
 });
