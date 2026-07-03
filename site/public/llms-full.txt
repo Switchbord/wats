@@ -5890,6 +5890,7 @@ If you inject your own `whatsapp` facade, these flags do nothing. The service pa
 | `/readyz` | GET | none | Returns `{ ok: true, service: "wats" }` after construction. |
 | `/status` | GET | service bearer | Redacted operator status snapshot. Missing or invalid token returns `404`, not `401`. |
 | `/metrics` | GET | service bearer | Prometheus/OpenMetrics scrape endpoint. Missing or invalid token returns `404`, not `401`. |
+| `/debug/diagnostics` | GET | service bearer | Redacted support diagnostics snapshot. Missing or invalid token returns `404`, not `401`. |
 | `/openapi.json` | GET | none | Returns the generated OpenAPI 3.1 document. |
 | `profile.webhook.path` | GET | Meta verify token | Delegates to `createWebhookAdapter`. |
 | `profile.webhook.path` | POST | Meta signature | Delegates to `createWebhookAdapter`. |
@@ -5909,7 +5910,7 @@ Unknown routes return `404`. Unsupported methods return `405` with an `Allow` he
 
 `createWatsServiceOpenApiDocument(profile, options?)` returns a plain-object OpenAPI 3.1 document for the current service routes. The app serves the same document at `GET /openapi.json` with JSON content type and no bearer requirement; method mismatch returns `405` with `Allow: GET`.
 
-The document includes `serviceBearerAuth` only on the protected message routes, the `/status` operator route, and, when `enableGroupRoutes` is true, the protected Groups routes. It never embeds raw service bearer, Graph access, app secret, verify token, or config env-var secret reference values.
+The document includes `serviceBearerAuth` only on the protected message routes, the `/status` and `/debug/diagnostics` operator routes, the `/metrics` scrape route, and, when `enableGroupRoutes` is true, the protected Groups routes. It never embeds raw service bearer, Graph access, app secret, verify token, or config env-var secret reference values.
 
 ## Operator status
 
@@ -5958,6 +5959,37 @@ scrape_configs:
       - targets: ["your-service:443"]
     metrics_path: /metrics
 ```
+
+## Debug diagnostics
+
+`GET /debug/diagnostics` returns a bounded, redacted JSON support snapshot for operators and support bundles. Same auth posture as `/status` and `/metrics`: service bearer required, `404` (not `401`) on a missing or mismatched token. The `404` body is identical to the catch-all.
+
+The snapshot contains:
+
+| Field | Content | Risk posture |
+|---|---|---|
+| `service`, `version` | Package name and version | safe |
+| `graphApiVersion` | Configured Meta Graph API version | safe |
+| `serviceMode` | Coarse mode (`low-config`, `persistence-only`, `graph`) | safe |
+| `runtime` | `"bun"` or `"node"` only | safe |
+| `routes` | Templated route inventory with `:id` / `:groupId` placeholders | no raw ids |
+| `featureFlags` | `{ groupRoutes, persistence }` booleans | safe |
+| `persistence` | Health summary: `ok`, `backend`, `currentVersion`, `redactedLocation` | no path or DSN |
+| `metricFamilies` | Names of registered metric families only | no values, no label sets |
+| `recentErrors` | Error class names with counts | no messages, no stack traces, no PII |
+| `configShape` | Config field names with env-secret references (`env:VAR`) only | no values, no paths |
+
+```bash
+curl -s -H "Authorization: Bearer $WATS_...KEN" https://your-service/debug/diagnostics
+```
+
+Limits are defensive:
+
+- No more than 10 distinct error classes are retained; when the cap is hit the lowest-count class is dropped.
+- Error class names are truncated at 80 characters before counting.
+- The snapshot never includes raw logs, stack traces, env values, config file paths, tokens, phone numbers, WABA ids, WAMIDs, message text, or webhook bodies.
+
+This is not a pprof/heap endpoint and does not return live memory or CPU profiles. It is a structured facts-only endpoint meant for triage before fetching metrics and logs through the deployment's normal observability pipeline.
 
 ## Service bearer auth
 
