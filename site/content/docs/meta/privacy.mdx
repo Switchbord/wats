@@ -51,7 +51,7 @@ Use synthetic values in tests and public issues. If a report may contain secrets
 - `GET /status` — redacted operator status snapshot
 - `GET /debug/diagnostics` — bounded support snapshot
 
-These endpoints are disabled by default and require the service bearer token when enabled; a missing or wrong token returns the same `404` as an unknown route. No default outbound telemetry is sent. See the [Telemetry operator guide](/docs/guides/telemetry) and the [Service Reference](/docs/reference/service) for the threat model, attribute dictionary, Prometheus scrape config, and an OpenTelemetry adapter example.
+These endpoints are always registered, but an invalid, missing, or wrong token returns the same `404` as an unknown route so the endpoint existence is not leaked. They produce data only when a valid service bearer token is supplied. No default outbound telemetry is sent. See the [Telemetry operator guide](/docs/guides/telemetry) and the [Service Reference](/docs/reference/service) for the threat model, attribute dictionary, Prometheus scrape config, and an OpenTelemetry adapter example.
 
 ## Future telemetry
 

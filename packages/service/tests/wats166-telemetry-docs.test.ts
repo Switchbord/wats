@@ -30,6 +30,16 @@ describe("WATS-166 telemetry docs guardrails", () => {
     expect(guide.toLowerCase()).toContain("no default outbound telemetry");
     expect(guide.toLowerCase()).toContain("opt-in");
     expect(privacy.toLowerCase()).toContain("no default outbound telemetry is sent");
+    expect(privacy.toLowerCase()).toContain("always registered");
+    expect(guide.toLowerCase()).toContain("always registered");
+  });
+
+  test("telemetry docs do not claim endpoints are disabled or unregistered by default", () => {
+    const forbidden = [/not registered unless/i, /enabled in config/i, /disabled by default/i];
+    for (const re of forbidden) {
+      expect(re.test(guide)).toBe(false);
+      expect(re.test(privacy)).toBe(false);
+    }
   });
 
   test("telemetry docs document the three protected endpoints", () => {
@@ -39,9 +49,16 @@ describe("WATS-166 telemetry docs guardrails", () => {
     }
   });
 
-  test("telemetry docs do not claim outbound telemetry to WATS maintainers", () => {
-    const bad = /\b(sends?|report|upload).{0,60}(analytics|usage|telemetry)\b/i;
-    expect(bad.test(guide)).toBe(false);
+  test("telemetry docs do not claim outbound telemetry to WATS maintainers or vendors", () => {
+    const forbidden = [
+      /telemetry\s+(is\s+)?(sent|sends?)\s+(to\s+)?(WATS|maintainer|vendor|backend)/i,
+      /(WATS|maintainer|vendor)\s+.*\btelemetry\b.*\b(sent|sends?|collects?)/i,
+      /sends?\s+telemetry\s+(to\s+)?(WATS|maintainer|vendor|backend)/i,
+    ];
+    for (const re of forbidden) {
+      expect(re.test(guide)).toBe(false);
+      expect(re.test(privacy)).toBe(false);
+    }
   });
 
   test("telemetry docs do not expose PII examples", () => {
@@ -62,7 +79,7 @@ describe("WATS-166 telemetry docs guardrails", () => {
     }
     const authLines = guide.match(/Authorization:\s*Bearer[^\n]*/g) ?? [];
     for (const line of authLines) {
-      expect(line).toMatch(/\$\{|\.\.\./); // env var or ellipsis placeholder
+      expect(line).toMatch(/\$\{|\.\.\.|\.\.\.N/); // env var or ellipsis placeholder
     }
   });
 

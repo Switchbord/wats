@@ -7,11 +7,11 @@ description: Operate WATS telemetry endpoints safely — Prometheus scraping, Op
 
 ## Threat model and default stance
 
-WATS ships with **no default outbound telemetry**. Importing `@wats/service` and starting `createWatsServiceApp` does not contact WATS maintainers, a hosted observability vendor, or any analytics endpoint. All telemetry is opt-in and operator-controlled:
+WATS ships with **no default outbound telemetry**. Importing `@wats/service` and starting `createWatsServiceApp` does not contact WATS maintainers, a hosted observability vendor, or any analytics endpoint. The telemetry endpoints are always registered by the service, but an invalid or missing service bearer token returns the same `404` body as any unknown route so the endpoints cannot be discovered by unauthenticated callers. All telemetry ingestion is opt-in and operator-controlled:
 
-- `/metrics` is not registered unless you explicitly point a Prometheus-compatible scraper at it.
-- `/status` is not advertised; a missing or wrong service bearer token returns the same `404` body as any unknown route so the endpoint does not leak its own existence.
-- `/debug/diagnostics` is a bounded, redacted JSON snapshot for support bundles.
+- `GET /metrics` exposes data only when a Prometheus-compatible scraper pulls it with a valid token.
+- `GET /status` returns data only when requested with a valid token.
+- `GET /debug/diagnostics` returns a bounded, redacted JSON snapshot only when requested with a valid token.
 - The optional `TelemetrySink` (TELEMETRY-C) emits events only to a sink you own and wire yourself.
 
 Data minimization is enforced, not optional:
@@ -24,13 +24,13 @@ If you file a bug report, CI log, or support bundle, redact bearer tokens, app s
 
 ## What each endpoint tells you
 
-| Endpoint | Purpose | Default | Auth failure |
-|---|---|---|---|
-| `GET /metrics` | Prometheus/OpenMetrics exposition of runtime counters and histograms | Not registered unless enabled in config | `404` identical to catch-all 404 |
-| `GET /status` | Redacted operator status snapshot | Not registered unless enabled in config | `404` identical to catch-all 404 |
-| `GET /debug/diagnostics` | Bounded support snapshot with version, route inventory, and recent error classes only | Not registered unless enabled in config | `404` identical to catch-all 404 |
+| Endpoint | Purpose | Auth failure |
+|---|---|---|
+| `GET /metrics` | Prometheus/OpenMetrics exposition of runtime counters and histograms | `404` identical to catch-all 404 |
+| `GET /status` | Redacted operator status snapshot | `404` identical to catch-all 404 |
+| `GET /debug/diagnostics` | Bounded support snapshot with version, route inventory, and recent error classes only | `404` identical to catch-all 404 |
 
-All three endpoints reuse the same `serviceBearerToken` as the message API routes, but they fail closed to `404` on missing or mismatched tokens. This is intentional: telemetry surface availability is more sensitive than the public message-sending routes.
+All three endpoints are matched before the catch-all and reuse the same `serviceBearerToken` as the message API routes. A missing or mismatched token returns `404` so the endpoint existence is not leaked. This is intentional: telemetry surface availability is more sensitive than the public message-sending routes.
 
 ## Attribute dictionary
 
@@ -38,8 +38,8 @@ The internal metrics registry exposes Prometheus names; the optional `TelemetryS
 
 | Internal metric | Attribute keys | Notes |
 |---|---|---|
-| `http_requests_total` | `http.route`, `http.request.method`, `http.status_code`, `http.response.status.class` | route is always templated |
-| `http_request_duration_seconds` | `http.route`, `http.request.method`, `http.status_code`, `http.response.status.class` | sink receives the full set; `/metrics` histogram narrows to `route` + `status_class` |
+| `http_requests_total` | `http.route`, `http.request.method`, `http.status_code`, `http.response.status.class` | `/metrics` counter narrows to `route`+`method`+`status_class`; the sink receives the full attribute set (incl. `http.status_code`) |
+| `http_request_duration_seconds` | `http.route`, `http.request.method`, `http.status_code`, `http.response.status.class` | `/metrics` histogram narrows to `route`+`status_class`; the sink receives the full attribute set |
 | `graph_operations_total` | `wats.graph.endpoint_family`, `http.status_code`, `http.response.status.class`, `wats.operation.outcome` | endpoint family enum-clamped |
 | `send_outcomes_total` | `wats.graph.endpoint_family`, `wats.operation.outcome` | |
 | `webhook_normalization_total` | `wats.webhook.update_kind`, `wats.operation.outcome` | update kind enum-clamped |
@@ -141,4 +141,4 @@ The response contains safe, structured facts only. For the full field list and r
 
 - [Service Reference](/docs/reference/service#telemetry-sink)
 - [Privacy and Telemetry](/docs/meta/privacy)
-- [Telemetry Privacy Model and Metric Taxonomy](https://github.com/Switchbord/wats/blob/main/maintainers/telemetry-taxonomy.md) (maintainer contract)
+- [Telemetry Privacy Model and Metric Taxonomy](https://github.com/Switchbord/wats/blob/feat/wats-164/maintainers/telemetry-taxonomy.md) (maintainer contract)
