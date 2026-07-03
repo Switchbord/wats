@@ -128,6 +128,58 @@ Metric families:
 
 `route` values are templated (`/api/messages/:id`, `/api/groups/:groupId`) — never a raw id. `update_kind` and `endpoint_family` values are enum-clamped to `unknown` when the underlying data doesn't match a known category, so a malformed webhook or an unexpected Graph path can never inject an arbitrary label value. Labels never carry phone numbers, WAMIDs, message text, or tokens.
 
+## Telemetry sink
+
+WATS emits every internal telemetry event to an optional `TelemetrySink` passed in `WatsServiceConfig.telemetrySink`. If no sink is supplied the data still flows to the internal `/metrics` Prometheus registry. The sink seam lets you bridge to OpenTelemetry JS, Datadog, or any other backend without WATS taking a hard `@opentelemetry/*` runtime dependency.
+
+```ts
+import {
+  createWatsServiceApp,
+  OTEL_ATTR,
+  type TelemetrySink
+} from "@wats/service";
+
+class OtelBridge implements TelemetrySink {
+  private meter = otel.metrics.getMeter("wats.service");
+
+  incrementCounter(name: string, value: number, attributes: Record<string, string | number | boolean>) {
+    this.meter.createCounter(name).add(value, attributes);
+  }
+
+  recordHistogram(name: string, valueSeconds: number, attributes: Record<string, string | number | boolean>) {
+    this.meter.createHistogram(name).record(valueSeconds, attributes);
+  }
+
+  recordSpan?(name: string, start: Date, end: Date, attributes: Record<string, string | number | boolean>) {
+    // Optional span hook for request-scoped tracing.
+    // Not currently called by WATS; reserved for future instrumentation.
+  }
+
+  recordEvent?(name: string, attributes: Record<string, string | number | boolean>) {
+    // Optional event hook.
+  }
+}
+
+const app = createWatsServiceApp({
+  profile,
+  secrets,
+  telemetrySink: new OtelBridge()
+});
+```
+
+Methods are intentionally synchronous so the calling code never awaits a remote export. Attribute keys follow OpenTelemetry conventions where a standard exists:
+
+| Internal metric | Attribute keys | Notes |
+|---|---|---|
+| `http_requests_total` | `http.route`, `http.request.method`, `http.status_code`, `http.response.status.class` | route is always templated |
+| `http_request_duration_seconds` | `http.route`, `http.response.status.class` | method omitted to match histogram cardinality |
+| `graph_operations_total` | `wats.graph.endpoint_family`, `http.status_code`, `http.response.status.class`, `wats.operation.outcome` | endpoint family enum-clamped |
+| `send_outcomes_total` | `wats.graph.endpoint_family`, `wats.operation.outcome` | |
+| `webhook_normalization_total` | `wats.webhook.update_kind`, `wats.operation.outcome` | update kind enum-clamped |
+| `persistence_operations_total` | `wats.persistence.adapter`, `wats.operation.outcome` | absent when no `PersistenceStore` is injected |
+
+Use `OTEL_ATTR.httpRoute`, `OTEL_ATTR.operationOutcome`, and the other exported constants instead of hard-coding the dotted strings. `incrementCounter` and `recordHistogram` are required; `recordSpan` and `recordEvent` are optional and are currently reserved for future request-scoped instrumentation. No `@opentelemetry/*` package appears in WATS runtime dependencies.
+
 Point a Prometheus server at it with a scrape job:
 
 ```yaml

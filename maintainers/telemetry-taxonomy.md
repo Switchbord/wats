@@ -87,6 +87,23 @@ Options for future implementers:
 
 WATS-162 (`/metrics`), WATS-163 (`/status`), WATS-164 (OTel hook seams), WATS-165 (`/debug/diagnostics`), and WATS-166 (docs) must implement against this document. If an implementation needs a new metric family, label key, or diagnostic field, amend this doc and its test first.
 
+## Telemetry sink seam
+
+In addition to the Prometheus `/metrics` endpoint, WATS exposes an internal telemetry event stream through a `TelemetrySink` interface (WATS-164). A sink receives the same events that update the internal metrics registry. The interface is synchronous, PII-safe, and carries no hard `@opentelemetry/*` dependency. Implementers may bridge it to OpenTelemetry JS, Datadog, CloudWatch, or any other backend.
+
+Attribute keys use OpenTelemetry conventions where they exist:
+
+| Internal metric name | Sink attributes |
+|---|---|
+| `http_requests_total` | `http.route`, `http.request.method`, `http.status_code`, `http.response.status.class` |
+| `http_request_duration_seconds` | `http.route`, `http.response.status.class` |
+| `graph_operations_total` | `wats.graph.endpoint_family`, `http.status_code`, `http.response.status.class`, `wats.operation.outcome` |
+| `send_outcomes_total` | `wats.graph.endpoint_family`, `wats.operation.outcome` |
+| `webhook_normalization_total` | `wats.webhook.update_kind`, `wats.operation.outcome` |
+| `persistence_operations_total` | `wats.persistence.adapter`, `wats.operation.outcome` |
+
+The same PII denylist and enum-clamping rules apply to sink attributes as to Prometheus labels. No `@opentelemetry/*` package may appear in runtime dependencies.
+
 ## No /metrics implementation in this slice
 
 This document is a contract. No `/metrics` route, Prometheus text endpoint, OpenMetrics endpoint, or metrics registry exists in `@wats/service` as of this slice. The test asserts that no file under `packages/service/src/` contains `/metrics`, `prometheus`, or `openmetrics`. WATS-162 implements the endpoint.
