@@ -167,12 +167,12 @@ const app = createWatsServiceApp({
 });
 ```
 
-Methods are intentionally synchronous so the calling code never awaits a remote export. Attribute keys follow OpenTelemetry conventions where a standard exists:
+Methods are intentionally synchronous so the calling code never awaits a remote export, and errors thrown by a user sink are isolated and logged so telemetry cannot break request handling. Attribute keys follow OpenTelemetry conventions where a standard exists:
 
 | Internal metric | Attribute keys | Notes |
 |---|---|---|
 | `http_requests_total` | `http.route`, `http.request.method`, `http.status_code`, `http.response.status.class` | route is always templated |
-| `http_request_duration_seconds` | `http.route`, `http.response.status.class` | method omitted to match histogram cardinality |
+| `http_request_duration_seconds` | `http.route`, `http.request.method`, `http.status_code`, `http.response.status.class` | `/metrics` histogram is intentionally narrowed to `route`+`status_class` for cardinality; the sink receives the full attribute set. |
 | `graph_operations_total` | `wats.graph.endpoint_family`, `http.status_code`, `http.response.status.class`, `wats.operation.outcome` | endpoint family enum-clamped |
 | `send_outcomes_total` | `wats.graph.endpoint_family`, `wats.operation.outcome` | |
 | `webhook_normalization_total` | `wats.webhook.update_kind`, `wats.operation.outcome` | update kind enum-clamped |

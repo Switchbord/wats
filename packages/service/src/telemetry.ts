@@ -43,11 +43,10 @@ export const OTEL_ATTR = {
   httpRoute: "http.route",
   httpMethod: "http.request.method",
   httpStatusClass: "http.response.status.class",
-  httpStatusCode: "http.response.status_code",
+  httpStatusCode: "http.status_code",
   webhookUpdateKind: "wats.webhook.update_kind",
   graphEndpointFamily: "wats.graph.endpoint_family",
   persistenceAdapter: "wats.persistence.adapter",
-  persistenceState: "wats.persistence.state",
   operationOutcome: "wats.operation.outcome",
 } as const;
 
@@ -57,8 +56,7 @@ export type OtelMetricName =
   | "webhook_normalization_total"
   | "graph_operations_total"
   | "send_outcomes_total"
-  | "persistence_operations_total"
-  | "outbox_depth";
+  | "persistence_operations_total";
 
 // Prometheus-style label names used by the internal MetricsRegistry.
 const INTERNAL_LABEL = {
@@ -69,7 +67,6 @@ const INTERNAL_LABEL = {
   endpoint_family: "endpoint_family",
   outcome: "outcome",
   adapter: "adapter",
-  state: "state",
 } as const;
 
 // Map each metric name to the OTel attribute keys that carry its internal label values.
@@ -103,16 +100,7 @@ const METRIC_LABEL_MAP: Record<
     [OTEL_ATTR.persistenceAdapter]: "adapter",
     [OTEL_ATTR.operationOutcome]: "outcome",
   },
-  outbox_depth: {
-    [OTEL_ATTR.persistenceAdapter]: "adapter",
-    [OTEL_ATTR.persistenceState]: "state",
-  },
 };
-
-// Attribute coercion helpers used by the bridge to normalize values.
-function isAllowedAttributeValue(value: unknown): value is TelemetryAttributeValue {
-  return typeof value === "string" || typeof value === "number" || typeof value === "boolean";
-}
 
 /**
  * Build a set of OTel-style attributes for an HTTP request.
@@ -155,13 +143,6 @@ export function persistenceTelemetryAttributes(adapter: string, outcome: string)
   return {
     [OTEL_ATTR.persistenceAdapter]: adapter,
     [OTEL_ATTR.operationOutcome]: outcome,
-  };
-}
-
-export function outboxDepthTelemetryAttributes(adapter: string, state: string): TelemetryAttributes {
-  return {
-    [OTEL_ATTR.persistenceAdapter]: adapter,
-    [OTEL_ATTR.persistenceState]: state,
   };
 }
 

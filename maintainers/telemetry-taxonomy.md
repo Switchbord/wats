@@ -96,7 +96,7 @@ Attribute keys use OpenTelemetry conventions where they exist:
 | Internal metric name | Sink attributes |
 |---|---|
 | `http_requests_total` | `http.route`, `http.request.method`, `http.status_code`, `http.response.status.class` |
-| `http_request_duration_seconds` | `http.route`, `http.response.status.class` |
+| `http_request_duration_seconds` | `http.route`, `http.request.method`, `http.status_code`, `http.response.status.class` | metrics histogram is narrowed to `route`+`status_class`; sink receives the full attributes |
 | `graph_operations_total` | `wats.graph.endpoint_family`, `http.status_code`, `http.response.status.class`, `wats.operation.outcome` |
 | `send_outcomes_total` | `wats.graph.endpoint_family`, `wats.operation.outcome` |
 | `webhook_normalization_total` | `wats.webhook.update_kind`, `wats.operation.outcome` |

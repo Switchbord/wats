@@ -14,7 +14,9 @@ import {
   createWatsServiceApp,
   type WatsServiceConfig,
   CapturingTelemetrySink,
-  OTEL_ATTR
+  NOOP_TELEMETRY_SINK,
+  OTEL_ATTR,
+  type TelemetrySink
 } from "../src/index";
 import type { WatsProfileConfig } from "@wats/config";
 
@@ -251,7 +253,7 @@ describe("WATS-164 OpenTelemetry-compatible telemetry sink", () => {
   });
 
   test("package does not declare @opentelemetry dependencies", () => {
-    const pkg = JSON.parse(readFileSync(new URL("../../../package.json", import.meta.url), "utf8"));
+    const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
     // @opentelemetry runtime deps are forbidden; peer/dev/build tooling is okay.
     const allDeps = [
       ...Object.keys(pkg.dependencies ?? {}),
@@ -260,5 +262,23 @@ describe("WATS-164 OpenTelemetry-compatible telemetry sink", () => {
     ];
     const runtimeOpentelemetry = allDeps.filter((d) => d.startsWith("@opentelemetry/"));
     expect(runtimeOpentelemetry).toEqual([]);
+  });
+
+  test("NOOP_TELEMETRY_SINK swallows calls", () => {
+    const sink = NOOP_TELEMETRY_SINK;
+    expect(() => sink.incrementCounter("http_requests_total", 1, {})).not.toThrow();
+    expect(() => sink.recordHistogram("http_request_duration_seconds", 0.01, {})).not.toThrow();
+  });
+
+  test("throwing user sink does not break the request", async () => {
+    const throwingSink: TelemetrySink = {
+      incrementCounter() { throw new Error("sink boom"); },
+      recordHistogram() { throw new Error("sink boom histogram"); }
+    };
+    const app = createWatsServiceApp(config({ telemetrySink: throwingSink }));
+    const res = await app.fetch(new Request("https://svc.test/healthz"));
+    expect(res.status).toBe(200);
+    const metrics = await (await app.fetch(authedGet("/metrics"))).text();
+    expect(metrics).toContain("http_requests_total{");
   });
 });

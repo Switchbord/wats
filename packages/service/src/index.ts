@@ -645,11 +645,12 @@ class MetricsRegistry {
     this.#histogramHelp.set(name, help);
   }
 
-  incrementCounter(name: string, labels: Readonly<Record<string, string>>): void {
+  incrementCounter(name: string, labels: Readonly<Record<string, string>>, value = 1): void {
+    if (!Number.isFinite(value) || value < 0) throw new Error(`MetricsRegistry: counter increment value must be a non-negative finite number, received ${value}`);
     const series = this.#counters.get(name);
     if (series === undefined) throw new Error(`MetricsRegistry: counter "${name}" was not declared.`);
     const key = labelKey(labels);
-    series.set(key, (series.get(key) ?? 0) + 1);
+    series.set(key, (series.get(key) ?? 0) + value);
   }
 
   observeHistogram(name: string, labels: Readonly<Record<string, string>>, valueSeconds: number): void {
@@ -800,15 +801,15 @@ class MetricsBridgeTelemetrySink implements TelemetrySink {
 
   incrementCounter(name: OtelMetricName, value: number, attributes: TelemetryAttributes): void {
     if (name === "http_requests_total") {
-      this.#metrics.incrementCounter(name, this.#httpLabels(attributes));
+      this.#metrics.incrementCounter(name, this.#httpLabels(attributes), value);
     } else if (name === "webhook_normalization_total") {
-      this.#metrics.incrementCounter(name, this.#webhookLabels(attributes));
+      this.#metrics.incrementCounter(name, this.#webhookLabels(attributes), value);
     } else if (name === "graph_operations_total") {
-      this.#metrics.incrementCounter(name, this.#graphLabels(attributes));
+      this.#metrics.incrementCounter(name, this.#graphLabels(attributes), value);
     } else if (name === "send_outcomes_total") {
-      this.#metrics.incrementCounter(name, this.#sendLabels(attributes));
+      this.#metrics.incrementCounter(name, this.#sendLabels(attributes), value);
     } else if (name === "persistence_operations_total") {
-      this.#metrics.incrementCounter(name, this.#persistenceLabels(attributes));
+      this.#metrics.incrementCounter(name, this.#persistenceLabels(attributes), value);
     }
   }
 
@@ -867,9 +868,9 @@ class MetricsBridgeTelemetrySink implements TelemetrySink {
   }
 }
 
-// Fan out metric, span, and event calls to multiple sinks. Span/event methods
-// are only called when every downstream sink that supports them is present,
-// checked at call time.
+// Fan out metric, span, and event calls to multiple sinks. A downstream sink
+// that throws is isolated from the others: the exception is swallowed and
+// logged to stderr so a user exporter cannot break a successful request.
 class ComposedTelemetrySink implements TelemetrySink {
   readonly #sinks: ReadonlyArray<TelemetrySink>;
 
@@ -878,23 +879,50 @@ class ComposedTelemetrySink implements TelemetrySink {
   }
 
   incrementCounter(name: string, value: number, attributes: TelemetryAttributes): void {
-    for (const sink of this.#sinks) sink.incrementCounter(name, value, attributes);
+    for (const sink of this.#sinks) {
+      try {
+        sink.incrementCounter(name, value, attributes);
+      } catch (error) {
+        this.#logSinkError("incrementCounter", error);
+      }
+    }
   }
 
   recordHistogram(name: string, valueSeconds: number, attributes: TelemetryAttributes): void {
-    for (const sink of this.#sinks) sink.recordHistogram(name, valueSeconds, attributes);
+    for (const sink of this.#sinks) {
+      try {
+        sink.recordHistogram(name, valueSeconds, attributes);
+      } catch (error) {
+        this.#logSinkError("recordHistogram", error);
+      }
+    }
   }
 
   recordSpan(name: string, start: Date, end: Date, attributes: TelemetryAttributes): void {
     for (const sink of this.#sinks) {
-      if (typeof sink.recordSpan === "function") sink.recordSpan(name, start, end, attributes);
+      try {
+        if (typeof sink.recordSpan === "function") sink.recordSpan(name, start, end, attributes);
+      } catch (error) {
+        this.#logSinkError("recordSpan", error);
+      }
     }
   }
 
   recordEvent(name: string, attributes: TelemetryAttributes, timestamp?: Date): void {
     for (const sink of this.#sinks) {
-      if (typeof sink.recordEvent === "function") sink.recordEvent(name, attributes, timestamp);
+      try {
+        if (typeof sink.recordEvent === "function") sink.recordEvent(name, attributes, timestamp);
+      } catch (error) {
+        this.#logSinkError("recordEvent", error);
+      }
     }
+  }
+
+  #logSinkError(method: string, error: unknown): void {
+    const name = error instanceof Error ? error.name : "Error";
+    const message = error instanceof Error ? error.message : String(error);
+    // eslint-disable-next-line no-console
+    console.error(JSON.stringify({ event: "wats.telemetry.sink.error", method, errorName: name, errorMessage: message, at: new Date().toISOString() }));
   }
 }
 
@@ -921,7 +949,6 @@ function recordPersistenceOperation(sink: TelemetrySink, adapter: string, outcom
   sink.incrementCounter("persistence_operations_total", 1, persistenceTelemetryAttributes(adapter, outcome));
 }
 
-// Renders the /status route-templating logic against an arbitrary matched
 // Renders the /status route-templating logic against an arbitrary matched
 // path, for use as the http_requests_total / http_request_duration_seconds
 // "route" label. Reuses the same "never a raw id" invariant as WATS-163: an
@@ -2927,7 +2954,6 @@ export {
   graphTelemetryAttributes,
   sendTelemetryAttributes,
   persistenceTelemetryAttributes,
-  webhookTelemetryAttributes,
-  outboxDepthTelemetryAttributes
+  webhookTelemetryAttributes
 } from "./telemetry.js";
 
