@@ -456,9 +456,11 @@ function sanitizePersistenceHealth(health: unknown): Record<string, unknown> {
   const record = (typeof health === "object" && health !== null ? health : {}) as Record<string, unknown>;
   const rawLocation = typeof record.redactedLocation === "string" ? record.redactedLocation : "";
   const safeLocation = /^\[REDACTED/u.test(rawLocation) ? rawLocation : "[REDACTED]";
+  const rawBackend = typeof record.backend === "string" ? record.backend : "unknown";
+  const safeBackend = /^\b(sqlite|postgres)\b$/iu.test(rawBackend) ? rawBackend.toLowerCase() : "unknown";
   return {
     ok: record.ok === true,
-    backend: typeof record.backend === "string" ? record.backend : "unknown",
+    backend: safeBackend,
     currentVersion: Number.isInteger(record.currentVersion) ? (record.currentVersion as number) : 0,
     redactedLocation: safeLocation
   };
@@ -507,7 +509,7 @@ async function buildDiagnosticsPayload(ctx: RuntimeConfig): Promise<Record<strin
     version: DEFAULT_OPENAPI_VERSION,
     graphApiVersion: ctx.profile.graph.apiVersion,
     serviceMode: deriveServiceMode(ctx),
-    runtime: typeof (globalThis as { Bun?: unknown }).Bun === "object" ? "bun" : "node",
+    runtime: typeof (globalThis as { Bun?: unknown }).Bun === "object" ? "bun" : "unknown",
     routes: buildRouteInventory(ctx),
     featureFlags: {
       groupRoutes: ctx.enableGroupRoutes,
@@ -538,7 +540,7 @@ function redactedConfigShape(profile: WatsProfileConfig): Record<string, unknown
 }
 
 function envRef(value: { env: string } | string): string {
-  return typeof value === "string" ? "literal:[REDACTED]" : `env:${value.env}`;
+  return "[REDACTED]";
 }
 
 // ---------------------------------------------------------------------------
@@ -694,8 +696,10 @@ class MetricsRegistry {
 // Records only class names with counts — no messages, no stack traces, no
 // PII, no env values. Bounded OOM defense: a single runaway error source can
 // never grow the ledger beyond MAX_ERROR_CLASSES, and error names are capped at
-// MAX_ERROR_NAME_LENGTH characters before counting.
-class ErrorLedger {
+// MAX_ERROR_NAME_LENGTH characters before counting. When the cap is exceeded
+// the least-recently recorded class is evicted (Map insertion order), so a
+// brand-new failure is always visible on its first occurrence.
+export class ErrorLedger {
   readonly #counts = new Map<string, number>();
   static readonly MAX_ERROR_CLASSES = 10;
   static readonly MAX_ERROR_NAME_LENGTH = 80;
@@ -707,10 +711,11 @@ class ErrorLedger {
       : name;
     const current = this.#counts.get(key) ?? 0;
     this.#counts.set(key, current + 1);
-    // Evict the lowest-count class when over capacity, preserving OOM defense.
+    // Evict the oldest class when over capacity, preserving OOM defense and
+    // ensuring the most recently seen class name is retained on first sight.
     if (this.#counts.size > ErrorLedger.MAX_ERROR_CLASSES) {
-      const minEntry = Array.from(this.#counts.entries()).sort((a, b) => a[1] - b[1])[0];
-      if (minEntry !== undefined) this.#counts.delete(minEntry[0]);
+      const firstKey = this.#counts.keys().next().value;
+      if (firstKey !== undefined) this.#counts.delete(firstKey);
     }
   }
 
@@ -1146,7 +1151,46 @@ function createOpenApiSchemas(enableGroupRoutes = false): Record<string, Record<
         },
         metricFamilies: { type: "array", items: { type: "string" } },
         recentErrors: { type: "object", additionalProperties: { type: "integer", minimum: 1 } },
-        configShape: { type: "object", additionalProperties: true }
+        configShape: {
+          type: "object",
+          additionalProperties: false,
+          required: ["graph", "auth", "service", "webhook"],
+          properties: {
+            graph: {
+              type: "object",
+              additionalProperties: false,
+              required: ["apiVersion"],
+              properties: { apiVersion: { type: "string" } }
+            },
+            auth: {
+              type: "object",
+              additionalProperties: false,
+              required: ["accessToken"],
+              properties: { accessToken: { type: "string" } }
+            },
+            service: {
+              type: "object",
+              additionalProperties: false,
+              required: ["host", "port", "apiPrefix"],
+              properties: {
+                host: { type: "string" },
+                port: { type: "integer" },
+                apiPrefix: { type: "string" }
+              }
+            },
+            webhook: {
+              type: "object",
+              additionalProperties: false,
+              required: ["path", "verifyToken", "appSecret", "maxBodyBytes"],
+              properties: {
+                path: { type: "string" },
+                verifyToken: { type: "string" },
+                appSecret: { type: "string" },
+                maxBodyBytes: { type: "integer" }
+              }
+            }
+          }
+        }
       }
     },
     ErrorEnvelope: {
@@ -2585,6 +2629,12 @@ function makeRuntimeConfig(config: WatsServiceConfig): RuntimeConfig {
         // (matching handleWebhook's own existing try/catch boundary below).
         const errors = isRecord(result) ? (result as { errors?: unknown }).errors : undefined;
         const outcome: MetricOutcome = Array.isArray(errors) && errors.length > 0 ? "error" : "success";
+        if (outcome === "error") {
+          // Record the first representative handler error so the ledger
+          // reflects webhook-side failures, not only thrown exceptions.
+          const firstError = Array.isArray(errors) ? errors[0] : undefined;
+          errorLedger.record(firstError ?? new Error("webhook_handler_failure"));
+        }
         recordWebhookNormalization(metricsRegistry, kind, outcome);
         return result;
       } catch (error) {

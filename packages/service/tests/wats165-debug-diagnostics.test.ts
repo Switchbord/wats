@@ -218,30 +218,81 @@ describe("WATS-165 redacted /debug/diagnostics support snapshot", () => {
     expect(routes.length).toBeLessThanOrEqual(50);
   });
 
-  test("recent error ledger is capped and counts by error class only", async () => {
-    const app = createWatsServiceApp(config({ persistence: memoryStore() as unknown as never }));
+  test("recent error ledger is capped and counts by error class only", () => {
+    // Direct unit test of the bounded ledger: drive 15 distinct error classes
+    // and one very long class name, then verify the cap and truncation.
+    const { ErrorLedger } = require("../src/index") as { ErrorLedger: typeof import("../src/index").ErrorLedger };
+    const ledger = new ErrorLedger();
 
-    const groupIds = Array.from({ length: 15 }, (_, i) => `group-${i}`);
-    for (const groupId of groupIds) {
-      await app.fetch(new Request(`https://svc.test/api/groups/${groupId}`, {
-        method: "GET",
-        headers: { authorization: `Bearer ${SECRETS.serviceBearerToken}` }
-      }));
+    class GraphDemoError0 extends Error {}
+    class GraphDemoError1 extends Error {}
+    class GraphDemoError2 extends Error {}
+    class GraphDemoError3 extends Error {}
+    class GraphDemoError4 extends Error {}
+    class GraphDemoError5 extends Error {}
+    class GraphDemoError6 extends Error {}
+    class GraphDemoError7 extends Error {}
+    class GraphDemoError8 extends Error {}
+    class GraphDemoError9 extends Error {}
+    class GraphDemoError10 extends Error {}
+    class GraphDemoError11 extends Error {}
+    class GraphDemoError12 extends Error {}
+    class GraphDemoError13 extends Error {}
+    class VeryLongErrorName extends Error {}
+    Object.defineProperty(VeryLongErrorName, "name", { value: `A${"a".repeat(90)}` });
+
+    const classes = [
+      GraphDemoError0,
+      GraphDemoError1,
+      GraphDemoError2,
+      GraphDemoError3,
+      GraphDemoError4,
+      GraphDemoError5,
+      GraphDemoError6,
+      GraphDemoError7,
+      GraphDemoError8,
+      GraphDemoError9,
+      GraphDemoError10,
+      GraphDemoError11,
+      GraphDemoError12,
+      GraphDemoError13,
+      VeryLongErrorName
+    ];
+
+    for (const Err of classes) {
+      ledger.record(new Err());
     }
 
-    const res = await app.fetch(authedDiagnosticsReq());
-    const body = (await res.json()) as Record<string, unknown>;
-    const errors = body.recentErrors as Record<string, number>;
+    const errors = ledger.snapshot();
 
-    expect(Object.keys(errors).length).toBeLessThanOrEqual(10);
+    // MAX_ERROR_CLASSES = 10
+    expect(Object.keys(errors).length).toBe(10);
     for (const [key, value] of Object.entries(errors)) {
       expect(typeof key).toBe("string");
       expect(Number.isInteger(value)).toBe(true);
       expect(value).toBeGreaterThanOrEqual(1);
+      expect(key.length).toBeLessThanOrEqual(83); // 80 + "..."
     }
+
+    // The newest class has a very long name; verify it was truncated.
+    const newLongKey = Object.keys(errors).find((k) => k.startsWith("A"));
+    expect(newLongKey).toBeDefined();
+    const longKey = newLongKey as string;
+    expect(longKey.endsWith("...")).toBe(true);
+    expect(longKey.length).toBe(83);
+
+    // The oldest classes (GraphDemoError0..GraphDemoError4) should have been
+    // evicted because the cap keeps only the 10 most recently recorded keys.
+    expect(errors).not.toHaveProperty("GraphDemoError0");
+    expect(errors).not.toHaveProperty("GraphDemoError4");
+    expect(errors).toHaveProperty("GraphDemoError5");
+    expect(errors).toHaveProperty("GraphDemoError13");
+
+    ledger.record(new GraphDemoError0());
+    expect(ledger.snapshot()).toHaveProperty("GraphDemoError0");
   });
 
-  test("config shape is summarized without exposing secret env var values", async () => {
+  test("config shape is summarized without exposing secret env var values or names", async () => {
     const app = createWatsServiceApp(config({ persistence: memoryStore() as unknown as never }));
     const res = await app.fetch(authedDiagnosticsReq());
     const body = (await res.json()) as Record<string, unknown>;
@@ -251,19 +302,51 @@ describe("WATS-165 redacted /debug/diagnostics support snapshot", () => {
     expect(isRecord(shape.auth)).toBe(true);
     const auth = shape.auth as Record<string, unknown>;
     expect(auth.accessToken).not.toBe(SECRETS.accessToken);
-    expect(auth.accessToken).toMatch(/^env:\S+/u);
+    expect(auth.accessToken).toBe("[REDACTED]");
 
     expect(isRecord(shape.webhook)).toBe(true);
     const webhook = shape.webhook as Record<string, unknown>;
-    expect(webhook.verifyToken).toMatch(/^env:\S+/u);
-    expect(webhook.appSecret).toMatch(/^env:\S+/u);
+    expect(webhook.verifyToken).toBe("[REDACTED]");
+    expect(webhook.appSecret).toBe("[REDACTED]");
     expect(webhook.verifyToken).not.toBe(SECRETS.webhookVerifyToken);
     expect(webhook.appSecret).not.toBe(SECRETS.webhookAppSecret);
 
-    expect(JSON.stringify(shape)).not.toContain(SECRETS.serviceBearerToken);
-    expect(JSON.stringify(shape)).not.toContain(SECRETS.webhookVerifyToken);
-    expect(JSON.stringify(shape)).not.toContain(SECRETS.webhookAppSecret);
-    expect(JSON.stringify(shape)).not.toContain(SECRETS.accessToken);
+    const serialized = JSON.stringify(shape);
+    expect(serialized).not.toContain("env:");
+    expect(serialized).not.toContain("WATS_");
+    expect(serialized).not.toContain(SECRETS.serviceBearerToken);
+    expect(serialized).not.toContain(SECRETS.webhookVerifyToken);
+    expect(serialized).not.toContain(SECRETS.webhookAppSecret);
+    expect(serialized).not.toContain(SECRETS.accessToken);
+  });
+
+  test("persistence backend is clamped to the known allowlist", async () => {
+    const leakyStore = {
+      ...memoryStore(),
+      backend: "sqlite /var/secrets/wats.db" as const,
+      async health() {
+        return { ok: true, backend: "sqlite /var/secrets/wats.db" as const, currentVersion: 1, redactedLocation: "[REDACTED_SQLITE_DATABASE]" };
+      }
+    };
+    const app = createWatsServiceApp(config({ persistence: leakyStore as unknown as never }));
+    const res = await app.fetch(authedDiagnosticsReq());
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(isRecord(body.persistence)).toBe(true);
+    const persistence = body.persistence as Record<string, unknown>;
+    expect(persistence.backend).toBe("unknown");
+    expect(JSON.stringify(persistence)).not.toContain("/var/secrets");
+    expect(persistence.redactedLocation).toBe("[REDACTED_SQLITE_DATABASE]");
+  });
+
+  test("persistence backend allowlist accepts in-tree sqlite and postgres values", async () => {
+    const sqliteApp = createWatsServiceApp(config({ persistence: memoryStore() as unknown as never }));
+    const sqliteBody = ((await (await sqliteApp.fetch(authedDiagnosticsReq())).json()) as Record<string, unknown>);
+    expect((sqliteBody.persistence as Record<string, unknown>).backend).toBe("sqlite");
+
+    const postgresStore = { ...memoryStore(), backend: "postgres" as const, async health() { return { ok: true, backend: "postgres" as const, currentVersion: 1, redactedLocation: "[REDACTED_POSTGRES_DSN]" }; } };
+    const pgApp = createWatsServiceApp(config({ persistence: postgresStore as unknown as never }));
+    const pgBody = ((await (await pgApp.fetch(authedDiagnosticsReq())).json()) as Record<string, unknown>);
+    expect((pgBody.persistence as Record<string, unknown>).backend).toBe("postgres");
   });
 
   test("OpenAPI document includes /debug/diagnostics with bearer security", () => {
