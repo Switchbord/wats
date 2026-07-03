@@ -91,6 +91,7 @@ describe("WATS-35 OpenAPI document generator", () => {
       "/api/messages",
       "/api/messages/text",
       "/api/messages/{messageId}",
+      "/debug/diagnostics",
       "/healthz",
       "/metrics",
       "/openapi.json",
@@ -162,6 +163,7 @@ describe("WATS-35 OpenAPI document generator", () => {
     expect(hasBearerSecurity(operation(doc, "/api/messages", "post"))).toBe(true);
     expect(hasBearerSecurity(operation(doc, "/status", "get"))).toBe(true);
     expect(hasBearerSecurity(operation(doc, "/metrics", "get"))).toBe(true);
+    expect(hasBearerSecurity(operation(doc, "/debug/diagnostics", "get"))).toBe(true);
 
     expect(hasBearerSecurity(operation(doc, "/healthz", "get"))).toBe(false);
     expect(hasBearerSecurity(operation(doc, "/readyz", "get"))).toBe(false);
@@ -196,6 +198,7 @@ describe("WATS-35 OpenAPI document generator", () => {
     const doc = createWatsServiceOpenApiDocument(custom, { serverUrl: "https://service.example/base?ignored=1#fragment" });
 
     expect(Object.keys(doc.paths).sort()).toEqual([
+      "/debug/diagnostics",
       "/healthz",
       "/hooks/custom",
       "/metrics",
@@ -253,6 +256,7 @@ describe("WATS-35 OpenAPI document generator", () => {
       "/readyz",
       "/status",
       "/metrics",
+      "/debug/diagnostics",
       "/openapi.json",
       "/api/messages",
       "/api/messages/text"
