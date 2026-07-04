@@ -68,6 +68,7 @@ If you inject your own `whatsapp` facade, these flags do nothing. The service pa
 | --- | --- | --- | --- |
 | `/healthz` | GET | none | Returns `{ ok: true, service: "wats" }`. |
 | `/readyz` | GET | none | Returns `{ ok: true, service: "wats" }` after construction. |
+| `/status` | GET | service bearer | Redacted operator status snapshot. Missing or invalid token returns `404`, not `401`. |
 | `/openapi.json` | GET | none | Returns the generated OpenAPI 3.1 document. |
 | `profile.webhook.path` | GET | Meta verify token | Delegates to `createWebhookAdapter`. |
 | `profile.webhook.path` | POST | Meta signature | Delegates to `createWebhookAdapter`. |
@@ -87,7 +88,13 @@ Unknown routes return `404`. Unsupported methods return `405` with an `Allow` he
 
 `createWatsServiceOpenApiDocument(profile, options?)` returns a plain-object OpenAPI 3.1 document for the current service routes. The app serves the same document at `GET /openapi.json` with JSON content type and no bearer requirement; method mismatch returns `405` with `Allow: GET`.
 
-The document includes `serviceBearerAuth` only on the protected message routes and, when `enableGroupRoutes` is true, the protected Groups routes. It never embeds raw service bearer, Graph access, app secret, verify token, or config env-var secret reference values.
+The document includes `serviceBearerAuth` only on the protected message routes, the `/status` operator route, and, when `enableGroupRoutes` is true, the protected Groups routes. It never embeds raw service bearer, Graph access, app secret, verify token, or config env-var secret reference values.
+
+## Operator status
+
+`GET /status` returns a redacted operator snapshot: package `version`, `uptimeSeconds`, `graphApiVersion`, a coarse `serviceMode`, a templated `routes` inventory, `featureFlags`, and a `persistence` health summary (or `null` when no store is injected). Route entries use `:param` placeholders, so no WABA id, phone-number id, or message id appears in the inventory.
+
+`/status` differs from liveness and readiness. `/healthz` and `/readyz` answer "is this process alive?" and "is it ready to serve?" — they take no auth and return a fixed `{ ok, service }` body. `/status` answers "what is this instance doing?", requires the service bearer token, and returns structured operator data. A missing or invalid token returns `404` (not `401`) so the endpoint's existence is not disclosed to unauthenticated callers; the `404` body is identical to the catch-all. The snapshot never includes tokens, phone numbers, WABA ids, config file paths, raw webhook bodies, message text, or stack traces.
 
 ## Service bearer auth
 

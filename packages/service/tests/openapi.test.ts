@@ -94,6 +94,7 @@ describe("WATS-35 OpenAPI document generator", () => {
       "/healthz",
       "/openapi.json",
       "/readyz",
+      "/status",
       "/webhooks/whatsapp"
     ]);
 
@@ -153,11 +154,12 @@ describe("WATS-35 OpenAPI document generator", () => {
     expect(Array.isArray(commerceInteractiveSchema.oneOf)).toBe(true);
   });
 
-  test("marks only service message routes with bearer security", () => {
+  test("marks service message and status routes with bearer security", () => {
     const doc = createWatsServiceOpenApiDocument(profile());
 
     expect(hasBearerSecurity(operation(doc, "/api/messages/text", "post"))).toBe(true);
     expect(hasBearerSecurity(operation(doc, "/api/messages", "post"))).toBe(true);
+    expect(hasBearerSecurity(operation(doc, "/status", "get"))).toBe(true);
 
     expect(hasBearerSecurity(operation(doc, "/healthz", "get"))).toBe(false);
     expect(hasBearerSecurity(operation(doc, "/readyz", "get"))).toBe(false);
@@ -196,6 +198,7 @@ describe("WATS-35 OpenAPI document generator", () => {
       "/hooks/custom",
       "/openapi.json",
       "/readyz",
+      "/status",
       "/v1/internal/messages",
       "/v1/internal/messages/text",
       "/v1/internal/messages/{messageId}"
@@ -245,6 +248,7 @@ describe("WATS-35 OpenAPI document generator", () => {
     const reservedWebhookPaths = [
       "/healthz",
       "/readyz",
+      "/status",
       "/openapi.json",
       "/api/messages",
       "/api/messages/text"
@@ -257,7 +261,7 @@ describe("WATS-35 OpenAPI document generator", () => {
       expect(() => createWatsServiceApp(config({ profile: profile({ webhook: { ...profile().webhook, path } }) }))).toThrow(WatsServiceError);
     }
 
-    const collidingPrefixes = ["/healthz", "/readyz", "/openapi.json", "/webhooks/whatsapp"];
+    const collidingPrefixes = ["/healthz", "/readyz", "/status", "/openapi.json", "/webhooks/whatsapp"];
     for (const apiPrefix of collidingPrefixes) {
       expect(() =>
         createWatsServiceOpenApiDocument(profile({ service: { ...profile().service, apiPrefix } }))
