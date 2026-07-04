@@ -599,11 +599,13 @@ const METRIC_UPDATE_KINDS = [
 ] as const;
 type MetricUpdateKind = (typeof METRIC_UPDATE_KINDS)[number];
 
-function statusClassOf(status: number): MetricStatusClass {
+function statusClassOf(status: number): MetricStatusClass | "unknown" {
+  if (status >= 100 && status < 200) return "unknown";
   if (status >= 200 && status < 300) return "2xx";
   if (status >= 300 && status < 400) return "3xx";
   if (status >= 400 && status < 500) return "4xx";
-  return "5xx";
+  if (status >= 500 && status < 600) return "5xx";
+  return "unknown";
 }
 
 // Enum-clamp an untrusted string against a fixed allowlist. Never forwards a
@@ -654,6 +656,7 @@ class MetricsRegistry {
   }
 
   observeHistogram(name: string, labels: Readonly<Record<string, string>>, valueSeconds: number): void {
+    if (!Number.isFinite(valueSeconds) || valueSeconds < 0) throw new Error(`MetricsRegistry: histogram observation must be a non-negative finite number, received ${valueSeconds}`);
     const series = this.#histograms.get(name);
     if (series === undefined) throw new Error(`MetricsRegistry: histogram "${name}" was not declared.`);
     const key = labelKey(labels);
@@ -946,7 +949,10 @@ function recordSendOutcome(sink: TelemetrySink, endpointFamily: MetricEndpointFa
 }
 
 function recordPersistenceOperation(sink: TelemetrySink, adapter: string, outcome: MetricOutcome): void {
-  sink.incrementCounter("persistence_operations_total", 1, persistenceTelemetryAttributes(adapter, outcome));
+  // Clamp to the same backend allowlist /status uses (sanitizePersistenceHealth)
+  // so a custom adapter's raw backend string never becomes an unbounded label.
+  const clampedAdapter = clampToEnum(adapter.toLowerCase(), ["sqlite", "postgres"] as const);
+  sink.incrementCounter("persistence_operations_total", 1, persistenceTelemetryAttributes(clampedAdapter, outcome));
 }
 
 // Renders the /status route-templating logic against an arbitrary matched
@@ -2750,6 +2756,11 @@ function makeRuntimeConfig(config: WatsServiceConfig): RuntimeConfig {
             // webhook acknowledgement.
             recordGraphOperation(telemetrySink, "messages", graphErrorStatus(error), "error");
             recordSendOutcome(telemetrySink, "messages", "error");
+            // Same ledger coverage as the message-route Graph failures: an
+            // auto-reply send failure must be visible in /debug/diagnostics
+            // recentErrors, not only in the stdout line below. (The closure
+            // runs at webhook-dispatch time, after errorLedger is created.)
+            errorLedger.record(error);
             const e = (error ?? undefined) as { code?: number; errorSubcode?: number } | undefined;
             const code = e?.code;
             const subcode = e?.errorSubcode;
