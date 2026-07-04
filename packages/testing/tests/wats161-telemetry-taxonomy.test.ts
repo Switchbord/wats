@@ -1,7 +1,7 @@
 // WATS-161 — TELEMETRY-0: privacy model and metric taxonomy for WATS service telemetry.
 //
-// This test pins the design contract before any /metrics, /status, or
-// diagnostics endpoint is implemented. It asserts:
+// This test pins the design contract that WATS-162..166 implement against.
+// It asserts:
 //   1. A maintainer taxonomy doc exists and covers required decision areas.
 //   2. The doc defines an explicit allowlist of metric names (snake_case only).
 //   3. The doc defines an explicit allowlist of label keys.
@@ -10,13 +10,11 @@
 //   6. The doc defines route templating and enum-clamping rules.
 //   7. The doc separates telemetry from liveness/readiness.
 //   8. The doc decides endpoint protection strategy (bearer, opt-in, 404).
-//   9. No /metrics implementation exists anywhere in the service package.
-//
-// No /metrics implementation exists in this slice. This is a docs/test
-// contract only.
+//   9. The /metrics implementation (WATS-162) declares only allowlisted
+//      metric names — drift-guarded against @wats/service source.
 
 import { describe, expect, test } from "bun:test";
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 function findRepoRoot(startDir: string): string {
@@ -46,18 +44,6 @@ function extractSection(doc: string, heading: string): string {
   const nextHeading = doc.indexOf("\n## ", start + 1);
   const end = nextHeading === -1 ? doc.length : nextHeading;
   return doc.slice(start, end);
-}
-
-/** Collect all .ts files under a directory recursively. */
-function collectTsFiles(dir: string): string[] {
-  const results: string[] = [];
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry);
-    const st = statSync(full);
-    if (st.isDirectory()) results.push(...collectTsFiles(full));
-    else if (entry.endsWith(".ts")) results.push(full);
-  }
-  return results;
 }
 
 describe("WATS-161 telemetry privacy model and metric taxonomy", () => {
@@ -290,24 +276,22 @@ describe("WATS-161 telemetry privacy model and metric taxonomy", () => {
     expect(bearerLine!.trimEnd().endsWith(".")).toBe(true);
   });
 
-  test("no /metrics implementation exists anywhere in the service package", () => {
-    const serviceDir = join(repoRoot, "packages", "service", "src");
-    const tsFiles = collectTsFiles(serviceDir);
-    expect(tsFiles.length).toBeGreaterThan(0);
-    for (const file of tsFiles) {
-      const content = readFileSync(file, "utf8");
-      expect(
-        content,
-        `${file} contains "/metrics" — implementation must not exist in this slice`
-      ).not.toMatch(/\/metrics/iu);
-      expect(
-        content,
-        `${file} contains "prometheus" — implementation must not exist in this slice`
-      ).not.toMatch(/prometheus/iu);
-      expect(
-        content,
-        `${file} contains "openmetrics" — implementation must not exist in this slice`
-      ).not.toMatch(/openmetrics/iu);
+  test("/metrics implementation (WATS-162) respects the taxonomy's metric name allowlist", () => {
+    // WATS-161 originally asserted no /metrics implementation existed in this
+    // slice. WATS-162 has since implemented it; that guard is superseded by
+    // a stronger one: every metric name the implementation actually declares
+    // must appear in this doc's "Allowed metric families" table, so the
+    // contract and the code cannot drift apart in either direction.
+    const serviceSource = readFileSync(join(repoRoot, "packages", "service", "src", "index.ts"), "utf8");
+    const declaredNames = Array.from(
+      serviceSource.matchAll(/registry\.declare(?:Counter|Histogram)\("([a-z_]+)"/gu),
+      (m) => m[1]
+    ).sort();
+    expect(declaredNames.length, "no declareCounter/declareHistogram calls found in @wats/service").toBeGreaterThan(0);
+
+    const doc = read("maintainers/telemetry-taxonomy.md");
+    for (const name of declaredNames) {
+      expect(doc, `metric "${name}" declared in code but not in the taxonomy doc`).toContain(`\`${name}\``);
     }
   });
 });

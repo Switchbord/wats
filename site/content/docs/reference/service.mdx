@@ -5,7 +5,7 @@ description: "The @wats/service runtime-neutral standalone webhook/API service a
 
 <DocMeta status="experimental" lastReviewed="2026-06-21" />
 
-`@wats/service` exposes a runtime-neutral `Request -> Response` app composing the Graph client, webhook adapter, config profile shape, and WhatsApp facade. It is not a production server by itself: the CLI provides dry-run and credential-gated live `wats serve` wrappers, and a generated OpenAPI 3.1 document covers the routes below. Not implemented yet: Node/Docker packaging, metrics, production hosting.
+`@wats/service` exposes a runtime-neutral `Request -> Response` app composing the Graph client, webhook adapter, config profile shape, and WhatsApp facade. It is not a production server by itself: the CLI provides dry-run and credential-gated live `wats serve` wrappers, and a generated OpenAPI 3.1 document covers the routes below. Not implemented yet: Node/Docker packaging, production hosting.
 
 ## Public API
 
@@ -69,6 +69,7 @@ If you inject your own `whatsapp` facade, these flags do nothing. The service pa
 | `/healthz` | GET | none | Returns `{ ok: true, service: "wats" }`. |
 | `/readyz` | GET | none | Returns `{ ok: true, service: "wats" }` after construction. |
 | `/status` | GET | service bearer | Redacted operator status snapshot. Missing or invalid token returns `404`, not `401`. |
+| `/metrics` | GET | service bearer | Prometheus/OpenMetrics scrape endpoint. Missing or invalid token returns `404`, not `401`. |
 | `/openapi.json` | GET | none | Returns the generated OpenAPI 3.1 document. |
 | `profile.webhook.path` | GET | Meta verify token | Delegates to `createWebhookAdapter`. |
 | `profile.webhook.path` | POST | Meta signature | Delegates to `createWebhookAdapter`. |
@@ -95,6 +96,48 @@ The document includes `serviceBearerAuth` only on the protected message routes, 
 `GET /status` returns a redacted operator snapshot: package `version`, `uptimeSeconds`, `graphApiVersion`, a coarse `serviceMode`, a templated `routes` inventory, `featureFlags`, and a `persistence` health summary (or `null` when no store is injected). Route entries use `:param` placeholders, so no WABA id, phone-number id, or message id appears in the inventory.
 
 `/status` differs from liveness and readiness. `/healthz` and `/readyz` answer "is this process alive?" and "is it ready to serve?" — they take no auth and return a fixed `{ ok, service }` body. `/status` answers "what is this instance doing?", requires the service bearer token, and returns structured operator data. A missing or invalid token returns `404` (not `401`) so the endpoint's existence is not disclosed to unauthenticated callers; the `404` body is identical to the catch-all. The snapshot never includes tokens, phone numbers, WABA ids, config file paths, raw webhook bodies, message text, or stack traces.
+
+## Metrics
+
+`GET /metrics` serves Prometheus/OpenMetrics text exposition (`Content-Type: text/plain; version=0.0.4`). Same auth posture as `/status`: service bearer required, `404` (not `401`) on a missing or mismatched token.
+
+```
+curl -s -H "Authorization: Bearer $WATS_SERVICE_BEARER_TOKEN" https://your-service/metrics
+```
+
+```
+# HELP http_requests_total Inbound HTTP requests to the service.
+# TYPE http_requests_total counter
+http_requests_total{method="POST",route="/webhooks/whatsapp",status_class="2xx"} 42
+# HELP graph_operations_total Outbound Graph API calls by endpoint family and status class.
+# TYPE graph_operations_total counter
+graph_operations_total{endpoint_family="messages",outcome="success",status_class="2xx"} 17
+```
+
+Metric families:
+
+| Metric | Type | Labels |
+| --- | --- | --- |
+| `http_requests_total` | counter | `route`, `method`, `status_class` |
+| `http_request_duration_seconds` | histogram | `route`, `status_class` |
+| `webhook_normalization_total` | counter | `update_kind`, `outcome` |
+| `graph_operations_total` | counter | `endpoint_family`, `status_class`, `outcome` |
+| `send_outcomes_total` | counter | `endpoint_family`, `outcome` |
+| `persistence_operations_total` | counter | `adapter`, `outcome` — absent entirely when no `PersistenceStore` is injected |
+
+`route` values are templated (`/api/messages/:id`, `/api/groups/:groupId`) — never a raw id. `update_kind` and `endpoint_family` values are enum-clamped to `unknown` when the underlying data doesn't match a known category, so a malformed webhook or an unexpected Graph path can never inject an arbitrary label value. Labels never carry phone numbers, WAMIDs, message text, or tokens.
+
+Point a Prometheus server at it with a scrape job:
+
+```yaml
+scrape_configs:
+  - job_name: wats-service
+    scheme: https
+    bearer_token: "${WATS_SERVICE_BEARER_TOKEN}"
+    static_configs:
+      - targets: ["your-service:443"]
+    metrics_path: /metrics
+```
 
 ## Service bearer auth
 
@@ -304,7 +347,7 @@ The repo ships a Railway-targeted root `Dockerfile` that wraps the implemented `
 
 ## Non-goals
 
-Not implemented: a full Meta Graph API OpenAPI document, live Meta credential checks, background queue/outbox workers, metrics, TLS, rate limiting, production container publication, or message schemas beyond the current text/media/location/contacts/reaction/interactive slices.
+Not implemented: a full Meta Graph API OpenAPI document, live Meta credential checks, background queue/outbox workers, TLS, rate limiting, production container publication, or message schemas beyond the current text/media/location/contacts/reaction/interactive slices.
 
 ## Related docs
 

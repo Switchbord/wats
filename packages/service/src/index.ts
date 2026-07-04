@@ -136,6 +136,7 @@ interface RuntimeConfig {
   readonly messagesPath: string;
   readonly enableGroupRoutes: boolean;
   readonly groupsPath: string;
+  readonly metrics: MetricsRegistry;
 }
 
 interface ServiceRouteMatch {
@@ -147,6 +148,7 @@ const JSON_CONTENT_TYPE = "application/json; charset=utf-8";
 const SERVICE_NAME = "wats";
 const OPENAPI_PATH = "/openapi.json";
 const STATUS_PATH = "/status";
+const METRICS_PATH = "/metrics";
 const SERVER_START_MS = Date.now();
 const DEFAULT_OPENAPI_TITLE = "WATS Service API";
 const DEFAULT_OPENAPI_VERSION = "0.3.27";
@@ -334,6 +336,18 @@ function sanitizeGraphDiagnostics(error: unknown): SanitizedGraphDiagnostics {
   return out;
 }
 
+// WATS-162: derive a status_class-able HTTP status from a Graph failure for
+// graph_operations_total. GraphApiError (and its subclasses, e.g.
+// GraphRateLimitError) always carries the real upstream status. A
+// GraphNetworkError (or anything else) never reached Meta at all — no HTTP
+// status exists, so it is classified as 5xx (a service-side/network failure,
+// not a client error), matching the existing graphFailureResponse's own
+// treatment of network failures as 502-class outcomes.
+function graphErrorStatus(error: unknown): number {
+  if (error instanceof GraphApiError) return error.status;
+  return 502;
+}
+
 function graphFailureResponse(error: unknown): Response {
   const diagnostics = sanitizeGraphDiagnostics(error);
 
@@ -469,6 +483,228 @@ async function buildStatusPayload(ctx: RuntimeConfig): Promise<Record<string, un
     },
     persistence
   };
+}
+
+// ---------------------------------------------------------------------------
+// WATS-162: Prometheus/OpenMetrics-compatible /metrics registry.
+//
+// A tiny in-memory counter/histogram registry, gated to exactly the metric
+// families and label keys the WATS-161 taxonomy allows. The allowlists live
+// here (not just in the doc) so an attempt to record an unlisted metric name
+// or label key throws in development/tests rather than silently emitting an
+// unreviewed series. Label values derived from untrusted input (update_kind,
+// endpoint_family) are enum-clamped to "unknown" per the taxonomy's
+// enum-clamping rule — this is enforced by the recording functions below,
+// not by the caller.
+//
+// outbox_depth (gauge) is intentionally NOT implemented: PersistenceStore
+// exposes no non-mutating outbox-count query, and adding one is out of scope
+// for a metrics-endpoint slice. Revisit when persistence gains that query.
+// ---------------------------------------------------------------------------
+
+const METRIC_STATUS_CLASSES = ["2xx", "3xx", "4xx", "5xx"] as const;
+type MetricStatusClass = (typeof METRIC_STATUS_CLASSES)[number];
+
+const METRIC_OUTCOMES = ["success", "error", "skipped", "deduped"] as const;
+type MetricOutcome = (typeof METRIC_OUTCOMES)[number];
+
+const METRIC_ENDPOINT_FAMILIES = ["messages", "media", "templates", "groups", "flows"] as const;
+type MetricEndpointFamily = (typeof METRIC_ENDPOINT_FAMILIES)[number];
+
+// Mirrors TypedUpdateKind in @wats/core (packages/core/src/webhookNormalizer.ts).
+// Pinned here as a literal list (not imported) so a change to the upstream
+// type is caught by the drift-guard test rather than silently widening what
+// /metrics will accept as a label value.
+const METRIC_UPDATE_KINDS = [
+  "message", "status", "account", "unknown", "callConnect", "callTerminate",
+  "callStatus", "groupLifecycle", "groupParticipants", "groupSettings",
+  "groupStatus", "userPreferences", "system", "chatOpened"
+] as const;
+type MetricUpdateKind = (typeof METRIC_UPDATE_KINDS)[number];
+
+function statusClassOf(status: number): MetricStatusClass {
+  if (status >= 200 && status < 300) return "2xx";
+  if (status >= 300 && status < 400) return "3xx";
+  if (status >= 400 && status < 500) return "4xx";
+  return "5xx";
+}
+
+// Enum-clamp an untrusted string against a fixed allowlist. Never forwards a
+// raw, unbounded, or PII-bearing value into a metric label.
+function clampToEnum<T extends string>(value: string, allowed: readonly T[]): T | "unknown" {
+  return (allowed as readonly string[]).includes(value) ? (value as T) : "unknown";
+}
+
+interface HistogramState {
+  readonly bucketCounts: number[];
+  sum: number;
+  count: number;
+}
+
+// A minimal Prometheus-compatible metrics registry. Each metric family is
+// declared once at construction with its allowed label key set; recording a
+// label key or value outside that declared shape throws (development/tests
+// only ever exercise the allowlisted shape, so this never fires in normal
+// operation and exists to catch drift at the source rather than at scrape
+// time).
+class MetricsRegistry {
+  readonly #counters = new Map<string, Map<string, number>>();
+  readonly #histograms = new Map<string, Map<string, HistogramState>>();
+  readonly #counterHelp = new Map<string, string>();
+  readonly #histogramHelp = new Map<string, string>();
+  readonly #histogramBuckets: readonly number[];
+
+  constructor(histogramBucketsSeconds: readonly number[] = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]) {
+    this.#histogramBuckets = histogramBucketsSeconds;
+  }
+
+  declareCounter(name: string, help: string): void {
+    if (!this.#counters.has(name)) this.#counters.set(name, new Map());
+    this.#counterHelp.set(name, help);
+  }
+
+  declareHistogram(name: string, help: string): void {
+    if (!this.#histograms.has(name)) this.#histograms.set(name, new Map());
+    this.#histogramHelp.set(name, help);
+  }
+
+  incrementCounter(name: string, labels: Readonly<Record<string, string>>): void {
+    const series = this.#counters.get(name);
+    if (series === undefined) throw new Error(`MetricsRegistry: counter "${name}" was not declared.`);
+    const key = labelKey(labels);
+    series.set(key, (series.get(key) ?? 0) + 1);
+  }
+
+  observeHistogram(name: string, labels: Readonly<Record<string, string>>, valueSeconds: number): void {
+    const series = this.#histograms.get(name);
+    if (series === undefined) throw new Error(`MetricsRegistry: histogram "${name}" was not declared.`);
+    const key = labelKey(labels);
+    let state = series.get(key);
+    if (state === undefined) {
+      state = { bucketCounts: new Array(this.#histogramBuckets.length).fill(0), sum: 0, count: 0 };
+      series.set(key, state);
+    }
+    for (let i = 0; i < this.#histogramBuckets.length; i += 1) {
+      if (valueSeconds <= this.#histogramBuckets[i]!) state.bucketCounts[i] += 1;
+    }
+    state.sum += valueSeconds;
+    state.count += 1;
+  }
+
+  // Renders Prometheus text exposition format (version=0.0.4). Deterministic
+  // ordering (declaration order, then insertion order of label combinations)
+  // so output is stable across scrapes for the same traffic pattern.
+  render(): string {
+    const lines: string[] = [];
+    for (const [name, series] of this.#counters) {
+      if (series.size === 0) continue;
+      lines.push(`# HELP ${name} ${this.#counterHelp.get(name) ?? ""}`);
+      lines.push(`# TYPE ${name} counter`);
+      for (const [key, value] of series) {
+        lines.push(`${name}${key} ${value}`);
+      }
+    }
+    for (const [name, series] of this.#histograms) {
+      if (series.size === 0) continue;
+      lines.push(`# HELP ${name} ${this.#histogramHelp.get(name) ?? ""}`);
+      lines.push(`# TYPE ${name} histogram`);
+      for (const [key, state] of series) {
+        const baseLabels = key.slice(1, -1); // strip surrounding { }
+        for (let i = 0; i < this.#histogramBuckets.length; i += 1) {
+          const bucketLabel = baseLabels.length > 0
+            ? `{${baseLabels},le="${this.#histogramBuckets[i]}"}`
+            : `{le="${this.#histogramBuckets[i]}"}`;
+          // bucketCounts[i] already holds the cumulative count of
+          // observations <= this threshold (incremented in observeHistogram),
+          // matching Prometheus's own cumulative-bucket semantics directly.
+          lines.push(`${name}_bucket${bucketLabel} ${state.bucketCounts[i]}`);
+        }
+        const infLabel = baseLabels.length > 0 ? `{${baseLabels},le="+Inf"}` : `{le="+Inf"}`;
+        lines.push(`${name}_bucket${infLabel} ${state.count}`);
+        lines.push(`${name}_sum${key} ${state.sum}`);
+        lines.push(`${name}_count${key} ${state.count}`);
+      }
+    }
+    return lines.length === 0 ? "" : `${lines.join("\n")}\n`;
+  }
+}
+
+// Stable, sorted label-key serialization so the same label set always
+// produces the same series key regardless of the order fields were passed.
+//
+// Escape a label value per the Prometheus text exposition format: backslash
+// and double-quote must be escaped, and a literal newline must be escaped to
+// \n. Defense in depth — every current label value flows from an enum-
+// clamped or literal closed set, so this never fires in practice, but a
+// future call site that passes an un-clamped string must not be able to
+// corrupt the exposition format.
+function escapeLabelValue(value: string): string {
+  return value.replace(/\\/gu, "\\\\").replace(/"/gu, '\\"').replace(/\n/gu, "\\n");
+}
+
+function labelKey(labels: Readonly<Record<string, string>>): string {
+  const keys = Object.keys(labels).sort();
+  if (keys.length === 0) return "";
+  const rendered = keys.map((k) => `${k}="${escapeLabelValue(labels[k]!)}"`).join(",");
+  return `{${rendered}}`;
+}
+
+function createMetricsRegistry(): MetricsRegistry {
+  const registry = new MetricsRegistry();
+  registry.declareCounter("http_requests_total", "Inbound HTTP requests to the service.");
+  registry.declareHistogram("http_request_duration_seconds", "Request duration in seconds.");
+  registry.declareCounter("webhook_normalization_total", "Webhook envelopes normalized by update kind and outcome.");
+  registry.declareCounter("graph_operations_total", "Outbound Graph API calls by endpoint family and status class.");
+  registry.declareCounter("send_outcomes_total", "Message send attempts by outcome.");
+  registry.declareCounter("persistence_operations_total", "Persistence store operations by adapter and outcome.");
+  return registry;
+}
+
+function recordHttpRequest(metrics: MetricsRegistry, route: string, method: string, status: number, durationSeconds: number): void {
+  const statusClass = statusClassOf(status);
+  metrics.incrementCounter("http_requests_total", { route, method, status_class: statusClass });
+  metrics.observeHistogram("http_request_duration_seconds", { route, status_class: statusClass }, durationSeconds);
+}
+
+function recordWebhookNormalization(metrics: MetricsRegistry, updateKind: string, outcome: MetricOutcome): void {
+  const clampedKind = clampToEnum(updateKind, METRIC_UPDATE_KINDS);
+  metrics.incrementCounter("webhook_normalization_total", { update_kind: clampedKind, outcome });
+}
+
+function recordGraphOperation(metrics: MetricsRegistry, endpointFamily: MetricEndpointFamily, status: number, outcome: MetricOutcome): void {
+  metrics.incrementCounter("graph_operations_total", { endpoint_family: endpointFamily, status_class: statusClassOf(status), outcome });
+}
+
+function recordSendOutcome(metrics: MetricsRegistry, endpointFamily: MetricEndpointFamily, outcome: MetricOutcome): void {
+  metrics.incrementCounter("send_outcomes_total", { endpoint_family: endpointFamily, outcome });
+}
+
+function recordPersistenceOperation(metrics: MetricsRegistry, adapter: string, outcome: MetricOutcome): void {
+  metrics.incrementCounter("persistence_operations_total", { adapter, outcome });
+}
+
+// Renders the /status route-templating logic against an arbitrary matched
+// path, for use as the http_requests_total / http_request_duration_seconds
+// "route" label. Reuses the same "never a raw id" invariant as WATS-163: an
+// unmatched path (one that fails the whole route cascade before reaching the
+// 404 catch-all) reports "unmatched" instead of the raw pathname.
+function templateRouteLabel(ctx: RuntimeConfig, path: string): string {
+  if (path === "/healthz" || path === "/readyz" || path === OPENAPI_PATH || path === STATUS_PATH || path === METRICS_PATH) return path;
+  if (path === ctx.webhookPath) return ctx.webhookPath;
+  if (path === ctx.textPath) return ctx.textPath;
+  if (path === ctx.messagesPath) return ctx.messagesPath;
+  if (path.startsWith(`${ctx.messagesPath}/`)) return `${ctx.messagesPath}/:id`;
+  if (ctx.enableGroupRoutes) {
+    const match = matchGroupRoute(ctx, path);
+    if (match !== null) {
+      if (match.route === "groups") return ctx.groupsPath;
+      if (match.route === "group") return `${ctx.groupsPath}/:groupId`;
+      if (match.route === "groupInviteLink") return `${ctx.groupsPath}/:groupId/invite-link`;
+      if (match.route === "groupParticipants") return `${ctx.groupsPath}/:groupId/participants`;
+      return `${ctx.groupsPath}/:groupId/join-requests`;
+    }
+  }
+  return "unmatched";
 }
 
 
@@ -617,7 +853,7 @@ function assertNoRouteCollisions(webhookPath: string, apiPrefix: string, enableG
   const textPath = `${apiPrefix}/messages/text`;
   const messagesPath = `${apiPrefix}/messages`;
   const groupsPath = `${apiPrefix}/groups`;
-  const reservedStaticPaths = new Set(["/healthz", "/readyz", STATUS_PATH, OPENAPI_PATH]);
+  const reservedStaticPaths = new Set(["/healthz", "/readyz", STATUS_PATH, METRICS_PATH, OPENAPI_PATH]);
   const webhookCollidesWithGroups = enableGroupRoutes && (webhookPath === groupsPath || webhookPath.startsWith(`${groupsPath}/`));
   if (reservedStaticPaths.has(webhookPath) || webhookPath === textPath || webhookPath === messagesPath || webhookCollidesWithGroups) {
     throw new WatsServiceError("invalid_path", "profile.webhook.path must not collide with service routes.");
@@ -1123,6 +1359,22 @@ export function createWatsServiceOpenApiDocument(
         }
       }
     },
+    [METRICS_PATH]: {
+      get: {
+        tags: ["status"],
+        summary: "Prometheus/OpenMetrics scrape endpoint",
+        description: "Returns PII-safe counters and histograms in Prometheus text exposition format (version=0.0.4). Requires the service bearer token. On a missing or mismatched token the service returns 404 (not 401) so the endpoint's existence is not leaked, matching /status (WATS-163).",
+        security: [{ serviceBearerAuth: [] }],
+        responses: {
+          "200": {
+            description: "Prometheus text exposition format.",
+            content: { "text/plain; version=0.0.4; charset=utf-8": { schema: { type: "string" } } }
+          },
+          "404": errorResponseSpec("Route not found, or bearer token missing/invalid (existence hidden)."),
+          "405": errorResponseSpec("Method not allowed.")
+        }
+      }
+    },
     [webhookPath]: {
       get: {
         tags: ["webhook"],
@@ -1619,12 +1871,30 @@ async function handleWebhook(ctx: RuntimeConfig, request: Request): Promise<Resp
   const response = await createFetchWebhookHandler(webhookAdapter)(request);
   if (response.status !== 200 || dispatches.length === 0) return response;
 
-  const record = await ctx.persistence.recordWebhookEvent({
-    eventKey: event.eventKey,
-    eventHash: event.eventHash,
-    receivedAt: new Date().toISOString()
-  });
+  let record: "recorded" | "duplicate";
+  try {
+    record = await ctx.persistence.recordWebhookEvent({
+      eventKey: event.eventKey,
+      eventHash: event.eventHash,
+      receivedAt: new Date().toISOString()
+    });
+    recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "success");
+  } catch (error) {
+    // Record the metric, then preserve the pre-instrumentation behavior
+    // exactly: this call was never wrapped in a try/catch before, so a
+    // thrown error propagated uncaught. Re-throw rather than failing open.
+    recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "error");
+    throw error;
+  }
   if (record === "duplicate") {
+    // WATS-162: normalization already happened (the adapter parsed and
+    // normalized every update into `dispatches`), but the update is not
+    // re-dispatched. Record "deduped" per update so webhook_normalization_total
+    // reflects that normalization occurred even though dispatch was skipped.
+    for (const update of dispatches) {
+      const kind = isRecord(update) && typeof update.kind === "string" ? update.kind : "unknown";
+      recordWebhookNormalization(ctx.metrics, kind, "deduped");
+    }
     return jsonResponse(200, { status: "ok", received: dispatches.length, dispatched: 0, skipped: dispatches.length });
   }
 
@@ -1689,13 +1959,17 @@ async function recordOutboundProjection(
       createdAt: now,
       updatedAt: now
     });
+    recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "success");
   } catch {
     // Projection failure must not break the send response.
+    recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "error");
   }
   try {
     await ctx.persistence.appendMessageStatus({ waMessageId, status: "sent", timestamp: now });
+    recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "success");
   } catch {
     // Best-effort; projection failure must not break the send response.
+    recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "error");
   }
 }
 
@@ -1711,7 +1985,14 @@ async function handleTextMessage(ctx: RuntimeConfig, request: Request): Promise<
   if (idempotencyKey === "invalid") return errorResponse(400, "invalid_idempotency_key", "Idempotency-Key is invalid.");
   const requestHash = idempotencyKey !== null && ctx.persistence !== undefined ? `sha256:${await sha256Hex(rawBody)}` : null;
   if (idempotencyKey !== null && requestHash !== null && ctx.persistence !== undefined) {
-    const existing = await ctx.persistence.getServiceRequest({ idempotencyKey, requestHash });
+    let existing: Awaited<ReturnType<PersistenceStore["getServiceRequest"]>>;
+    try {
+      existing = await ctx.persistence.getServiceRequest({ idempotencyKey, requestHash });
+      recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "success");
+    } catch (error) {
+      recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "error");
+      throw error;
+    }
     if (existing === "conflict") return errorResponse(409, "idempotency_conflict", "Idempotency-Key conflicts with a different request body.");
     if (existing !== null) return jsonTextResponse(200, existing.responseJson);
   }
@@ -1730,15 +2011,23 @@ async function handleTextMessage(ctx: RuntimeConfig, request: Request): Promise<
       text: payload.text.body,
       previewUrl: input.previewUrl
     });
+    recordGraphOperation(ctx.metrics, "messages", 200, "success");
+    recordSendOutcome(ctx.metrics, "messages", "success");
     if (idempotencyKey !== null && requestHash !== null && ctx.persistence !== undefined) {
       const responseJson = responseToJsonText(result);
       if (responseJson !== null) {
+        // Note: a persistence failure here is caught by the outer catch below
+        // and reported as a Graph-operation error too — a pre-existing
+        // conflation in the original control flow, not introduced here.
         await ctx.persistence.recordServiceRequest({ idempotencyKey, requestHash, responseJson, createdAt: new Date().toISOString() });
+        recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "success");
       }
     }
     await recordOutboundProjection(ctx, result, input.to, "text");
     return jsonResponse(200, result);
   } catch (error) {
+    recordGraphOperation(ctx.metrics, "messages", graphErrorStatus(error), "error");
+    recordSendOutcome(ctx.metrics, "messages", "error");
     return graphFailureResponse(error);
   }
 }
@@ -1755,7 +2044,14 @@ async function handleGenericMessage(ctx: RuntimeConfig, request: Request): Promi
   if (idempotencyKey === "invalid") return errorResponse(400, "invalid_idempotency_key", "Idempotency-Key is invalid.");
   const requestHash = idempotencyKey !== null && ctx.persistence !== undefined ? `sha256:${await sha256Hex(rawBody)}` : null;
   if (idempotencyKey !== null && requestHash !== null && ctx.persistence !== undefined) {
-    const existing = await ctx.persistence.getServiceRequest({ idempotencyKey, requestHash });
+    let existing: Awaited<ReturnType<PersistenceStore["getServiceRequest"]>>;
+    try {
+      existing = await ctx.persistence.getServiceRequest({ idempotencyKey, requestHash });
+      recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "success");
+    } catch (error) {
+      recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "error");
+      throw error;
+    }
     if (existing === "conflict") return errorResponse(409, "idempotency_conflict", "Idempotency-Key conflicts with a different request body.");
     if (existing !== null) return jsonTextResponse(200, existing.responseJson);
   }
@@ -1767,10 +2063,16 @@ async function handleGenericMessage(ctx: RuntimeConfig, request: Request): Promi
       body,
       headers: { "content-type": "application/json" }
     });
+    recordGraphOperation(ctx.metrics, "messages", 200, "success");
+    recordSendOutcome(ctx.metrics, "messages", "success");
     if (idempotencyKey !== null && requestHash !== null && ctx.persistence !== undefined) {
       const responseJson = responseToJsonText(result);
       if (responseJson !== null) {
+        // Note: a persistence failure here is caught by the outer catch below
+        // and reported as a Graph-operation error too — a pre-existing
+        // conflation in the original control flow, not introduced here.
         await ctx.persistence.recordServiceRequest({ idempotencyKey, requestHash, responseJson, createdAt: new Date().toISOString() });
+        recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "success");
       }
     }
     const genericTo = typeof (body as { to?: unknown }).to === "string" ? (body as { to: string }).to : undefined;
@@ -1778,6 +2080,8 @@ async function handleGenericMessage(ctx: RuntimeConfig, request: Request): Promi
     await recordOutboundProjection(ctx, result, genericTo, genericType);
     return jsonResponse(200, result);
   } catch (error) {
+    recordGraphOperation(ctx.metrics, "messages", graphErrorStatus(error), "error");
+    recordSendOutcome(ctx.metrics, "messages", "error");
     return graphFailureResponse(error);
   }
 }
@@ -1816,8 +2120,10 @@ async function handleListMessages(ctx: RuntimeConfig, request: Request, url: URL
     const result = await ctx.persistence.listMessages(
       beforeRowId === undefined ? { limit } : { limit, beforeRowId }
     );
+    recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "success");
     return jsonResponse(200, { items: result.items, nextCursor: result.nextCursor });
   } catch {
+    recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "error");
     return errorResponse(503, "persistence_not_configured", "Message projections require a persistence store.");
   }
 }
@@ -1839,9 +2145,11 @@ async function handleGetMessage(ctx: RuntimeConfig, request: Request, path: stri
   }
   try {
     const record = await ctx.persistence.getMessage({ waMessageId });
+    recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "success");
     if (record === null) return errorResponse(404, "not_found", "Message not found.");
     return jsonResponse(200, record);
   } catch {
+    recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "error");
     return errorResponse(404, "not_found", "Message not found.");
   }
 }
@@ -1874,6 +2182,22 @@ async function readGroupJsonBody(request: Request): Promise<unknown | "malformed
 
 async function handleGroupRoute(ctx: RuntimeConfig, request: Request, url: URL, match: ServiceRouteMatch): Promise<Response> {
   const method = request.method.toUpperCase();
+  // WATS-162: every branch below performs exactly one outbound Graph call.
+  // Wrapping each call site individually would be repetitive and error-prone
+  // (9 call sites); instead this thin helper records graph_operations_total
+  // around the await and rethrows on failure, so the existing outer catch
+  // (GraphRequestValidationError special-case vs graphFailureResponse) is
+  // completely unchanged.
+  async function recordedGraphCall<T>(op: Promise<T>): Promise<T> {
+    try {
+      const result = await op;
+      recordGraphOperation(ctx.metrics, "groups", 200, "success");
+      return result;
+    } catch (error) {
+      recordGraphOperation(ctx.metrics, "groups", graphErrorStatus(error), "error");
+      throw error;
+    }
+  }
   try {
     if (match.route === "groups") {
       if (method === "GET") {
@@ -1883,12 +2207,12 @@ async function handleGroupRoute(ctx: RuntimeConfig, request: Request, url: URL, 
           if (value === "invalid") return errorResponse(400, "malformed_query", "Group query is invalid.");
           if (value !== undefined) params[name] = value;
         }
-        return jsonResponse(200, await listGroups(ctx.graphClient, params as never));
+        return jsonResponse(200, await recordedGraphCall(listGroups(ctx.graphClient, params as never)));
       }
       if (method === "POST") {
         const body = await readGroupJsonBody(request);
         if (body === "malformed") return errorResponse(400, "malformed_json", "Request body must be valid JSON.");
-        return jsonResponse(200, await createGroup(ctx.graphClient, { phoneNumberId: ctx.profile.whatsapp.phoneNumberId }, body as never));
+        return jsonResponse(200, await recordedGraphCall(createGroup(ctx.graphClient, { phoneNumberId: ctx.profile.whatsapp.phoneNumberId }, body as never)));
       }
       return methodNotAllowed("GET, POST");
     }
@@ -1899,20 +2223,20 @@ async function handleGroupRoute(ctx: RuntimeConfig, request: Request, url: URL, 
       if (method === "GET") {
         const fields = readQueryString(url, "fields");
         if (fields === "invalid") return errorResponse(400, "malformed_query", "Group query is invalid.");
-        return jsonResponse(200, await getGroup(ctx.graphClient, fields === undefined ? { groupId } : { groupId, fields }));
+        return jsonResponse(200, await recordedGraphCall(getGroup(ctx.graphClient, fields === undefined ? { groupId } : { groupId, fields })));
       }
       if (method === "POST") {
         const body = await readGroupJsonBody(request);
         if (body === "malformed") return errorResponse(400, "malformed_json", "Request body must be valid JSON.");
-        return jsonResponse(200, await updateGroup(ctx.graphClient, { groupId }, body as never));
+        return jsonResponse(200, await recordedGraphCall(updateGroup(ctx.graphClient, { groupId }, body as never)));
       }
-      if (method === "DELETE") return jsonResponse(200, await deleteGroup(ctx.graphClient, { groupId }));
+      if (method === "DELETE") return jsonResponse(200, await recordedGraphCall(deleteGroup(ctx.graphClient, { groupId })));
       return methodNotAllowed("GET, POST, DELETE");
     }
 
     if (match.route === "groupInviteLink") {
-      if (method === "GET") return jsonResponse(200, await getGroupInviteLink(ctx.graphClient, { groupId }));
-      if (method === "POST") return jsonResponse(200, await resetGroupInviteLink(ctx.graphClient, { groupId }));
+      if (method === "GET") return jsonResponse(200, await recordedGraphCall(getGroupInviteLink(ctx.graphClient, { groupId })));
+      if (method === "POST") return jsonResponse(200, await recordedGraphCall(resetGroupInviteLink(ctx.graphClient, { groupId })));
       return methodNotAllowed("GET, POST");
     }
 
@@ -1920,7 +2244,7 @@ async function handleGroupRoute(ctx: RuntimeConfig, request: Request, url: URL, 
       if (method !== "DELETE") return methodNotAllowed("DELETE");
       const body = await readGroupJsonBody(request);
       if (body === "malformed") return errorResponse(400, "malformed_json", "Request body must be valid JSON.");
-      return jsonResponse(200, await removeGroupParticipants(ctx.graphClient, { groupId }, body as never));
+      return jsonResponse(200, await recordedGraphCall(removeGroupParticipants(ctx.graphClient, { groupId }, body as never)));
     }
 
     if (method === "GET") {
@@ -1930,13 +2254,13 @@ async function handleGroupRoute(ctx: RuntimeConfig, request: Request, url: URL, 
         if (value === "invalid") return errorResponse(400, "malformed_query", "Group query is invalid.");
         if (value !== undefined) params[name] = value;
       }
-      return jsonResponse(200, await listGroupJoinRequests(ctx.graphClient, params as never));
+      return jsonResponse(200, await recordedGraphCall(listGroupJoinRequests(ctx.graphClient, params as never)));
     }
     if (method === "POST" || method === "DELETE") {
       const body = await readGroupJsonBody(request);
       if (body === "malformed") return errorResponse(400, "malformed_json", "Request body must be valid JSON.");
       const fn = method === "POST" ? approveGroupJoinRequests : rejectGroupJoinRequests;
-      return jsonResponse(200, await fn(ctx.graphClient, { groupId }, body as never));
+      return jsonResponse(200, await recordedGraphCall(fn(ctx.graphClient, { groupId }, body as never)));
     }
     return methodNotAllowed("GET, POST, DELETE");
   } catch (error) {
@@ -1985,6 +2309,7 @@ function makeRuntimeConfig(config: WatsServiceConfig): RuntimeConfig {
     baseUrl: profile.graph.baseUrl,
     ...(transport !== undefined ? { transport } : {})
   });
+  const metricsRegistry = createMetricsRegistry();
   let whatsapp: WebhookFacadeLike;
   if (suppliedWhatsapp !== undefined) {
     whatsapp = suppliedWhatsapp;
@@ -2049,6 +2374,8 @@ function makeRuntimeConfig(config: WatsServiceConfig): RuntimeConfig {
               to: from,
               text: "Received by WATS. (automated echo — live deployment test)"
             });
+            recordGraphOperation(metricsRegistry, "messages", 200, "success");
+            recordSendOutcome(metricsRegistry, "messages", "success");
             const sentId = (result as { messages?: ReadonlyArray<{ id?: string }> }).messages?.[0]?.id;
             // eslint-disable-next-line no-console
             console.log(JSON.stringify({
@@ -2062,6 +2389,8 @@ function makeRuntimeConfig(config: WatsServiceConfig): RuntimeConfig {
             // SDK mapped one) so a failed auto-reply is observable instead of
             // silently swallowed. Never re-throw: a send failure must not break
             // webhook acknowledgement.
+            recordGraphOperation(metricsRegistry, "messages", graphErrorStatus(error), "error");
+            recordSendOutcome(metricsRegistry, "messages", "error");
             const e = (error ?? undefined) as { code?: number; errorSubcode?: number } | undefined;
             const code = e?.code;
             const subcode = e?.errorSubcode;
@@ -2081,10 +2410,38 @@ function makeRuntimeConfig(config: WatsServiceConfig): RuntimeConfig {
     }
     whatsapp = facade;
   }
+  // WATS-162: webhook_normalization_total wraps the single choke point both
+  // webhook-handling paths converge on. handleWebhook's persistence-staged
+  // path calls ctx.whatsapp.dispatch() explicitly in its own loop; the
+  // no-persistence path lets WebhookAdapter call whatsapp.dispatch()
+  // internally. Wrapping here (once, before either path is constructed)
+  // guarantees exactly one metric per dispatched update regardless of path,
+  // without either handler needing to know about metrics.
+  const instrumentedWhatsapp: WebhookFacadeLike = {
+    dispatch: async (update: unknown) => {
+      const kind = isRecord(update) && typeof update.kind === "string" ? update.kind : "unknown";
+      try {
+        const result = await whatsapp.dispatch(update);
+        // The real WhatsApp facade's dispatch() always resolves (handler
+        // throws are caught internally into a DispatchReport), so a thrown
+        // exception alone would rarely fire for the default facade. Inspect
+        // the report's `errors` array when present for a more accurate
+        // success/error signal; fall back to "success" on resolve otherwise
+        // (matching handleWebhook's own existing try/catch boundary below).
+        const errors = isRecord(result) ? (result as { errors?: unknown }).errors : undefined;
+        const outcome: MetricOutcome = Array.isArray(errors) && errors.length > 0 ? "error" : "success";
+        recordWebhookNormalization(metricsRegistry, kind, outcome);
+        return result;
+      } catch (error) {
+        recordWebhookNormalization(metricsRegistry, kind, "error");
+        throw error;
+      }
+    }
+  };
   const webhookAdapter = createWebhookAdapter({
     verifyToken: secrets.webhookVerifyToken,
     appSecret: secrets.webhookAppSecret,
-    whatsapp,
+    whatsapp: instrumentedWhatsapp,
     maxBodyBytes: profile.webhook.maxBodyBytes,
     ...(cryptoProvider !== undefined ? { cryptoProvider } : {})
   });
@@ -2093,7 +2450,7 @@ function makeRuntimeConfig(config: WatsServiceConfig): RuntimeConfig {
     profile,
     secrets,
     graphClient,
-    whatsapp,
+    whatsapp: instrumentedWhatsapp,
     ...(cryptoProvider !== undefined ? { cryptoProvider } : {}),
     ...(persistence !== undefined ? { persistence } : {}),
     webhookHandler: createFetchWebhookHandler(webhookAdapter),
@@ -2102,12 +2459,89 @@ function makeRuntimeConfig(config: WatsServiceConfig): RuntimeConfig {
     textPath: `${apiPrefix}/messages/text`,
     messagesPath: `${apiPrefix}/messages`,
     enableGroupRoutes,
-    groupsPath: `${apiPrefix}/groups`
+    groupsPath: `${apiPrefix}/groups`,
+    metrics: metricsRegistry
   };
 }
 
 export function createWatsServiceApp(config: WatsServiceConfig): WatsServiceApp {
   const ctx = makeRuntimeConfig(config);
+
+  async function dispatchRoute(request: Request, url: URL, method: string, path: string): Promise<Response> {
+    if (path === "/healthz") {
+      if (method !== "GET") return methodNotAllowed("GET");
+      return jsonResponse(200, { ok: true, service: SERVICE_NAME });
+    }
+
+    if (path === "/readyz") {
+      if (method !== "GET") return methodNotAllowed("GET");
+      return jsonResponse(200, { ok: true, service: SERVICE_NAME });
+    }
+
+    if (path === STATUS_PATH) {
+      // Telemetry endpoints fail closed to the catch-all 404 on missing or
+      // mismatched auth (and for any method) so their existence is not
+      // leaked to anonymous callers — per the WATS-161 taxonomy. Auth is
+      // checked before method so an unauthenticated POST is a 404, not a 405.
+      if (!isAuthorized(request, ctx.secrets.serviceBearerToken)) return notFound();
+      if (method !== "GET") return methodNotAllowed("GET");
+      return jsonResponse(200, await buildStatusPayload(ctx));
+    }
+
+    if (path === METRICS_PATH) {
+      // Same existence-hiding posture as /status (WATS-163): 404 on
+      // missing/mismatched auth and on any non-GET method, checked before
+      // the method branch.
+      if (!isAuthorized(request, ctx.secrets.serviceBearerToken)) return notFound();
+      if (method !== "GET") return methodNotAllowed("GET");
+      return new Response(ctx.metrics.render(), {
+        status: 200,
+        headers: { "content-type": "text/plain; version=0.0.4; charset=utf-8" }
+      });
+    }
+
+    if (path === OPENAPI_PATH) {
+      if (method !== "GET") return methodNotAllowed("GET");
+      return jsonResponse(200, createWatsServiceOpenApiDocument(ctx.profile, { serverUrl: url.origin, enableGroupRoutes: ctx.enableGroupRoutes }));
+    }
+
+    if (path === ctx.webhookPath) {
+      if (method !== "GET" && method !== "POST") return methodNotAllowed("GET, POST");
+      return handleWebhook(ctx, request);
+    }
+
+    if (path === ctx.textPath) {
+      if (method !== "POST") return methodNotAllowed("POST");
+      if (!isAuthorized(request, ctx.secrets.serviceBearerToken)) return unauthorized();
+      return handleTextMessage(ctx, request);
+    }
+
+    if (path === ctx.messagesPath) {
+      if (method === "POST") {
+        if (!isAuthorized(request, ctx.secrets.serviceBearerToken)) return unauthorized();
+        return handleGenericMessage(ctx, request);
+      }
+      if (method === "GET") {
+        return handleListMessages(ctx, request, url);
+      }
+      return methodNotAllowed("GET, POST");
+    }
+
+    if (ctx.enableGroupRoutes) {
+      const groupMatch = matchGroupRoute(ctx, path);
+      if (groupMatch !== null) {
+        if (!isAuthorized(request, ctx.secrets.serviceBearerToken)) return unauthorized();
+        return handleGroupRoute(ctx, request, url, groupMatch);
+      }
+    }
+
+    if (path.startsWith(`${ctx.messagesPath}/`)) {
+      if (method !== "GET") return methodNotAllowed("GET");
+      return handleGetMessage(ctx, request, path);
+    }
+
+    return notFound();
+  }
 
   return {
     async fetch(request: Request): Promise<Response> {
@@ -2120,67 +2554,17 @@ export function createWatsServiceApp(config: WatsServiceConfig): WatsServiceApp 
       const method = request.method.toUpperCase();
       const path = url.pathname;
 
-      if (path === "/healthz") {
-        if (method !== "GET") return methodNotAllowed("GET");
-        return jsonResponse(200, { ok: true, service: SERVICE_NAME });
-      }
-
-      if (path === "/readyz") {
-        if (method !== "GET") return methodNotAllowed("GET");
-        return jsonResponse(200, { ok: true, service: SERVICE_NAME });
-      }
-
-      if (path === STATUS_PATH) {
-        // Telemetry endpoints fail closed to the catch-all 404 on missing or
-        // mismatched auth (and for any method) so their existence is not
-        // leaked to anonymous callers — per the WATS-161 taxonomy. Auth is
-        // checked before method so an unauthenticated POST is a 404, not a 405.
-        if (!isAuthorized(request, ctx.secrets.serviceBearerToken)) return notFound();
-        if (method !== "GET") return methodNotAllowed("GET");
-        return jsonResponse(200, await buildStatusPayload(ctx));
-      }
-
-      if (path === OPENAPI_PATH) {
-        if (method !== "GET") return methodNotAllowed("GET");
-        return jsonResponse(200, createWatsServiceOpenApiDocument(ctx.profile, { serverUrl: url.origin, enableGroupRoutes: ctx.enableGroupRoutes }));
-      }
-
-      if (path === ctx.webhookPath) {
-        if (method !== "GET" && method !== "POST") return methodNotAllowed("GET, POST");
-        return handleWebhook(ctx, request);
-      }
-
-      if (path === ctx.textPath) {
-        if (method !== "POST") return methodNotAllowed("POST");
-        if (!isAuthorized(request, ctx.secrets.serviceBearerToken)) return unauthorized();
-        return handleTextMessage(ctx, request);
-      }
-
-      if (path === ctx.messagesPath) {
-        if (method === "POST") {
-          if (!isAuthorized(request, ctx.secrets.serviceBearerToken)) return unauthorized();
-          return handleGenericMessage(ctx, request);
-        }
-        if (method === "GET") {
-          return handleListMessages(ctx, request, url);
-        }
-        return methodNotAllowed("GET, POST");
-      }
-
-      if (ctx.enableGroupRoutes) {
-        const groupMatch = matchGroupRoute(ctx, path);
-        if (groupMatch !== null) {
-          if (!isAuthorized(request, ctx.secrets.serviceBearerToken)) return unauthorized();
-          return handleGroupRoute(ctx, request, url, groupMatch);
-        }
-      }
-
-      if (path.startsWith(`${ctx.messagesPath}/`)) {
-        if (method !== "GET") return methodNotAllowed("GET");
-        return handleGetMessage(ctx, request, path);
-      }
-
-      return notFound();
+      // WATS-162: http_requests_total / http_request_duration_seconds wrap
+      // every dispatched request. Timed and recorded here — the single
+      // choke point all requests pass through — regardless of which route
+      // (or the catch-all) produced the response, so route dispatch code
+      // itself never needs to know about metrics.
+      const startedAtMs = Date.now();
+      const response = await dispatchRoute(request, url, method, path);
+      const durationSeconds = Math.max(0, Date.now() - startedAtMs) / 1000;
+      recordHttpRequest(ctx.metrics, templateRouteLabel(ctx, path), method, response.status, durationSeconds);
+      return response;
     }
   };
 }
+
