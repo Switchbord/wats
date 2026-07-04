@@ -137,6 +137,7 @@ interface RuntimeConfig {
   readonly enableGroupRoutes: boolean;
   readonly groupsPath: string;
   readonly metrics: MetricsRegistry;
+  readonly errorLedger: ErrorLedger;
 }
 
 interface ServiceRouteMatch {
@@ -149,6 +150,7 @@ const SERVICE_NAME = "wats";
 const OPENAPI_PATH = "/openapi.json";
 const STATUS_PATH = "/status";
 const METRICS_PATH = "/metrics";
+const DEBUG_DIAGNOSTICS_PATH = "/debug/diagnostics";
 const SERVER_START_MS = Date.now();
 const DEFAULT_OPENAPI_TITLE = "WATS Service API";
 const DEFAULT_OPENAPI_VERSION = "0.3.27";
@@ -348,7 +350,8 @@ function graphErrorStatus(error: unknown): number {
   return 502;
 }
 
-function graphFailureResponse(error: unknown): Response {
+function graphFailureResponse(error: unknown, errorLedger?: ErrorLedger): Response {
+  errorLedger?.record(error);
   const diagnostics = sanitizeGraphDiagnostics(error);
 
   // Emit one warn-level JSON log line carrying only sanitized structured
@@ -411,6 +414,8 @@ function buildRouteInventory(ctx: RuntimeConfig): string[] {
     "/readyz",
     OPENAPI_PATH,
     STATUS_PATH,
+    METRICS_PATH,
+    DEBUG_DIAGNOSTICS_PATH,
     ctx.webhookPath,
     ctx.textPath,
     ctx.messagesPath,
@@ -451,9 +456,11 @@ function sanitizePersistenceHealth(health: unknown): Record<string, unknown> {
   const record = (typeof health === "object" && health !== null ? health : {}) as Record<string, unknown>;
   const rawLocation = typeof record.redactedLocation === "string" ? record.redactedLocation : "";
   const safeLocation = /^\[REDACTED/u.test(rawLocation) ? rawLocation : "[REDACTED]";
+  const rawBackend = typeof record.backend === "string" ? record.backend : "unknown";
+  const safeBackend = /^\b(sqlite|postgres)\b$/iu.test(rawBackend) ? rawBackend.toLowerCase() : "unknown";
   return {
     ok: record.ok === true,
-    backend: typeof record.backend === "string" ? record.backend : "unknown",
+    backend: safeBackend,
     currentVersion: Number.isInteger(record.currentVersion) ? (record.currentVersion as number) : 0,
     redactedLocation: safeLocation
   };
@@ -483,6 +490,57 @@ async function buildStatusPayload(ctx: RuntimeConfig): Promise<Record<string, un
     },
     persistence
   };
+}
+
+// WATS-165: bounded, redacted support diagnostics payload. Never contains
+// tokens, env values, stack traces, raw paths, phone numbers, ids, or message
+// content — only structured runtime facts an operator needs for triage.
+async function buildDiagnosticsPayload(ctx: RuntimeConfig): Promise<Record<string, unknown>> {
+  let persistence: Record<string, unknown> = { ok: false, backend: "unknown", currentVersion: 0, redactedLocation: "[REDACTED]" };
+  if (ctx.persistence !== undefined) {
+    try {
+      persistence = sanitizePersistenceHealth(await ctx.persistence.health());
+    } catch {
+      // Keep the default redacted unhealthy summary.
+    }
+  }
+  return {
+    service: SERVICE_NAME,
+    version: DEFAULT_OPENAPI_VERSION,
+    graphApiVersion: ctx.profile.graph.apiVersion,
+    serviceMode: deriveServiceMode(ctx),
+    runtime: typeof (globalThis as { Bun?: unknown }).Bun === "object" ? "bun" : "unknown",
+    routes: buildRouteInventory(ctx),
+    featureFlags: {
+      groupRoutes: ctx.enableGroupRoutes,
+      persistence: ctx.persistence !== undefined
+    },
+    persistence,
+    metricFamilies: ctx.metrics.families(),
+    recentErrors: ctx.errorLedger.snapshot(),
+    configShape: redactedConfigShape(ctx.profile)
+  };
+}
+
+function redactedConfigShape(profile: WatsProfileConfig): Record<string, unknown> {
+  // Summarize the config shape with env-secret refs, never the values. Keys
+  // here are the fields a support operator expects to see, plus runtime
+  // feature flags. No file paths, no env values, no tokens.
+  return {
+    graph: { apiVersion: profile.graph.apiVersion },
+    auth: { accessToken: envRef(profile.auth.accessToken) },
+    service: { host: profile.service.host, port: profile.service.port, apiPrefix: profile.service.apiPrefix },
+    webhook: {
+      path: profile.webhook.path,
+      verifyToken: envRef(profile.webhook.verifyToken),
+      appSecret: envRef(profile.webhook.appSecret),
+      maxBodyBytes: profile.webhook.maxBodyBytes
+    }
+  };
+}
+
+function envRef(value: { env: string } | string): string {
+  return "[REDACTED]";
 }
 
 // ---------------------------------------------------------------------------
@@ -627,6 +685,57 @@ class MetricsRegistry {
     }
     return lines.length === 0 ? "" : `${lines.join("\n")}\n`;
   }
+
+  // Names only — used by /debug/diagnostics. No values or label sets exposed.
+  families(): readonly string[] {
+    return Array.from(new Set([...this.#counters.keys(), ...this.#histograms.keys()]));
+  }
+}
+
+// WATS-165: bounded in-memory error-class ledger for /debug/diagnostics.
+// Records only class names with counts — no messages, no stack traces, no
+// PII, no env values. Bounded OOM defense: a single runaway error source can
+// never grow the ledger beyond MAX_ERROR_CLASSES, and error names are capped at
+// MAX_ERROR_NAME_LENGTH characters before counting. When the cap is exceeded
+// the least-recently recorded class is evicted (Map insertion order), so a
+// brand-new failure is always visible on its first occurrence.
+export class ErrorLedger {
+  readonly #counts = new Map<string, number>();
+  static readonly MAX_ERROR_CLASSES = 10;
+  static readonly MAX_ERROR_NAME_LENGTH = 80;
+
+  record(error: unknown): void {
+    const name = this.#classNameOf(error);
+    const key = name.length > ErrorLedger.MAX_ERROR_NAME_LENGTH
+      ? `${name.slice(0, ErrorLedger.MAX_ERROR_NAME_LENGTH)}...`
+      : name;
+    const current = this.#counts.get(key) ?? 0;
+    this.#counts.set(key, current + 1);
+    // Evict the oldest class when over capacity, preserving OOM defense and
+    // ensuring the most recently seen class name is retained on first sight.
+    if (this.#counts.size > ErrorLedger.MAX_ERROR_CLASSES) {
+      const firstKey = this.#counts.keys().next().value;
+      if (firstKey !== undefined) this.#counts.delete(firstKey);
+    }
+  }
+
+  snapshot(): Record<string, number> {
+    return Object.fromEntries(this.#counts);
+  }
+
+  #classNameOf(error: unknown): string {
+    if (error === null || error === undefined) return "Error";
+    if (typeof error === "string") return "Error";
+    if (error instanceof Error) return error.constructor.name || "Error";
+    if (typeof error === "object" && "constructor" in error && typeof (error as { constructor?: { name?: string } }).constructor?.name === "string") {
+      return (error as { constructor: { name: string } }).constructor.name;
+    }
+    return "Error";
+  }
+}
+
+function createErrorLedger(): ErrorLedger {
+  return new ErrorLedger();
 }
 
 // Stable, sorted label-key serialization so the same label set always
@@ -689,7 +798,7 @@ function recordPersistenceOperation(metrics: MetricsRegistry, adapter: string, o
 // unmatched path (one that fails the whole route cascade before reaching the
 // 404 catch-all) reports "unmatched" instead of the raw pathname.
 function templateRouteLabel(ctx: RuntimeConfig, path: string): string {
-  if (path === "/healthz" || path === "/readyz" || path === OPENAPI_PATH || path === STATUS_PATH || path === METRICS_PATH) return path;
+  if (path === "/healthz" || path === "/readyz" || path === OPENAPI_PATH || path === STATUS_PATH || path === METRICS_PATH || path === DEBUG_DIAGNOSTICS_PATH) return path;
   if (path === ctx.webhookPath) return ctx.webhookPath;
   if (path === ctx.textPath) return ctx.textPath;
   if (path === ctx.messagesPath) return ctx.messagesPath;
@@ -853,7 +962,7 @@ function assertNoRouteCollisions(webhookPath: string, apiPrefix: string, enableG
   const textPath = `${apiPrefix}/messages/text`;
   const messagesPath = `${apiPrefix}/messages`;
   const groupsPath = `${apiPrefix}/groups`;
-  const reservedStaticPaths = new Set(["/healthz", "/readyz", STATUS_PATH, METRICS_PATH, OPENAPI_PATH]);
+  const reservedStaticPaths = new Set(["/healthz", "/readyz", STATUS_PATH, METRICS_PATH, DEBUG_DIAGNOSTICS_PATH, OPENAPI_PATH]);
   const webhookCollidesWithGroups = enableGroupRoutes && (webhookPath === groupsPath || webhookPath.startsWith(`${groupsPath}/`));
   if (reservedStaticPaths.has(webhookPath) || webhookPath === textPath || webhookPath === messagesPath || webhookCollidesWithGroups) {
     throw new WatsServiceError("invalid_path", "profile.webhook.path must not collide with service routes.");
@@ -1005,6 +1114,81 @@ function createOpenApiSchemas(enableGroupRoutes = false): Record<string, Record<
             backend: { type: "string" },
             currentVersion: { type: "integer" },
             redactedLocation: { type: "string" }
+          }
+        }
+      }
+    },
+    DiagnosticsResponse: {
+      type: "object",
+      additionalProperties: false,
+      required: ["service", "version", "graphApiVersion", "serviceMode", "runtime", "routes", "featureFlags", "persistence", "metricFamilies", "recentErrors", "configShape"],
+      properties: {
+        service: { type: "string", const: SERVICE_NAME },
+        version: { type: "string" },
+        graphApiVersion: { type: "string" },
+        serviceMode: { type: "string" },
+        runtime: { type: "string" },
+        routes: { type: "array", items: { type: "string" } },
+        featureFlags: {
+          type: "object",
+          additionalProperties: false,
+          required: ["groupRoutes", "persistence"],
+          properties: {
+            groupRoutes: { type: "boolean" },
+            persistence: { type: "boolean" }
+          }
+        },
+        persistence: {
+          type: "object",
+          additionalProperties: false,
+          required: ["ok", "backend", "currentVersion", "redactedLocation"],
+          properties: {
+            ok: { type: "boolean" },
+            backend: { type: "string" },
+            currentVersion: { type: "integer" },
+            redactedLocation: { type: "string" }
+          }
+        },
+        metricFamilies: { type: "array", items: { type: "string" } },
+        recentErrors: { type: "object", additionalProperties: { type: "integer", minimum: 1 } },
+        configShape: {
+          type: "object",
+          additionalProperties: false,
+          required: ["graph", "auth", "service", "webhook"],
+          properties: {
+            graph: {
+              type: "object",
+              additionalProperties: false,
+              required: ["apiVersion"],
+              properties: { apiVersion: { type: "string" } }
+            },
+            auth: {
+              type: "object",
+              additionalProperties: false,
+              required: ["accessToken"],
+              properties: { accessToken: { type: "string" } }
+            },
+            service: {
+              type: "object",
+              additionalProperties: false,
+              required: ["host", "port", "apiPrefix"],
+              properties: {
+                host: { type: "string" },
+                port: { type: "integer" },
+                apiPrefix: { type: "string" }
+              }
+            },
+            webhook: {
+              type: "object",
+              additionalProperties: false,
+              required: ["path", "verifyToken", "appSecret", "maxBodyBytes"],
+              properties: {
+                path: { type: "string" },
+                verifyToken: { type: "string" },
+                appSecret: { type: "string" },
+                maxBodyBytes: { type: "integer" }
+              }
+            }
           }
         }
       }
@@ -1370,6 +1554,19 @@ export function createWatsServiceOpenApiDocument(
             description: "Prometheus text exposition format.",
             content: { "text/plain; version=0.0.4; charset=utf-8": { schema: { type: "string" } } }
           },
+          "404": errorResponseSpec("Route not found, or bearer token missing/invalid (existence hidden)."),
+          "405": errorResponseSpec("Method not allowed.")
+        }
+      }
+    },
+    [DEBUG_DIAGNOSTICS_PATH]: {
+      get: {
+        tags: ["status"],
+        summary: "Redacted support diagnostics snapshot",
+        description: "Returns a bounded, redacted JSON support snapshot (service metadata, templated route inventory, feature flags, persistence health summary, metric family names, recent error-class counts, config shape with env-secret refs). Requires the service bearer token. On a missing or mismatched token the service returns 404 (not 401) so the endpoint's existence is not leaked. This endpoint is intentionally not a pprof/heap endpoint: it returns structured runtime facts only and never emits raw logs, stack traces, env values, tokens, or message content.",
+        security: [{ serviceBearerAuth: [] }],
+        responses: {
+          "200": okResponseSpec("Redacted support diagnostics snapshot.", "DiagnosticsResponse"),
           "404": errorResponseSpec("Route not found, or bearer token missing/invalid (existence hidden)."),
           "405": errorResponseSpec("Method not allowed.")
         }
@@ -2028,7 +2225,7 @@ async function handleTextMessage(ctx: RuntimeConfig, request: Request): Promise<
   } catch (error) {
     recordGraphOperation(ctx.metrics, "messages", graphErrorStatus(error), "error");
     recordSendOutcome(ctx.metrics, "messages", "error");
-    return graphFailureResponse(error);
+    return graphFailureResponse(error, ctx.errorLedger);
   }
 }
 
@@ -2082,7 +2279,7 @@ async function handleGenericMessage(ctx: RuntimeConfig, request: Request): Promi
   } catch (error) {
     recordGraphOperation(ctx.metrics, "messages", graphErrorStatus(error), "error");
     recordSendOutcome(ctx.metrics, "messages", "error");
-    return graphFailureResponse(error);
+    return graphFailureResponse(error, ctx.errorLedger);
   }
 }
 
@@ -2265,7 +2462,7 @@ async function handleGroupRoute(ctx: RuntimeConfig, request: Request, url: URL, 
     return methodNotAllowed("GET, POST, DELETE");
   } catch (error) {
     if (error instanceof GraphRequestValidationError) return errorResponse(400, "malformed_body", "Group request body or route is invalid.");
-    return graphFailureResponse(error);
+    return graphFailureResponse(error, ctx.errorLedger);
   }
 }
 
@@ -2410,6 +2607,8 @@ function makeRuntimeConfig(config: WatsServiceConfig): RuntimeConfig {
     }
     whatsapp = facade;
   }
+  const errorLedger = createErrorLedger();
+
   // WATS-162: webhook_normalization_total wraps the single choke point both
   // webhook-handling paths converge on. handleWebhook's persistence-staged
   // path calls ctx.whatsapp.dispatch() explicitly in its own loop; the
@@ -2430,10 +2629,17 @@ function makeRuntimeConfig(config: WatsServiceConfig): RuntimeConfig {
         // (matching handleWebhook's own existing try/catch boundary below).
         const errors = isRecord(result) ? (result as { errors?: unknown }).errors : undefined;
         const outcome: MetricOutcome = Array.isArray(errors) && errors.length > 0 ? "error" : "success";
+        if (outcome === "error") {
+          // Record the first representative handler error so the ledger
+          // reflects webhook-side failures, not only thrown exceptions.
+          const firstError = Array.isArray(errors) ? errors[0] : undefined;
+          errorLedger.record(firstError ?? new Error("webhook_handler_failure"));
+        }
         recordWebhookNormalization(metricsRegistry, kind, outcome);
         return result;
       } catch (error) {
         recordWebhookNormalization(metricsRegistry, kind, "error");
+        errorLedger.record(error);
         throw error;
       }
     }
@@ -2460,7 +2666,8 @@ function makeRuntimeConfig(config: WatsServiceConfig): RuntimeConfig {
     messagesPath: `${apiPrefix}/messages`,
     enableGroupRoutes,
     groupsPath: `${apiPrefix}/groups`,
-    metrics: metricsRegistry
+    metrics: metricsRegistry,
+    errorLedger
   };
 }
 
@@ -2498,6 +2705,14 @@ export function createWatsServiceApp(config: WatsServiceConfig): WatsServiceApp 
         status: 200,
         headers: { "content-type": "text/plain; version=0.0.4; charset=utf-8" }
       });
+    }
+
+    if (path === DEBUG_DIAGNOSTICS_PATH) {
+      // WATS-165: diagnostics shares the telemetry-endpoint existence-hiding
+      // posture: 404 on missing/mismatched auth, 405 on non-GET after auth.
+      if (!isAuthorized(request, ctx.secrets.serviceBearerToken)) return notFound();
+      if (method !== "GET") return methodNotAllowed("GET");
+      return jsonResponse(200, await buildDiagnosticsPayload(ctx));
     }
 
     if (path === OPENAPI_PATH) {
