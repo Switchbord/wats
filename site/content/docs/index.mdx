@@ -5,17 +5,15 @@ description: A Bun-first TypeScript toolkit for the WhatsApp Cloud API.
 
 WATS is a Bun-first TypeScript toolkit for the WhatsApp Cloud API. It ships as composable packages — Graph client, webhook adapter, typed routing, config, CLI, standalone service — not one monolithic framework. Take the parts you need.
 
-It is for TypeScript teams who want typed Graph calls, webhook updates, routing, and a standalone service across Bun, Node, Workers, and Deno. WATS also ships a Groups API with no pywa equivalent.
-
 - [Quickstart](/docs/quickstart) — install the packages and send your first message.
 - [CLI onboarding](/docs/guides/cli-init) — config scaffolding, setup wizard, doctor, dry-run serve.
 - [Live webhook](/docs/guides/live-webhook) — point Meta at a locally running service behind a public HTTPS tunnel.
 - [Deploy guides](/docs/guides/deploy-bun) — Bun, Node, Cloudflare Workers, and the Docker shape.
 - [Reference](/docs/reference) — per-package API documentation.
-- [Parity](/docs/parity) — what is live-validated, shape-only, or planned against WhatsApp and pywa.
+- [Endpoint status](/docs/parity) — per-endpoint implementation and live status.
 
 ## When not to use WATS
 
-- You already run pywa on Python and it covers your needs. WATS does not port your stack; it replaces it in TypeScript.
-- You need every endpoint live against Meta today. Much of the surface is shape-only, not yet live-validated — check [parity](/docs/parity) first.
+- You need every endpoint proven against live Meta today. Much of the surface is tested against the wire contract but has not carried live traffic — check [endpoint status](/docs/parity) first.
 - You need a frozen API. The 0.x line still makes breaking changes.
+- You're happy on pywa and Python. WATS started as "pywa, but TypeScript" — if the Python side works for you, there's no reason to move.
