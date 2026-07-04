@@ -1408,7 +1408,7 @@ WATS ships with **no default outbound telemetry**. Importing `@wats/service` and
 - `GET /metrics` exposes data only when a Prometheus-compatible scraper pulls it with a valid token.
 - `GET /status` returns data only when requested with a valid token.
 - `GET /debug/diagnostics` returns a bounded, redacted JSON snapshot only when requested with a valid token.
-- The optional `TelemetrySink` (TELEMETRY-C) emits events only to a sink you own and wire yourself.
+- The optional `TelemetrySink` emits events only to a sink you own and wire yourself.
 
 Data minimization is enforced, not optional:
 
@@ -1537,7 +1537,7 @@ The response contains safe, structured facts only. For the full field list and r
 
 - [Service Reference](/docs/reference/service#telemetry-sink)
 - [Privacy and Telemetry](/docs/meta/privacy)
-- [Telemetry Privacy Model and Metric Taxonomy](https://github.com/Switchbord/wats/blob/feat/wats-164/maintainers/telemetry-taxonomy.md) (maintainer contract)
+- [Telemetry Privacy Model and Metric Taxonomy](https://github.com/Switchbord/wats/blob/main/maintainers/telemetry-taxonomy.md) (maintainer contract)
 
 ---
 
