@@ -165,9 +165,6 @@ tests. When you get there:
 - Capture only redacted logs; never paste raw webhook bodies that contain user data into issues.
 - Record delivered or read state only when an observed webhook/event-store record proves it.
 
-There is no live tunnel command; tunnels are not required during tests and
-live callbacks are not validated by the examples.
-
 ## Extensibility seams
 
 Examples should build on the existing public seams:
@@ -180,8 +177,5 @@ Examples should build on the existing public seams:
 
 ## What is not here yet
 
-WATS implements safe local `wats init` config/env placeholder generation,
-offline `wats doctor` diagnostics, dry-run `wats serve` smoke checks, and
-credential-gated local live `wats serve` behind a secure HTTPS tunnel.
 Dockerfiles, Compose files, release automation, image publication, production
 hosting, and a full community gallery remain outside this set.

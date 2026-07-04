@@ -162,10 +162,6 @@ Path ids, `to`, `recipient`, and `callId` must be non-empty strings with no cont
 
 The Graph error taxonomy is preserved after the request reaches transport, including calling subclasses such as `CallingNotEnabledError`, `DuplicateCallError`, and `CallConnectionError`. Repository tests use `createMockTransport`; live call sessions remain credential-gated and are not performed in CI.
 
-## Status
-
-shape-only. The lifecycle callables, permission reader, call-button/deep-link helpers, and calling webhook normalizers are covered by MockTransport and synthetic webhook tests. Live call sessions, WebRTC/media signaling, and calling-access provisioning remain credential-gated and unperformed.
-
 ## Related docs
 
 - [Scoped Clients Reference](/docs/reference/scoped-clients) — `PhoneNumberClient` calling methods over the bound phone-number scope.

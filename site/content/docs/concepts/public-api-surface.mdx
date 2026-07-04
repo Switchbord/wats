@@ -5,11 +5,9 @@ description: The public package surfaces that ship today versus planned parity w
 
 <DocMeta status="active" appliesTo="0.3.x-alpha-tooling" lastReviewed="2026-05-02" />
 
-What ships today, separated from what is planned, so the docs never overstate WhatsApp Business Platform coverage.
-
 For full signatures and behavior, see the [reference](/docs/reference).
 
-One distinction matters throughout: shape-only versus live-validated. MockTransport tests, local crypto, synthetic webhooks, and consumer fixtures prove a WATS API shape is implemented — they do not prove Meta accepted that behavior in a live account. Live validation is credential-gated and tracked in the [parity matrix](/docs/parity). The default repository checks never call Meta.
+shape-only versus live-validated: MockTransport tests, local crypto, synthetic webhooks, and consumer fixtures prove a WATS API shape is implemented — they do not prove Meta accepted that behavior in a live account. Live validation is credential-gated and tracked in the [parity matrix](/docs/parity). The default repository checks never call Meta.
 
 ## Current package surfaces
 
@@ -62,7 +60,7 @@ Primary exports:
 - public endpoint subpaths: `@wats/graph/endpoints/messages`, `@wats/graph/endpoints/media`, `@wats/graph/endpoints/templates`, `@wats/graph/endpoints/flows`, `@wats/graph/endpoints/calling`, `@wats/graph/endpoints/business-management`, and `@wats/graph/endpoints/groups`. `bun run api:check` keeps package exports, fixture imports, docs, and changelog mentions aligned
 - Node/Bun-only filesystem media helpers: `@wats/graph/node-media` exports path-based `uploadAndSend*FromPath` helpers. This subpath is deliberately separate from the root entrypoint so browser/edge users never pull `node:fs` transitively.
 - `paginate` / `paginateAll`
-- Graph error classes and pywa-seeded error registry helpers
+- Graph error classes and error registry helpers
 - media runtime: `uploadMedia`, `downloadMedia`, `downloadMediaBytes`, `deleteMedia`, `decryptEncryptedMedia`, upload-session helpers, `MediaValidationError`, `MediaCryptoError`, `MediaIntegrityError`, and finite media cap constants
 
 Status: foundations-complete for Graph plumbing. Media runtime, outbound composers, template helpers, Flow helpers, Calling request/webhook shapes, Groups request shapes, and bounded business/admin helpers are complete for credential-free MockTransport-backed behavior. Live Meta checks, automatic user-block decisions, policy/appeal automation, catalog CRUD, and remaining WABA admin APIs remain credential-gated.

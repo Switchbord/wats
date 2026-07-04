@@ -67,7 +67,7 @@ that matches where you are:
 - [Transport and testing](/docs/guides/transport-and-testing) — MockTransport, retries, interceptors.
 - [Groups quickstart](/docs/guides/groups-quickstart) — the credential-free Groups flow.
 - [Deploy guides](/docs/guides/deploy-bun) — Bun, Node, Cloudflare Workers, Docker shape.
-- [Parity matrix](/docs/parity) — what works against live Meta, with evidence.
+- [Endpoint status](/docs/parity) — what works against live Meta.
 
 ---
 
@@ -527,9 +527,6 @@ tests. When you get there:
 - Capture only redacted logs; never paste raw webhook bodies that contain user data into issues.
 - Record delivered or read state only when an observed webhook/event-store record proves it.
 
-There is no live tunnel command; tunnels are not required during tests and
-live callbacks are not validated by the examples.
-
 ## Extensibility seams
 
 Examples should build on the existing public seams:
@@ -542,9 +539,6 @@ Examples should build on the existing public seams:
 
 ## What is not here yet
 
-WATS implements safe local `wats init` config/env placeholder generation,
-offline `wats doctor` diagnostics, dry-run `wats serve` smoke checks, and
-credential-gated local live `wats serve` behind a secure HTTPS tunnel.
 Dockerfiles, Compose files, release automation, image publication, production
 hosting, and a full community gallery remain outside this set.
 
@@ -1883,7 +1877,8 @@ The canonical dependency map for the WATS workspace. Arrows point from dependent
 
 ### `@wats/types`
 
-- Purpose: shared TypeScript domain contracts for config, webhook envelopes, messages, statuses, contacts, entities, and error payloads.
+Shared TypeScript domain contracts for config, webhook envelopes, messages, statuses, contacts, entities, and error payloads.
+
 - Runtime targets: Bun, Node, Workers, Deno.
 - Public: yes.
 - Dependencies out: none.
@@ -1891,7 +1886,8 @@ The canonical dependency map for the WATS workspace. Arrows point from dependent
 
 ### `@wats/crypto`
 
-- Purpose: `CryptoProvider` seam plus Node/Bun and WebCrypto adapters.
+`CryptoProvider` seam plus Node/Bun and WebCrypto adapters.
+
 - Runtime targets: Bun, Node, Workers, Deno.
 - Public: yes.
 - Dependencies out: `@wats/types` for shared error payload contracts.
@@ -1899,7 +1895,8 @@ The canonical dependency map for the WATS workspace. Arrows point from dependent
 
 ### `@wats/graph`
 
-- Purpose: Graph client, transport seam, endpoint registry, scoped clients, error registry, pagination, and endpoint catalog.
+Graph client, transport seam, endpoint registry, scoped clients, error registry, pagination, and endpoint catalog.
+
 - Runtime targets: Bun, Node, Workers, Deno through injected `Transport` / fetch.
 - Public: yes.
 - Dependencies out: `@wats/types`.
@@ -1941,7 +1938,8 @@ Media runtime:
 
 ### `@wats/http`
 
-- Purpose: webhook challenge/signature primitives, runtime-neutral `WebhookAdapter`, and Bun/Node/Fetch wrappers.
+Webhook challenge/signature primitives, runtime-neutral `WebhookAdapter`, and Bun/Node/Fetch wrappers.
+
 - Runtime targets: Bun, Node, Workers, Deno-style Fetch runtimes.
 - Public: yes.
 - Dependencies out: `@wats/crypto`, `@wats/core`, `@wats/types`.
@@ -1951,7 +1949,8 @@ Media runtime:
 
 ### `@wats/core`
 
-- Purpose: typed webhook normalization, typed filters, raw filters, routers, listener registry, and `WhatsApp` facade composition root.
+Typed webhook normalization, typed filters, raw filters, routers, listener registry, and `WhatsApp` facade composition root.
+
 - Runtime targets: Bun, Node, Workers, Deno where dependencies are available.
 - Public: yes.
 - Dependencies out: `@wats/types`, `@wats/graph`.
@@ -1961,7 +1960,8 @@ The facade binds a `GraphClient`, optional `PhoneNumberClient` / `WABAClient`, a
 
 ### `@wats/config`
 
-- Purpose: YAML/JSON config schema, env-secret references, config loading, validation, and redaction.
+YAML/JSON config schema, env-secret references, config loading, validation, and redaction.
+
 - Runtime targets: Bun and Node-compatible ESM; config parsing itself is runtime-light.
 - Public: yes, experimental.
 - Dependencies out: `@wats/internal-utils` for shared object guards.
@@ -1969,7 +1969,8 @@ The facade binds a `GraphClient`, optional `PhoneNumberClient` / `WABAClient`, a
 
 ### `@wats/cli`
 
-- Purpose: package-manager CLI surface for safe config validation, OpenAPI export, help, and local webhook token generation.
+Package-manager CLI surface for safe config validation, OpenAPI export, help, and local webhook token generation.
+
 - Runtime targets: Bun now; Node-compatible ESM is the direction for the publishable CLI.
 - Public: yes, experimental.
 - Dependencies out: `@wats/config`, `@wats/service`.
@@ -1977,7 +1978,8 @@ The facade binds a `GraphClient`, optional `PhoneNumberClient` / `WABAClient`, a
 
 ### `@wats/service`
 
-- Purpose: runtime-neutral standalone webhook/API service foundation plus generated OpenAPI 3.1 document for the service routes.
+Runtime-neutral standalone webhook/API service foundation plus generated OpenAPI 3.1 document for the service routes.
+
 - Runtime targets: Bun and Web Fetch-compatible runtimes for the core `Request -> Response` app; Node/Bun server wrappers are later work.
 - Public: yes, experimental.
 - Dependencies out: `@wats/config`, `@wats/core`, `@wats/http`, `@wats/graph`, `@wats/crypto`.
@@ -1985,7 +1987,8 @@ The facade binds a `GraphClient`, optional `PhoneNumberClient` / `WABAClient`, a
 
 ### `@wats/persistence`
 
-- Purpose: experimental persistence contracts, the SQLite local adapter, and the Postgres adapter, plus the migration runner, webhook/service idempotency records, message projection, and outbox record APIs.
+Experimental persistence contracts, the SQLite local adapter, and the Postgres adapter, plus the migration runner, webhook/service idempotency records, message projection, and outbox record APIs.
+
 - Runtime targets: Bun for `@wats/persistence/sqlite`; `@wats/persistence/postgres` runs wherever `pg` does; root contracts and `runOutboxWorkerOnce` are TypeScript-only.
 - Public: yes, experimental.
 - Published subpaths: `@wats/persistence`, `@wats/persistence/sqlite`, `@wats/persistence/postgres`.
@@ -1996,14 +1999,16 @@ The facade binds a `GraphClient`, optional `PhoneNumberClient` / `WABAClient`, a
 
 ### `@wats/internal-utils`
 
-- Purpose: internal support package for shared pure helpers required by public runtime packages.
+Internal support package for shared pure helpers required by public runtime packages.
+
 - Public: yes for package-manager completeness; do not treat it as stable public API.
 - Published: yes, because `@wats/config` depends on it at runtime.
 - Dependencies out: none.
 
 ### `@wats/testing`
 
-- Purpose: private workspace tests, consumer fixtures, fixture payloads, and policy checks.
+Private workspace tests, consumer fixtures, fixture payloads, and policy checks.
+
 - Runtime targets: Bun test runner only.
 - Public: no.
 - Published: no.
@@ -2038,11 +2043,9 @@ The facade binds a `GraphClient`, optional `PhoneNumberClient` / `WABAClient`, a
 # WATS Public API Surface
 URL: https://wats.sh/docs/concepts/public-api-surface
 
-What ships today, separated from what is planned, so the docs never overstate WhatsApp Business Platform coverage.
-
 For full signatures and behavior, see the [reference](/docs/reference).
 
-One distinction matters throughout: shape-only versus live-validated. MockTransport tests, local crypto, synthetic webhooks, and consumer fixtures prove a WATS API shape is implemented — they do not prove Meta accepted that behavior in a live account. Live validation is credential-gated and tracked in the [parity matrix](/docs/parity). The default repository checks never call Meta.
+shape-only versus live-validated: MockTransport tests, local crypto, synthetic webhooks, and consumer fixtures prove a WATS API shape is implemented — they do not prove Meta accepted that behavior in a live account. Live validation is credential-gated and tracked in the [parity matrix](/docs/parity). The default repository checks never call Meta.
 
 ## Current package surfaces
 
@@ -2095,7 +2098,7 @@ Primary exports:
 - public endpoint subpaths: `@wats/graph/endpoints/messages`, `@wats/graph/endpoints/media`, `@wats/graph/endpoints/templates`, `@wats/graph/endpoints/flows`, `@wats/graph/endpoints/calling`, `@wats/graph/endpoints/business-management`, and `@wats/graph/endpoints/groups`. `bun run api:check` keeps package exports, fixture imports, docs, and changelog mentions aligned
 - Node/Bun-only filesystem media helpers: `@wats/graph/node-media` exports path-based `uploadAndSend*FromPath` helpers. This subpath is deliberately separate from the root entrypoint so browser/edge users never pull `node:fs` transitively.
 - `paginate` / `paginateAll`
-- Graph error classes and pywa-seeded error registry helpers
+- Graph error classes and error registry helpers
 - media runtime: `uploadMedia`, `downloadMedia`, `downloadMediaBytes`, `deleteMedia`, `decryptEncryptedMedia`, upload-session helpers, `MediaValidationError`, `MediaCryptoError`, `MediaIntegrityError`, and finite media cap constants
 
 Status: foundations-complete for Graph plumbing. Media runtime, outbound composers, template helpers, Flow helpers, Calling request/webhook shapes, Groups request shapes, and bounded business/admin helpers are complete for credential-free MockTransport-backed behavior. Live Meta checks, automatic user-block decisions, policy/appeal automation, catalog CRUD, and remaining WABA admin APIs remain credential-gated.
@@ -2271,8 +2274,6 @@ See the [release policy](/docs/meta/release-policy) for versioning rules and the
 
 # Reference Index
 URL: https://wats.sh/docs/reference
-
-One table per package. Find the surface you need; the contract lives in the linked doc.
 
 ## Graph primitives (`@wats/graph`)
 
@@ -2500,10 +2501,6 @@ Path ids, `to`, `recipient`, and `callId` must be non-empty strings with no cont
 `session` must be a descriptor-safe plain object. WATS clones it before transport, maps `sdpType` to Graph `sdp_type`, and rejects accessors, `toJSON`, custom prototypes, cycles, unsafe prototype keys (`__proto__`, `constructor`, `prototype`), non-finite numbers, functions, symbols, empty/oversized strings, NUL/DEL-bearing SDP text, and serialized bodies over `CALL_SESSION_MAX_BYTES` (`65_536`). Undefined optional fields are omitted from the Graph JSON body.
 
 The Graph error taxonomy is preserved after the request reaches transport, including calling subclasses such as `CallingNotEnabledError`, `DuplicateCallError`, and `CallConnectionError`. Repository tests use `createMockTransport`; live call sessions remain credential-gated and are not performed in CI.
-
-## Status
-
-shape-only. The lifecycle callables, permission reader, call-button/deep-link helpers, and calling webhook normalizers are covered by MockTransport and synthetic webhook tests. Live call sessions, WebRTC/media signaling, and calling-access provisioning remain credential-gated and unperformed.
 
 ## Related docs
 
@@ -4441,13 +4438,13 @@ URL: https://wats.sh/docs/reference/groups
 
 Capture the group request shapes in the [playground](/playground?scenario=groups).
 
-WATS Groups is an official WhatsApp Cloud API v25 surface and a WATS beyond-pywa addition — pywa has no Groups API equivalent. WATS exposes it as an opt-in, composable family: import the Groups subpath, construct a scoped client, or pass `enableGroupRoutes: true` to the service. Non-group users get no new default service routes.
+WATS Groups is an official WhatsApp Cloud API v25 surface, exposed as an opt-in, composable family: import the Groups subpath, construct a scoped client, or pass `enableGroupRoutes: true` to the service. Non-group users get no new default service routes.
 
 Groups hang off the business phone-number id, not the WABA id. Public WATS names stay camelCase; Meta snake_case is emitted only at the Graph wire boundary.
 
 ## Live validation status
 
-`listGroups` is live-validated against a real WhatsApp Business number. Group mutations — create, update, delete, participant removal, join-request approve/reject — are shape-only. The June 2026 campaign ran `createGroup` against a test number and Meta rejected it with an entitlement error; the mutation matrix is unproven until a Groups-entitled phone number exists. Treat every mutation helper as request-shape-correct but not Meta-accepted until that blocker clears. See the [parity matrix](/docs/parity) Groups row.
+`listGroups` is live-validated against a real WhatsApp Business number. Group mutations — create, update, delete, participant removal, join-request approve/reject — are shape-only. A live `createGroup` attempt was rejected with an entitlement error on the test number; mutations stay shape-only until a Groups-entitled phone number exists. See the [parity matrix](/docs/parity) Groups row.
 
 ## Endpoint contracts
 
@@ -7636,10 +7633,9 @@ equivalents. For per-capability status, the [parity matrix](/docs/parity) is
 authoritative; the [live campaign log](/docs/parity/live-campaign) is the
 evidence.
 
-Status tags below use the honesty taxonomy. **live-validated**: exercised
-against live Meta. **shape-only**: implemented and tested locally; Meta has
-not seen it. **planned**: no WATS equivalent yet. A shape-only row works in
-code today — it just has no live proof.
+Status tags below use the honesty taxonomy: **live-validated** (exercised
+against live Meta), **shape-only** (implemented and tested locally), and
+**planned** (no WATS equivalent yet).
 
 ## Package and construction map
 
@@ -7875,31 +7871,29 @@ Do not migrate code assuming WATS already has pywa parity for:
 # pywa Parity Matrix
 URL: https://wats.sh/docs/parity
 
-Every row carries one of three tags. **live-validated**: exercised against live
-Meta Graph/webhooks in the June 2026 campaign. **shape-only**: implemented and
-tested against MockTransport and synthetic webhooks; Meta has not seen it.
-**planned**: not built. An implemented surface stays shape-only until Meta
-accepts the request and WATS parses the live response.
+Three tags. **live-validated**: exercised against live Meta Graph/webhooks.
+**shape-only**: implemented and tested against MockTransport and synthetic
+webhooks; Meta has not seen it. **planned**: not built.
 
 | Capability | pywa | wats | Status |
 | --- | --- | --- | --- |
-| Client construction | `pywa.WhatsApp(...)` | `GraphClient` + `WhatsApp` facade; construction-time validation. | live-validated — carried every Graph call in the campaign. |
-| Scoped sub-clients | `phone_id` / WABA-bound methods | `PhoneNumberClient`, `WABAClient`; ids validated at construction. | live-validated — live reads and sends ran through both. |
-| Handler routing | decorator registration | `TypedRouter`: registration-order dispatch, handles with `unregister()`, observer hooks. | live-validated — live webhooks dispatched through the router. |
+| Client construction | `pywa.WhatsApp(...)` | `GraphClient` + `WhatsApp` facade; construction-time validation. | live-validated |
+| Scoped sub-clients | `phone_id` / WABA-bound methods | `PhoneNumberClient`, `WABAClient`; ids validated at construction. | live-validated |
+| Handler routing | decorator registration | `TypedRouter`: registration-order dispatch, handles with `unregister()`, observer hooks. | live-validated |
 | Filters | `&` / `\|` / `~` operator filters | `filtersTyped`: `and`/`or`/`not`/`custom` plus message/status/template/group built-ins. | shape-only — pure local predicates; nothing here talks to Meta. |
 | Listeners | `listen` waiters | `wa.listen({ type, from?, filter?, timeoutMs?, signal? })` over a bounded registry. | shape-only. |
 | Sent-result waiters | `SentMessage.wait_for_reply` etc. | `startChat(...)` returns `waitForReply`, `waitForClick`, `waitForSelection`, `waitForFlowCompletion`, `waitUntilDelivered`, `waitUntilRead`, and `waitUntilFailed`, all resolved from observed webhooks only. | shape-only — process-local listener registry, no persistence. |
-| Webhook verification | server config | Challenge echo + constant-time `X-Hub-Signature-256` HMAC over the raw body. | live-validated — verified real Meta signatures end to end. |
-| Webhook adapter | built-in server | Runtime-neutral `WebhookAdapter` with fetch / Bun / Node wrappers; identical status-code taxonomy. | live-validated — served live Meta traffic on a public callback. |
+| Webhook verification | server config | Challenge echo + constant-time `X-Hub-Signature-256` HMAC over the raw body. | live-validated |
+| Webhook adapter | built-in server | Runtime-neutral `WebhookAdapter` with fetch / Bun / Node wrappers; identical status-code taxonomy. | live-validated |
 | Webhook normalization | update classes | `normalizeWebhookEnvelope` → `TypedUpdate` union; per-entry skip taxonomy, dedup, event cap. | live-validated for message and status families; deeper families shape-only. |
 | Update parser | n/a (internal) | Strict envelope validation, safety limits, malformed-skip counters. | live-validated via the webhook path. |
-| Error model | `WhatsAppError` subclasses | `GraphApiError` hierarchy + registry seeded with pywa's 66 codes; `instanceof` narrowing. | live-validated — real Meta error codes parsed into typed errors. |
-| Shared domain types | Python classes | Closed discriminated unions for messages, statuses, contacts, webhook values. | live-validated — live responses parsed into these types. |
-| Graph transport | `wa.api` | `Transport` seam: `createFetchTransport`, `createMockTransport`, `defineEndpoint` registry. | live-validated — fetch transport carried the campaign. |
+| Error model | `WhatsAppError` subclasses | `GraphApiError` hierarchy + registry seeded with pywa's 66 codes; `instanceof` narrowing. | live-validated |
+| Shared domain types | Python classes | Closed discriminated unions for messages, statuses, contacts, webhook values. | live-validated |
+| Graph transport | `wa.api` | `Transport` seam: `createFetchTransport`, `createMockTransport`, `defineEndpoint` registry. | live-validated |
 | Retry/backoff | client options | Opt-in `createReliableTransport`: jittered backoff, `Retry-After`, no POST retries by default. | shape-only. |
 | Pagination | iterator helpers | `paginate` / `paginateAll` async generators over cursor pages. | shape-only. |
 | Crypto provider | n/a (internal) | `CryptoProvider` seam with Node and WebCrypto adapters. | live-validated via live HMAC verification. |
-| Text sends | `send_text` / `send_message` | `sendText`, `WhatsApp.startChat` to arbitrary recipients. | live-validated — accepted with a real message id. |
+| Text sends | `send_text` / `send_message` | `sendText`, `WhatsApp.startChat` to arbitrary recipients. | live-validated |
 | Media sends | `send_image` etc. | `sendImage` / `sendVideo` / `sendAudio` / `sendDocument` / `sendSticker` by media id or link. | live-validated for image by media id; other media composers shape-only. |
 | Other composers | location, contacts, reactions, buttons, lists, CTA, catalog, mark-read, typing | Matching helpers on `PhoneNumberClient` and the facade. | shape-only. |
 | One-call media send | file/bytes polymorphism | `PhoneNumberClient.uploadAndSendImage` / `uploadAndSendVideo` / `uploadAndSendAudio` / `uploadAndSendDocument` / `uploadAndSendSticker` upload in-memory `Blob` / `ArrayBuffer` / `Uint8Array` bodies, then send by returned media id. The Node/Bun-only `@wats/graph/node-media` subpath adds filesystem-path helpers. | shape-only. |
@@ -7910,7 +7904,7 @@ accepts the request and WATS parses the live response.
 | Flow encrypted data-channel | richer Flow runtime | `decryptRequest`/`encryptResponse` (RSA-OAEP + AES-GCM, IV-flip response) and a framework-agnostic `handleFlowRequest` dispatch (ping/error-ack/close), backed by `@wats/crypto`. | shape-only — local crypto round-trip; no hosted endpoint or live publish. Media-upload (CBC+HMAC) decryption is implemented shape-only. |
 | Calling | `initiate_call` etc. | Initiate/pre-accept/accept/reject/terminate callables, call-button message and deep-link helpers, typed calling webhooks and filters. See [Calling Reference](/docs/reference/calling). | shape-only — no live call sessions yet. |
 | Call permissions + calling-settings mutation | permission models, SIP/settings writes | `getCallPermissions` (typed permission/action/limit models), `calling` settings sub-object on `updatePhoneNumberSettings` (status, call hours, call icons, callback permission, SIP servers), `call_permission_reply` webhook fields (`isPermanent`, `responseSource`, plus `fromUserId`/`fromParentUserId`). | shape-only — no live calls; WebRTC/media orchestration still planned. |
-| Business/admin reads | `get_business_account` etc. | `getWabaInfo`, `listSubscribedApps`, `listPhoneNumbers`, `getPhoneNumberInfo`, `getBusinessProfile`, `getCommerceSettings`. | live-validated — all parsed live Graph v25.0. |
+| Business/admin reads | `get_business_account` etc. | `getWabaInfo`, `listSubscribedApps`, `listPhoneNumbers`, `getPhoneNumberInfo`, `getBusinessProfile`, `getCommerceSettings`. | live-validated |
 | Phone-number settings read | settings getter | `getPhoneNumberSettings` (storage config, optional SIP credentials as `sipUserPassword`) plus `getWabaInfo` calling health as `healthStatus.canReceiveCallSip`. | shape-only — not exercised in the live campaign. |
 | Business/admin mutations | profile/commerce/settings updates | `updateBusinessProfile`, `updateCommerceSettings`, `updatePhoneNumberSettings`, Block API, OBA/display-name helpers, the phone registration lifecycle (`createPhoneNumber`, `requestVerificationCode`, `verifyPhoneNumber`, `registerPhoneNumber`, `deregisterPhoneNumber`, `setTwoStepVerificationPin`), business public-key helpers (`getBusinessPublicKey`, `setBusinessPublicKey`), and QR code CRUD (`createQrCode`, `listQrCodes`, `getQrCode`, `updateQrCode`, `deleteQrCode`). | shape-only. |
 | Admin: tokens, catalog CRUD | established | Embedded Signup token exchange is shape-only. Catalog/product inventory CRUD is not built. | planned for catalog CRUD. |
@@ -7923,7 +7917,7 @@ accepts the request and WATS parses the live response.
 | Internal utilities | n/a | `@wats/internal-utils` shared helpers. | shape-only — never leaves the process. |
 | OpenTelemetry observability | n/a | Not built; router/adapter observer hooks exist as seams. | planned. |
 
-Evidence for every live-validated tag: [live campaign log](/docs/parity/live-campaign).
+Live-validation run log: [campaign log](/docs/parity/live-campaign).
 
 ## Notes
 
@@ -7940,13 +7934,8 @@ URL: https://wats.sh/docs/parity/live-campaign
 
 WATS development is credential-free by default: MockTransport, synthetic
 webhooks, no Meta calls in CI. A live campaign is the exception — an
-operator-authorized run against real Meta assets that upgrades surfaces from
-shape-only to live-validated. This page is the runbook plus the redacted
-execution log.
-
-A surface earns live-validated only when Meta accepts the request, WATS parses
-the response shape, webhook/result side effects are observed where applicable,
-and cleanup completes or is explicitly documented.
+operator-authorized run against real Meta assets. This page is the runbook
+plus the redacted execution log.
 
 ## Scope
 
@@ -8197,7 +8186,7 @@ Breaking changes to these surfaces require at least a 0.x minor bump plus change
 
 ## Experimental surfaces
 
-Experimental surfaces are public enough to use and test, but may change in any 0.x minor while WATS works toward WhatsApp/pywa parity. Changes are still documented and tested. Pin versions and expect movement.
+Experimental surfaces are public enough to use and test, but may change in any 0.x minor while WATS works toward WhatsApp parity. Changes are still documented and tested. Pin versions and expect movement.
 
 Current experimental surfaces:
 
@@ -8299,7 +8288,7 @@ WATS uses semantic versioning across published workspace packages.
 
 ## `0.x` development line
 
-The `0.x` line covers the public toolkit while it expands toward full WhatsApp/pywa parity.
+The `0.x` line covers the public toolkit while it expands toward full WhatsApp parity.
 
 - Patch bump: documentation fixes, test-only changes, non-behavioral repo hygiene, or bug fixes that do not change public contracts.
 - Minor bump: any new public feature, endpoint family, package, CLI command, config schema field, standalone service route, persistence contract, or deployment artifact that defines supported behavior.
@@ -8409,7 +8398,7 @@ Before tagging or pushing a release:
 
 ---
 
-# Roadmap to WhatsApp / pywa Parity
+# Roadmap
 URL: https://wats.sh/docs/meta/roadmap
 
 What is planned, what is shipped, and what is explicitly out of scope. Issue-level tracking lives in the project tracker.
@@ -8419,7 +8408,7 @@ What is planned, what is shipped, and what is explicitly out of scope. Issue-lev
 The `0.3.x-alpha-tooling` line ships the substrate:
 
 - Graph client, transport seam, endpoint registry, pagination, scoped clients
-- pywa-seeded Graph error registry
+- Graph error registry seeded with the known Meta error codes
 - webhook challenge/signature verification, runtime-neutral WebhookAdapter, Bun/Node/Fetch wrappers
 - typed webhook normalizer, typed filters, router, listeners, `WhatsApp` facade
 - media runtime: upload, metadata resolution, binary download, delete, encrypted decrypt, resumable upload sessions
@@ -8433,13 +8422,13 @@ The `0.3.x-alpha-tooling` line ships the substrate:
 - SQLite persistence: migrations, idempotency records, outbox APIs
 - Postgres persistence adapter at `@wats/persistence/postgres` (shape-only, mock-client tested; no default CI live Postgres)
 - local message projection (`wats_messages` / `wats_message_status_events`) and read-only `wats messages list/show` CLI inspection
-- pywa migration guide and per-capability parity matrix
+- pywa migration guide and per-endpoint status page
 
-Everything above is credential-free and MockTransport-validated unless the [parity matrix](/docs/parity) marks it live-validated. The Postgres adapter is mock-client tested; it is not live-validated against a running Postgres service.
+Everything above is credential-free and MockTransport-validated unless [endpoint status](/docs/parity) marks it live-validated. The Postgres adapter is mock-client tested; it is not live-validated against a running Postgres service.
 
 ## Planned
 
-- Live credentialed validation of media, message, template, Flow, and calling paths. The campaign runs in deliberate phases — read-only discovery first, side-effecting tests second, destructive cleanup last, admin mutations only with separate authorization. It is halted until credentials and explicit operator authorization exist.
+- Live credentialed validation of media, message, template, Flow, and calling paths: read-only discovery first, side-effecting tests second, destructive cleanup last. Halted until credentials and explicit operator authorization exist.
 - Mutating admin endpoints still remaining: WABA CRUD, catalog/product inventory CRUD, and `subscribeApp`; shipped request-shape helpers remain shape-only until live validation.
 - Live Postgres validation and service send enqueueing.
 - Production deployment hardening: Compose, container image publication, registry workflow, and a production hosting contract. The repo ships a Railway-targeted Dockerfile.
@@ -8463,18 +8452,16 @@ URL: https://wats.sh/docs
 
 WATS is a Bun-first TypeScript toolkit for the WhatsApp Cloud API. It ships as composable packages — Graph client, webhook adapter, typed routing, config, CLI, standalone service — not one monolithic framework. Take the parts you need.
 
-It is for TypeScript teams who want typed Graph calls, webhook updates, routing, and a standalone service across Bun, Node, Workers, and Deno. WATS also ships a Groups API with no pywa equivalent.
-
 - [Quickstart](/docs/quickstart) — install the packages and send your first message.
 - [CLI onboarding](/docs/guides/cli-init) — config scaffolding, setup wizard, doctor, dry-run serve.
 - [Live webhook](/docs/guides/live-webhook) — point Meta at a locally running service behind a public HTTPS tunnel.
 - [Deploy guides](/docs/guides/deploy-bun) — Bun, Node, Cloudflare Workers, and the Docker shape.
 - [Reference](/docs/reference) — per-package API documentation.
-- [Parity](/docs/parity) — what is live-validated, shape-only, or planned against WhatsApp and pywa.
+- [Endpoint status](/docs/parity) — per-endpoint implementation and live status.
 
 ## When not to use WATS
 
-- You already run pywa on Python and it covers your needs. WATS does not port your stack; it replaces it in TypeScript.
-- You need every endpoint live against Meta today. Much of the surface is shape-only, not yet live-validated — check [parity](/docs/parity) first.
+- You need every endpoint proven against live Meta today. Much of the surface is tested against the wire contract but has not carried live traffic — check [endpoint status](/docs/parity) first.
 - You need a frozen API. The 0.x line still makes breaking changes.
+- You're happy on pywa and Python. WATS started as "pywa, but TypeScript" — if the Python side works for you, there's no reason to move.
 

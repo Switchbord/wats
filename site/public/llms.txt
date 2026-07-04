@@ -50,9 +50,9 @@ Playground (runs the real SDK in-browser, no credentials): https://wats.sh/playg
 - [WhatsApp facade reference (`WhatsApp`)](https://wats.sh/docs/reference/whatsapp-facade): The WhatsApp composition root: what it binds, what it exposes, and when to bypass it.
 - [Migration: pywa to WATS](https://wats.sh/docs/migration/pywa): A migration map from Python pywa integrations to WATS, with honest live-parity status and known gaps.
 - [pywa Parity Matrix](https://wats.sh/docs/parity): Capability-by-capability status of WATS against pywa, tagged live-validated, shape-only, or planned.
-- [Live-testing campaign](https://wats.sh/docs/parity/live-campaign): How WATS gets validated against live Meta assets, and the redacted log of runs that earned the live-validated tags.
+- [Live-testing campaign](https://wats.sh/docs/parity/live-campaign): How WATS gets validated against live Meta assets, and the redacted run log.
 - [API Stability Policy](https://wats.sh/docs/meta/api-stability): How to read stable-for-0.x, experimental, and internal WATS surfaces during the alpha line.
 - [Privacy and Telemetry](https://wats.sh/docs/meta/privacy): WATS sends no telemetry by default; what traffic occurs, how data is handled, and redaction expectations.
 - [Release Policy](https://wats.sh/docs/meta/release-policy): How WATS versions packages and what each release class may contain.
-- [Roadmap to WhatsApp / pywa Parity](https://wats.sh/docs/meta/roadmap): What WATS plans to ship next, and what is explicitly out of scope for now.
+- [Roadmap](https://wats.sh/docs/meta/roadmap): What WATS plans to ship next, and what is explicitly out of scope for now.
 - [WATS documentation](https://wats.sh/docs): A Bun-first TypeScript toolkit for the WhatsApp Cloud API.
