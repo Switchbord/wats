@@ -1,6 +1,6 @@
 {
   "name": "@wats/http",
-  "version": "0.3.27",
+  "version": "0.3.28",
   "private": false,
   "license": "MIT",
   "type": "module",
@@ -61,8 +61,8 @@
     "wats"
   ],
   "dependencies": {
-    "@wats/crypto": "^0.3.27",
-    "@wats/core": "^0.3.27",
-    "@wats/types": "^0.3.27"
+    "@wats/crypto": "^0.3.28",
+    "@wats/core": "^0.3.28",
+    "@wats/types": "^0.3.28"
   }
 }
