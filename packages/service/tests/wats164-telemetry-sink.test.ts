@@ -144,7 +144,7 @@ describe("WATS-164 OpenTelemetry-compatible telemetry sink", () => {
       expect(c.attributes[OTEL_ATTR.httpStatusCode]).toBeDefined();
       expect(c.attributes[OTEL_ATTR.httpStatusClass]).toBeDefined();
       expect(c.attributes[OTEL_ATTR.operationOutcome]).toBeDefined();
-      expect(["success", "error"]).toContain(c.attributes[OTEL_ATTR.operationOutcome]);
+      expect(["success", "error"]).toContain(String(c.attributes[OTEL_ATTR.operationOutcome]));
     }
 
     const sendCounters = sink.counters.filter((c) => c.name === "send_outcomes_total");
@@ -232,7 +232,7 @@ describe("WATS-164 OpenTelemetry-compatible telemetry sink", () => {
     for (const c of webhookCounters) {
       expect(c.attributes[OTEL_ATTR.webhookUpdateKind]).toBeDefined();
       expect(c.attributes[OTEL_ATTR.operationOutcome]).toBeDefined();
-      expect(["message", "unknown"]).toContain(c.attributes[OTEL_ATTR.webhookUpdateKind]);
+      expect(["message", "unknown"]).toContain(String(c.attributes[OTEL_ATTR.webhookUpdateKind]));
     }
   });
 
