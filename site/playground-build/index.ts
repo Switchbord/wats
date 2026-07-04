@@ -4,7 +4,7 @@
 // bundled (esbuild, browser ESM) into site/public/playground/wats-bundle.js.
 //
 // It re-exports the public surfaces the playground scenarios need from the
-// PUBLISHED @wats/* packages (pinned 0.3.26). Named re-exports are used so a
+// PUBLISHED @wats/* packages (pinned 0.3.28). Named re-exports are used so a
 // later import-map rewrite (`@wats/...` -> `/playground/wats-bundle.js`) stays
 // trivial: scenario code can `import { GraphClient } from "@wats/graph"` and
 // the rewrite resolves to this single bundle.

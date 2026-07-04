@@ -433,8 +433,10 @@ interface InteractiveCtaUrlReply {
 interface InteractiveCallPermissionReply {
 	type: "call_permission_reply";
 	callPermissionReply: {
-		response: "accepted" | "rejected";
+		response: "accept" | "reject" | "accepted" | "rejected";
 		expirationTimestamp?: string;
+		isPermanent?: boolean;
+		responseSource?: "user_action" | "automatic";
 	};
 }
 type InteractiveReply = InteractiveButtonReply | InteractiveListReply | InteractiveNfmReply | InteractiveProductReply | InteractiveProductListReply | InteractiveCtaUrlReply | InteractiveCallPermissionReply;
@@ -445,6 +447,12 @@ interface InteractiveMessage {
 	timestamp: string;
 	interactive: InteractiveReply;
 	context?: MessageContext;
+	/**
+	 * WATS-167: caller identity fields surfaced on call_permission_reply
+	 * inbound messages. Only populated when Meta includes them.
+	 */
+	fromUserId?: string;
+	fromParentUserId?: string;
 	raw?: unknown;
 }
 interface ButtonPayload {
@@ -931,6 +939,14 @@ interface TypedStatusUpdate {
 	readonly status: GroupMessageStatus;
 	readonly rawChange: WhatsAppWebhookChange;
 }
+interface NormalizedCallContact {
+	readonly name?: string;
+	readonly username?: string;
+	readonly waId?: string;
+	readonly userId?: string;
+	readonly parentUserId?: string;
+	readonly raw: Record<string, unknown>;
+}
 interface NormalizedCallPayload {
 	readonly id: string;
 	readonly event: CallEvent;
@@ -939,6 +955,22 @@ interface NormalizedCallPayload {
 	readonly direction?: CallDirection;
 	readonly timestamp?: string;
 	readonly session?: unknown;
+	/**
+	 * WATS-167: terminate-call outcome fields. `status` accepts Meta's
+	 * documented "FAILED"/"COMPLETED" plus any string for forward-compat.
+	 */
+	readonly status?: string;
+	readonly startTime?: string;
+	readonly endTime?: string;
+	readonly duration?: number;
+	readonly bizOpaqueCallbackData?: string;
+	/** Opaque payload from interactive `voice_call` call-button messages. */
+	readonly ctaPayload?: string;
+	/** Opaque payload from `wa.me/call` deep links. */
+	readonly deeplinkPayload?: string;
+	readonly toUserId?: string;
+	readonly toParentUserId?: string;
+	readonly contacts?: readonly NormalizedCallContact[];
 	readonly raw: Record<string, unknown>;
 }
 interface NormalizedCallStatusPayload {
@@ -946,6 +978,9 @@ interface NormalizedCallStatusPayload {
 	readonly status: CallStatusType;
 	readonly recipientId?: string;
 	readonly timestamp?: string;
+	readonly recipientUserId?: string;
+	readonly recipientParentUserId?: string;
+	readonly bizOpaqueCallbackData?: string;
 	readonly raw: Record<string, unknown>;
 }
 interface TypedCallUpdate {
@@ -1505,6 +1540,18 @@ interface GraphMessagesSendCallPermissionRequestInput extends GraphMessagesRecip
 	readonly footerText?: string;
 	readonly replyToMessageId?: string;
 }
+interface GraphMessagesSendVoiceCallInput {
+	/** Phone-number / wa_id recipient. If `recipient` is also supplied, Meta routes by `to`. */
+	readonly to?: string;
+	/** Business-scoped user id / parent BSUID recipient. */
+	readonly recipient?: string;
+	readonly recipientType?: "individual";
+	readonly bodyText: string;
+	readonly displayText?: string;
+	readonly ttlMinutes?: number;
+	readonly payload?: string;
+	readonly replyToMessageId?: string;
+}
 interface GraphMessagesSendProductInput extends GraphMessagesRecipientInput {
 	readonly catalogId: string;
 	readonly productRetailerId: string;
@@ -1551,7 +1598,16 @@ interface GraphMessagesTemplateComponentInput {
 	readonly index?: string;
 }
 type GraphMessagesTemplateCategory = "MARKETING" | "UTILITY" | "AUTHENTICATION";
-interface GraphMessagesSendTemplateInput extends GraphMessagesRecipientInput {
+interface GraphMessagesVoiceCallTemplateButtonInput {
+	readonly ttlMinutes?: number;
+	readonly payload?: string;
+	readonly index?: string;
+}
+interface GraphMessagesSendTemplateInput {
+	readonly to?: string;
+	/** Business-scoped user id / parent BSUID recipient for templates that support it. */
+	readonly recipient?: string;
+	readonly recipientType?: GraphMessagesRecipientType;
 	readonly name: string;
 	readonly languageCode: string;
 	readonly templateCategory?: GraphMessagesTemplateCategory;
@@ -1716,7 +1772,8 @@ type GraphMessagesReactionPayload = {
 type GraphMessagesInteractivePayload = {
 	messaging_product: "whatsapp";
 	recipient_type?: GraphMessagesRecipientType;
-	to: string;
+	to?: string;
+	recipient?: string;
 	type: "interactive";
 	interactive: Record<string, unknown>;
 	context?: {
@@ -1726,7 +1783,8 @@ type GraphMessagesInteractivePayload = {
 type GraphMessagesTemplatePayload = {
 	messaging_product: "whatsapp";
 	recipient_type?: GraphMessagesRecipientType;
-	to: string;
+	to?: string;
+	recipient?: string;
 	type: "template";
 	template: Record<string, unknown>;
 	context?: {
@@ -1773,6 +1831,12 @@ declare const GRAPH_MESSAGES_MAX_LIST_SECTIONS = 10;
 declare const GRAPH_MESSAGES_MAX_LIST_ROWS = 10;
 declare const GRAPH_MESSAGES_MAX_CONTACTS = 257;
 declare const GRAPH_MESSAGES_MAX_PRODUCT_ITEMS = 30;
+declare const GRAPH_MESSAGES_VOICE_CALL_DISPLAY_TEXT_MAX_LENGTH = 20;
+declare const GRAPH_MESSAGES_VOICE_CALL_TTL_MINUTES_MIN = 1;
+declare const GRAPH_MESSAGES_VOICE_CALL_TTL_MINUTES_MAX = 43200;
+declare const GRAPH_MESSAGES_VOICE_CALL_TTL_MINUTES_DEFAULT = 10080;
+declare const GRAPH_MESSAGES_VOICE_CALL_TEMPLATE_TTL_MINUTES_MIN = 1440;
+declare const GRAPH_MESSAGES_VOICE_CALL_PAYLOAD_MAX_LENGTH = 512;
 declare function buildSendTextPayload(input: GraphMessagesSendTextInput): GraphMessagesTextPayload;
 declare function buildSendImagePayload(input: GraphMessagesSendImageInput): GraphMessagesImagePayload;
 declare function buildSendVideoPayload(input: GraphMessagesSendVideoInput): GraphMessagesVideoPayload;
@@ -1788,14 +1852,21 @@ declare function buildSendButtonsPayload(input: GraphMessagesSendButtonsInput): 
 declare function buildSendListPayload(input: GraphMessagesSendListInput): GraphMessagesInteractivePayload;
 declare function buildSendCtaUrlPayload(input: GraphMessagesSendCtaUrlInput): GraphMessagesInteractivePayload;
 declare function buildSendCallPermissionRequestPayload(input: GraphMessagesSendCallPermissionRequestInput): GraphMessagesInteractivePayload;
+declare function buildSendVoiceCallPayload(input: GraphMessagesSendVoiceCallInput): GraphMessagesInteractivePayload;
 declare function buildSendProductPayload(input: GraphMessagesSendProductInput): GraphMessagesInteractivePayload;
 declare function buildSendProductsPayload(input: GraphMessagesSendProductsInput): GraphMessagesInteractivePayload;
 declare function buildSendCatalogPayload(input: GraphMessagesSendCatalogInput): GraphMessagesInteractivePayload;
 declare function buildRequestLocationPayload(input: GraphMessagesRequestLocationInput): GraphMessagesInteractivePayload;
 declare function buildMarkMessageAsReadPayload(input: GraphMessagesMarkMessageAsReadInput): GraphMessagesStatusPayload;
 declare function buildTypingIndicatorPayload(input: GraphMessagesTypingIndicatorInput): GraphMessagesStatusPayload;
+declare function buildVoiceCallTemplateButtonComponent(input: GraphMessagesVoiceCallTemplateButtonInput): Record<string, unknown>;
 declare function buildSendTemplatePayload(input: GraphMessagesSendTemplateInput): GraphMessagesTemplatePayload;
 declare function buildSendMarketingTemplatePayload(input: GraphMessagesSendMarketingTemplateInput): GraphMessagesMarketingTemplatePayload;
+interface WhatsAppCallDeepLinkInput {
+	readonly phoneNumber: string;
+	readonly bizPayload?: string;
+}
+declare function buildWhatsAppCallDeepLink(input: WhatsAppCallDeepLinkInput): string;
 type EndpointHttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 interface EndpointParamSpec {
 	readonly in: "path" | "query";
@@ -2330,7 +2401,8 @@ interface CallSessionDescriptionPayload {
 	readonly [key: string]: unknown;
 }
 interface InitiateCallRequest {
-	readonly to: string;
+	readonly to?: string;
+	readonly recipient?: string;
 	readonly session: CallSessionDescription | Record<string, unknown>;
 	readonly bizOpaqueCallbackData?: string;
 }
@@ -2374,6 +2446,45 @@ declare const rejectCall: ((client: GraphClient, params: CallsParams, body: Reje
 declare const terminateCall: ((client: GraphClient, params: CallsParams, body: TerminateCallRequest, opts?: EndpointInvokeOptions) => Promise<CallLifecycleResponse>) & {
 	definition: EndpointDefinition<CallsParams, WireBody, CallLifecycleResponse>;
 };
+type CallPermissionStatus = "no_permission" | "temporary" | "permanent";
+interface CallPermissionActionLimit {
+	readonly timePeriod?: string;
+	readonly maxAllowed?: number;
+	readonly currentUsage?: number;
+	readonly limitExpirationTime?: number;
+	readonly [key: string]: unknown;
+}
+interface CallPermissionAction {
+	readonly actionName?: string;
+	readonly canPerformAction?: boolean;
+	readonly limits?: ReadonlyArray<CallPermissionActionLimit>;
+	readonly [key: string]: unknown;
+}
+interface CallPermission {
+	readonly status?: CallPermissionStatus | string;
+	readonly expirationTime?: number;
+	readonly [key: string]: unknown;
+}
+interface CallPermissionsResponse {
+	readonly messagingProduct?: string;
+	readonly permission?: CallPermission;
+	readonly actions?: ReadonlyArray<CallPermissionAction>;
+	readonly [key: string]: unknown;
+}
+interface GetCallPermissionsInput {
+	readonly phoneNumberId: string;
+	readonly userWaId?: string;
+	readonly recipient?: string;
+}
+type CallPermissionsParams = {
+	readonly phoneNumberId: string;
+	readonly user_wa_id?: string;
+	readonly recipient?: string;
+};
+type WireResponse = Record<string, unknown>;
+declare const getCallPermissions: ((client: GraphClient, input: GetCallPermissionsInput, _body?: undefined, opts?: EndpointInvokeOptions) => Promise<CallPermissionsResponse>) & {
+	definition: EndpointDefinition<CallPermissionsParams, never, WireResponse>;
+};
 interface GraphPaging {
 	readonly cursors?: {
 		readonly before?: string;
@@ -2383,6 +2494,16 @@ interface GraphPaging {
 	readonly previous?: string;
 }
 type BusinessManagementFields = string | readonly string[];
+interface WabaHealthStatusEntity {
+	readonly entityType?: string;
+	readonly canReceiveCallSip?: boolean;
+	readonly [key: string]: unknown;
+}
+interface WabaHealthStatus {
+	readonly canReceiveCallSip?: boolean;
+	readonly entities?: readonly WabaHealthStatusEntity[];
+	readonly [key: string]: unknown;
+}
 interface WabaInfo {
 	readonly id?: string;
 	readonly name?: string;
@@ -2396,7 +2517,8 @@ interface WabaInfo {
 	/** WATS-91 / Graph v24+ portfolio-level messaging limit. */
 	readonly whatsapp_business_manager_messaging_limit?: string;
 	readonly ownership_type?: string;
-	readonly health_status?: unknown;
+	/** Calling health status normalized from Graph `health_status.can_receive_call_sip`. */
+	readonly healthStatus?: WabaHealthStatus;
 	readonly currency?: string;
 	readonly country?: string;
 	readonly subscribed_apps?: unknown;
@@ -2432,7 +2554,55 @@ interface PhoneNumberInfo {
 	readonly whatsapp_business_manager_messaging_limit?: string;
 	readonly [key: string]: unknown;
 }
+interface SipServerSettings {
+	readonly hostname?: string;
+	readonly port?: number;
+	readonly requestUriUserParams?: Record<string, string>;
+	/** Response-only; present on read only when `includeSipCredentials=true`. Treat as secret material. */
+	readonly sipUserPassword?: string;
+	/** Response-only; never sent in updates. */
+	readonly appId?: number;
+	readonly [key: string]: unknown;
+}
+interface SipSettings {
+	readonly status?: string;
+	readonly servers?: readonly SipServerSettings[];
+	readonly [key: string]: unknown;
+}
+interface CallHoursWeeklyOperatingHoursSettings {
+	readonly day_of_week?: string;
+	readonly open_time?: string;
+	readonly close_time?: string;
+	readonly [key: string]: unknown;
+}
+interface CallHoursHolidayScheduleSettings {
+	readonly date?: string;
+	readonly start_time?: string;
+	readonly end_time?: string;
+	readonly [key: string]: unknown;
+}
+interface CallHoursSettings {
+	readonly status?: string;
+	readonly timezone_id?: string;
+	readonly weekly_operating_hours?: readonly CallHoursWeeklyOperatingHoursSettings[];
+	readonly holiday_schedule?: readonly CallHoursHolidayScheduleSettings[];
+	readonly [key: string]: unknown;
+}
+interface CallIconsSettings {
+	readonly restrict_to_user_countries?: readonly string[];
+	readonly [key: string]: unknown;
+}
+interface CallingSettings {
+	readonly status?: string;
+	readonly call_icon_visibility?: string;
+	readonly call_icons?: CallIconsSettings;
+	readonly call_hours?: CallHoursSettings;
+	readonly callback_permission_status?: string;
+	readonly sip?: SipSettings;
+	readonly [key: string]: unknown;
+}
 interface PhoneNumberSettingsEntry {
+	readonly calling?: CallingSettings;
 	readonly [key: string]: unknown;
 }
 interface PhoneNumberSettingsResponse {
@@ -2496,6 +2666,18 @@ interface GetWabaInfoInput {
 interface ListSubscribedAppsInput {
 	readonly wabaId: string;
 }
+interface SetWabaCallbackOverrideInput {
+	readonly wabaId: string;
+	readonly overrideCallbackUri: string;
+	readonly verifyToken: string;
+}
+interface ClearWabaCallbackOverrideInput {
+	readonly wabaId: string;
+}
+interface WabaCallbackOverrideResponse {
+	readonly success?: boolean;
+	readonly [key: string]: unknown;
+}
 interface ListPhoneNumbersInput {
 	readonly wabaId: string;
 	readonly fields?: BusinessManagementFields;
@@ -2517,9 +2699,47 @@ interface StorageConfigurationInput {
 	readonly status: "ENABLED" | "DISABLED" | string;
 	readonly [key: string]: unknown;
 }
+type CallingStatus = "ENABLED" | "DISABLED";
+interface CallIconsInput {
+	readonly restrictToUserCountries?: readonly string[];
+}
+interface WeeklyOperatingHoursInput {
+	readonly dayOfWeek: string;
+	readonly openTime: string;
+	readonly closeTime: string;
+}
+interface HolidayScheduleInput {
+	readonly date: string;
+	readonly startTime: string;
+	readonly endTime: string;
+}
+interface CallHoursInput {
+	readonly status?: CallingStatus | string;
+	readonly timezoneId?: string;
+	readonly weeklyOperatingHours?: readonly WeeklyOperatingHoursInput[];
+	readonly holidaySchedule?: readonly HolidayScheduleInput[];
+}
+interface SipServerInput {
+	readonly hostname: string;
+	readonly port?: number;
+	readonly requestUriUserParams?: Record<string, string>;
+}
+interface SipInput {
+	readonly status?: CallingStatus | string;
+	readonly servers?: readonly SipServerInput[];
+}
+interface CallingInput {
+	readonly status?: CallingStatus | string;
+	readonly callIconVisibility?: "DEFAULT" | "DISABLE_ALL" | string;
+	readonly callIcons?: CallIconsInput;
+	readonly callHours?: CallHoursInput;
+	readonly callbackPermissionStatus?: CallingStatus | string;
+	readonly sip?: SipInput;
+}
 interface UpdatePhoneNumberSettingsInput {
 	readonly phoneNumberId: string;
 	readonly storageConfiguration?: StorageConfigurationInput;
+	readonly calling?: CallingInput;
 }
 interface PhoneNumberSettingsUpdateResponse {
 	readonly success?: boolean;
@@ -2601,6 +2821,116 @@ interface SubmitDisplayNameForReviewResponse {
 	readonly success?: boolean;
 	readonly [key: string]: unknown;
 }
+interface CreatePhoneNumberInput {
+	readonly wabaId: string;
+	readonly countryCode: string;
+	readonly phoneNumber: string;
+	readonly verifiedName: string;
+}
+interface CreatePhoneNumberResponse {
+	readonly id?: string;
+	readonly [key: string]: unknown;
+}
+interface RequestVerificationCodeInput {
+	readonly phoneNumberId: string;
+	readonly codeMethod: "SMS" | "VOICE" | string;
+	readonly language: string;
+}
+interface RequestVerificationCodeResponse {
+	readonly success?: boolean;
+	readonly [key: string]: unknown;
+}
+interface VerifyPhoneNumberInput {
+	readonly phoneNumberId: string;
+	readonly code: string;
+}
+interface VerifyPhoneNumberResponse {
+	readonly success?: boolean;
+	readonly [key: string]: unknown;
+}
+interface RegisterPhoneNumberInput {
+	readonly phoneNumberId: string;
+	readonly pin: string;
+	readonly dataLocalizationRegion?: string;
+}
+interface RegisterPhoneNumberResponse {
+	readonly success?: boolean;
+	readonly [key: string]: unknown;
+}
+interface DeregisterPhoneNumberInput {
+	readonly phoneNumberId: string;
+}
+interface DeregisterPhoneNumberResponse {
+	readonly success?: boolean;
+	readonly [key: string]: unknown;
+}
+interface SetTwoStepVerificationPinInput {
+	readonly phoneNumberId: string;
+	readonly pin: string;
+}
+interface SetTwoStepVerificationPinResponse {
+	readonly success?: boolean;
+	readonly [key: string]: unknown;
+}
+type QrImageFormat = "SVG" | "PNG";
+interface CreateQrCodeInput {
+	readonly phoneNumberId: string;
+	readonly prefilledMessage: string;
+	readonly generateQrImage: QrImageFormat | string;
+}
+interface QrCodeEntry {
+	readonly code?: string;
+	readonly prefilled_message?: string;
+	readonly deep_link_url?: string;
+	readonly qr_image_url?: string;
+	readonly [key: string]: unknown;
+}
+interface CreateQrCodeResponse {
+	readonly code?: string;
+	readonly prefilled_message?: string;
+	readonly deep_link_url?: string;
+	readonly qr_image_url?: string;
+	readonly [key: string]: unknown;
+}
+interface ListQrCodesInput {
+	readonly phoneNumberId: string;
+	readonly fields?: BusinessManagementFields;
+	readonly before?: string;
+	readonly after?: string;
+}
+interface ListQrCodesResponse {
+	readonly data?: readonly QrCodeEntry[];
+	readonly paging?: GraphPaging;
+	readonly [key: string]: unknown;
+}
+interface GetQrCodeInput {
+	readonly phoneNumberId: string;
+	readonly code: string;
+	readonly fields?: BusinessManagementFields;
+}
+interface GetQrCodeResponse {
+	readonly data?: readonly QrCodeEntry[];
+	readonly [key: string]: unknown;
+}
+interface UpdateQrCodeInput {
+	readonly phoneNumberId: string;
+	readonly code: string;
+	readonly prefilledMessage: string;
+}
+interface UpdateQrCodeResponse {
+	readonly code?: string;
+	readonly prefilled_message?: string;
+	readonly deep_link_url?: string;
+	readonly [key: string]: unknown;
+}
+interface DeleteQrCodeInput {
+	readonly phoneNumberId: string;
+	readonly code: string;
+}
+interface DeleteQrCodeResponse {
+	readonly success?: boolean;
+	readonly [key: string]: unknown;
+}
 interface GetBusinessProfileInput {
 	readonly phoneNumberId: string;
 	readonly fields?: BusinessManagementFields;
@@ -2614,6 +2944,9 @@ declare function buildUpdatePhoneNumberSettingsBody(input: UpdatePhoneNumberSett
 declare function normalizeUpdatePhoneNumberSettingsParams(input: UpdatePhoneNumberSettingsInput): WireParams;
 declare function normalizeWabaInfoParams(input: GetWabaInfoInput): WireParams;
 declare function normalizeListSubscribedAppsParams(input: ListSubscribedAppsInput): WireParams;
+declare function normalizeSetWabaCallbackOverrideParams(input: SetWabaCallbackOverrideInput): WireParams;
+declare function normalizeClearWabaCallbackOverrideParams(input: ClearWabaCallbackOverrideInput): WireParams;
+declare function buildWabaCallbackOverrideBody(input: SetWabaCallbackOverrideInput): Record<string, unknown>;
 declare function normalizeListPhoneNumbersParams(input: ListPhoneNumbersInput): WireParams;
 declare function normalizePhoneNumberInfoParams(input: GetPhoneNumberInfoInput): WireParams;
 declare function normalizePhoneNumberSettingsParams(input: GetPhoneNumberSettingsInput): WireParams;
@@ -2627,6 +2960,22 @@ declare function buildOfficialBusinessAccountReviewBody(input: RequestOfficialBu
 declare function normalizeOfficialBusinessAccountReviewParams(input: RequestOfficialBusinessAccountReviewInput): WireParams;
 declare function buildDisplayNameReviewBody(input: SubmitDisplayNameForReviewInput): Record<string, unknown>;
 declare function normalizeDisplayNameReviewParams(input: SubmitDisplayNameForReviewInput): WireParams;
+declare function buildCreatePhoneNumberBody(input: CreatePhoneNumberInput): Record<string, unknown>;
+declare function normalizeCreatePhoneNumberParams(input: CreatePhoneNumberInput): WireParams;
+declare function normalizeRequestVerificationCodeParams(input: RequestVerificationCodeInput): WireParams;
+declare function normalizeVerifyPhoneNumberParams(input: VerifyPhoneNumberInput): WireParams;
+declare function buildRegisterPhoneNumberBody(input: RegisterPhoneNumberInput): Record<string, unknown>;
+declare function normalizeRegisterPhoneNumberParams(input: RegisterPhoneNumberInput): WireParams;
+declare function normalizeDeregisterPhoneNumberParams(input: DeregisterPhoneNumberInput): WireParams;
+declare function buildSetTwoStepVerificationPinBody(input: SetTwoStepVerificationPinInput): Record<string, unknown>;
+declare function normalizeSetTwoStepVerificationPinParams(input: SetTwoStepVerificationPinInput): WireParams;
+declare function normalizeCreateQrCodeParams(input: CreateQrCodeInput): WireParams;
+declare function buildCreateQrCodeBody(input: CreateQrCodeInput): Record<string, unknown>;
+declare function normalizeListQrCodesParams(input: ListQrCodesInput): WireParams;
+declare function normalizeGetQrCodeParams(input: GetQrCodeInput): WireParams;
+declare function normalizeUpdateQrCodeParams(input: UpdateQrCodeInput): WireParams;
+declare function buildUpdateQrCodeBody(input: UpdateQrCodeInput): Record<string, unknown>;
+declare function normalizeDeleteQrCodeParams(input: DeleteQrCodeInput): WireParams;
 declare function normalizeBusinessProfileParams(input: GetBusinessProfileInput): WireParams;
 declare function normalizeCommerceSettingsParams(input: GetCommerceSettingsInput): WireParams;
 declare function buildUpdateBusinessProfileBody(input: UpdateBusinessProfileInput): Record<string, unknown>;
@@ -2634,6 +2983,38 @@ declare function normalizeUpdateBusinessProfileParams(input: UpdateBusinessProfi
 declare function buildUpdateCommerceSettingsBody(input: UpdateCommerceSettingsInput): Record<string, unknown>;
 declare function normalizeUpdateCommerceSettingsParams(input: UpdateCommerceSettingsInput): WireParams;
 declare function sanitizeBusinessManagementOptions(opts: EndpointInvokeOptions | undefined, helperName: string): EndpointInvokeOptions | undefined;
+interface BusinessPublicKeyResponse {
+	readonly business_public_key?: string;
+	readonly id?: string;
+	readonly [key: string]: unknown;
+}
+interface BusinessPublicKeyUpdateResponse {
+	readonly success?: boolean;
+	readonly [key: string]: unknown;
+}
+interface GetBusinessPublicKeyInput {
+	readonly phoneNumberId: string;
+	readonly fields?: BusinessManagementFields;
+}
+interface SetBusinessPublicKeyInput {
+	readonly phoneNumberId: string;
+	readonly businessPublicKey: string;
+}
+declare function assertBusinessPublicKey(value: unknown, helperName: string): string;
+declare function normalizeGetBusinessPublicKeyParams(input: GetBusinessPublicKeyInput): WireParams;
+declare function normalizeSetBusinessPublicKeyParams(input: SetBusinessPublicKeyInput): WireParams;
+declare function buildSetBusinessPublicKeyBody(input: SetBusinessPublicKeyInput): URLSearchParams;
+declare const getBusinessPublicKey: ((client: GraphClient, params: GetBusinessPublicKeyInput, body?: never, opts?: EndpointInvokeOptions) => Promise<BusinessPublicKeyResponse>) & {
+	definition: EndpointDefinition<{
+		phoneNumberId: string;
+		fields?: string;
+	}, never, BusinessPublicKeyResponse>;
+};
+declare const setBusinessPublicKey: ((client: GraphClient, params: SetBusinessPublicKeyInput, body?: never, opts?: EndpointInvokeOptions) => Promise<BusinessPublicKeyUpdateResponse>) & {
+	definition: EndpointDefinition<{
+		phoneNumberId: string;
+	}, SetBusinessPublicKeyInput, BusinessPublicKeyUpdateResponse>;
+};
 declare const getWabaInfo: ((client: GraphClient, params: GetWabaInfoInput, body?: never, opts?: EndpointInvokeOptions) => Promise<WabaInfo>) & {
 	definition: EndpointDefinition<{
 		wabaId: string;
@@ -2644,6 +3025,16 @@ declare const listSubscribedApps: ((client: GraphClient, params: ListSubscribedA
 	definition: EndpointDefinition<{
 		wabaId: string;
 	}, never, SubscribedAppsResponse>;
+};
+declare const setWabaCallbackOverride: ((client: GraphClient, params: SetWabaCallbackOverrideInput, body?: never, opts?: EndpointInvokeOptions) => Promise<WabaCallbackOverrideResponse>) & {
+	definition: EndpointDefinition<{
+		wabaId: string;
+	}, SetWabaCallbackOverrideInput, WabaCallbackOverrideResponse>;
+};
+declare const clearWabaCallbackOverride: ((client: GraphClient, params: ClearWabaCallbackOverrideInput, body?: never, opts?: EndpointInvokeOptions) => Promise<WabaCallbackOverrideResponse>) & {
+	definition: EndpointDefinition<{
+		wabaId: string;
+	}, never, WabaCallbackOverrideResponse>;
 };
 declare const getPhoneNumberInfo: ((client: GraphClient, params: GetPhoneNumberInfoInput, body?: never, opts?: EndpointInvokeOptions) => Promise<PhoneNumberInfo>) & {
 	definition: EndpointDefinition<{
@@ -2715,6 +3106,91 @@ declare const updateCommerceSettings: ((client: GraphClient, params: UpdateComme
 	definition: EndpointDefinition<{
 		phoneNumberId: string;
 	}, UpdateCommerceSettingsInput, CommerceSettingsUpdateResponse>;
+};
+declare const createPhoneNumber: ((client: GraphClient, params: CreatePhoneNumberInput, body?: never, opts?: EndpointInvokeOptions) => Promise<CreatePhoneNumberResponse>) & {
+	definition: EndpointDefinition<{
+		wabaId: string;
+	}, CreatePhoneNumberInput, CreatePhoneNumberResponse>;
+};
+declare const requestVerificationCode: ((client: GraphClient, params: RequestVerificationCodeInput, body?: never, opts?: EndpointInvokeOptions) => Promise<RequestVerificationCodeResponse>) & {
+	definition: EndpointDefinition<{
+		phoneNumberId: string;
+		code_method?: string;
+		language?: string;
+	}, never, RequestVerificationCodeResponse>;
+};
+declare const verifyPhoneNumber: ((client: GraphClient, params: VerifyPhoneNumberInput, body?: never, opts?: EndpointInvokeOptions) => Promise<VerifyPhoneNumberResponse>) & {
+	definition: EndpointDefinition<{
+		phoneNumberId: string;
+		code?: string;
+	}, never, VerifyPhoneNumberResponse>;
+};
+declare const registerPhoneNumber: ((client: GraphClient, params: RegisterPhoneNumberInput, body?: never, opts?: EndpointInvokeOptions) => Promise<RegisterPhoneNumberResponse>) & {
+	definition: EndpointDefinition<{
+		phoneNumberId: string;
+	}, RegisterPhoneNumberInput, RegisterPhoneNumberResponse>;
+};
+declare const deregisterPhoneNumber: ((client: GraphClient, params: DeregisterPhoneNumberInput, body?: never, opts?: EndpointInvokeOptions) => Promise<DeregisterPhoneNumberResponse>) & {
+	definition: EndpointDefinition<{
+		phoneNumberId: string;
+	}, never, DeregisterPhoneNumberResponse>;
+};
+declare const setTwoStepVerificationPin: ((client: GraphClient, params: SetTwoStepVerificationPinInput, body?: never, opts?: EndpointInvokeOptions) => Promise<SetTwoStepVerificationPinResponse>) & {
+	definition: EndpointDefinition<{
+		phoneNumberId: string;
+	}, SetTwoStepVerificationPinInput, SetTwoStepVerificationPinResponse>;
+};
+declare const createQrCode: ((client: GraphClient, params: CreateQrCodeInput, body?: never, opts?: EndpointInvokeOptions) => Promise<CreateQrCodeResponse>) & {
+	definition: EndpointDefinition<{
+		phoneNumberId: string;
+	}, CreateQrCodeInput, CreateQrCodeResponse>;
+};
+declare const listQrCodes: ((client: GraphClient, params: ListQrCodesInput, body?: never, opts?: EndpointInvokeOptions) => Promise<ListQrCodesResponse>) & {
+	definition: EndpointDefinition<{
+		phoneNumberId: string;
+		fields?: string;
+		before?: string;
+		after?: string;
+	}, never, ListQrCodesResponse>;
+};
+declare const getQrCode: ((client: GraphClient, params: GetQrCodeInput, body?: never, opts?: EndpointInvokeOptions) => Promise<GetQrCodeResponse>) & {
+	definition: EndpointDefinition<{
+		phoneNumberId: string;
+		code: string;
+		fields?: string;
+	}, never, GetQrCodeResponse>;
+};
+declare const updateQrCode: ((client: GraphClient, params: UpdateQrCodeInput, body?: never, opts?: EndpointInvokeOptions) => Promise<UpdateQrCodeResponse>) & {
+	definition: EndpointDefinition<{
+		phoneNumberId: string;
+	}, UpdateQrCodeInput, UpdateQrCodeResponse>;
+};
+declare const deleteQrCode: ((client: GraphClient, params: DeleteQrCodeInput, body?: never, opts?: EndpointInvokeOptions) => Promise<DeleteQrCodeResponse>) & {
+	definition: EndpointDefinition<{
+		phoneNumberId: string;
+		code: string;
+	}, never, DeleteQrCodeResponse>;
+};
+interface ExchangeBusinessAccessTokenInput {
+	readonly clientId: string;
+	readonly clientSecret: string;
+	readonly code: string;
+}
+interface BusinessAccessTokenResponse {
+	readonly access_token?: string;
+	readonly token_type?: string;
+	readonly expires_in?: number;
+	readonly [key: string]: unknown;
+}
+type WireParams$1 = Record<string, string>;
+declare function normalizeExchangeBusinessAccessTokenParams(input: ExchangeBusinessAccessTokenInput): WireParams$1;
+declare function sanitizeOauthOptions(opts: EndpointInvokeOptions | undefined, helperName: string): EndpointInvokeOptions | undefined;
+declare const exchangeBusinessAccessToken: ((client: GraphClient, params: ExchangeBusinessAccessTokenInput, body?: never, opts?: EndpointInvokeOptions) => Promise<BusinessAccessTokenResponse>) & {
+	definition: EndpointDefinition<{
+		client_id: string;
+		client_secret: string;
+		code: string;
+	}, never, BusinessAccessTokenResponse>;
 };
 type GroupJoinApprovalMode$1 = "auto_approve" | "approval_required";
 interface GroupParticipantWire {
@@ -2905,7 +3381,7 @@ type TemplateParameterFormat = "POSITIONAL" | "NAMED";
 type TemplateQualityScore = "GREEN" | "YELLOW" | "RED" | "UNKNOWN" | string;
 type TemplateOtpType = "COPY_CODE" | "ONE_TAP" | "ZERO_TAP" | string;
 type TemplateHeaderFormat = "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT" | "LOCATION";
-type TemplateButtonType = "QUICK_REPLY" | "URL" | "PHONE_NUMBER" | "COPY_CODE" | "CATALOG" | "FLOW" | "OTP";
+type TemplateButtonType = "QUICK_REPLY" | "URL" | "PHONE_NUMBER" | "COPY_CODE" | "CATALOG" | "FLOW" | "OTP" | "VOICE_CALL";
 interface TemplateComponent {
 	readonly type: string;
 	readonly [key: string]: unknown;
@@ -2953,7 +3429,17 @@ interface CreateMessageTemplateBody {
 	readonly name: string;
 	readonly language: TemplateLanguageCode;
 	readonly category: TemplateCategory | string;
-	readonly components: readonly TemplateComponent[];
+	/**
+	 * Required for normal template creation. Optional when creating from a
+	 * WhatsApp Template Library entry via `libraryTemplateName`.
+	 */
+	readonly components?: readonly TemplateComponent[];
+	/** Maps to Graph `library_template_name`. */
+	readonly libraryTemplateName?: string;
+	/** Maps to Graph `library_template_body_inputs`. */
+	readonly libraryTemplateBodyInputs?: readonly Record<string, unknown>[];
+	/** Maps to Graph `library_template_button_inputs`. */
+	readonly libraryTemplateButtonInputs?: readonly Record<string, unknown>[];
 	readonly parameterFormat?: TemplateParameterFormat;
 	readonly messageSendTtlSeconds?: number;
 	readonly [key: string]: unknown;
@@ -3028,6 +3514,11 @@ type TemplateButtonInput = {
 	readonly autofillText?: string;
 	readonly zeroTapTermsAccepted?: boolean;
 	readonly supportedApps?: readonly TemplateSupportedAppInput[];
+	readonly [key: string]: unknown;
+} | {
+	readonly type: "VOICE_CALL";
+	readonly text?: string;
+	readonly ttlMinutes?: number;
 	readonly [key: string]: unknown;
 };
 interface TemplateButtonsComponentInput {
@@ -3223,6 +3714,161 @@ declare const getTemplateGroupAnalytics: ((client: Parameters<typeof getTemplate
 		wabaId: string;
 	}, never, TemplateGroupAnalyticsResponse>;
 };
+declare const KNOWN_TEMPLATE_TOP_BLOCK_REASONS: readonly [
+	"NO_LONGER_NEEDED",
+	"NO_REASON",
+	"NO_REASON_GIVEN",
+	"NO_SIGN_UP",
+	"OFFENSIVE_MESSAGES",
+	"OTHER",
+	"OTP_DID_NOT_REQUEST",
+	"SPAM",
+	"UNKNOWN_BLOCK_REASON",
+	"UNKNOWN"
+];
+type TemplateTopBlockReason = (typeof KNOWN_TEMPLATE_TOP_BLOCK_REASONS)[number];
+interface TemplatesCompareResult {
+	readonly blockRate?: readonly string[];
+	readonly timesSent?: Readonly<Record<string, number>>;
+	readonly topBlockReason?: Readonly<Record<string, string>>;
+	/** Raw Graph `data` array, preserved verbatim for forward-compat. */
+	readonly data?: readonly unknown[];
+	readonly [key: string]: unknown;
+}
+interface CompareTemplatesInput {
+	readonly templateId: string;
+	/** One or more additional template ids to compare against. */
+	readonly templateIds: readonly string[];
+	/** Unix timestamp (seconds) as a string, per pywa. */
+	readonly start: string;
+	/** Unix timestamp (seconds) as a string, per pywa. */
+	readonly end: string;
+}
+interface TemplateUnpauseResult {
+	readonly success: boolean;
+	readonly reason?: string;
+	readonly [key: string]: unknown;
+}
+interface UnpauseTemplateInput {
+	readonly templateId: string;
+}
+declare const COMPARE_TEMPLATES_MAX_IDS = 200;
+interface CompareRawResponse {
+	readonly data?: readonly unknown[];
+	readonly [key: string]: unknown;
+}
+declare const compareTemplatesRaw: EndpointCallable<{
+	templateId: string;
+	template_ids: string;
+	start: string;
+	end: string;
+}, never, CompareRawResponse>;
+declare const compareTemplates: {
+	(client: GraphClient, params: CompareTemplatesInput, body?: never, opts?: EndpointInvokeOptions): Promise<TemplatesCompareResult>;
+	readonly definition: typeof compareTemplatesRaw.definition;
+};
+declare const unpauseTemplateRaw: EndpointCallable<{
+	templateId: string;
+}, never, TemplateUnpauseResult>;
+declare const unpauseTemplate: {
+	(client: GraphClient, params: UnpauseTemplateInput, body?: never, opts?: EndpointInvokeOptions): Promise<TemplateUnpauseResult>;
+	readonly definition: typeof unpauseTemplateRaw.definition;
+};
+interface MigrateTemplatesInput {
+	readonly destinationWabaId: string;
+	readonly sourceWabaId: string;
+	/** Optional zero-based page number (Meta examples use `0`). */
+	readonly pageNumber?: number;
+}
+interface MigratedTemplateEntry {
+	readonly id: string;
+	readonly [key: string]: unknown;
+}
+interface FailedTemplateEntry {
+	readonly id: string;
+	readonly reason: string;
+	readonly [key: string]: unknown;
+}
+interface MigrateTemplatesResponse {
+	readonly migratedTemplates?: readonly MigratedTemplateEntry[];
+	readonly failedTemplates?: readonly FailedTemplateEntry[];
+	readonly [key: string]: unknown;
+}
+interface MigrateTemplatesRawResponse {
+	readonly migrated_templates?: readonly unknown[];
+	readonly failed_templates?: unknown;
+	readonly [key: string]: unknown;
+}
+declare const migrateTemplatesRaw: EndpointCallable<{
+	destinationWabaId: string;
+	source_waba_id: string;
+	page_number?: string;
+}, never, MigrateTemplatesRawResponse>;
+declare const migrateTemplates: {
+	(client: GraphClient, params: MigrateTemplatesInput, body?: never, opts?: EndpointInvokeOptions): Promise<MigrateTemplatesResponse>;
+	readonly definition: typeof migrateTemplatesRaw.definition;
+};
+declare const ARCHIVE_TEMPLATES_MAX_IDS = 100;
+interface ArchiveTemplatesInput {
+	readonly wabaId: string;
+	readonly templateIds: readonly string[];
+}
+interface UnarchiveTemplatesInput {
+	readonly wabaId: string;
+	readonly templateIds: readonly string[];
+}
+interface ArchiveTemplatesResponse {
+	readonly archivedTemplates: readonly string[];
+	readonly failedTemplates: Record<string, string>;
+	readonly [key: string]: unknown;
+}
+interface UnarchiveTemplatesResponse {
+	readonly unarchivedTemplates: readonly string[];
+	readonly failedTemplates: Record<string, string>;
+	readonly [key: string]: unknown;
+}
+declare function archiveTemplates(client: GraphClient, params: ArchiveTemplatesInput, _body?: never, opts?: EndpointInvokeOptions): Promise<ArchiveTemplatesResponse>;
+declare function unarchiveTemplates(client: GraphClient, params: UnarchiveTemplatesInput, _body?: never, opts?: EndpointInvokeOptions): Promise<UnarchiveTemplatesResponse>;
+declare const UPSERT_AUTH_LANGUAGES_MAX = 100;
+declare const UPSERT_AUTH_SUPPORTED_APPS_MAX = 10;
+type UpsertAuthOtpType = "COPY_CODE" | "ONE_TAP" | "ZERO_TAP";
+declare const KNOWN_UPSERT_AUTH_OTP_TYPES: readonly UpsertAuthOtpType[];
+interface UpsertAuthSupportedAppInput {
+	readonly packageName: string;
+	readonly signatureHash: string;
+}
+interface UpsertAuthOtpButtonInput {
+	readonly otpType: UpsertAuthOtpType;
+	readonly supportedApps?: readonly UpsertAuthSupportedAppInput[];
+}
+interface UpsertAuthenticationTemplateBody {
+	readonly name: string;
+	readonly languages: readonly string[];
+	readonly otpButton: UpsertAuthOtpButtonInput;
+	readonly addSecurityRecommendation?: boolean;
+	readonly codeExpirationMinutes?: number;
+	readonly messageSendTtlSeconds?: number;
+}
+interface UpsertedAuthTemplateEntry {
+	readonly id?: string;
+	readonly status?: string;
+	readonly language?: string;
+	readonly [key: string]: unknown;
+}
+interface UpsertAuthenticationTemplateResponse {
+	readonly data?: readonly UpsertedAuthTemplateEntry[];
+	readonly [key: string]: unknown;
+}
+declare function buildUpsertAuthenticationTemplateBody(input: UpsertAuthenticationTemplateBody): Record<string, unknown>;
+declare const upsertAuthenticationTemplateRaw: EndpointCallable<{
+	wabaId: string;
+}, UpsertAuthenticationTemplateBody, UpsertAuthenticationTemplateResponse>;
+declare const upsertAuthenticationTemplate: {
+	(client: GraphClient, params: {
+		readonly wabaId: string;
+	}, body: UpsertAuthenticationTemplateBody, opts?: EndpointInvokeOptions): Promise<UpsertAuthenticationTemplateResponse>;
+	readonly definition: typeof upsertAuthenticationTemplateRaw.definition;
+};
 declare function buildCreateMessageTemplateBody(input: CreateMessageTemplateBody): Record<string, unknown>;
 declare function buildUpdateMessageTemplateBody(input: UpdateMessageTemplateBody): Record<string, unknown>;
 declare function buildTemplateHeaderComponent(input: TemplateHeaderComponentInput | TemplateComponent): TemplateComponent;
@@ -3306,6 +3952,77 @@ interface GetFlowAssetsInput {
 	readonly fields?: string;
 	readonly limit?: string;
 	readonly after?: string;
+}
+declare const KNOWN_FLOW_METRIC_NAMES: readonly [
+	"ENDPOINT_REQUEST_COUNT",
+	"ENDPOINT_REQUEST_ERROR",
+	"ENDPOINT_REQUEST_ERROR_RATE",
+	"ENDPOINT_REQUEST_LATENCY_SECONDS_CEIL",
+	"ENDPOINT_AVAILABILITY"
+];
+type FlowMetricName = (typeof KNOWN_FLOW_METRIC_NAMES)[number];
+declare const KNOWN_FLOW_METRIC_GRANULARITIES: readonly [
+	"DAY",
+	"HOUR",
+	"LIFETIME"
+];
+type FlowMetricGranularity = (typeof KNOWN_FLOW_METRIC_GRANULARITIES)[number];
+interface FlowMetricDataPoint {
+	readonly timestamp?: string;
+	readonly data?: readonly {
+		readonly key?: string;
+		readonly value?: unknown;
+	}[];
+	readonly [key: string]: unknown;
+}
+interface FlowMetric {
+	readonly name?: string;
+	readonly granularity?: string;
+	readonly dataPoints?: readonly FlowMetricDataPoint[];
+	readonly [key: string]: unknown;
+}
+interface FlowMetricResponse {
+	readonly id?: string;
+	readonly metric?: {
+		readonly name?: string;
+		readonly granularity?: string;
+		readonly data_points?: readonly unknown[];
+		readonly [key: string]: unknown;
+	};
+	readonly [key: string]: unknown;
+}
+interface GetFlowMetricsInput {
+	readonly flowId: string;
+	readonly name: FlowMetricName | string;
+	readonly granularity: FlowMetricGranularity | string;
+	/** Optional YYYY-MM-DD inclusive lower bound. */
+	readonly since?: string;
+	/** Optional YYYY-MM-DD inclusive upper bound. */
+	readonly until?: string;
+}
+declare const MIGRATE_FLOWS_MAX_NAMES = 100;
+declare const MIGRATE_FLOWS_NAME_MAX_LENGTH = 256;
+interface MigratedFlow {
+	readonly sourceName?: string;
+	readonly sourceId?: string;
+	readonly migratedId?: string;
+	readonly [key: string]: unknown;
+}
+interface MigratedFlowError {
+	readonly sourceName?: string;
+	readonly errorCode?: number | string;
+	readonly errorMessage?: string;
+	readonly [key: string]: unknown;
+}
+interface MigrateFlowsResponse {
+	readonly migratedFlows?: readonly MigratedFlow[];
+	readonly failedFlows?: readonly MigratedFlowError[];
+	readonly [key: string]: unknown;
+}
+interface MigrateFlowsInput {
+	readonly destinationWabaId: string;
+	readonly sourceWabaId: string;
+	readonly sourceFlowNames: readonly string[];
 }
 interface FlowScreenResponseInput {
 	readonly screen: string;
@@ -3433,9 +4150,370 @@ declare const FLOW_JSON_MAX_BYTES = 131072;
 declare const FLOW_MAX_CATEGORIES = 5;
 declare function buildFlowJson(input: FlowJson | Record<string, unknown>): FlowJson;
 declare function validateFlowJson(input: FlowJson | Record<string, unknown>): void;
+declare const FLOW_DSL_MAX_CONTROL_DEPTH = 5;
+type WireObject = Record<string, unknown>;
+interface FlowJsonProps {
+	readonly version: string;
+	readonly screens: readonly unknown[];
+	readonly dataApiVersion?: string;
+	readonly routingModel?: Record<string, readonly string[]>;
+	readonly dataChannelUri?: string;
+}
+declare function flowJson(props: FlowJsonProps): FlowJson;
+interface ScreenProps {
+	readonly id: string;
+	readonly layout: unknown;
+	readonly title?: string;
+	readonly data?: Record<string, unknown>;
+	readonly terminal?: boolean;
+	readonly success?: boolean;
+	readonly refreshOnBack?: boolean;
+	readonly sensitive?: readonly string[];
+}
+declare function screen$1(props: ScreenProps): WireObject;
+declare function singleColumnLayout(children: readonly unknown[]): WireObject;
+interface FormProps {
+	readonly name: string;
+	readonly children: readonly unknown[];
+	readonly initValues?: Record<string, unknown>;
+	readonly errorMessages?: Record<string, unknown>;
+}
+declare function form(props: FormProps): WireObject;
+declare function textHeading(props: {
+	text: string;
+	visible?: boolean;
+}): WireObject;
+declare function textSubheading(props: {
+	text: string;
+	visible?: boolean;
+}): WireObject;
+declare function textBody(props: {
+	text: string | readonly string[];
+	markdown?: boolean;
+	fontWeight?: string;
+	strikethrough?: boolean;
+	visible?: boolean;
+}): WireObject;
+declare function textCaption(props: {
+	text: string | readonly string[];
+	markdown?: boolean;
+	fontWeight?: string;
+	strikethrough?: boolean;
+	visible?: boolean;
+}): WireObject;
+declare function richText(props: {
+	text: string | readonly string[];
+	visible?: boolean;
+}): WireObject;
+declare function textInput(props: {
+	name: string;
+	label: string;
+	inputType?: string;
+	labelVariant?: string;
+	pattern?: string;
+	required?: boolean;
+	minChars?: number;
+	maxChars?: number;
+	helperText?: string;
+	enabled?: boolean;
+	visible?: boolean;
+	initValue?: string;
+	errorMessage?: string;
+}): WireObject;
+declare function textArea(props: {
+	name: string;
+	label: string;
+	labelVariant?: string;
+	required?: boolean;
+	maxLength?: number;
+	helperText?: string;
+	enabled?: boolean;
+	visible?: boolean;
+	initValue?: string;
+	errorMessage?: string;
+}): WireObject;
+declare function checkboxGroup(props: {
+	name: string;
+	dataSource: unknown;
+	label?: string;
+	description?: string;
+	minSelectedItems?: number;
+	maxSelectedItems?: number;
+	required?: boolean;
+	visible?: boolean;
+	enabled?: boolean;
+	initValue?: readonly string[];
+	mediaSize?: string;
+	onSelectAction?: unknown;
+	onUnselectAction?: unknown;
+}): WireObject;
+declare function radioButtonsGroup(props: {
+	name: string;
+	dataSource: unknown;
+	label?: string;
+	description?: string;
+	required?: boolean;
+	visible?: boolean;
+	enabled?: boolean;
+	initValue?: string;
+	mediaSize?: string;
+	onSelectAction?: unknown;
+	onUnselectAction?: unknown;
+}): WireObject;
+declare function dropdown(props: {
+	name: string;
+	label: string;
+	dataSource: unknown;
+	enabled?: boolean;
+	required?: boolean;
+	visible?: boolean;
+	initValue?: string;
+	onSelectAction?: unknown;
+	onUnselectAction?: unknown;
+}): WireObject;
+declare function chipsSelector(props: {
+	name: string;
+	dataSource: unknown;
+	label: string;
+	description?: string;
+	minSelectedItems?: number;
+	maxSelectedItems?: number;
+	required?: boolean;
+	visible?: boolean;
+	enabled?: boolean;
+	initValue?: readonly string[];
+	onSelectAction?: unknown;
+	onUnselectAction?: unknown;
+}): WireObject;
+declare function footer(props: {
+	label: string;
+	onClickAction: unknown;
+	leftCaption?: string;
+	centerCaption?: string;
+	rightCaption?: string;
+	enabled?: boolean;
+}): WireObject;
+declare function optIn(props: {
+	name: string;
+	label: string;
+	required?: boolean;
+	visible?: boolean;
+	initValue?: boolean;
+	onClickAction?: unknown;
+	onSelectAction?: unknown;
+	onUnselectAction?: unknown;
+}): WireObject;
+declare function embeddedLink(props: {
+	text: string;
+	onClickAction: unknown;
+	visible?: boolean;
+}): WireObject;
+interface NavigationItemProps {
+	readonly id: string;
+	readonly mainContent: Record<string, unknown>;
+	readonly start?: Record<string, unknown>;
+	readonly end?: Record<string, unknown>;
+	readonly badge?: string;
+	readonly tags?: readonly string[];
+	readonly onClickAction?: unknown;
+}
+declare function navigationItem(props: NavigationItemProps): WireObject;
+declare function navigationList(props: {
+	name: string;
+	listItems: readonly unknown[];
+	label?: string;
+	description?: string;
+	mediaSize?: string;
+	onClickAction?: unknown;
+}): WireObject;
+declare function datePicker(props: {
+	name: string;
+	label: string;
+	minDate?: string;
+	maxDate?: string;
+	unavailableDates?: readonly string[];
+	helperText?: string;
+	enabled?: boolean;
+	required?: boolean;
+	visible?: boolean;
+	initValue?: string;
+	errorMessage?: string;
+	onSelectAction?: unknown;
+}): WireObject;
+declare function calendarPicker(props: {
+	name: string;
+	label: string;
+	title?: string;
+	description?: string;
+	mode?: string;
+	minDate?: string;
+	maxDate?: string;
+	unavailableDates?: readonly string[];
+	minDays?: number;
+	maxDays?: number;
+	includeDays?: readonly string[];
+	helperText?: string;
+	enabled?: boolean;
+	required?: boolean;
+	visible?: boolean;
+	initValue?: unknown;
+	errorMessage?: string;
+	onSelectAction?: unknown;
+}): WireObject;
+declare function image(props: {
+	src: string;
+	aspectRatio: number;
+	width?: number;
+	height?: number;
+	scaleType?: string;
+	altText?: string;
+	visible?: boolean;
+}): WireObject;
+interface ImageCarouselItemProps {
+	readonly src: string;
+	readonly altText: string;
+}
+declare function imageCarouselItem(props: ImageCarouselItemProps): WireObject;
+declare function imageCarousel(props: {
+	images: readonly unknown[];
+	aspectRatio?: string;
+	scaleType?: string;
+	visible?: boolean;
+}): WireObject;
+declare function photoPicker(props: {
+	name: string;
+	label: string;
+	description?: string;
+	photoSource?: string;
+	maxFileSizeKb?: number;
+	minUploadedPhotos?: number;
+	maxUploadedPhotos?: number;
+	enabled?: boolean;
+	visible?: boolean;
+	errorMessage?: string;
+}): WireObject;
+declare function documentPicker(props: {
+	name: string;
+	label: string;
+	description?: string;
+	maxFileSizeKb?: number;
+	minUploadedDocuments?: number;
+	maxUploadedDocuments?: number;
+	allowedMimeTypes?: readonly string[];
+	enabled?: boolean;
+	visible?: boolean;
+	errorMessage?: string;
+}): WireObject;
+interface IfProps {
+	readonly condition: string;
+	readonly then: readonly unknown[];
+	readonly else?: readonly unknown[];
+	readonly else_?: readonly unknown[];
+}
+declare function ifComponent(props: IfProps): WireObject;
+interface SwitchProps {
+	readonly value: string;
+	readonly cases: Record<string, readonly unknown[]>;
+}
+declare function switchComponent(props: SwitchProps): WireObject;
+declare function dataSource(props: {
+	id: string;
+	title: string;
+	onSelectAction?: unknown;
+	onUnselectAction?: unknown;
+	description?: string;
+	metadata?: Record<string, unknown>;
+	enabled?: boolean;
+	image?: string;
+	altText?: string;
+	color?: string;
+}): WireObject;
+declare function dataExchangeAction(props?: {
+	payload?: Record<string, unknown>;
+}): WireObject;
+interface NavigateActionProps {
+	readonly next: {
+		readonly name: string;
+		readonly type?: string;
+	};
+	readonly payload?: Record<string, unknown>;
+}
+declare function navigateAction(props: NavigateActionProps): WireObject;
+declare function completeAction(props?: {
+	payload?: Record<string, unknown>;
+}): WireObject;
+declare function updateDataAction(props: {
+	payload: Record<string, unknown>;
+}): WireObject;
+declare function openUrlAction(props: {
+	url: string;
+}): WireObject;
 declare function buildFlowScreenResponse(input: FlowScreenResponseInput): FlowScreenResponse;
 declare function buildFlowCloseResponse(input?: FlowCloseResponseInput): FlowCloseResponse;
 declare function buildFlowErrorResponse(input: FlowErrorResponseInput): FlowErrorResponse;
+interface CryptoValidationErrorShape {
+	readonly code: "invalid_key" | "invalid_body" | "invalid_length" | "unsupported_capability";
+	readonly message: string;
+}
+interface CryptoProvider {
+	readonly name: string;
+	hmacSha256(key: Uint8Array | string, body: Uint8Array | string): Promise<Uint8Array>;
+	timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean;
+	randomBytes(byteLength: number): Promise<Uint8Array>;
+	rsaOaepDecrypt?(privateKey: JsonWebKey | Uint8Array, ciphertext: Uint8Array): Promise<Uint8Array>;
+	aesGcmDecrypt?(key: Uint8Array, iv: Uint8Array, ciphertext: Uint8Array, aad?: Uint8Array): Promise<Uint8Array>;
+	aesGcmEncrypt?(key: Uint8Array, iv: Uint8Array, plaintext: Uint8Array, aad?: Uint8Array): Promise<{
+		ciphertext: Uint8Array;
+		authTag: Uint8Array;
+	}>;
+	sha256?(data: Uint8Array): Promise<Uint8Array>;
+	aesCbcDecrypt?(key: Uint8Array, iv: Uint8Array, ciphertext: Uint8Array): Promise<Uint8Array>;
+}
+type CryptoErrorCode = CryptoValidationErrorShape["code"];
+interface CryptoProviderErrorOptions {
+	readonly cause?: unknown;
+}
+declare class CryptoProviderError extends Error {
+	readonly code: CryptoErrorCode;
+	readonly cause?: unknown;
+	constructor(code: CryptoErrorCode, message: string, options?: CryptoProviderErrorOptions);
+}
+declare class InvalidKeyError extends CryptoProviderError {
+	constructor(message: string, options?: CryptoProviderErrorOptions);
+}
+declare class InvalidBodyError extends CryptoProviderError {
+	constructor(message: string, options?: CryptoProviderErrorOptions);
+}
+declare class InvalidLengthError extends CryptoProviderError {
+	constructor(message: string, options?: CryptoProviderErrorOptions);
+}
+declare class UnsupportedCapabilityError extends CryptoProviderError {
+	constructor(message: string, options?: CryptoProviderErrorOptions);
+}
+declare function createWebCryptoProvider(): Promise<CryptoProvider>;
+declare function buildFlowMetricField(input: GetFlowMetricsInput): string;
+declare const getFlowMetricsRaw: EndpointCallable<{
+	flowId: string;
+	fields: string;
+}, never, FlowMetricResponse>;
+declare const getFlowMetrics: {
+	(client: GraphClient, params: GetFlowMetricsInput, body?: never, opts?: EndpointInvokeOptions): Promise<FlowMetric>;
+	readonly definition: typeof getFlowMetricsRaw.definition;
+};
+interface MigrateRawResponse {
+	readonly migrated_flows?: readonly unknown[];
+	readonly failed_flows?: readonly unknown[];
+	readonly [key: string]: unknown;
+}
+declare const migrateFlowsRaw: EndpointCallable<{
+	destinationWabaId: string;
+	source_waba_id: string;
+	source_flow_names: string;
+}, never, MigrateRawResponse>;
+declare const migrateFlows: {
+	(client: GraphClient, params: MigrateFlowsInput, body?: never, opts?: EndpointInvokeOptions): Promise<MigrateFlowsResponse>;
+	readonly definition: typeof migrateFlowsRaw.definition;
+};
 interface GroupClientConfig {
 	readonly graphClient: GraphClient;
 	readonly groupId: string;
@@ -3469,6 +4547,27 @@ interface PhoneNumberClientConfig {
 	readonly graphClient: GraphClient;
 	readonly phoneNumberId: string;
 }
+interface UploadAndSendMediaBaseInput {
+	readonly to: string;
+	readonly file: Blob | ArrayBuffer | Uint8Array;
+	readonly mimeType: string;
+	readonly replyToMessageId?: string;
+}
+interface UploadAndSendImageInput extends UploadAndSendMediaBaseInput {
+	readonly caption?: string;
+}
+interface UploadAndSendVideoInput extends UploadAndSendMediaBaseInput {
+	readonly caption?: string;
+}
+interface UploadAndSendAudioInput extends UploadAndSendMediaBaseInput {
+	/** Graph v24+ voice-message designation for audio sends. */
+	readonly voice?: boolean;
+}
+interface UploadAndSendDocumentInput extends UploadAndSendMediaBaseInput {
+	readonly caption?: string;
+	readonly filename?: string;
+}
+type UploadAndSendStickerInput = UploadAndSendMediaBaseInput;
 export declare function validatePhoneNumberClientConfig(config: PhoneNumberClientConfig): void;
 export declare class PhoneNumberClient {
 	#private;
@@ -3489,6 +4588,19 @@ export declare class PhoneNumberClient {
 	updateSettings(params: Omit<UpdatePhoneNumberSettingsInput, "phoneNumberId">, opts?: EndpointInvokeOptions): Promise<PhoneNumberSettingsUpdateResponse>;
 	/** Graph `GET /{phoneNumberId}/whatsapp_business_profile`. */
 	getBusinessProfile(params?: Omit<GetBusinessProfileInput, "phoneNumberId">, opts?: EndpointInvokeOptions): Promise<BusinessProfileResponse>;
+	/**
+	 * Graph `GET /{phoneNumberId}/whatsapp_business_encryption`.
+	 *
+	 * NOTE: the GET response shape is UNVERIFIED live (pywa has no getter); the
+	 * returned `BusinessPublicKeyResponse` is shape-only with tolerant indexing.
+	 */
+	getBusinessPublicKey(params?: Omit<GetBusinessPublicKeyInput, "phoneNumberId">, opts?: EndpointInvokeOptions): Promise<BusinessPublicKeyResponse>;
+	/**
+	 * Graph `POST /{phoneNumberId}/whatsapp_business_encryption` — sets the
+	 * business public key. The body is form-encoded
+	 * (`business_public_key=<PEM>`) to match pywa's proven wire contract.
+	 */
+	setBusinessPublicKey(params: Omit<SetBusinessPublicKeyInput, "phoneNumberId">, opts?: EndpointInvokeOptions): Promise<BusinessPublicKeyUpdateResponse>;
 	/** Graph `GET /{phoneNumberId}/whatsapp_commerce_settings`. */
 	getCommerceSettings(params?: Omit<GetCommerceSettingsInput, "phoneNumberId">, opts?: EndpointInvokeOptions): Promise<CommerceSettingsResponse>;
 	/** Graph `POST /{phoneNumberId}/whatsapp_business_profile`. */
@@ -3507,6 +4619,47 @@ export declare class PhoneNumberClient {
 	requestOfficialBusinessAccountReview(params: Omit<RequestOfficialBusinessAccountReviewInput, "phoneNumberId">, opts?: EndpointInvokeOptions): Promise<OfficialBusinessAccountReviewResponse>;
 	/** Graph `POST /{phoneNumberId}` with Graph `new_display_name`. */
 	submitDisplayNameForReview(params: Omit<SubmitDisplayNameForReviewInput, "phoneNumberId">, opts?: EndpointInvokeOptions): Promise<SubmitDisplayNameForReviewResponse>;
+	/** Graph `POST /{phoneNumberId}/request_code?code_method=...&language=...` (WATS-155). */
+	requestVerificationCode(params: Omit<RequestVerificationCodeInput, "phoneNumberId">, opts?: EndpointInvokeOptions): Promise<RequestVerificationCodeResponse>;
+	/** Graph `POST /{phoneNumberId}/verify_code?code=...` (WATS-155). */
+	verifyPhoneNumber(params: Omit<VerifyPhoneNumberInput, "phoneNumberId">, opts?: EndpointInvokeOptions): Promise<VerifyPhoneNumberResponse>;
+	/** Graph `POST /{phoneNumberId}/register` (WATS-155). */
+	registerPhoneNumber(params: Omit<RegisterPhoneNumberInput, "phoneNumberId">, opts?: EndpointInvokeOptions): Promise<RegisterPhoneNumberResponse>;
+	/** Graph `POST /{phoneNumberId}/deregister` (WATS-155). */
+	deregisterPhoneNumber(params?: Omit<DeregisterPhoneNumberInput, "phoneNumberId">, opts?: EndpointInvokeOptions): Promise<DeregisterPhoneNumberResponse>;
+	/** Graph `POST /{phoneNumberId}` with Graph `two_step_verification.pin` (WATS-155). */
+	setTwoStepVerificationPin(params: Omit<SetTwoStepVerificationPinInput, "phoneNumberId">, opts?: EndpointInvokeOptions): Promise<SetTwoStepVerificationPinResponse>;
+	/**
+	 * Graph `POST /{phoneNumberId}/message_qrdls` (WATS-156) — creates a QR
+	 * code / short link with a prefilled message and image format. The bound
+	 * phoneNumberId is injected and wins over any caller-supplied value.
+	 */
+	createQrCode(params: Omit<CreateQrCodeInput, "phoneNumberId">, opts?: EndpointInvokeOptions): Promise<CreateQrCodeResponse>;
+	/**
+	 * Graph `GET /{phoneNumberId}/message_qrdls` (WATS-156) — lists all QR
+	 * codes / short links for the bound phone number. Supports optional
+	 * `fields` and cursor pagination (`before` / `after`).
+	 */
+	listQrCodes(params?: Omit<ListQrCodesInput, "phoneNumberId">, opts?: EndpointInvokeOptions): Promise<ListQrCodesResponse>;
+	/**
+	 * Graph `GET /{phoneNumberId}/message_qrdls/{code}` (WATS-156) — gets a
+	 * single QR code / short link by code. The bound phoneNumberId is
+	 * injected; `code` and optional `fields` come from the caller.
+	 */
+	getQrCode(params: Omit<GetQrCodeInput, "phoneNumberId">, opts?: EndpointInvokeOptions): Promise<GetQrCodeResponse>;
+	/**
+	 * Graph `POST /{phoneNumberId}/message_qrdls` (WATS-156) — updates an
+	 * existing QR code's prefilled message. Same path as create but body
+	 * carries the existing `code` plus the new `prefilledMessage`. The bound
+	 * phoneNumberId is injected.
+	 */
+	updateQrCode(params: Omit<UpdateQrCodeInput, "phoneNumberId">, opts?: EndpointInvokeOptions): Promise<UpdateQrCodeResponse>;
+	/**
+	 * Graph `DELETE /{phoneNumberId}/message_qrdls/{code}` (WATS-156) —
+	 * deletes a QR code / short link by code. The bound phoneNumberId is
+	 * injected; `code` comes from the caller.
+	 */
+	deleteQrCode(params: Omit<DeleteQrCodeInput, "phoneNumberId">, opts?: EndpointInvokeOptions): Promise<DeleteQrCodeResponse>;
 	/**
 	 * Graph `POST /{phoneNumberId}/messages` — delegates to the F-6
 	 * endpoint-registry `sendMessage` callable with the bound
@@ -3523,6 +4676,7 @@ export declare class PhoneNumberClient {
 	sendVideo(input: GraphMessagesSendVideoInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse>;
 	sendAudio(input: GraphMessagesSendAudioInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse>;
 	sendCallPermissionRequest(input: GraphMessagesSendCallPermissionRequestInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse>;
+	sendVoiceCall(input: GraphMessagesSendVoiceCallInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse>;
 	sendDocument(input: GraphMessagesSendDocumentInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse>;
 	sendSticker(input: GraphMessagesSendStickerInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse>;
 	sendLocation(input: GraphMessagesSendLocationInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse>;
@@ -3545,6 +4699,11 @@ export declare class PhoneNumberClient {
 	acceptCall(input: AcceptCallRequest, opts?: EndpointInvokeOptions): Promise<CallLifecycleResponse>;
 	rejectCall(input: RejectCallRequest, opts?: EndpointInvokeOptions): Promise<CallLifecycleResponse>;
 	terminateCall(input: TerminateCallRequest, opts?: EndpointInvokeOptions): Promise<CallLifecycleResponse>;
+	uploadAndSendImage(input: UploadAndSendImageInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse>;
+	uploadAndSendVideo(input: UploadAndSendVideoInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse>;
+	uploadAndSendAudio(input: UploadAndSendAudioInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse>;
+	uploadAndSendDocument(input: UploadAndSendDocumentInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse>;
+	uploadAndSendSticker(input: UploadAndSendStickerInput, opts?: EndpointInvokeOptions): Promise<GraphMessagesSendResponse>;
 }
 interface WABAClientConfig {
 	readonly graphClient: GraphClient;
@@ -3560,12 +4719,25 @@ export declare class WABAClient {
 	getInfo(params?: Omit<GetWabaInfoInput, "wabaId">, opts?: EndpointInvokeOptions): Promise<WabaInfo>;
 	/** Graph `GET /{wabaId}/subscribed_apps`. */
 	listSubscribedApps(params?: Record<string, never>, opts?: EndpointInvokeOptions): Promise<SubscribedAppsResponse>;
+	/** Graph `POST /{wabaId}/subscribed_apps` — sets a WABA alternate callback URL. */
+	setCallbackOverride(params: Omit<SetWabaCallbackOverrideInput, "wabaId">, opts?: EndpointInvokeOptions): Promise<WabaCallbackOverrideResponse>;
+	/** Graph `POST /{wabaId}/subscribed_apps` with no body — clears the override. */
+	clearCallbackOverride(params?: Omit<ClearWabaCallbackOverrideInput, "wabaId">, opts?: EndpointInvokeOptions): Promise<WabaCallbackOverrideResponse>;
 	/**
 	 * Graph `GET /{wabaId}/phone_numbers` — returns the phone numbers
 	 * attached to this WABA. Delegates to the F-6 `listPhoneNumbers`
 	 * endpoint-registry callable with the bound wabaId injected.
 	 */
 	listPhoneNumbers(params?: Omit<ListPhoneNumbersInput, "wabaId">, opts?: EndpointInvokeOptions): Promise<PhoneNumberListResponse>;
+	/**
+	 * Graph `POST /{wabaId}/phone_numbers` (WATS-155) — registers a new
+	 * phone number against the bound WABA. Mirrors pywa's
+	 * `WhatsApp.create_phone_number`. The bound wabaId is injected into the
+	 * params object and wins over any caller-supplied `wabaId`; body fields
+	 * (countryCode / phoneNumber / verifiedName) are passed through to the
+	 * endpoint callable's body builder.
+	 */
+	createPhoneNumber(body: Omit<CreatePhoneNumberInput, "wabaId">, opts?: EndpointInvokeOptions): Promise<CreatePhoneNumberResponse>;
 	/** Graph `GET /{wabaId}/message_templates`. */
 	listMessageTemplates(params?: Omit<ListMessageTemplatesInput, "wabaId">, opts?: EndpointInvokeOptions): Promise<TemplateListResponse>;
 	/** Graph `POST /{wabaId}/message_templates`. */
@@ -3592,6 +4764,59 @@ export declare class WABAClient {
 	deleteTemplateGroup(params: DeleteTemplateGroupInput, opts?: EndpointInvokeOptions): Promise<TemplateGroupMutationResponse>;
 	/** Graph `GET /{wabaId}/template_group_analytics`. */
 	getTemplateGroupAnalytics(params?: Omit<TemplateGroupAnalyticsInput, "wabaId">, opts?: EndpointInvokeOptions): Promise<TemplateGroupAnalyticsResponse>;
+	/**
+	 * Graph `GET /{templateId}/compare` (WATS-153). Template-id scoped edge
+	 * that compares send/block metrics across templates. Delegates to the
+	 * endpoint-registry callable; the bound wabaId is not used because the
+	 * path is template-id scoped (mirrors getMessageTemplate).
+	 */
+	compareTemplates(params: CompareTemplatesInput, opts?: EndpointInvokeOptions): Promise<TemplatesCompareResult>;
+	/**
+	 * Graph `POST /{templateId}/unpause` (WATS-153). Template-id scoped edge
+	 * that unpauses a paused template. Delegates to the endpoint-registry
+	 * callable; the bound wabaId is not used (mirrors getMessageTemplate).
+	 * The endpoint/response shape is UNVERIFIED — see REFERENCE-153.md.
+	 */
+	unpauseTemplate(params: UnpauseTemplateInput, opts?: EndpointInvokeOptions): Promise<TemplateUnpauseResult>;
+	/**
+	 * Graph `POST /{wabaId}/migrate_message_templates?source_waba_id=...`
+	 * (WATS-160A). Copies (not moves) message templates from a source WABA
+	 * into the bound destination WABA. Mirrors pywa's
+	 * `WhatsApp.migrate_templates`. The bound wabaId is used as the
+	 * destination and wins over any caller-supplied `destinationWabaId`
+	 * (mirrors `migrateFlows`). See REFERENCE-160 / handoff.
+	 */
+	migrateTemplates(params: Omit<MigrateTemplatesInput, "destinationWabaId">, opts?: EndpointInvokeOptions): Promise<MigrateTemplatesResponse>;
+	/**
+	 * `POST https://api.facebook.com/{wabaId}/message_templates/archive`
+	 * (WATS-160B). Bulk-archive up to 100 message templates on the bound WABA.
+	 * Mirrors pywa's `WhatsApp.archive_templates`. Uses
+	 * `GraphClient.requestRaw` (not `defineEndpoint`) because the endpoint
+	 * lives on api.facebook.com, not graph.facebook.com. The bound wabaId is
+	 * used in the path and wins over any caller-supplied `wabaId` (mirrors
+	 * `migrateTemplates`). See REFERENCE-153.md §5.
+	 */
+	archiveTemplates(params: Omit<ArchiveTemplatesInput, "wabaId">, opts?: EndpointInvokeOptions): Promise<ArchiveTemplatesResponse>;
+	/**
+	 * `POST https://api.facebook.com/{wabaId}/message_templates/unarchive`
+	 * (WATS-160B). Bulk-unarchive up to 100 message templates on the bound
+	 * WABA. Mirrors pywa's `WhatsApp.unarchive_templates`. Uses
+	 * `GraphClient.requestRaw` (not `defineEndpoint`) because the endpoint
+	 * lives on api.facebook.com, not graph.facebook.com. The bound wabaId is
+	 * used in the path and wins over any caller-supplied `wabaId` (mirrors
+	 * `migrateTemplates`). See REFERENCE-153.md §5.
+	 */
+	unarchiveTemplates(params: Omit<UnarchiveTemplatesInput, "wabaId">, opts?: EndpointInvokeOptions): Promise<UnarchiveTemplatesResponse>;
+	/**
+	 * `POST /{wabaId}/upsert_message_templates` (WATS-160C). Upserts an
+	 * authentication message template (one or more languages) on the bound
+	 * WABA. Mirrors pywa's `WhatsApp.upsert_authentication_template`. The
+	 * bound wabaId is used in the path and wins over any caller-supplied
+	 * `wabaId`. Stricter than `createMessageTemplate`: the body is a fixed
+	 * camelCase descriptor translated into the Graph AUTHENTICATION
+	 * component layout. See advanced.ts / REFERENCE.
+	 */
+	upsertAuthenticationTemplate(body: UpsertAuthenticationTemplateBody, opts?: EndpointInvokeOptions): Promise<UpsertAuthenticationTemplateResponse>;
 	/** Graph `GET /{wabaId}/flows`. */
 	listFlows(params?: Omit<ListFlowsInput, "wabaId">, opts?: EndpointInvokeOptions): Promise<FlowListResponse>;
 	/** Graph `POST /{wabaId}/flows`. */
@@ -3620,6 +4845,20 @@ export declare class WABAClient {
 	}, opts?: EndpointInvokeOptions): Promise<FlowMutationResponse>;
 	/** Graph `GET /{flowId}/assets`. */
 	getFlowAssets(params: GetFlowAssetsInput, opts?: EndpointInvokeOptions): Promise<FlowAssetsResponse>;
+	/**
+	 * Graph `GET /{flowId}?fields=metric.name(...).granularity(...)...`
+	 * (WATS-154). Flow-id scoped edge that returns Flow metrics; the bound
+	 * wabaId is not used because the path is flow-id scoped (mirrors
+	 * getFlow / getFlowAssets). See REFERENCE-154.md §1.
+	 */
+	getFlowMetrics(params: GetFlowMetricsInput, opts?: EndpointInvokeOptions): Promise<FlowMetric>;
+	/**
+	 * Graph `POST /{wabaId}/migrate_flows?source_waba_id=...&source_flow_names=...`
+	 * (WATS-154). Copies (not moves) Flows from a source WABA into the bound
+	 * destination WABA. Mirrors pywa's `WhatsApp.migrate_flows`. The bound
+	 * wabaId is used as the destination; see REFERENCE-154.md §2.
+	 */
+	migrateFlows(params: Omit<MigrateFlowsInput, "destinationWabaId">, opts?: EndpointInvokeOptions): Promise<MigrateFlowsResponse>;
 }
 interface CreateFetchTransportOptions {
 	readonly fetch?: typeof globalThis.fetch;
@@ -3839,6 +5078,28 @@ interface WhatsAppWaitableSentResult extends GraphMessagesSendResponse {
 	waitUntilDelivered(options?: WhatsAppSentWaitOptions): Promise<TypedStatusUpdate>;
 	waitUntilRead(options?: WhatsAppSentWaitOptions): Promise<TypedStatusUpdate>;
 	waitUntilFailed(options?: WhatsAppSentWaitOptions): Promise<TypedStatusUpdate>;
+	/**
+	 * WATS-158: resolves on an inbound interactive `button_reply` OR a
+	 * quick-reply `button` message from the same recipient whose
+	 * `context.messageId` matches the sent message id. Closes the pywa
+	 * parity gap where sent button prompts could not await their click
+	 * callback. Reuses the existing bounded listener substrate — no
+	 * polling, no persistence, no extra process-global state.
+	 */
+	waitForClick(options?: WhatsAppSentWaitOptions): Promise<TypedMessageUpdate>;
+	/**
+	 * WATS-158: resolves on an inbound interactive `list_reply` from the
+	 * same recipient whose `context.messageId` matches the sent message
+	 * id. Parity with pywa `SentMessage.wait_for_selection()`.
+	 */
+	waitForSelection(options?: WhatsAppSentWaitOptions): Promise<TypedMessageUpdate>;
+	/**
+	 * WATS-158: resolves on an inbound interactive `nfm_reply` (Flow
+	 * completion) from the same recipient whose `context.messageId`
+	 * matches the sent message id. Parity with pywa
+	 * `SentMessage.wait_for_flow_completion()`.
+	 */
+	waitForFlowCompletion(options?: WhatsAppSentWaitOptions): Promise<TypedMessageUpdate>;
 }
 type WhatsAppListenErrorCode = "invalid_listen_options" | "invalid_listen_type" | "invalid_listen_from" | "invalid_listen_filter";
 declare class WhatsAppListenOptionsError extends Error {
@@ -3895,40 +5156,6 @@ export declare class WhatsApp {
 		kind: TKind;
 	}>>;
 }
-interface CryptoValidationErrorShape {
-	readonly code: "invalid_key" | "invalid_body" | "invalid_length" | "unsupported_capability";
-	readonly message: string;
-}
-interface CryptoProvider {
-	readonly name: string;
-	hmacSha256(key: Uint8Array | string, body: Uint8Array | string): Promise<Uint8Array>;
-	timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean;
-	randomBytes(byteLength: number): Promise<Uint8Array>;
-	rsaOaepDecrypt?(privateKey: JsonWebKey | Uint8Array, ciphertext: Uint8Array): Promise<Uint8Array>;
-	aesGcmDecrypt?(key: Uint8Array, iv: Uint8Array, ciphertext: Uint8Array, aad?: Uint8Array): Promise<Uint8Array>;
-}
-declare function createWebCryptoProvider(): Promise<CryptoProvider>;
-type CryptoErrorCode = CryptoValidationErrorShape["code"];
-interface CryptoProviderErrorOptions {
-	readonly cause?: unknown;
-}
-declare class CryptoProviderError extends Error {
-	readonly code: CryptoErrorCode;
-	readonly cause?: unknown;
-	constructor(code: CryptoErrorCode, message: string, options?: CryptoProviderErrorOptions);
-}
-declare class InvalidKeyError extends CryptoProviderError {
-	constructor(message: string, options?: CryptoProviderErrorOptions);
-}
-declare class InvalidBodyError extends CryptoProviderError {
-	constructor(message: string, options?: CryptoProviderErrorOptions);
-}
-declare class InvalidLengthError extends CryptoProviderError {
-	constructor(message: string, options?: CryptoProviderErrorOptions);
-}
-declare class UnsupportedCapabilityError extends CryptoProviderError {
-	constructor(message: string, options?: CryptoProviderErrorOptions);
-}
 type MockTransportResponseSpec = {
 	readonly status: number;
 	readonly headers?: Record<string, string> | Headers;
@@ -3953,10 +5180,10 @@ declare namespace filtersTyped {
 	export { CallFilterNamespace, ChatOpenedFilterNamespace, FILTER_BRAND, FilterValidationError, FilterValidationErrorCode, GroupFilterNamespace, MessageFilterNamespace, StatusFilterNamespace, SystemFilterNamespace, TemplateFilterNamespace, TypedFilter, UserPreferencesFilterNamespace, account, and$1 as and, call, chatOpened, createTypedFilter, custom, group, isTypedFilter, message, not$1 as not, or$1 as or, status$1 as status, system, template, unknown, userPreferences };
 }
 declare namespace core {
-	export { CallDirection, CallEvent, CallStatusType, DEFAULT_MAX_ACTIVE_LISTENERS, DEFAULT_MAX_EVENTS_PER_ENVELOPE, DEFAULT_MAX_HANDLERS_PER_DISPATCH, DEFAULT_UPDATE_ROUTER_LIMITS, DispatchErrorRecord, DispatchHandlerError, DispatchLimitError, DispatchLimitErrorCode, DispatchReport, DispatchSummary, GroupMessage, GroupMessageStatus, Handler, HandlerContext, LimitExceededDetail, ListenerAbortCode, ListenerAbortError, ListenerEvaluationResult, ListenerHandle, ListenerOptions, ListenerOptionsError, ListenerOptionsErrorCode, ListenerRegistry, ListenerRegistryOptions, ListenerTimeoutCode, ListenerTimeoutError, MAX_ID_LENGTH, MessageTextContainsOptions, NormalizeWebhookOptions, NormalizedCallPayload, NormalizedCallStatusPayload, NormalizedChatOpenedPayload, NormalizedIdentityChangePayload, NormalizedPhoneNumberChangePayload, NormalizedSystemPayload, NormalizedUserPreferencePayload, NormalizedWebhookResult, ParseWebhookUpdateResult, ParsedUpdateChangeMetadata, ParsedUpdateDiscriminator, ParsedUpdateEntryMetadata, ParsedUpdateEvent, ParsedUpdateRawRefs, RegistrationHandle, RouterConcurrency, RouterObserver, SkippedReason, SkippedUpdate, TypedAccountUpdate, TypedCallStatusUpdate, TypedCallUpdate, TypedChatOpenedUpdate, TypedGenericAccountUpdate, TypedGroupLifecycleUpdate, TypedGroupParticipantsUpdate, TypedGroupSettingsUpdate, TypedGroupStatusUpdate, TypedGroupUpdate, TypedMessageUpdate, TypedRouter, TypedRouterOptions, TypedRouterOptionsError, TypedRouterOptionsErrorCode, TypedStatusUpdate, TypedSystemUpdate, TypedTemplateAccountUpdate, TypedUnknownUpdate, TypedUpdate, TypedUpdateKind, TypedUserPreferencesUpdate, UpdateFilter, UpdateParserError, UpdateParserErrorCode, UpdateParserOptions, UpdateRouteHandler, UpdateRouteSelector, UpdateRouter, UpdateRouterOptions, WebhookNormalizationError, WebhookNormalizationErrorCode, WhatsApp, WhatsAppCreateGroupInput, WhatsAppFacadeConfig, WhatsAppFacadeConfigError, WhatsAppFacadeErrorCode, WhatsAppListenErrorCode, WhatsAppListenOptions, WhatsAppListenOptionsError, WhatsAppMarkMessageAsReadInput, WhatsAppMarketingTemplateResponse, WhatsAppRemoveReactionInput, WhatsAppRequestLocationInput, WhatsAppSendAudioInput, WhatsAppSendButtonsInput, WhatsAppSendCatalogInput, WhatsAppSendContactsInput, WhatsAppSendCtaUrlInput, WhatsAppSendDocumentInput, WhatsAppSendGroupMessageInput, WhatsAppSendImageInput, WhatsAppSendListInput, WhatsAppSendLocationInput, WhatsAppSendMarketingTemplateInput, WhatsAppSendProductInput, WhatsAppSendProductsInput, WhatsAppSendReactionInput, WhatsAppSendStickerInput, WhatsAppSendTemplateInput, WhatsAppSendVideoInput, WhatsAppSentWaitOptions, WhatsAppStartChatInput, WhatsAppTypingIndicatorInput, WhatsAppWaitableSentResult, and, createListenerRegistry, createUpdateRouter, filtersTyped, hasMessageStatus, hasMessageText, messageFromWaId, messageStatusIn, messageTextContains, normalizeWebhookEnvelope, not, or, parseWebhookUpdate };
+	export { CallDirection, CallEvent, CallStatusType, DEFAULT_MAX_ACTIVE_LISTENERS, DEFAULT_MAX_EVENTS_PER_ENVELOPE, DEFAULT_MAX_HANDLERS_PER_DISPATCH, DEFAULT_UPDATE_ROUTER_LIMITS, DispatchErrorRecord, DispatchHandlerError, DispatchLimitError, DispatchLimitErrorCode, DispatchReport, DispatchSummary, GroupMessage, GroupMessageStatus, Handler, HandlerContext, LimitExceededDetail, ListenerAbortCode, ListenerAbortError, ListenerEvaluationResult, ListenerHandle, ListenerOptions, ListenerOptionsError, ListenerOptionsErrorCode, ListenerRegistry, ListenerRegistryOptions, ListenerTimeoutCode, ListenerTimeoutError, MAX_ID_LENGTH, MessageTextContainsOptions, NormalizeWebhookOptions, NormalizedCallContact, NormalizedCallPayload, NormalizedCallStatusPayload, NormalizedChatOpenedPayload, NormalizedIdentityChangePayload, NormalizedPhoneNumberChangePayload, NormalizedSystemPayload, NormalizedUserPreferencePayload, NormalizedWebhookResult, ParseWebhookUpdateResult, ParsedUpdateChangeMetadata, ParsedUpdateDiscriminator, ParsedUpdateEntryMetadata, ParsedUpdateEvent, ParsedUpdateRawRefs, RegistrationHandle, RouterConcurrency, RouterObserver, SkippedReason, SkippedUpdate, TypedAccountUpdate, TypedCallStatusUpdate, TypedCallUpdate, TypedChatOpenedUpdate, TypedGenericAccountUpdate, TypedGroupLifecycleUpdate, TypedGroupParticipantsUpdate, TypedGroupSettingsUpdate, TypedGroupStatusUpdate, TypedGroupUpdate, TypedMessageUpdate, TypedRouter, TypedRouterOptions, TypedRouterOptionsError, TypedRouterOptionsErrorCode, TypedStatusUpdate, TypedSystemUpdate, TypedTemplateAccountUpdate, TypedUnknownUpdate, TypedUpdate, TypedUpdateKind, TypedUserPreferencesUpdate, UpdateFilter, UpdateParserError, UpdateParserErrorCode, UpdateParserOptions, UpdateRouteHandler, UpdateRouteSelector, UpdateRouter, UpdateRouterOptions, WebhookNormalizationError, WebhookNormalizationErrorCode, WhatsApp, WhatsAppCreateGroupInput, WhatsAppFacadeConfig, WhatsAppFacadeConfigError, WhatsAppFacadeErrorCode, WhatsAppListenErrorCode, WhatsAppListenOptions, WhatsAppListenOptionsError, WhatsAppMarkMessageAsReadInput, WhatsAppMarketingTemplateResponse, WhatsAppRemoveReactionInput, WhatsAppRequestLocationInput, WhatsAppSendAudioInput, WhatsAppSendButtonsInput, WhatsAppSendCatalogInput, WhatsAppSendContactsInput, WhatsAppSendCtaUrlInput, WhatsAppSendDocumentInput, WhatsAppSendGroupMessageInput, WhatsAppSendImageInput, WhatsAppSendListInput, WhatsAppSendLocationInput, WhatsAppSendMarketingTemplateInput, WhatsAppSendProductInput, WhatsAppSendProductsInput, WhatsAppSendReactionInput, WhatsAppSendStickerInput, WhatsAppSendTemplateInput, WhatsAppSendVideoInput, WhatsAppSentWaitOptions, WhatsAppStartChatInput, WhatsAppTypingIndicatorInput, WhatsAppWaitableSentResult, and, createListenerRegistry, createUpdateRouter, filtersTyped, hasMessageStatus, hasMessageText, messageFromWaId, messageStatusIn, messageTextContains, normalizeWebhookEnvelope, not, or, parseWebhookUpdate };
 }
 declare namespace graph {
-	export { APIMethodError, APIPermissionError, AcceptCallRequest, AccessDeniedError, AccountInMaintenanceModeError, AccountLockedError, AccountRestrictedFromCountryError, AuthException, BlockListConcurrentUpdateError, BlockListLimitReachedError, BlockUserInternalError, BlockUsersInput, BlockUsersResponse, BlockedUser, BlockedUserOperation, BlockedUsersResponse, BulkBlockingFailedError, BusinessInitiatedCallsLimitHitError, BusinessManagementFields, BusinessPaymentIssueError, BusinessProfileEntry, BusinessProfileResponse, BusinessProfileUpdateResponse, CALL_BIZ_OPAQUE_CALLBACK_DATA_MAX_LENGTH, CALL_SESSION_MAX_ARRAY_LENGTH, CALL_SESSION_MAX_BYTES, CALL_SESSION_MAX_DEPTH, CALL_SESSION_MAX_STRING_LENGTH, CallAction, CallConnectionError, CallConnectionTimeoutError, CallLifecycleResponse, CallPermissionNotFoundError, CallPermissionRequestLimitHitError, CallRateLimitExceededError, CallSdpType, CallSessionDescription, CallSessionDescriptionPayload, CallingCannotBeEnabledError, CallingNotEnabledError, CommerceSettingsEntry, CommerceSettingsResponse, CommerceSettingsUpdateResponse, ConcurrentCallsLimitError, CreateFetchTransportOptions, CreateFlowBody, CreateGroupBody, CreateGroupParams, CreateMessageTemplateBody, CreateTemplateGroupBody, CreateUploadSessionParams, CreateUploadSessionResponse, DEFAULT_GRAPH_BASE_URL, DEFAULT_MAX_MEDIA_DOWNLOAD_BYTES, DEFAULT_MAX_MEDIA_UPLOAD_BYTES, DEFAULT_MAX_UPLOAD_SESSION_BYTES, DEFAULT_TRANSPORT_RETRY_POLICY, DeleteMessageTemplateInput, DeleteTemplateGroupInput, DuplicateCallError, EncryptedMediaBundle, EndpointCallable, EndpointDefinition, EndpointHttpMethod, EndpointInvokeOptions, EndpointParamSpec, ExpiredAccessTokenError, FLOW_JSON_MAX_ARRAY_LENGTH, FLOW_JSON_MAX_BYTES, FLOW_JSON_MAX_COMPONENTS, FLOW_JSON_MAX_DEPTH, FLOW_JSON_MAX_SCREENS, FLOW_JSON_MAX_STRING_LENGTH, FLOW_MAX_CATEGORIES, FetchCallPermissionLimitHitError, FlowAssetDetails, FlowAssetsResponse, FlowBlockedByIntegrityError, FlowBlockedError, FlowCategory, FlowCloseResponse, FlowCloseResponseInput, FlowDeletingError, FlowDeprecatingError, FlowDetails, FlowErrorResponse, FlowErrorResponseInput, FlowJson, FlowListResponse, FlowMutationResponse, FlowPublishingError, FlowScreenResponse, FlowScreenResponseInput, FlowStatus, FlowThrottledError, FlowUpdatingError, GRAPH_MESSAGES_BUTTON_ID_MAX_LENGTH, GRAPH_MESSAGES_BUTTON_TITLE_MAX_LENGTH, GRAPH_MESSAGES_DOCUMENT_FILENAME_MAX_LENGTH, GRAPH_MESSAGES_GENERAL_TEXT_MAX_LENGTH, GRAPH_MESSAGES_MAX_CONTACTS, GRAPH_MESSAGES_MAX_LIST_ROWS, GRAPH_MESSAGES_MAX_LIST_SECTIONS, GRAPH_MESSAGES_MAX_PRODUCT_ITEMS, GRAPH_MESSAGES_MAX_REPLY_BUTTONS, GRAPH_MESSAGES_MEDIA_CAPTION_MAX_LENGTH, GRAPH_MESSAGES_MEDIA_ID_MAX_LENGTH, GRAPH_MESSAGES_MEDIA_LINK_MAX_LENGTH, GRAPH_MESSAGES_RECIPIENT_MAX_DIGITS, GRAPH_MESSAGES_REPLY_TO_MESSAGE_ID_MAX_LENGTH, GRAPH_MESSAGES_ROW_DESCRIPTION_MAX_LENGTH, GRAPH_MESSAGES_ROW_TITLE_MAX_LENGTH, GRAPH_MESSAGES_SECTION_TITLE_MAX_LENGTH, GRAPH_MESSAGES_SHORT_LABEL_MAX_LENGTH, GRAPH_MESSAGES_TEXT_BODY_MAX_LENGTH, GROUP_DESCRIPTION_MAX_LENGTH, GROUP_MAX_JOIN_REQUESTS, GROUP_MAX_PARTICIPANTS, GROUP_SUBJECT_MAX_LENGTH, GenericError, GetBusinessProfileInput, GetCommerceSettingsInput, GetFlowAssetsInput, GetFlowInput, GetGroupParams, GetMessageTemplateInput, GetOfficialBusinessAccountStatusInput, GetPhoneNumberInfoInput, GetPhoneNumberSettingsInput, GetTemplateGroupInput, GetUploadSessionParams, GetUploadSessionResponse, GetWabaInfoInput, GraphApiError, GraphApiErrorPayload, GraphAuthError, GraphClient, GraphClientConfig, GraphErrorClassification, GraphErrorEnvelope, GraphErrorFactoryContext, GraphErrorRegistryEntry, GraphMessagesAudioPayload, GraphMessagesContactAddressInput, GraphMessagesContactEmailInput, GraphMessagesContactInput, GraphMessagesContactNameInput, GraphMessagesContactOrgInput, GraphMessagesContactPhoneInput, GraphMessagesContactUrlInput, GraphMessagesContactsPayload, GraphMessagesDocumentPayload, GraphMessagesEndpoint, GraphMessagesImagePayload, GraphMessagesInteractivePayload, GraphMessagesLocationPayload, GraphMessagesMarkMessageAsReadInput, GraphMessagesMarketingMessageStatus, GraphMessagesMarketingProductPolicy, GraphMessagesMarketingTemplatePayload, GraphMessagesMarketingTemplateResponse, GraphMessagesMediaPayload, GraphMessagesMediaType, GraphMessagesPinPayload, GraphMessagesReactionPayload, GraphMessagesRecipientInput, GraphMessagesRecipientType, GraphMessagesRemainingPayload, GraphMessagesRemoveReactionInput, GraphMessagesRequestLocationInput, GraphMessagesSendAudioInput, GraphMessagesSendBody, GraphMessagesSendButtonsInput, GraphMessagesSendCallPermissionRequestInput, GraphMessagesSendCaptionedMediaInput, GraphMessagesSendCatalogInput, GraphMessagesSendContactsInput, GraphMessagesSendCtaUrlInput, GraphMessagesSendDocumentInput, GraphMessagesSendImageInput, GraphMessagesSendListInput, GraphMessagesSendLocationInput, GraphMessagesSendMarketingTemplateInput, GraphMessagesSendMediaInput, GraphMessagesSendMessageInput, GraphMessagesSendPinInput, GraphMessagesSendProductInput, GraphMessagesSendProductsInput, GraphMessagesSendReactionInput, GraphMessagesSendResponse, GraphMessagesSendStickerInput, GraphMessagesSendTemplateInput, GraphMessagesSendTextInput, GraphMessagesSendVideoInput, GraphMessagesStatusPayload, GraphMessagesStickerPayload, GraphMessagesTemplateCategory, GraphMessagesTemplateComponentInput, GraphMessagesTemplatePayload, GraphMessagesTextPayload, GraphMessagesTypingIndicatorInput, GraphMessagesVideoPayload, GraphNetworkError, GraphPaging, GraphQueryParams, GraphQueryValue, GraphRateLimitError, GraphRawRequestOptions, GraphRequestOptions, GraphRequestValidationError, GraphSerializationError, GroupClient, GroupClientConfig, GroupDetails, GroupIdParams, GroupInviteLinkResponse, GroupJoinApprovalMode$1 as GroupJoinApprovalMode, GroupJoinRequestWire, GroupJoinRequestsResponse, GroupMutationResponse, GroupParticipantWire, GroupSummaryWire, IncorrectCertificateError, InitiateCallRequest, InvalidParameterError, InvalidTemplateCursorError, InvalidTemplateParameterError, ListBlockedUsersInput, ListFlowsInput, ListGroupJoinRequestsParams, ListGroupsParams, ListGroupsResponse, ListMessageTemplatesInput, ListPhoneNumbersInput, ListSubscribedAppsInput, ListTemplateGroupsInput, MAX_MEDIA_DOWNLOAD_BYTES, MAX_MEDIA_UPLOAD_BYTES, MAX_UPLOAD_SESSION_BYTES, MEDIA_LINEAR_ISSUE_DECRYPT, MEDIA_LINEAR_ISSUE_DELETE, MEDIA_LINEAR_ISSUE_DOWNLOAD, MEDIA_LINEAR_ISSUE_UPLOAD, ManageGroupJoinRequestsBody, MarketingMessagesLiteInvalidFlowError, MarketingMessagesLiteUnsupportedMessageTypeError, MarketingMessagesLiteUnsupportedTemplateCategoryError, MarketingMessagesLiteUnsupportedTemplateStructureError, MediaCryptoError, MediaCryptoErrorCode, MediaDeleteOptions, MediaDeleteResponse, MediaDownloadBytesOptions, MediaDownloadBytesResponse, MediaDownloadError, MediaDownloadOptions, MediaDownloadResponse, MediaIntegrityError, MediaIntegrityErrorCode, MediaNotImplementedCode, MediaNotImplementedError, MediaOperation, MediaUploadBody, MediaUploadError, MediaUploadOptions, MediaUploadResponse, MediaValidationError, MediaValidationErrorCode, MessageUndeliverableError, MissingRequiredParameterError, OfficialBusinessAccountReviewResponse, OfficialBusinessAccountStatusResponse, PaginatedPage, PaginatedResult, PaginationError, PaginationErrorCode, PaginationOptions, PermissionDeniedError, PhoneNumberClient, PhoneNumberClientConfig, PhoneNumberInfo, PhoneNumberListEntry, PhoneNumberListResponse, PhoneNumberSettingsEntry, PhoneNumberSettingsResponse, PhoneNumberSettingsUpdateResponse, PreAcceptCallRequest, RATE_LIMIT_CODES, RateLimitHitError, RateLimitIssuesError, ReEngagementMessageError, ReceiverUncallableError, RecipientCannotBeSenderError, RecipientIdentityKeyMismatchError, RecipientNotInAllowedListError, RejectCallRequest, ReliableTransportOptions, ReliableTransportRetryContext, RemoveGroupParticipantsBody, RequestOfficialBusinessAccountReviewInput, SendTemplateComponentForValidation, ServiceUnavailableError, SpamRateLimitHitError, StorageConfigurationInput, SubmitDisplayNameForReviewInput, SubmitDisplayNameForReviewResponse, SubscribedAppInfo, SubscribedAppsResponse, TemplateBodyComponentInput, TemplateButtonInput, TemplateButtonType, TemplateButtonsComponentInput, TemplateCategory, TemplateClassificationRateLimitError, TemplateComponent, TemplateContentPolicyViolationError, TemplateDefinitionForValidation, TemplateDetails, TemplateDisabledError, TemplateFooterComponentInput, TemplateGroupAnalyticsInput, TemplateGroupAnalyticsPoint, TemplateGroupAnalyticsResponse, TemplateGroupBody, TemplateGroupDetails, TemplateGroupListResponse, TemplateGroupMutationResponse, TemplateHeaderComponentInput, TemplateHeaderFormat, TemplateLanguageCode, TemplateListResponse, TemplateMutationResponse, TemplateNotExistsError, TemplateOtpType, TemplateParamCountMismatchError, TemplateParamFormatMismatchError, TemplateParamValueInvalidError, TemplateParameterFormat, TemplatePausedError, TemplateQualityScore, TemplateStatus, TemplateSupportedAppInput, TemplateTextTooLongError, TemporarilyBlockedError, TerminateCallRequest, ToManyAPICallsError, TooManyMessagesError, Transport, TransportHttpMethod, TransportInterceptor, TransportOptions, TransportRequest, TransportResponse, TransportRetryPolicy, UnblockUsersInput, UnblockUsersResponse, UnknownError, UnsupportedMessageTypeError, UpdateBusinessProfileInput, UpdateCommerceSettingsInput, UpdateFlowJsonBody, UpdateFlowMetadataBody, UpdateGroupBody, UpdateMessageTemplateBody, UpdatePhoneNumberSettingsInput, UpdateTemplateGroupBody, UploadFileToSessionParams, UploadFileToSessionResponse, UploadSessionOptions, UserIsInExperimentGroupError, UserStoppedMarketingMessagesError, WABAClient, WABAClientConfig, WabaInfo, acceptCall, approveGroupJoinRequests, assertSafePathParamValue, blockUsers, buildBlockUsersBody, buildCreateMessageTemplateBody, buildDisplayNameReviewBody, buildFlowCloseResponse, buildFlowErrorResponse, buildFlowJson, buildFlowScreenResponse, buildMarkMessageAsReadPayload, buildOfficialBusinessAccountReviewBody, buildRemoveReactionPayload, buildRequestLocationPayload, buildSendAudioPayload, buildSendButtonsPayload, buildSendCallPermissionRequestPayload, buildSendCatalogPayload, buildSendContactsPayload, buildSendCtaUrlPayload, buildSendDocumentPayload, buildSendImagePayload, buildSendListPayload, buildSendLocationPayload, buildSendMarketingTemplatePayload, buildSendMessagePayload, buildSendPinPayload, buildSendProductPayload, buildSendProductsPayload, buildSendReactionPayload, buildSendStickerPayload, buildSendTemplatePayload, buildSendTextPayload, buildSendVideoPayload, buildTemplateBodyComponent, buildTemplateButtonComponent, buildTemplateFooterComponent, buildTemplateHeaderComponent, buildTypingIndicatorPayload, buildUnblockUsersBody, buildUpdateBusinessProfileBody, buildUpdateCommerceSettingsBody, buildUpdateMessageTemplateBody, buildUpdatePhoneNumberSettingsBody, clearErrorRegistry, createFetchTransport, createFlow, createGraphApiError, createGroup, createMessageTemplate, createReliableTransport, createTemplateGroup, createUploadSession, decryptEncryptedMedia, defineEndpoint, deleteFlow, deleteGroup, deleteMedia, deleteMessageTemplate, deleteTemplateGroup, deprecateFlow, downloadMedia, downloadMediaBytes, getBusinessProfile, getCommerceSettings, getFlow, getFlowAssets, getGroup, getGroupInviteLink, getMessageTemplate, getOfficialBusinessAccountStatus, getPhoneNumberInfo, getPhoneNumberSettings, getTemplateGroup, getTemplateGroupAnalytics, getUploadSession, getWabaInfo, initiateCall, isBuiltInRegistered, isGraphApiErrorPayload, isGraphErrorEnvelope, listBlockedUsers, listFlows, listGroupJoinRequests, listGroups, listMessageTemplates, listPhoneNumbers, listRegisteredErrors, listSubscribedApps, listTemplateGroups, markBuiltInRegistered, normalizeBlockUsersParams, normalizeBusinessProfileParams, normalizeCommerceSettingsParams, normalizeDisplayNameReviewParams, normalizeGroupDetailsResponse, normalizeGroupInviteLinkResponse, normalizeGroupJoinRequestsResponse, normalizeGroupMutationResponse, normalizeListBlockedUsersParams, normalizeListGroupsResponse, normalizeListPhoneNumbersParams, normalizeListSubscribedAppsParams, normalizeOfficialBusinessAccountReviewParams, normalizeOfficialBusinessAccountStatusParams, normalizePhoneNumberInfoParams, normalizePhoneNumberSettingsParams, normalizeUnblockUsersParams, normalizeUpdateBusinessProfileParams, normalizeUpdateCommerceSettingsParams, normalizeUpdatePhoneNumberSettingsParams, normalizeWabaInfoParams, paginate, paginateAll, preAcceptCall, publishFlow, registerBuiltInErrorCodes, registerErrorCode, rejectCall, rejectGroupJoinRequests, removeGroupParticipants, requestOfficialBusinessAccountReview, resetGroupInviteLink, resolveRegisteredError, sanitizeBusinessManagementOptions, sanitizeCallSession, scrubErrorCause, sendMarketingTemplate, sendMessage, submitDisplayNameForReview, terminateCall, unblockUsers, updateBusinessProfile, updateCommerceSettings, updateFlowJson, updateFlowMetadata, updateGroup, updateMessageTemplate, updatePhoneNumberSettings, updateTemplateGroup, uploadFileToSession, uploadMedia, validateFlowJson, validateGroupClientConfig, validatePhoneNumberClientConfig, validateTemplateParameterCounts, validateWABAClientConfig };
+	export { APIMethodError, APIPermissionError, ARCHIVE_TEMPLATES_MAX_IDS, AcceptCallRequest, AccessDeniedError, AccountInMaintenanceModeError, AccountLockedError, AccountRestrictedFromCountryError, ArchiveTemplatesInput, ArchiveTemplatesResponse, AuthException, BlockListConcurrentUpdateError, BlockListLimitReachedError, BlockUserInternalError, BlockUsersInput, BlockUsersResponse, BlockedUser, BlockedUserOperation, BlockedUsersResponse, BulkBlockingFailedError, BusinessAccessTokenResponse, BusinessInitiatedCallsLimitHitError, BusinessManagementFields, BusinessPaymentIssueError, BusinessProfileEntry, BusinessProfileResponse, BusinessProfileUpdateResponse, BusinessPublicKeyResponse, BusinessPublicKeyUpdateResponse, CALL_BIZ_OPAQUE_CALLBACK_DATA_MAX_LENGTH, CALL_SESSION_MAX_ARRAY_LENGTH, CALL_SESSION_MAX_BYTES, CALL_SESSION_MAX_DEPTH, CALL_SESSION_MAX_STRING_LENGTH, COMPARE_TEMPLATES_MAX_IDS, CallAction, CallConnectionError, CallConnectionTimeoutError, CallHoursHolidayScheduleSettings, CallHoursInput, CallHoursSettings, CallHoursWeeklyOperatingHoursSettings, CallIconsInput, CallIconsSettings, CallLifecycleResponse, CallPermission, CallPermissionAction, CallPermissionActionLimit, CallPermissionNotFoundError, CallPermissionRequestLimitHitError, CallPermissionStatus, CallPermissionsResponse, CallRateLimitExceededError, CallSdpType, CallSessionDescription, CallSessionDescriptionPayload, CallingCannotBeEnabledError, CallingInput, CallingNotEnabledError, CallingSettings, CallingStatus, ClearWabaCallbackOverrideInput, CommerceSettingsEntry, CommerceSettingsResponse, CommerceSettingsUpdateResponse, CompareTemplatesInput, ConcurrentCallsLimitError, CreateFetchTransportOptions, CreateFlowBody, CreateGroupBody, CreateGroupParams, CreateMessageTemplateBody, CreatePhoneNumberInput, CreatePhoneNumberResponse, CreateQrCodeInput, CreateQrCodeResponse, CreateTemplateGroupBody, CreateUploadSessionParams, CreateUploadSessionResponse, DEFAULT_GRAPH_BASE_URL, DEFAULT_MAX_MEDIA_DOWNLOAD_BYTES, DEFAULT_MAX_MEDIA_UPLOAD_BYTES, DEFAULT_MAX_UPLOAD_SESSION_BYTES, DEFAULT_TRANSPORT_RETRY_POLICY, DeleteMessageTemplateInput, DeleteQrCodeInput, DeleteQrCodeResponse, DeleteTemplateGroupInput, DeregisterPhoneNumberInput, DeregisterPhoneNumberResponse, DuplicateCallError, EncryptedMediaBundle, EndpointCallable, EndpointDefinition, EndpointHttpMethod, EndpointInvokeOptions, EndpointParamSpec, ExchangeBusinessAccessTokenInput, ExpiredAccessTokenError, FLOW_DSL_MAX_CONTROL_DEPTH, FLOW_JSON_MAX_ARRAY_LENGTH, FLOW_JSON_MAX_BYTES, FLOW_JSON_MAX_COMPONENTS, FLOW_JSON_MAX_DEPTH, FLOW_JSON_MAX_SCREENS, FLOW_JSON_MAX_STRING_LENGTH, FLOW_MAX_CATEGORIES, FailedTemplateEntry, FetchCallPermissionLimitHitError, FlowAssetDetails, FlowAssetsResponse, FlowBlockedByIntegrityError, FlowBlockedError, FlowCategory, FlowCloseResponse, FlowCloseResponseInput, FlowDeletingError, FlowDeprecatingError, FlowDetails, FlowErrorResponse, FlowErrorResponseInput, FlowJson, FlowJsonProps, FlowListResponse, FlowMetric, FlowMetricDataPoint, FlowMetricGranularity, FlowMetricName, FlowMutationResponse, FlowPublishingError, FlowScreenResponse, FlowScreenResponseInput, FlowStatus, FlowThrottledError, FlowUpdatingError, FormProps, GRAPH_MESSAGES_BUTTON_ID_MAX_LENGTH, GRAPH_MESSAGES_BUTTON_TITLE_MAX_LENGTH, GRAPH_MESSAGES_DOCUMENT_FILENAME_MAX_LENGTH, GRAPH_MESSAGES_GENERAL_TEXT_MAX_LENGTH, GRAPH_MESSAGES_MAX_CONTACTS, GRAPH_MESSAGES_MAX_LIST_ROWS, GRAPH_MESSAGES_MAX_LIST_SECTIONS, GRAPH_MESSAGES_MAX_PRODUCT_ITEMS, GRAPH_MESSAGES_MAX_REPLY_BUTTONS, GRAPH_MESSAGES_MEDIA_CAPTION_MAX_LENGTH, GRAPH_MESSAGES_MEDIA_ID_MAX_LENGTH, GRAPH_MESSAGES_MEDIA_LINK_MAX_LENGTH, GRAPH_MESSAGES_RECIPIENT_MAX_DIGITS, GRAPH_MESSAGES_REPLY_TO_MESSAGE_ID_MAX_LENGTH, GRAPH_MESSAGES_ROW_DESCRIPTION_MAX_LENGTH, GRAPH_MESSAGES_ROW_TITLE_MAX_LENGTH, GRAPH_MESSAGES_SECTION_TITLE_MAX_LENGTH, GRAPH_MESSAGES_SHORT_LABEL_MAX_LENGTH, GRAPH_MESSAGES_TEXT_BODY_MAX_LENGTH, GRAPH_MESSAGES_VOICE_CALL_DISPLAY_TEXT_MAX_LENGTH, GRAPH_MESSAGES_VOICE_CALL_PAYLOAD_MAX_LENGTH, GRAPH_MESSAGES_VOICE_CALL_TEMPLATE_TTL_MINUTES_MIN, GRAPH_MESSAGES_VOICE_CALL_TTL_MINUTES_DEFAULT, GRAPH_MESSAGES_VOICE_CALL_TTL_MINUTES_MAX, GRAPH_MESSAGES_VOICE_CALL_TTL_MINUTES_MIN, GROUP_DESCRIPTION_MAX_LENGTH, GROUP_MAX_JOIN_REQUESTS, GROUP_MAX_PARTICIPANTS, GROUP_SUBJECT_MAX_LENGTH, GenericError, GetBusinessProfileInput, GetBusinessPublicKeyInput, GetCallPermissionsInput, GetCommerceSettingsInput, GetFlowAssetsInput, GetFlowInput, GetFlowMetricsInput, GetGroupParams, GetMessageTemplateInput, GetOfficialBusinessAccountStatusInput, GetPhoneNumberInfoInput, GetPhoneNumberSettingsInput, GetQrCodeInput, GetQrCodeResponse, GetTemplateGroupInput, GetUploadSessionParams, GetUploadSessionResponse, GetWabaInfoInput, GraphApiError, GraphApiErrorPayload, GraphAuthError, GraphClient, GraphClientConfig, GraphErrorClassification, GraphErrorEnvelope, GraphErrorFactoryContext, GraphErrorRegistryEntry, GraphMessagesAudioPayload, GraphMessagesContactAddressInput, GraphMessagesContactEmailInput, GraphMessagesContactInput, GraphMessagesContactNameInput, GraphMessagesContactOrgInput, GraphMessagesContactPhoneInput, GraphMessagesContactUrlInput, GraphMessagesContactsPayload, GraphMessagesDocumentPayload, GraphMessagesEndpoint, GraphMessagesImagePayload, GraphMessagesInteractivePayload, GraphMessagesLocationPayload, GraphMessagesMarkMessageAsReadInput, GraphMessagesMarketingMessageStatus, GraphMessagesMarketingProductPolicy, GraphMessagesMarketingTemplatePayload, GraphMessagesMarketingTemplateResponse, GraphMessagesMediaPayload, GraphMessagesMediaType, GraphMessagesPinPayload, GraphMessagesReactionPayload, GraphMessagesRecipientInput, GraphMessagesRecipientType, GraphMessagesRemainingPayload, GraphMessagesRemoveReactionInput, GraphMessagesRequestLocationInput, GraphMessagesSendAudioInput, GraphMessagesSendBody, GraphMessagesSendButtonsInput, GraphMessagesSendCallPermissionRequestInput, GraphMessagesSendCaptionedMediaInput, GraphMessagesSendCatalogInput, GraphMessagesSendContactsInput, GraphMessagesSendCtaUrlInput, GraphMessagesSendDocumentInput, GraphMessagesSendImageInput, GraphMessagesSendListInput, GraphMessagesSendLocationInput, GraphMessagesSendMarketingTemplateInput, GraphMessagesSendMediaInput, GraphMessagesSendMessageInput, GraphMessagesSendPinInput, GraphMessagesSendProductInput, GraphMessagesSendProductsInput, GraphMessagesSendReactionInput, GraphMessagesSendResponse, GraphMessagesSendStickerInput, GraphMessagesSendTemplateInput, GraphMessagesSendTextInput, GraphMessagesSendVideoInput, GraphMessagesSendVoiceCallInput, GraphMessagesStatusPayload, GraphMessagesStickerPayload, GraphMessagesTemplateCategory, GraphMessagesTemplateComponentInput, GraphMessagesTemplatePayload, GraphMessagesTextPayload, GraphMessagesTypingIndicatorInput, GraphMessagesVideoPayload, GraphMessagesVoiceCallTemplateButtonInput, GraphNetworkError, GraphPaging, GraphQueryParams, GraphQueryValue, GraphRateLimitError, GraphRawRequestOptions, GraphRequestOptions, GraphRequestValidationError, GraphSerializationError, GroupClient, GroupClientConfig, GroupDetails, GroupIdParams, GroupInviteLinkResponse, GroupJoinApprovalMode$1 as GroupJoinApprovalMode, GroupJoinRequestWire, GroupJoinRequestsResponse, GroupMutationResponse, GroupParticipantWire, GroupSummaryWire, HolidayScheduleInput, IfProps, ImageCarouselItemProps, IncorrectCertificateError, InitiateCallRequest, InvalidParameterError, InvalidTemplateCursorError, InvalidTemplateParameterError, KNOWN_FLOW_METRIC_GRANULARITIES, KNOWN_FLOW_METRIC_NAMES, KNOWN_TEMPLATE_TOP_BLOCK_REASONS, KNOWN_UPSERT_AUTH_OTP_TYPES, ListBlockedUsersInput, ListFlowsInput, ListGroupJoinRequestsParams, ListGroupsParams, ListGroupsResponse, ListMessageTemplatesInput, ListPhoneNumbersInput, ListQrCodesInput, ListQrCodesResponse, ListSubscribedAppsInput, ListTemplateGroupsInput, MAX_MEDIA_DOWNLOAD_BYTES, MAX_MEDIA_UPLOAD_BYTES, MAX_UPLOAD_SESSION_BYTES, MEDIA_LINEAR_ISSUE_DECRYPT, MEDIA_LINEAR_ISSUE_DELETE, MEDIA_LINEAR_ISSUE_DOWNLOAD, MEDIA_LINEAR_ISSUE_UPLOAD, MIGRATE_FLOWS_MAX_NAMES, MIGRATE_FLOWS_NAME_MAX_LENGTH, ManageGroupJoinRequestsBody, MarketingMessagesLiteInvalidFlowError, MarketingMessagesLiteUnsupportedMessageTypeError, MarketingMessagesLiteUnsupportedTemplateCategoryError, MarketingMessagesLiteUnsupportedTemplateStructureError, MediaCryptoError, MediaCryptoErrorCode, MediaDeleteOptions, MediaDeleteResponse, MediaDownloadBytesOptions, MediaDownloadBytesResponse, MediaDownloadError, MediaDownloadOptions, MediaDownloadResponse, MediaIntegrityError, MediaIntegrityErrorCode, MediaNotImplementedCode, MediaNotImplementedError, MediaOperation, MediaUploadBody, MediaUploadError, MediaUploadOptions, MediaUploadResponse, MediaValidationError, MediaValidationErrorCode, MessageUndeliverableError, MigrateFlowsInput, MigrateFlowsResponse, MigrateTemplatesInput, MigrateTemplatesResponse, MigratedFlow, MigratedFlowError, MigratedTemplateEntry, MissingRequiredParameterError, NavigateActionProps, NavigationItemProps, OfficialBusinessAccountReviewResponse, OfficialBusinessAccountStatusResponse, PaginatedPage, PaginatedResult, PaginationError, PaginationErrorCode, PaginationOptions, PermissionDeniedError, PhoneNumberClient, PhoneNumberClientConfig, PhoneNumberInfo, PhoneNumberListEntry, PhoneNumberListResponse, PhoneNumberSettingsEntry, PhoneNumberSettingsResponse, PhoneNumberSettingsUpdateResponse, PreAcceptCallRequest, QrCodeEntry, QrImageFormat, RATE_LIMIT_CODES, RateLimitHitError, RateLimitIssuesError, ReEngagementMessageError, ReceiverUncallableError, RecipientCannotBeSenderError, RecipientIdentityKeyMismatchError, RecipientNotInAllowedListError, RegisterPhoneNumberInput, RegisterPhoneNumberResponse, RejectCallRequest, ReliableTransportOptions, ReliableTransportRetryContext, RemoveGroupParticipantsBody, RequestOfficialBusinessAccountReviewInput, RequestVerificationCodeInput, RequestVerificationCodeResponse, ScreenProps, SendTemplateComponentForValidation, ServiceUnavailableError, SetBusinessPublicKeyInput, SetTwoStepVerificationPinInput, SetTwoStepVerificationPinResponse, SetWabaCallbackOverrideInput, SipInput, SipServerInput, SipServerSettings, SipSettings, SpamRateLimitHitError, StorageConfigurationInput, SubmitDisplayNameForReviewInput, SubmitDisplayNameForReviewResponse, SubscribedAppInfo, SubscribedAppsResponse, SwitchProps, TemplateBodyComponentInput, TemplateButtonInput, TemplateButtonType, TemplateButtonsComponentInput, TemplateCategory, TemplateClassificationRateLimitError, TemplateComponent, TemplateContentPolicyViolationError, TemplateDefinitionForValidation, TemplateDetails, TemplateDisabledError, TemplateFooterComponentInput, TemplateGroupAnalyticsInput, TemplateGroupAnalyticsPoint, TemplateGroupAnalyticsResponse, TemplateGroupBody, TemplateGroupDetails, TemplateGroupListResponse, TemplateGroupMutationResponse, TemplateHeaderComponentInput, TemplateHeaderFormat, TemplateLanguageCode, TemplateListResponse, TemplateMutationResponse, TemplateNotExistsError, TemplateOtpType, TemplateParamCountMismatchError, TemplateParamFormatMismatchError, TemplateParamValueInvalidError, TemplateParameterFormat, TemplatePausedError, TemplateQualityScore, TemplateStatus, TemplateSupportedAppInput, TemplateTextTooLongError, TemplateTopBlockReason, TemplateUnpauseResult, TemplatesCompareResult, TemporarilyBlockedError, TerminateCallRequest, ToManyAPICallsError, TooManyMessagesError, Transport, TransportHttpMethod, TransportInterceptor, TransportOptions, TransportRequest, TransportResponse, TransportRetryPolicy, UPSERT_AUTH_LANGUAGES_MAX, UPSERT_AUTH_SUPPORTED_APPS_MAX, UnarchiveTemplatesInput, UnarchiveTemplatesResponse, UnblockUsersInput, UnblockUsersResponse, UnknownError, UnpauseTemplateInput, UnsupportedMessageTypeError, UpdateBusinessProfileInput, UpdateCommerceSettingsInput, UpdateFlowJsonBody, UpdateFlowMetadataBody, UpdateGroupBody, UpdateMessageTemplateBody, UpdatePhoneNumberSettingsInput, UpdateQrCodeInput, UpdateQrCodeResponse, UpdateTemplateGroupBody, UploadAndSendAudioInput, UploadAndSendDocumentInput, UploadAndSendImageInput, UploadAndSendMediaBaseInput, UploadAndSendStickerInput, UploadAndSendVideoInput, UploadFileToSessionParams, UploadFileToSessionResponse, UploadSessionOptions, UpsertAuthOtpButtonInput, UpsertAuthOtpType, UpsertAuthSupportedAppInput, UpsertAuthenticationTemplateBody, UpsertAuthenticationTemplateResponse, UpsertedAuthTemplateEntry, UserIsInExperimentGroupError, UserStoppedMarketingMessagesError, VerifyPhoneNumberInput, VerifyPhoneNumberResponse, WABAClient, WABAClientConfig, WabaCallbackOverrideResponse, WabaHealthStatus, WabaHealthStatusEntity, WabaInfo, WeeklyOperatingHoursInput, WhatsAppCallDeepLinkInput, acceptCall, approveGroupJoinRequests, archiveTemplates, assertBusinessPublicKey, assertSafePathParamValue, blockUsers, buildBlockUsersBody, buildCreateMessageTemplateBody, buildCreatePhoneNumberBody, buildCreateQrCodeBody, buildDisplayNameReviewBody, buildFlowCloseResponse, buildFlowErrorResponse, buildFlowJson, buildFlowMetricField, buildFlowScreenResponse, buildMarkMessageAsReadPayload, buildOfficialBusinessAccountReviewBody, buildRegisterPhoneNumberBody, buildRemoveReactionPayload, buildRequestLocationPayload, buildSendAudioPayload, buildSendButtonsPayload, buildSendCallPermissionRequestPayload, buildSendCatalogPayload, buildSendContactsPayload, buildSendCtaUrlPayload, buildSendDocumentPayload, buildSendImagePayload, buildSendListPayload, buildSendLocationPayload, buildSendMarketingTemplatePayload, buildSendMessagePayload, buildSendPinPayload, buildSendProductPayload, buildSendProductsPayload, buildSendReactionPayload, buildSendStickerPayload, buildSendTemplatePayload, buildSendTextPayload, buildSendVideoPayload, buildSendVoiceCallPayload, buildSetBusinessPublicKeyBody, buildSetTwoStepVerificationPinBody, buildTemplateBodyComponent, buildTemplateButtonComponent, buildTemplateFooterComponent, buildTemplateHeaderComponent, buildTypingIndicatorPayload, buildUnblockUsersBody, buildUpdateBusinessProfileBody, buildUpdateCommerceSettingsBody, buildUpdateMessageTemplateBody, buildUpdatePhoneNumberSettingsBody, buildUpdateQrCodeBody, buildUpsertAuthenticationTemplateBody, buildVoiceCallTemplateButtonComponent, buildWabaCallbackOverrideBody, buildWhatsAppCallDeepLink, calendarPicker, checkboxGroup, chipsSelector, clearErrorRegistry, clearWabaCallbackOverride, compareTemplates, completeAction, createFetchTransport, createFlow, createGraphApiError, createGroup, createMessageTemplate, createPhoneNumber, createQrCode, createReliableTransport, createTemplateGroup, createUploadSession, dataExchangeAction, dataSource, datePicker, decryptEncryptedMedia, defineEndpoint, deleteFlow, deleteGroup, deleteMedia, deleteMessageTemplate, deleteQrCode, deleteTemplateGroup, deprecateFlow, deregisterPhoneNumber, documentPicker, downloadMedia, downloadMediaBytes, dropdown, embeddedLink, exchangeBusinessAccessToken, flowJson, footer, form, getBusinessProfile, getBusinessPublicKey, getCallPermissions, getCommerceSettings, getFlow, getFlowAssets, getFlowMetrics, getGroup, getGroupInviteLink, getMessageTemplate, getOfficialBusinessAccountStatus, getPhoneNumberInfo, getPhoneNumberSettings, getQrCode, getTemplateGroup, getTemplateGroupAnalytics, getUploadSession, getWabaInfo, ifComponent, image, imageCarousel, imageCarouselItem, initiateCall, isBuiltInRegistered, isGraphApiErrorPayload, isGraphErrorEnvelope, listBlockedUsers, listFlows, listGroupJoinRequests, listGroups, listMessageTemplates, listPhoneNumbers, listQrCodes, listRegisteredErrors, listSubscribedApps, listTemplateGroups, markBuiltInRegistered, migrateFlows, migrateTemplates, navigateAction, navigationItem, navigationList, normalizeBlockUsersParams, normalizeBusinessProfileParams, normalizeClearWabaCallbackOverrideParams, normalizeCommerceSettingsParams, normalizeCreatePhoneNumberParams, normalizeCreateQrCodeParams, normalizeDeleteQrCodeParams, normalizeDeregisterPhoneNumberParams, normalizeDisplayNameReviewParams, normalizeExchangeBusinessAccessTokenParams, normalizeGetBusinessPublicKeyParams, normalizeGetQrCodeParams, normalizeGroupDetailsResponse, normalizeGroupInviteLinkResponse, normalizeGroupJoinRequestsResponse, normalizeGroupMutationResponse, normalizeListBlockedUsersParams, normalizeListGroupsResponse, normalizeListPhoneNumbersParams, normalizeListQrCodesParams, normalizeListSubscribedAppsParams, normalizeOfficialBusinessAccountReviewParams, normalizeOfficialBusinessAccountStatusParams, normalizePhoneNumberInfoParams, normalizePhoneNumberSettingsParams, normalizeRegisterPhoneNumberParams, normalizeRequestVerificationCodeParams, normalizeSetBusinessPublicKeyParams, normalizeSetTwoStepVerificationPinParams, normalizeSetWabaCallbackOverrideParams, normalizeUnblockUsersParams, normalizeUpdateBusinessProfileParams, normalizeUpdateCommerceSettingsParams, normalizeUpdatePhoneNumberSettingsParams, normalizeUpdateQrCodeParams, normalizeVerifyPhoneNumberParams, normalizeWabaInfoParams, openUrlAction, optIn, paginate, paginateAll, photoPicker, preAcceptCall, publishFlow, radioButtonsGroup, registerBuiltInErrorCodes, registerErrorCode, registerPhoneNumber, rejectCall, rejectGroupJoinRequests, removeGroupParticipants, requestOfficialBusinessAccountReview, requestVerificationCode, resetGroupInviteLink, resolveRegisteredError, richText, sanitizeBusinessManagementOptions, sanitizeCallSession, sanitizeOauthOptions, screen$1 as screen, scrubErrorCause, sendMarketingTemplate, sendMessage, setBusinessPublicKey, setTwoStepVerificationPin, setWabaCallbackOverride, singleColumnLayout, submitDisplayNameForReview, switchComponent, terminateCall, textArea, textBody, textCaption, textHeading, textInput, textSubheading, unarchiveTemplates, unblockUsers, unpauseTemplate, updateBusinessProfile, updateCommerceSettings, updateDataAction, updateFlowJson, updateFlowMetadata, updateGroup, updateMessageTemplate, updatePhoneNumberSettings, updateQrCode, updateTemplateGroup, uploadFileToSession, uploadMedia, upsertAuthenticationTemplate, validateFlowJson, validateGroupClientConfig, validatePhoneNumberClientConfig, validateTemplateParameterCounts, validateWABAClientConfig, verifyPhoneNumber };
 }
 declare namespace types {
 	export { AudioMessage, ButtonMessage, ButtonPayload, ContactAddress, ContactEmail, ContactOrg, ContactPhone, ContactUrl, ContactsMessage, ConversationRef, DocumentMessage, DocumentReference, GroupInviteLink, GroupJoinApprovalMode, GroupJoinRequest, GroupLifecycleUpdateType, GroupLifecycleUpdateWebhookValue, GroupLifecycleUpdateWireValue, GroupParticipant, GroupParticipantsUpdateType, GroupParticipantsUpdateWebhookValue, GroupParticipantsUpdateWireValue, GroupRecipientType, GroupSettingsUpdateType, GroupSettingsUpdateWebhookValue, GroupSettingsUpdateWireValue, GroupStatusUpdateType, GroupStatusUpdateWebhookValue, GroupStatusUpdateWireValue, GroupWebhookField, ImageMessage, InteractiveButtonReply, InteractiveCallPermissionReply, InteractiveCtaUrlReply, InteractiveListReply, InteractiveMessage, InteractiveNfmReply, InteractiveProductListReply, InteractiveProductReply, InteractiveReply, LocationMessage, LocationPayload, MediaReference, MessageContext, OrderMessage, OrderPayload, OrderProductItem, PricingRef, ReactionMessage, ReactionPayload, StickerMessage, SystemMessage, SystemNotification, TextMessage, UnsupportedMessage, UnsupportedMessageDetail, VideoMessage, WATS_TYPES_CONFIG_EXPORTS, WATS_TYPES_CONTACTS_EXPORTS, WATS_TYPES_ENTITIES_EXPORTS, WATS_TYPES_ERRORS_EXPORTS, WATS_TYPES_GROUPS_EXPORTS, WATS_TYPES_MESSAGES_EXPORTS, WATS_TYPES_STATUSES_EXPORTS, WATS_TYPES_WEBHOOK_EXPORTS, WatsGroup, WhatsAppAccountReviewUpdateValue, WhatsAppAccountUpdateValue, WhatsAppClientConfig, WhatsAppClientRuntimeConfig, WhatsAppContact, WhatsAppContactName, WhatsAppError, WhatsAppErrorPayload, WhatsAppGroupLifecycleUpdateValue, WhatsAppGroupParticipantsUpdateValue, WhatsAppGroupSettingsUpdateValue, WhatsAppGroupStatusUpdateValue, WhatsAppIdentityChangeValue, WhatsAppMarketingMessageStatus, WhatsAppMessage, WhatsAppMessageContext, WhatsAppMessageKind, WhatsAppMessageRecipient, WhatsAppMessageStatus, WhatsAppMessageStatusKind, WhatsAppMessageText, WhatsAppMessagesFieldValue, WhatsAppPhoneNumberChangeValue, WhatsAppPricingCategory, WhatsAppPricingModel, WhatsAppRawWebhookValue, WhatsAppTemplateStatusUpdateValue, WhatsAppUserMarketingPreferencesValue, WhatsAppWebhookChange, WhatsAppWebhookEntry, WhatsAppWebhookEnvelope, WhatsAppWebhookValue };

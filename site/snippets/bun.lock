@@ -5,8 +5,8 @@
     "": {
       "name": "@wats/site-snippets",
       "dependencies": {
-        "@wats/core": "0.3.26",
-        "@wats/graph": "0.3.26",
+        "@wats/core": "0.3.28",
+        "@wats/graph": "0.3.28",
       },
       "devDependencies": {
         "typescript": "6.0.3",
@@ -14,9 +14,11 @@
     },
   },
   "packages": {
-    "@wats/core": ["@wats/core@0.3.26", "", { "dependencies": { "@wats/graph": "^0.3.26" } }, "sha512-JK4MxSGUMmsDZAkRjw415ditaV5eIZUzSh7GxvrgUmCle5siyhW9M/rCSY/2lBg7IxPh9sWNCvg4CEYjPO/jAA=="],
+    "@wats/core": ["@wats/core@0.3.28", "", { "dependencies": { "@wats/graph": "^0.3.28" } }, "sha512-L5nnh2Gv452g9qgu9CAyE/6T17kZ1kQC0hIJbV4o7D+q8RM7UEIlcjzyOykTz8C1sK4dpvec9YEmTb/OosVT2g=="],
 
-    "@wats/graph": ["@wats/graph@0.3.26", "", {}, "sha512-MLAvgQ/m/JbQJCQcIQoZeXT9lRyd9v3ZtFXl/ADorv2CDGNjH/ENZGulbFTYX02FEYhZgP6xiC1SIxJnsFYiCg=="],
+    "@wats/crypto": ["@wats/crypto@0.3.28", "", {}, "sha512-CwDHUyn/N1XASV6O9zEkYb7xDs+3at+4AelWXtPWLWUxIVXBlmdzODOJcllgC3y29YZ0P1Gr7qyPICtmT6gC0g=="],
+
+    "@wats/graph": ["@wats/graph@0.3.28", "", { "dependencies": { "@wats/crypto": "^0.3.28" } }, "sha512-W04SmY86VD4/37aZsdAJPO/hnxMC9/cNjJTNQ7DSkW0ETLz8QekLTPU2TThErYE4mziyMnRFK2ROOEb/XHEwag=="],
 
     "typescript": ["typescript@6.0.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw=="],
   }
