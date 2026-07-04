@@ -6,6 +6,7 @@
     "groups-quickstart",
     "transport-and-testing",
     "community-examples",
+    "telemetry",
     "deploy-bun",
     "deploy-node",
     "deploy-cloudflare-workers",

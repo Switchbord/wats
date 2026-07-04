@@ -43,6 +43,16 @@ Bug reports, logs, CI output, and screenshots should redact:
 
 Use synthetic values in tests and public issues. If a report may contain secrets, follow `SECURITY.md` and report privately instead of opening a public issue.
 
+## Service telemetry
+
+`@wats/service` optionally exposes three operator telemetry surfaces:
+
+- `GET /metrics` — Prometheus/OpenMetrics exposition
+- `GET /status` — redacted operator status snapshot
+- `GET /debug/diagnostics` — bounded support snapshot
+
+These endpoints are always registered, but an invalid, missing, or wrong token returns the same `404` as an unknown route so the endpoint existence is not leaked. They produce data only when a valid service bearer token is supplied. No default outbound telemetry is sent. See the [Telemetry operator guide](/docs/guides/telemetry) and the [Service Reference](/docs/reference/service) for the threat model, attribute dictionary, Prometheus scrape config, and an OpenTelemetry adapter example.
+
 ## Future telemetry
 
-Future telemetry, if ever added, will be opt-in and documented. Any future telemetry proposal must describe the data collected, retention period, opt-in mechanism, disable path, and redaction policy before implementation.
+Future telemetry, if ever added, will be opt-in and documented. Any future telemetry proposal beyond the opt-in surfaces above will describe the data collected, retention period, opt-in mechanism, disable path, and redaction policy before implementation.

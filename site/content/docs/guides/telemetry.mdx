@@ -1,0 +1,144 @@
+---
+title: Telemetry for operators
+description: Operate WATS telemetry endpoints safely — Prometheus scraping, OpenTelemetry adapters, and the privacy threat model.
+---
+
+<DocMeta status="active" appliesTo="@wats/service, Prometheus, OpenTelemetry" lastReviewed="2026-07-03" />
+
+## Threat model and default stance
+
+WATS ships with **no default outbound telemetry**. Importing `@wats/service` and starting `createWatsServiceApp` does not contact WATS maintainers, a hosted observability vendor, or any analytics endpoint. The telemetry endpoints are always registered by the service, but an invalid or missing service bearer token returns the same `404` body as any unknown route so the endpoints cannot be discovered by unauthenticated callers. All telemetry ingestion is opt-in and operator-controlled:
+
+- `GET /metrics` exposes data only when a Prometheus-compatible scraper pulls it with a valid token.
+- `GET /status` returns data only when requested with a valid token.
+- `GET /debug/diagnostics` returns a bounded, redacted JSON snapshot only when requested with a valid token.
+- The optional `TelemetrySink` emits events only to a sink you own and wire yourself.
+
+Data minimization is enforced, not optional:
+
+- No phone numbers, WABA IDs, phone-number IDs, WAMIDs, or message text appear in metrics, diagnostics, or sink attributes.
+- No tokens, env values, config paths, stack traces, or raw webhook bodies are emitted.
+- Label and attribute values are enum-clamped or templated (`/messages/:id`, `/groups/:groupId`, `2xx`, `unknown`).
+
+If you file a bug report, CI log, or support bundle, redact bearer tokens, app secrets, webhook verify tokens, service bearer tokens, real WABA/phone-number IDs, and raw webhook bodies before sharing.
+
+## What each endpoint tells you
+
+| Endpoint | Purpose | Auth failure |
+|---|---|---|
+| `GET /metrics` | Prometheus/OpenMetrics exposition of runtime counters and histograms | `404` identical to catch-all 404 |
+| `GET /status` | Redacted operator status snapshot | `404` identical to catch-all 404 |
+| `GET /debug/diagnostics` | Bounded support snapshot with version, route inventory, and recent error classes only | `404` identical to catch-all 404 |
+
+All three endpoints are matched before the catch-all and reuse the same `serviceBearerToken` as the message API routes. A missing or mismatched token returns `404` so the endpoint existence is not leaked. This is intentional: telemetry surface availability is more sensitive than the public message-sending routes.
+
+## Attribute dictionary
+
+The internal metrics registry exposes Prometheus names; the optional `TelemetrySink` receives OpenTelemetry-compatible attribute keys.
+
+| Internal metric | Attribute keys | Notes |
+|---|---|---|
+| `http_requests_total` | `http.route`, `http.request.method`, `http.status_code`, `http.response.status.class` | `/metrics` counter narrows to `route`+`method`+`status_class`; the sink receives the full attribute set (incl. `http.status_code`) |
+| `http_request_duration_seconds` | `http.route`, `http.request.method`, `http.status_code`, `http.response.status.class` | `/metrics` histogram narrows to `route`+`status_class`; the sink receives the full attribute set |
+| `graph_operations_total` | `wats.graph.endpoint_family`, `http.status_code`, `http.response.status.class`, `wats.operation.outcome` | endpoint family enum-clamped |
+| `send_outcomes_total` | `wats.graph.endpoint_family`, `wats.operation.outcome` | |
+| `webhook_normalization_total` | `wats.webhook.update_kind`, `wats.operation.outcome` | update kind enum-clamped |
+| `persistence_operations_total` | `wats.persistence.adapter`, `wats.operation.outcome` | absent when no `PersistenceStore` is injected |
+
+## Prometheus scrape configuration
+
+Use a bearer-token-secret mechanism (Kubernetes secret, env var, or your secret manager) — never commit the real token. The example below shows placeholders only:
+
+```yaml
+# /etc/prometheus/prometheus.yml
+scrape_configs:
+  - job_name: wats-service
+    scheme: https
+    bearer_token: "${WATS_SERVICE_BEARER_TOKEN}"
+    static_configs:
+      - targets: ["your-service.example.com:443"]
+    metrics_path: /metrics
+    scrape_interval: 15s
+```
+
+WATS emits the metric families listed in the attribute dictionary and nothing else. No application-level counters (e.g. messages per individual recipient) are exposed, because that would violate the PII/cardinality contract.
+
+## OpenTelemetry adapter example
+
+`@wats/service` does not depend on `@opentelemetry/*`. If you want to bridge events into OpenTelemetry JS, provide an adapter like this:
+
+```ts
+import {
+  createWatsServiceApp,
+  OTEL_ATTR,
+  type TelemetrySink
+} from "@wats/service";
+import { metrics, trace } from "@opentelemetry/api";
+
+class WatsOtelBridge implements TelemetrySink {
+  private meter = metrics.getMeter("wats.service");
+  private tracer = trace.getTracer("wats.service");
+
+  incrementCounter(name: string, value: number, attributes: Record<string, string | number | boolean>) {
+    this.meter.createCounter(name).add(value, attributes);
+  }
+
+  recordHistogram(name: string, valueSeconds: number, attributes: Record<string, string | number | boolean>) {
+    this.meter.createHistogram(name).record(valueSeconds, attributes);
+  }
+
+  recordSpan(name: string, start: Date, end: Date, attributes: Record<string, string | number | boolean>) {
+    this.tracer.startActiveSpan(name, { startTime: start }, (span) => {
+      for (const [key, val] of Object.entries(attributes)) {
+        span.setAttribute(key, val);
+      }
+      span.end(end);
+    });
+  }
+
+  recordEvent(name: string, attributes: Record<string, string | number | boolean>) {
+    const span = trace.getActiveSpan();
+    if (span) {
+      span.addEvent(name, attributes);
+    }
+  }
+}
+
+const app = createWatsServiceApp({
+  profile,
+  secrets,
+  telemetrySink: new WatsOtelBridge()
+});
+```
+
+`recordSpan` and `recordEvent` are optional; WATS currently reserves them for future request-scoped instrumentation. The adapter runs synchronously inside the request hot path, so keep it fast. If your exporter throws, WATS isolates the failure and logs a JSON error line to `stderr`; telemetry cannot break a request.
+
+## Diagnostics snapshot curl
+
+```bash
+curl -s -H "Authorization: Bearer ${WATS_SERVICE_BEARER_TOKEN}" \
+  https://your-service.example.com/debug/diagnostics | jq
+```
+
+The response contains safe, structured facts only. For the full field list and redaction rules, see the Service Reference `/docs/reference/service#debug-diagnostics`.
+
+## Operator checklist
+
+- [ ] Telemetry endpoints are behind a service bearer token (not just network ACLs).
+- [ ] Prometheus scrape config pulls the token from a secret manager; the token is not committed.
+- [ ] No WATS metric, status field, or diagnostic field is used to count individual recipients or messages by PII-bearing id.
+- [ ] Retention and downstream access for the sink and `/metrics` scrapes follow your own privacy policy.
+- [ ] Public issues and CI logs do not include `Authorization` headers, `X-Hub-Signature` values, real WABA IDs, phone numbers, WAMIDs, or raw webhook bodies.
+
+## What not to do
+
+- Do not enable telemetry endpoints on a public internet host without token protection.
+- Do not derive custom metrics from un-redacted fields such as phone numbers, message text, or raw webhook payloads.
+- Do not treat `/debug/diagnostics` as a profiler or log-retrieval endpoint; it contains no heap dumps, stack traces, or raw request logs.
+- Do not install `@opentelemetry/*` into `@wats/service` itself; the sink seam is designed so you can add OTel only inside your adapter.
+
+## Related docs
+
+- [Service Reference](/docs/reference/service#telemetry-sink)
+- [Privacy and Telemetry](/docs/meta/privacy)
+- [Telemetry Privacy Model and Metric Taxonomy](https://github.com/Switchbord/wats/blob/main/maintainers/telemetry-taxonomy.md) (maintainer contract)

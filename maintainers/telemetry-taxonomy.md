@@ -76,9 +76,9 @@ The words `phone`, `recipient`, `sender`, `message`, `body`, `token`, `secret`, 
 
 ## Endpoint protection
 
-Telemetry endpoints are opt-in and protected. The default service configuration does not register telemetry routes; requests to `/metrics`, `/status`, `/debug/diagnostics` fall through to the existing catch-all 404 handler and return an indistinguishable `not_found` response. When enabled, endpoints require the existing service bearer token (the same `serviceBearerToken` from `WatsServiceSecrets`).
+Telemetry endpoints are always registered by the service and protected by the service bearer token. Requests to `/metrics`, `/status`, and `/debug/diagnostics` are matched before the catch-all handler so they can fail closed: a missing or mismatched `Authorization: Bearer <serviceBearerToken>` header returns an indistinguishable `not_found` response with bytes identical to the catch-all 404.
 
-Existing service routes (`/messages`, `/groups/*`) return 401 on auth failure. Telemetry endpoints intentionally diverge: a missing or mismatched token returns 404 (not 401) to avoid leaking endpoint existence, because telemetry surface availability is more sensitive than the public message-sending routes. The 404 response body and headers MUST be byte-identical to the catch-all 404.
+There is no separate "enable" flag. The endpoints exist as soon as the service is running, but they cannot be discovered or exercised without the token. Existing service routes (`/messages`, `/groups/*`) return `401` on auth failure. Telemetry endpoints intentionally diverge and return `404` (not `401`) to avoid leaking endpoint existence, because telemetry surface availability is more sensitive than the public message-sending routes.
 
 Options for future implementers:
 
