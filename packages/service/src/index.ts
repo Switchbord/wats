@@ -44,6 +44,18 @@ import {
   createWebhookAdapter,
   type WebhookFacadeLike
 } from "@wats/http";
+import {
+  httpTelemetryAttributes,
+  graphTelemetryAttributes,
+  sendTelemetryAttributes,
+  persistenceTelemetryAttributes,
+  webhookTelemetryAttributes,
+  type TelemetrySink,
+  type TelemetryAttributes,
+  type OtelMetricName,
+  NOOP_TELEMETRY_SINK,
+  OTEL_ATTR
+} from "./telemetry.js";
 
 export interface WatsServiceSecrets {
   readonly accessToken: string;
@@ -64,6 +76,12 @@ export interface WatsServiceConfig {
    * Defaults to false so non-group deployments keep the pre-Groups route set.
    */
   readonly enableGroupRoutes?: boolean;
+  /**
+   * Optional telemetry sink for OpenTelemetry-compatible exporters. When
+   * omitted, internal /metrics exposition is still updated; no user-owned
+   * collector receives telemetry.
+   */
+  readonly telemetrySink?: TelemetrySink;
 }
 
 export type WatsServiceErrorCode =
@@ -137,6 +155,7 @@ interface RuntimeConfig {
   readonly enableGroupRoutes: boolean;
   readonly groupsPath: string;
   readonly metrics: MetricsRegistry;
+  readonly telemetrySink: TelemetrySink;
   readonly errorLedger: ErrorLedger;
 }
 
@@ -626,11 +645,12 @@ class MetricsRegistry {
     this.#histogramHelp.set(name, help);
   }
 
-  incrementCounter(name: string, labels: Readonly<Record<string, string>>): void {
+  incrementCounter(name: string, labels: Readonly<Record<string, string>>, value = 1): void {
+    if (!Number.isFinite(value) || value < 0) throw new Error(`MetricsRegistry: counter increment value must be a non-negative finite number, received ${value}`);
     const series = this.#counters.get(name);
     if (series === undefined) throw new Error(`MetricsRegistry: counter "${name}" was not declared.`);
     const key = labelKey(labels);
-    series.set(key, (series.get(key) ?? 0) + 1);
+    series.set(key, (series.get(key) ?? 0) + value);
   }
 
   observeHistogram(name: string, labels: Readonly<Record<string, string>>, valueSeconds: number): void {
@@ -769,27 +789,164 @@ function createMetricsRegistry(): MetricsRegistry {
   return registry;
 }
 
-function recordHttpRequest(metrics: MetricsRegistry, route: string, method: string, status: number, durationSeconds: number): void {
+// WATS-164 bridge: a TelemetrySink that forwards to the internal Prometheus
+// MetricsRegistry so /metrics sees the same traffic as user sinks. OTel-style
+// attribute keys are mapped back to the internal Prometheus label names.
+class MetricsBridgeTelemetrySink implements TelemetrySink {
+  readonly #metrics: MetricsRegistry;
+
+  constructor(metrics: MetricsRegistry) {
+    this.#metrics = metrics;
+  }
+
+  incrementCounter(name: OtelMetricName, value: number, attributes: TelemetryAttributes): void {
+    if (name === "http_requests_total") {
+      this.#metrics.incrementCounter(name, this.#httpLabels(attributes), value);
+    } else if (name === "webhook_normalization_total") {
+      this.#metrics.incrementCounter(name, this.#webhookLabels(attributes), value);
+    } else if (name === "graph_operations_total") {
+      this.#metrics.incrementCounter(name, this.#graphLabels(attributes), value);
+    } else if (name === "send_outcomes_total") {
+      this.#metrics.incrementCounter(name, this.#sendLabels(attributes), value);
+    } else if (name === "persistence_operations_total") {
+      this.#metrics.incrementCounter(name, this.#persistenceLabels(attributes), value);
+    }
+  }
+
+  recordHistogram(name: "http_request_duration_seconds", valueSeconds: number, attributes: TelemetryAttributes): void {
+    if (name !== "http_request_duration_seconds") return;
+    this.#metrics.observeHistogram(name, this.#httpHistogramLabels(attributes), valueSeconds);
+  }
+
+  #getString(attributes: TelemetryAttributes, key: string): string {
+    const value = attributes[key];
+    return typeof value === "string" ? value : String(value ?? "");
+  }
+
+  #httpLabels(attributes: TelemetryAttributes): Readonly<Record<string, string>> {
+    return {
+      route: this.#getString(attributes, OTEL_ATTR.httpRoute),
+      method: this.#getString(attributes, OTEL_ATTR.httpMethod),
+      status_class: this.#getString(attributes, OTEL_ATTR.httpStatusClass)
+    };
+  }
+
+  #httpHistogramLabels(attributes: TelemetryAttributes): Readonly<Record<string, string>> {
+    return {
+      route: this.#getString(attributes, OTEL_ATTR.httpRoute),
+      status_class: this.#getString(attributes, OTEL_ATTR.httpStatusClass)
+    };
+  }
+
+  #webhookLabels(attributes: TelemetryAttributes): Readonly<Record<string, string>> {
+    return {
+      update_kind: this.#getString(attributes, OTEL_ATTR.webhookUpdateKind),
+      outcome: this.#getString(attributes, OTEL_ATTR.operationOutcome)
+    };
+  }
+
+  #graphLabels(attributes: TelemetryAttributes): Readonly<Record<string, string>> {
+    return {
+      endpoint_family: this.#getString(attributes, OTEL_ATTR.graphEndpointFamily),
+      status_class: this.#getString(attributes, OTEL_ATTR.httpStatusClass),
+      outcome: this.#getString(attributes, OTEL_ATTR.operationOutcome)
+    };
+  }
+
+  #sendLabels(attributes: TelemetryAttributes): Readonly<Record<string, string>> {
+    return {
+      endpoint_family: this.#getString(attributes, OTEL_ATTR.graphEndpointFamily),
+      outcome: this.#getString(attributes, OTEL_ATTR.operationOutcome)
+    };
+  }
+
+  #persistenceLabels(attributes: TelemetryAttributes): Readonly<Record<string, string>> {
+    return {
+      adapter: this.#getString(attributes, OTEL_ATTR.persistenceAdapter),
+      outcome: this.#getString(attributes, OTEL_ATTR.operationOutcome)
+    };
+  }
+}
+
+// Fan out metric, span, and event calls to multiple sinks. A downstream sink
+// that throws is isolated from the others: the exception is swallowed and
+// logged to stderr so a user exporter cannot break a successful request.
+class ComposedTelemetrySink implements TelemetrySink {
+  readonly #sinks: ReadonlyArray<TelemetrySink>;
+
+  constructor(...sinks: TelemetrySink[]) {
+    this.#sinks = sinks;
+  }
+
+  incrementCounter(name: string, value: number, attributes: TelemetryAttributes): void {
+    for (const sink of this.#sinks) {
+      try {
+        sink.incrementCounter(name, value, attributes);
+      } catch (error) {
+        this.#logSinkError("incrementCounter", error);
+      }
+    }
+  }
+
+  recordHistogram(name: string, valueSeconds: number, attributes: TelemetryAttributes): void {
+    for (const sink of this.#sinks) {
+      try {
+        sink.recordHistogram(name, valueSeconds, attributes);
+      } catch (error) {
+        this.#logSinkError("recordHistogram", error);
+      }
+    }
+  }
+
+  recordSpan(name: string, start: Date, end: Date, attributes: TelemetryAttributes): void {
+    for (const sink of this.#sinks) {
+      try {
+        if (typeof sink.recordSpan === "function") sink.recordSpan(name, start, end, attributes);
+      } catch (error) {
+        this.#logSinkError("recordSpan", error);
+      }
+    }
+  }
+
+  recordEvent(name: string, attributes: TelemetryAttributes, timestamp?: Date): void {
+    for (const sink of this.#sinks) {
+      try {
+        if (typeof sink.recordEvent === "function") sink.recordEvent(name, attributes, timestamp);
+      } catch (error) {
+        this.#logSinkError("recordEvent", error);
+      }
+    }
+  }
+
+  #logSinkError(method: string, error: unknown): void {
+    const name = error instanceof Error ? error.name : "Error";
+    const message = error instanceof Error ? error.message : String(error);
+    // eslint-disable-next-line no-console
+    console.error(JSON.stringify({ event: "wats.telemetry.sink.error", method, errorName: name, errorMessage: message, at: new Date().toISOString() }));
+  }
+}
+
+function recordHttpRequest(sink: TelemetrySink, route: string, method: string, status: number, durationSeconds: number): void {
   const statusClass = statusClassOf(status);
-  metrics.incrementCounter("http_requests_total", { route, method, status_class: statusClass });
-  metrics.observeHistogram("http_request_duration_seconds", { route, status_class: statusClass }, durationSeconds);
+  sink.incrementCounter("http_requests_total", 1, httpTelemetryAttributes(route, method, status, statusClass));
+  sink.recordHistogram("http_request_duration_seconds", durationSeconds, httpTelemetryAttributes(route, method, status, statusClass));
 }
 
-function recordWebhookNormalization(metrics: MetricsRegistry, updateKind: string, outcome: MetricOutcome): void {
+function recordWebhookNormalization(sink: TelemetrySink, updateKind: string, outcome: MetricOutcome): void {
   const clampedKind = clampToEnum(updateKind, METRIC_UPDATE_KINDS);
-  metrics.incrementCounter("webhook_normalization_total", { update_kind: clampedKind, outcome });
+  sink.incrementCounter("webhook_normalization_total", 1, webhookTelemetryAttributes(clampedKind, outcome));
 }
 
-function recordGraphOperation(metrics: MetricsRegistry, endpointFamily: MetricEndpointFamily, status: number, outcome: MetricOutcome): void {
-  metrics.incrementCounter("graph_operations_total", { endpoint_family: endpointFamily, status_class: statusClassOf(status), outcome });
+function recordGraphOperation(sink: TelemetrySink, endpointFamily: MetricEndpointFamily, status: number, outcome: MetricOutcome): void {
+  sink.incrementCounter("graph_operations_total", 1, graphTelemetryAttributes(endpointFamily, status, statusClassOf(status), outcome));
 }
 
-function recordSendOutcome(metrics: MetricsRegistry, endpointFamily: MetricEndpointFamily, outcome: MetricOutcome): void {
-  metrics.incrementCounter("send_outcomes_total", { endpoint_family: endpointFamily, outcome });
+function recordSendOutcome(sink: TelemetrySink, endpointFamily: MetricEndpointFamily, outcome: MetricOutcome): void {
+  sink.incrementCounter("send_outcomes_total", 1, sendTelemetryAttributes(endpointFamily, outcome));
 }
 
-function recordPersistenceOperation(metrics: MetricsRegistry, adapter: string, outcome: MetricOutcome): void {
-  metrics.incrementCounter("persistence_operations_total", { adapter, outcome });
+function recordPersistenceOperation(sink: TelemetrySink, adapter: string, outcome: MetricOutcome): void {
+  sink.incrementCounter("persistence_operations_total", 1, persistenceTelemetryAttributes(adapter, outcome));
 }
 
 // Renders the /status route-templating logic against an arbitrary matched
@@ -2075,12 +2232,12 @@ async function handleWebhook(ctx: RuntimeConfig, request: Request): Promise<Resp
       eventHash: event.eventHash,
       receivedAt: new Date().toISOString()
     });
-    recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "success");
+    recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "success");
   } catch (error) {
     // Record the metric, then preserve the pre-instrumentation behavior
     // exactly: this call was never wrapped in a try/catch before, so a
     // thrown error propagated uncaught. Re-throw rather than failing open.
-    recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "error");
+    recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "error");
     throw error;
   }
   if (record === "duplicate") {
@@ -2090,7 +2247,7 @@ async function handleWebhook(ctx: RuntimeConfig, request: Request): Promise<Resp
     // reflects that normalization occurred even though dispatch was skipped.
     for (const update of dispatches) {
       const kind = isRecord(update) && typeof update.kind === "string" ? update.kind : "unknown";
-      recordWebhookNormalization(ctx.metrics, kind, "deduped");
+      recordWebhookNormalization(ctx.telemetrySink, kind, "deduped");
     }
     return jsonResponse(200, { status: "ok", received: dispatches.length, dispatched: 0, skipped: dispatches.length });
   }
@@ -2156,17 +2313,17 @@ async function recordOutboundProjection(
       createdAt: now,
       updatedAt: now
     });
-    recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "success");
+    recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "success");
   } catch {
     // Projection failure must not break the send response.
-    recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "error");
+    recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "error");
   }
   try {
     await ctx.persistence.appendMessageStatus({ waMessageId, status: "sent", timestamp: now });
-    recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "success");
+    recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "success");
   } catch {
     // Best-effort; projection failure must not break the send response.
-    recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "error");
+    recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "error");
   }
 }
 
@@ -2185,9 +2342,9 @@ async function handleTextMessage(ctx: RuntimeConfig, request: Request): Promise<
     let existing: Awaited<ReturnType<PersistenceStore["getServiceRequest"]>>;
     try {
       existing = await ctx.persistence.getServiceRequest({ idempotencyKey, requestHash });
-      recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "success");
+      recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "success");
     } catch (error) {
-      recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "error");
+      recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "error");
       throw error;
     }
     if (existing === "conflict") return errorResponse(409, "idempotency_conflict", "Idempotency-Key conflicts with a different request body.");
@@ -2208,8 +2365,8 @@ async function handleTextMessage(ctx: RuntimeConfig, request: Request): Promise<
       text: payload.text.body,
       previewUrl: input.previewUrl
     });
-    recordGraphOperation(ctx.metrics, "messages", 200, "success");
-    recordSendOutcome(ctx.metrics, "messages", "success");
+    recordGraphOperation(ctx.telemetrySink, "messages", 200, "success");
+    recordSendOutcome(ctx.telemetrySink, "messages", "success");
     if (idempotencyKey !== null && requestHash !== null && ctx.persistence !== undefined) {
       const responseJson = responseToJsonText(result);
       if (responseJson !== null) {
@@ -2217,14 +2374,14 @@ async function handleTextMessage(ctx: RuntimeConfig, request: Request): Promise<
         // and reported as a Graph-operation error too — a pre-existing
         // conflation in the original control flow, not introduced here.
         await ctx.persistence.recordServiceRequest({ idempotencyKey, requestHash, responseJson, createdAt: new Date().toISOString() });
-        recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "success");
+        recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "success");
       }
     }
     await recordOutboundProjection(ctx, result, input.to, "text");
     return jsonResponse(200, result);
   } catch (error) {
-    recordGraphOperation(ctx.metrics, "messages", graphErrorStatus(error), "error");
-    recordSendOutcome(ctx.metrics, "messages", "error");
+    recordGraphOperation(ctx.telemetrySink, "messages", graphErrorStatus(error), "error");
+    recordSendOutcome(ctx.telemetrySink, "messages", "error");
     return graphFailureResponse(error, ctx.errorLedger);
   }
 }
@@ -2244,9 +2401,9 @@ async function handleGenericMessage(ctx: RuntimeConfig, request: Request): Promi
     let existing: Awaited<ReturnType<PersistenceStore["getServiceRequest"]>>;
     try {
       existing = await ctx.persistence.getServiceRequest({ idempotencyKey, requestHash });
-      recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "success");
+      recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "success");
     } catch (error) {
-      recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "error");
+      recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "error");
       throw error;
     }
     if (existing === "conflict") return errorResponse(409, "idempotency_conflict", "Idempotency-Key conflicts with a different request body.");
@@ -2260,8 +2417,8 @@ async function handleGenericMessage(ctx: RuntimeConfig, request: Request): Promi
       body,
       headers: { "content-type": "application/json" }
     });
-    recordGraphOperation(ctx.metrics, "messages", 200, "success");
-    recordSendOutcome(ctx.metrics, "messages", "success");
+    recordGraphOperation(ctx.telemetrySink, "messages", 200, "success");
+    recordSendOutcome(ctx.telemetrySink, "messages", "success");
     if (idempotencyKey !== null && requestHash !== null && ctx.persistence !== undefined) {
       const responseJson = responseToJsonText(result);
       if (responseJson !== null) {
@@ -2269,7 +2426,7 @@ async function handleGenericMessage(ctx: RuntimeConfig, request: Request): Promi
         // and reported as a Graph-operation error too — a pre-existing
         // conflation in the original control flow, not introduced here.
         await ctx.persistence.recordServiceRequest({ idempotencyKey, requestHash, responseJson, createdAt: new Date().toISOString() });
-        recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "success");
+        recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "success");
       }
     }
     const genericTo = typeof (body as { to?: unknown }).to === "string" ? (body as { to: string }).to : undefined;
@@ -2277,8 +2434,8 @@ async function handleGenericMessage(ctx: RuntimeConfig, request: Request): Promi
     await recordOutboundProjection(ctx, result, genericTo, genericType);
     return jsonResponse(200, result);
   } catch (error) {
-    recordGraphOperation(ctx.metrics, "messages", graphErrorStatus(error), "error");
-    recordSendOutcome(ctx.metrics, "messages", "error");
+    recordGraphOperation(ctx.telemetrySink, "messages", graphErrorStatus(error), "error");
+    recordSendOutcome(ctx.telemetrySink, "messages", "error");
     return graphFailureResponse(error, ctx.errorLedger);
   }
 }
@@ -2317,10 +2474,10 @@ async function handleListMessages(ctx: RuntimeConfig, request: Request, url: URL
     const result = await ctx.persistence.listMessages(
       beforeRowId === undefined ? { limit } : { limit, beforeRowId }
     );
-    recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "success");
+    recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "success");
     return jsonResponse(200, { items: result.items, nextCursor: result.nextCursor });
   } catch {
-    recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "error");
+    recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "error");
     return errorResponse(503, "persistence_not_configured", "Message projections require a persistence store.");
   }
 }
@@ -2342,11 +2499,11 @@ async function handleGetMessage(ctx: RuntimeConfig, request: Request, path: stri
   }
   try {
     const record = await ctx.persistence.getMessage({ waMessageId });
-    recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "success");
+    recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "success");
     if (record === null) return errorResponse(404, "not_found", "Message not found.");
     return jsonResponse(200, record);
   } catch {
-    recordPersistenceOperation(ctx.metrics, ctx.persistence.backend, "error");
+    recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "error");
     return errorResponse(404, "not_found", "Message not found.");
   }
 }
@@ -2388,10 +2545,10 @@ async function handleGroupRoute(ctx: RuntimeConfig, request: Request, url: URL, 
   async function recordedGraphCall<T>(op: Promise<T>): Promise<T> {
     try {
       const result = await op;
-      recordGraphOperation(ctx.metrics, "groups", 200, "success");
+      recordGraphOperation(ctx.telemetrySink, "groups", 200, "success");
       return result;
     } catch (error) {
-      recordGraphOperation(ctx.metrics, "groups", graphErrorStatus(error), "error");
+      recordGraphOperation(ctx.telemetrySink, "groups", graphErrorStatus(error), "error");
       throw error;
     }
   }
@@ -2507,6 +2664,11 @@ function makeRuntimeConfig(config: WatsServiceConfig): RuntimeConfig {
     ...(transport !== undefined ? { transport } : {})
   });
   const metricsRegistry = createMetricsRegistry();
+  const metricsBridge = new MetricsBridgeTelemetrySink(metricsRegistry);
+  const userSink = config.telemetrySink;
+  const telemetrySink: TelemetrySink = userSink !== undefined
+    ? new ComposedTelemetrySink(metricsBridge, userSink)
+    : metricsBridge;
   let whatsapp: WebhookFacadeLike;
   if (suppliedWhatsapp !== undefined) {
     whatsapp = suppliedWhatsapp;
@@ -2571,8 +2733,8 @@ function makeRuntimeConfig(config: WatsServiceConfig): RuntimeConfig {
               to: from,
               text: "Received by WATS. (automated echo — live deployment test)"
             });
-            recordGraphOperation(metricsRegistry, "messages", 200, "success");
-            recordSendOutcome(metricsRegistry, "messages", "success");
+            recordGraphOperation(telemetrySink, "messages", 200, "success");
+            recordSendOutcome(telemetrySink, "messages", "success");
             const sentId = (result as { messages?: ReadonlyArray<{ id?: string }> }).messages?.[0]?.id;
             // eslint-disable-next-line no-console
             console.log(JSON.stringify({
@@ -2586,8 +2748,8 @@ function makeRuntimeConfig(config: WatsServiceConfig): RuntimeConfig {
             // SDK mapped one) so a failed auto-reply is observable instead of
             // silently swallowed. Never re-throw: a send failure must not break
             // webhook acknowledgement.
-            recordGraphOperation(metricsRegistry, "messages", graphErrorStatus(error), "error");
-            recordSendOutcome(metricsRegistry, "messages", "error");
+            recordGraphOperation(telemetrySink, "messages", graphErrorStatus(error), "error");
+            recordSendOutcome(telemetrySink, "messages", "error");
             const e = (error ?? undefined) as { code?: number; errorSubcode?: number } | undefined;
             const code = e?.code;
             const subcode = e?.errorSubcode;
@@ -2635,10 +2797,10 @@ function makeRuntimeConfig(config: WatsServiceConfig): RuntimeConfig {
           const firstError = Array.isArray(errors) ? errors[0] : undefined;
           errorLedger.record(firstError ?? new Error("webhook_handler_failure"));
         }
-        recordWebhookNormalization(metricsRegistry, kind, outcome);
+        recordWebhookNormalization(telemetrySink, kind, outcome);
         return result;
       } catch (error) {
-        recordWebhookNormalization(metricsRegistry, kind, "error");
+        recordWebhookNormalization(telemetrySink, kind, "error");
         errorLedger.record(error);
         throw error;
       }
@@ -2667,6 +2829,7 @@ function makeRuntimeConfig(config: WatsServiceConfig): RuntimeConfig {
     enableGroupRoutes,
     groupsPath: `${apiPrefix}/groups`,
     metrics: metricsRegistry,
+    telemetrySink,
     errorLedger
   };
 }
@@ -2777,9 +2940,20 @@ export function createWatsServiceApp(config: WatsServiceConfig): WatsServiceApp 
       const startedAtMs = Date.now();
       const response = await dispatchRoute(request, url, method, path);
       const durationSeconds = Math.max(0, Date.now() - startedAtMs) / 1000;
-      recordHttpRequest(ctx.metrics, templateRouteLabel(ctx, path), method, response.status, durationSeconds);
+      recordHttpRequest(ctx.telemetrySink, templateRouteLabel(ctx, path), method, response.status, durationSeconds);
       return response;
     }
   };
 }
+
+// WATS-164: telemetry sink seam exports for OpenTelemetry-compatible adapters.
+export { NOOP_TELEMETRY_SINK, OTEL_ATTR, CapturingTelemetrySink } from "./telemetry.js";
+export type { TelemetrySink, TelemetryAttributes, OtelMetricName } from "./telemetry.js";
+export {
+  httpTelemetryAttributes,
+  graphTelemetryAttributes,
+  sendTelemetryAttributes,
+  persistenceTelemetryAttributes,
+  webhookTelemetryAttributes
+} from "./telemetry.js";
 
