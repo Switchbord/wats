@@ -142,9 +142,8 @@ describe("WATS-110 npm scope governance and provenance hardening", () => {
     expect(doc).not.toMatch(/2FA has been enforced on the npm org|OIDC trust is configured|provenance attestation verified on/iu);
     // The changelog convention for post-tag work (cf. WATS-141/124/123) is to
     // add the entry in the next release PR, not under the already-tagged
-    // 0.3.27 heading. So this slice does not add a changelog entry; verify the
-    // top heading stays the tagged release.
+    // heading. Verify the top heading stays the current release.
     const changelog = read("CHANGELOG.md");
-    expect(changelog.startsWith("# Changelog\n\n## [0.3.27]")).toBe(true);
+    expect(changelog.startsWith("# Changelog\n\n## [0.3.28]")).toBe(true);
   });
 });

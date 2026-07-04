@@ -4,8 +4,9 @@ export interface FeatureCardProps {
   title: string
   body: string
   href: string
-  status: Status
-  /** Optional visible text override for the status tag (e.g. Groups card per 04-content.md §5). */
+  /** Optional status tag; omit when the card doesn't need a badge. */
+  status?: Status
+  /** Optional visible text override for the status tag. */
   statusLabel?: string
 }
 
@@ -19,7 +20,7 @@ export function FeatureCard({ title, body, href, status, statusLabel }: FeatureC
     >
       <div className="flex items-start justify-between gap-3">
         <h3 className="font-semibold text-text">{title}</h3>
-        <StatusTag status={status} label={statusLabel} />
+        {status !== undefined && <StatusTag status={status} label={statusLabel} />}
       </div>
       <p className="mt-2 text-sm leading-relaxed text-text-muted">{body}</p>
     </a>

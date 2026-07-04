@@ -1,5 +1,5 @@
 ---
-title: Roadmap to WhatsApp / pywa Parity
+title: Roadmap
 description: What WATS plans to ship next, and what is explicitly out of scope for now.
 ---
 
@@ -12,7 +12,7 @@ What is planned, what is shipped, and what is explicitly out of scope. Issue-lev
 The `0.3.x-alpha-tooling` line ships the substrate:
 
 - Graph client, transport seam, endpoint registry, pagination, scoped clients
-- pywa-seeded Graph error registry
+- Graph error registry seeded with the known Meta error codes
 - webhook challenge/signature verification, runtime-neutral WebhookAdapter, Bun/Node/Fetch wrappers
 - typed webhook normalizer, typed filters, router, listeners, `WhatsApp` facade
 - media runtime: upload, metadata resolution, binary download, delete, encrypted decrypt, resumable upload sessions
@@ -26,13 +26,13 @@ The `0.3.x-alpha-tooling` line ships the substrate:
 - SQLite persistence: migrations, idempotency records, outbox APIs
 - Postgres persistence adapter at `@wats/persistence/postgres` (shape-only, mock-client tested; no default CI live Postgres)
 - local message projection (`wats_messages` / `wats_message_status_events`) and read-only `wats messages list/show` CLI inspection
-- pywa migration guide and per-capability parity matrix
+- pywa migration guide and per-endpoint status page
 
-Everything above is credential-free and MockTransport-validated unless the [parity matrix](/docs/parity) marks it live-validated. The Postgres adapter is mock-client tested; it is not live-validated against a running Postgres service.
+Everything above is credential-free and MockTransport-validated unless [endpoint status](/docs/parity) marks it live-validated. The Postgres adapter is mock-client tested; it is not live-validated against a running Postgres service.
 
 ## Planned
 
-- Live credentialed validation of media, message, template, Flow, and calling paths. The campaign runs in deliberate phases — read-only discovery first, side-effecting tests second, destructive cleanup last, admin mutations only with separate authorization. It is halted until credentials and explicit operator authorization exist.
+- Live credentialed validation of media, message, template, Flow, and calling paths: read-only discovery first, side-effecting tests second, destructive cleanup last. Halted until credentials and explicit operator authorization exist.
 - Mutating admin endpoints still remaining: WABA CRUD, catalog/product inventory CRUD, and `subscribeApp`; shipped request-shape helpers remain shape-only until live validation.
 - Live Postgres validation and service send enqueueing.
 - Production deployment hardening: Compose, container image publication, registry workflow, and a production hosting contract. The repo ships a Railway-targeted Dockerfile.

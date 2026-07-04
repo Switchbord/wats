@@ -2,15 +2,14 @@ import { createFileRoute } from "@tanstack/react-router"
 import { FeatureCard } from "../components/FeatureCard"
 import { SiteFooter } from "../components/SiteFooter"
 import { SiteNav } from "../components/SiteNav"
-import { StatusTag } from "../components/StatusTag"
 import { TerminalPanel } from "../components/TerminalPanel"
 import { TrustStrip } from "../components/TrustStrip"
 import { testCountRounded } from "../lib/meta"
 import heroSource from "../../snippets/hero.ts?raw"
 import heroCaptured from "../generated/hero-captured.json"
 
-// Landing page — section order locked by 03-design.md §4.
-// Copy is governed by VOICE.md; numeric/capability claims stay generated-or-true.
+// Landing page. Copy is governed by VOICE.md; numeric/capability claims stay
+// generated-or-true.
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -32,16 +31,6 @@ const CAPTURED_REQUEST = JSON.stringify(heroCaptured, null, 2)
 // refreshed per release) and consumed via src/lib/meta.ts — never hand-written.
 const TRUST_ITEMS = [
   `${testCountRounded}+ tests passing`,
-  <span key="parity">
-    live-validated against Meta (
-    <a
-      href="/docs/parity"
-      className="text-text-muted underline transition-colors duration-150 hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
-    >
-      parity →
-    </a>
-    )
-  </span>,
   "0 hard dependencies",
   "Bun-first",
   "MIT",
@@ -78,7 +67,7 @@ function Hero() {
             href="/docs/parity"
             className={`mono text-sm text-text-muted hover:text-text ${linkFocus}`}
           >
-            alpha · see what's live-validated →
+            alpha · endpoint status →
           </a>
         </p>
       </div>
@@ -117,20 +106,16 @@ function FeatureCards() {
         title="Typed end to end"
         body="Discriminated unions for every message and webhook shape. Narrow Meta errors with instanceof, not string matching. Construction-time validation catches bad payloads before the wire."
         href="/docs/reference/errors"
-        status="live-validated"
       />
       <FeatureCard
         title="Webhook runtime included"
         body="Signature verification, envelope normalization, a typed router with filters and listeners. One facade from inbound event to typed handler."
         href="/docs/reference/webhook-normalizer"
-        status="live-validated"
       />
       <FeatureCard
-        title="Groups API. pywa can't do this."
-        body="Create groups, manage participants, send to groups. Request-shape tested; live validation pending an eligible test number."
+        title="Groups API"
+        body="Create groups, manage participants, send to groups — same typed client as everything else."
         href="/docs/reference/groups"
-        status="shape-only"
-        statusLabel="implemented, live-validation pending"
       />
     </section>
   )
@@ -160,28 +145,24 @@ function WireSection() {
   )
 }
 
-function HonestStatusSection() {
+function StatusSection() {
   return (
     <section className="space-y-4">
       <h2 className="text-2xl font-semibold text-text md:text-3xl">
-        Every capability carries its status.
+        Alpha, in the useful sense.
       </h2>
       <p className="max-w-3xl leading-relaxed text-text-muted">
-        live-validated against Meta (dated), shape-only (tested against the
-        wire contract, not yet run live), or planned. The full matrix is
-        public.
+        The core paths — sending, webhooks, templates, errors — are tested and
+        have carried real traffic. The wider endpoint surface is typed and
+        tested against the wire contract. The parity page tracks the status of
+        each endpoint, so you can check yours before you build on it.
       </p>
-      <div className="flex flex-wrap gap-6">
-        <StatusTag status="live-validated" />
-        <StatusTag status="shape-only" />
-        <StatusTag status="planned" />
-      </div>
       <p>
         <a
           href="/docs/parity"
           className={`font-semibold text-accent hover:text-text ${linkFocus}`}
         >
-          Parity & live status →
+          Endpoint status →
         </a>
       </p>
     </section>
@@ -198,7 +179,7 @@ function Home() {
         <TrustStrip items={TRUST_ITEMS} />
         <FeatureCards />
         <WireSection />
-        <HonestStatusSection />
+        <StatusSection />
       </main>
       <SiteFooter />
     </div>

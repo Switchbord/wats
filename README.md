@@ -2,9 +2,13 @@
 
 [![CI](https://github.com/Switchbord/wats/actions/workflows/ci.yml/badge.svg)](https://github.com/Switchbord/wats/actions/workflows/ci.yml)
 
-WATS is a TypeScript toolkit for WhatsApp Cloud API teams who want typed Graph calls, webhook ingestion, routing, and a standalone service across Bun, Node, Workers, and Deno. It also ships a Groups API with no pywa equivalent.
+WATS is a TypeScript toolkit for the WhatsApp Cloud API: typed Graph calls,
+webhook ingestion, routing, and a standalone service. Bun-first, runs on Node,
+Workers, and Deno where practical.
 
-Docs, an interactive playground, and the live parity matrix: **[wats.sh](https://wats.sh)**.
+I built it because I wanted pywa's ergonomics in TypeScript and a reason to
+learn Bun properly. If that overlaps with what you need, the docs and an
+in-browser playground are at **[wats.sh](https://wats.sh)**.
 
 ```ts
 import { GraphClient, GraphRateLimitError, PhoneNumberClient } from "@wats/graph";
@@ -59,14 +63,12 @@ implicitly. Full command reference: [wats.sh/docs/reference/cli](https://wats.sh
 
 ## Status
 
-Alpha. Capabilities are tracked on a three-color taxonomy — live-validated
-against Meta, shape-only (tested against the wire contract, not yet run live),
-or planned — on the public matrix at
-[wats.sh/docs/parity](https://wats.sh/docs/parity). Foundations are in place
-and tested: Graph transport, endpoint registry, error taxonomy, webhook
-verification and normalization, filters, routers, listeners, the `WhatsApp`
-facade, the standalone service, and a Groups API with no pywa equivalent.
-Endpoint breadth is still expanding.
+Alpha. The core paths — text and template sends, media, webhook verification
+and normalization, routing, typed errors — are tested and have carried real
+traffic. The wider endpoint surface is typed and tested against the wire
+contract; per-endpoint status is tracked at
+[wats.sh/docs/parity](https://wats.sh/docs/parity). The 0.x line still makes
+breaking changes.
 
 ## Packages
 
@@ -110,7 +112,7 @@ Docs change in the same PR as the code they describe.
 ## Links
 
 - Site, docs, playground: [wats.sh](https://wats.sh)
-- Parity & live status: [wats.sh/docs/parity](https://wats.sh/docs/parity)
+- Endpoint status: [wats.sh/docs/parity](https://wats.sh/docs/parity)
 - Privacy & telemetry stance: [wats.sh/docs/meta/privacy](https://wats.sh/docs/meta/privacy)
 - npm: [@wats](https://www.npmjs.com/org/wats)
 - `CONTRIBUTING.md` — contribution workflow and credential-free defaults

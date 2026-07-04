@@ -1,5 +1,50 @@
 # Changelog
 
+## [0.3.28] - 2026-07-04
+
+Patch release: the `@wats/service` operator telemetry surfaces and a docs voice pass.
+
+### Added
+
+- **Operator telemetry endpoints.** `@wats/service` now serves `GET /metrics` (Prometheus/OpenMetrics exposition), `GET /status` (redacted operator snapshot), and `GET /debug/diagnostics` (bounded support snapshot). All three sit behind the existing service bearer token; a missing or wrong token returns the same `404` as an unknown route. Metric labels are enum-clamped and PII-free per `maintainers/telemetry-taxonomy.md`. No default outbound telemetry.
+
+### WATS-161
+
+- Telemetry privacy model and metric taxonomy (`maintainers/telemetry-taxonomy.md`) with a drift-guard contract test.
+
+### WATS-162
+
+- Prometheus/OpenMetrics `/metrics` endpoint backed by an allowlisted in-memory registry.
+
+### WATS-163
+
+- Redacted `/status` operator endpoint with 404 existence-hiding.
+
+### WATS-164
+
+- Dependency-free `TelemetrySink` seam (`TelemetrySink`, `OTEL_ATTR`, `NOOP_TELEMETRY_SINK`, `CapturingTelemetrySink` exports) with OpenTelemetry-compatible attribute keys; internal metrics feed through the same seam.
+
+### WATS-165
+
+- `/debug/diagnostics` bounded support snapshot: version, route inventory, redacted config shape, metric families, and a capped recent-error ledger.
+
+### WATS-166
+
+- Telemetry operator guide (threat model, attribute dictionary, Prometheus scrape config, OTel adapter example) and guardrail tests.
+
+### Fixed
+
+- Post-merge telemetry review fixes: persistence adapter metric label clamped to the sqlite/postgres allowlist, auto-reply Graph failures recorded into the diagnostics error ledger, 1xx/out-of-range HTTP statuses classified `unknown` instead of `5xx`, histogram observations validated non-negative/finite, and the taxonomy `status_class` enum corrected to `2xx`/`3xx`/`4xx`/`5xx`/`unknown`.
+- Docs voice pass: status-taxonomy marketing, competitive pywa framing, and restatement trimmed across the landing page, README, and docs; per-page content is unchanged where it carried real instructions.
+
+### Build
+
+- No new dependencies in any publishable `@wats/*` package.
+
+### Release
+
+- Release metadata is aligned for 0.3.28: all publishable `@wats/*` packages, the service OpenAPI default version, README, and release-contract locks move together. No live Meta validation, Railway deployment, npm provenance attestation, or GitHub release side effect is implied by this changelog entry until the release commands below complete.
+
 ## [0.3.27] - 2026-06-24
 
 Patch alpha compatibility and current-surface release. Publishes the post-0.3.26 Calling, persistence/operator-runtime, Flow media, and business-management helper surfaces that were already merged to `main`, plus the docs cleanup that reconciles those surfaces.

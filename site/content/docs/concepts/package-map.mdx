@@ -17,7 +17,8 @@ The canonical dependency map for the WATS workspace. Arrows point from dependent
 
 ### `@wats/types`
 
-- Purpose: shared TypeScript domain contracts for config, webhook envelopes, messages, statuses, contacts, entities, and error payloads.
+Shared TypeScript domain contracts for config, webhook envelopes, messages, statuses, contacts, entities, and error payloads.
+
 - Runtime targets: Bun, Node, Workers, Deno.
 - Public: yes.
 - Dependencies out: none.
@@ -25,7 +26,8 @@ The canonical dependency map for the WATS workspace. Arrows point from dependent
 
 ### `@wats/crypto`
 
-- Purpose: `CryptoProvider` seam plus Node/Bun and WebCrypto adapters.
+`CryptoProvider` seam plus Node/Bun and WebCrypto adapters.
+
 - Runtime targets: Bun, Node, Workers, Deno.
 - Public: yes.
 - Dependencies out: `@wats/types` for shared error payload contracts.
@@ -33,7 +35,8 @@ The canonical dependency map for the WATS workspace. Arrows point from dependent
 
 ### `@wats/graph`
 
-- Purpose: Graph client, transport seam, endpoint registry, scoped clients, error registry, pagination, and endpoint catalog.
+Graph client, transport seam, endpoint registry, scoped clients, error registry, pagination, and endpoint catalog.
+
 - Runtime targets: Bun, Node, Workers, Deno through injected `Transport` / fetch.
 - Public: yes.
 - Dependencies out: `@wats/types`.
@@ -75,7 +78,8 @@ Media runtime:
 
 ### `@wats/http`
 
-- Purpose: webhook challenge/signature primitives, runtime-neutral `WebhookAdapter`, and Bun/Node/Fetch wrappers.
+Webhook challenge/signature primitives, runtime-neutral `WebhookAdapter`, and Bun/Node/Fetch wrappers.
+
 - Runtime targets: Bun, Node, Workers, Deno-style Fetch runtimes.
 - Public: yes.
 - Dependencies out: `@wats/crypto`, `@wats/core`, `@wats/types`.
@@ -85,7 +89,8 @@ Media runtime:
 
 ### `@wats/core`
 
-- Purpose: typed webhook normalization, typed filters, raw filters, routers, listener registry, and `WhatsApp` facade composition root.
+Typed webhook normalization, typed filters, raw filters, routers, listener registry, and `WhatsApp` facade composition root.
+
 - Runtime targets: Bun, Node, Workers, Deno where dependencies are available.
 - Public: yes.
 - Dependencies out: `@wats/types`, `@wats/graph`.
@@ -95,7 +100,8 @@ The facade binds a `GraphClient`, optional `PhoneNumberClient` / `WABAClient`, a
 
 ### `@wats/config`
 
-- Purpose: YAML/JSON config schema, env-secret references, config loading, validation, and redaction.
+YAML/JSON config schema, env-secret references, config loading, validation, and redaction.
+
 - Runtime targets: Bun and Node-compatible ESM; config parsing itself is runtime-light.
 - Public: yes, experimental.
 - Dependencies out: `@wats/internal-utils` for shared object guards.
@@ -103,7 +109,8 @@ The facade binds a `GraphClient`, optional `PhoneNumberClient` / `WABAClient`, a
 
 ### `@wats/cli`
 
-- Purpose: package-manager CLI surface for safe config validation, OpenAPI export, help, and local webhook token generation.
+Package-manager CLI surface for safe config validation, OpenAPI export, help, and local webhook token generation.
+
 - Runtime targets: Bun now; Node-compatible ESM is the direction for the publishable CLI.
 - Public: yes, experimental.
 - Dependencies out: `@wats/config`, `@wats/service`.
@@ -111,7 +118,8 @@ The facade binds a `GraphClient`, optional `PhoneNumberClient` / `WABAClient`, a
 
 ### `@wats/service`
 
-- Purpose: runtime-neutral standalone webhook/API service foundation plus generated OpenAPI 3.1 document for the service routes.
+Runtime-neutral standalone webhook/API service foundation plus generated OpenAPI 3.1 document for the service routes.
+
 - Runtime targets: Bun and Web Fetch-compatible runtimes for the core `Request -> Response` app; Node/Bun server wrappers are later work.
 - Public: yes, experimental.
 - Dependencies out: `@wats/config`, `@wats/core`, `@wats/http`, `@wats/graph`, `@wats/crypto`.
@@ -119,7 +127,8 @@ The facade binds a `GraphClient`, optional `PhoneNumberClient` / `WABAClient`, a
 
 ### `@wats/persistence`
 
-- Purpose: experimental persistence contracts, the SQLite local adapter, and the Postgres adapter, plus the migration runner, webhook/service idempotency records, message projection, and outbox record APIs.
+Experimental persistence contracts, the SQLite local adapter, and the Postgres adapter, plus the migration runner, webhook/service idempotency records, message projection, and outbox record APIs.
+
 - Runtime targets: Bun for `@wats/persistence/sqlite`; `@wats/persistence/postgres` runs wherever `pg` does; root contracts and `runOutboxWorkerOnce` are TypeScript-only.
 - Public: yes, experimental.
 - Published subpaths: `@wats/persistence`, `@wats/persistence/sqlite`, `@wats/persistence/postgres`.
@@ -130,14 +139,16 @@ The facade binds a `GraphClient`, optional `PhoneNumberClient` / `WABAClient`, a
 
 ### `@wats/internal-utils`
 
-- Purpose: internal support package for shared pure helpers required by public runtime packages.
+Internal support package for shared pure helpers required by public runtime packages.
+
 - Public: yes for package-manager completeness; do not treat it as stable public API.
 - Published: yes, because `@wats/config` depends on it at runtime.
 - Dependencies out: none.
 
 ### `@wats/testing`
 
-- Purpose: private workspace tests, consumer fixtures, fixture payloads, and policy checks.
+Private workspace tests, consumer fixtures, fixture payloads, and policy checks.
+
 - Runtime targets: Bun test runner only.
 - Public: no.
 - Published: no.
