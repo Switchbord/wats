@@ -14,8 +14,13 @@
   <url><loc>https://wats.sh/docs/guides/deploy-docker</loc></url>
   <url><loc>https://wats.sh/docs/guides/deploy-node</loc></url>
   <url><loc>https://wats.sh/docs/guides/groups-quickstart</loc></url>
+  <url><loc>https://wats.sh/docs/guides/handle-button-and-list-replies</loc></url>
+  <url><loc>https://wats.sh/docs/guides/handle-status-callbacks</loc></url>
   <url><loc>https://wats.sh/docs/guides/live-webhook</loc></url>
   <url><loc>https://wats.sh/docs/guides/migrating-from-pywa</loc></url>
+  <url><loc>https://wats.sh/docs/guides/react-and-reply-in-context</loc></url>
+  <url><loc>https://wats.sh/docs/guides/send-and-receive-media</loc></url>
+  <url><loc>https://wats.sh/docs/guides/send-template-message</loc></url>
   <url><loc>https://wats.sh/docs/guides/telemetry</loc></url>
   <url><loc>https://wats.sh/docs/guides/transport-and-testing</loc></url>
   <url><loc>https://wats.sh/docs/meta/api-stability</loc></url>

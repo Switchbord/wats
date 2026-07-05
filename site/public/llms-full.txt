@@ -895,6 +895,10 @@ A correct deployment returns `200` with body `ping`; a wrong token returns
 # Docker Deployment Guide
 URL: https://wats.sh/docs/guides/deploy-docker
 
+> Planned. The commands on this page do not run today; they document the
+> intended shape. The repo ships a Railway-targeted Dockerfile for Railway
+> deploys; production container publication is not supported.
+
 `wats serve --config <path> --dry-run` is implemented for local Bun smoke
 checks, and
 `wats serve --config <path> --live --yes-live --env-file .env.local`
@@ -1360,6 +1364,132 @@ It uses MockTransport plus a synthetic `value.groups[]` group webhook and prints
 
 ---
 
+# Handle button and list replies
+URL: https://wats.sh/docs/guides/handle-button-and-list-replies
+
+`sendButtons` and `sendList` return waitable sent-results. The facade
+resolves `waitForClick` on an inbound `button_reply` and `waitForSelection`
+on a `list_reply` whose `context.messageId` matches the sent message id — no
+manual correlation, no polling.
+
+```ts
+import { createWhatsApp } from "@wats/core";
+
+const wa = createWhatsApp({
+  accessToken: process.env.WATS_ACCESS_TOKEN!,
+  phoneNumberId: process.env.WATS_PHONE_NUMBER_ID!,
+});
+
+const sent = await wa.sendButtons({
+  to: "<recipient-e164>",
+  bodyText: "Pick a shipping speed",
+  buttons: [
+    { id: "standard", title: "Standard" },
+    { id: "express", title: "Express" },
+  ],
+});
+
+const click = await sent.waitForClick({ timeoutMs: 60_000 });
+const choice = click.message.interactive.buttonReply.id; // "express"
+```
+
+For a list:
+
+```ts
+const list = await wa.sendList({
+  to: "<recipient-e164>",
+  bodyText: "Choose a slot",
+  buttonText: "Slots",
+  sections: [
+    {
+      rows: [
+        { id: "mon-am", title: "Mon AM" },
+        { id: "tue-pm", title: "Tue PM" },
+      ],
+    },
+  ],
+});
+
+const pick = await list.waitForSelection({ timeoutMs: 60_000 });
+const slot = pick.message.interactive.listReply.id; // "mon-am"
+```
+
+To route replies as they arrive (not as a waiter on a specific send), use
+typed filters. The `interactiveButtonReply` and `interactiveListReply`
+predicates narrow the update so the handler sees a typed reply:
+
+```ts
+import { message } from "@wats/core/filtersTyped";
+
+wa.on(message.interactiveButtonReply(), (ctx) => {
+  const id = ctx.update.message.interactive.buttonReply.id;
+  // dispatch on id
+});
+```
+
+The waiter and the router share the same listener substrate, so a click
+resolves a pending `waitForClick` and fires any matching `on` handler.
+
+## Related
+
+- [WhatsApp facade reference](/docs/reference/whatsapp-facade)
+- [Typed filters](/docs/reference/filters)
+
+---
+
+# Handle status callbacks
+URL: https://wats.sh/docs/guides/handle-status-callbacks
+
+A send accepted with HTTP 200 only proves Meta took the request. Delivered,
+read, and failed state arrives as inbound status webhooks. `onStatus`
+registers a handler that fires on every status update; the typed filter
+namespace narrows to a specific status.
+
+```ts
+import { createWhatsApp } from "@wats/core";
+import { status } from "@wats/core/filtersTyped";
+
+const wa = createWhatsApp({
+  accessToken: process.env.WATS_ACCESS_TOKEN!,
+  phoneNumberId: process.env.WATS_PHONE_NUMBER_ID!,
+});
+
+// Broad: every status update.
+wa.onStatus((ctx) => {
+  const s = ctx.update.status;
+  console.log(s.id, s.status); // wamid.HR... delivered
+});
+
+// Narrow: only failures.
+wa.on(status.failed(), (ctx) => {
+  const errors = ctx.update.status.errors;
+  // surface to your alerting
+});
+```
+
+For a single send, the waitable result resolves on the matching status for
+that message id — no manual id correlation:
+
+```ts
+const sent = await wa.sendText({ to: "<recipient-e164>", text: "ship notice" });
+
+await sent.waitUntilDelivered();
+await sent.waitUntilRead({ timeoutMs: 5 * 60_000 });
+```
+
+`status.sent()`, `status.delivered()`, `status.read()`, and `status.failed()`
+are the four statuses you usually branch on. Failed updates carry an
+`errors` array from Meta; inspect it before retrying, because Meta retries
+the webhook until you acknowledge it.
+
+## Related
+
+- [WhatsApp facade reference](/docs/reference/whatsapp-facade)
+- [Typed filters](/docs/reference/filters)
+- [Send and receive a live message](/docs/tutorials/send-and-receive)
+
+---
+
 # Live webhook
 URL: https://wats.sh/docs/guides/live-webhook
 
@@ -1704,6 +1834,181 @@ Do not migrate code assuming WATS already has pywa parity for:
 7. Replace conversational waits with `wa.listen(...)` or `startChat(...).waitForReply()` / status waiters where applicable.
 8. Add MockTransport tests before using real credentials.
 9. Keep live operations behind the [campaign gates](/docs/parity/live-campaign): read-only before side-effecting before destructive, redact everything.
+
+---
+
+# React and reply in context
+URL: https://wats.sh/docs/guides/react-and-reply-in-context
+
+A reply quotes the inbound message. Pass its id as `replyToMessageId` on any
+send input — Meta renders the quoted bubble in the client. A reaction is a
+send keyed on the message id with an emoji.
+
+```ts
+import { createWhatsApp } from "@wats/core";
+import { message } from "@wats/core/filtersTyped";
+
+const wa = createWhatsApp({
+  accessToken: process.env.WATS_ACCESS_TOKEN!,
+  phoneNumberId: process.env.WATS_PHONE_NUMBER_ID!,
+});
+
+wa.on(message.text(), async (ctx) => {
+  const inbound = ctx.update.message;
+
+  await wa.sendReaction({
+    to: inbound.from,
+    messageId: inbound.id,
+    emoji: "👍",
+  });
+
+  await wa.sendText({
+    to: inbound.from,
+    text: `you said: ${inbound.text.body}`,
+    replyToMessageId: inbound.id,
+  });
+});
+```
+
+`sendReaction` accepts a single emoji; pass an empty string (or call
+`removeReaction`) to clear one. The `message.reaction()`,
+`message.reactionAdded()`, and `message.reactionRemoved()` filters narrow
+inbound reaction updates so a handler can track emoji state on your own
+messages.
+
+```ts
+wa.on(message.reactionAdded(), (ctx) => {
+  const r = ctx.update.message.reaction;
+  console.log(r.emoji, "on", ctx.update.message.id);
+});
+```
+
+The inbound `context.messageId` on a reply or reaction tells you which of
+your sent messages it targets; the sent-result waiters use the same field to
+correlate `waitForReply`.
+
+## Related
+
+- [WhatsApp facade reference](/docs/reference/whatsapp-facade)
+- [Typed filters](/docs/reference/filters)
+
+---
+
+# Send and receive media
+URL: https://wats.sh/docs/guides/send-and-receive-media
+
+Sends take either a public `link` (Meta fetches it) or a `mediaId` from a
+prior `uploadMedia` call. Both return a waitable sent-result.
+
+```ts
+import { createWhatsApp } from "@wats/core";
+
+const wa = createWhatsApp({
+  accessToken: process.env.WATS_ACCESS_TOKEN!,
+  phoneNumberId: process.env.WATS_PHONE_NUMBER_ID!,
+});
+
+await wa.sendImage({
+  to: "<recipient-e164>",
+  link: "https://example.com/receipt.png",
+  caption: "your receipt",
+});
+
+await wa.sendDocument({
+  to: "<recipient-e164>",
+  link: "https://example.com/invoice.pdf",
+  filename: "invoice-4821.pdf",
+});
+```
+
+Inbound media arrives as a typed message with a `MediaReference` carrying the
+id Meta assigns. Download the bytes with the graph media runtime — a two-step
+fetch: metadata by id, then the binary by URL.
+
+```ts
+import { createWhatsApp } from "@wats/core";
+import { downloadMedia, downloadMediaBytes, DEFAULT_MAX_MEDIA_DOWNLOAD_BYTES } from "@wats/graph";
+
+const wa = createWhatsApp({
+  accessToken: process.env.WATS_ACCESS_TOKEN!,
+  phoneNumberId: process.env.WATS_PHONE_NUMBER_ID!,
+});
+
+wa.onMessage(async (ctx) => {
+  const message = ctx.update.message;
+  if (message.type !== "image") return;
+
+  const meta = await downloadMedia(wa.graphClient, { mediaId: message.image.id });
+  const file = await downloadMediaBytes(wa.graphClient, {
+    url: meta.url,
+    expectedSha256: meta.sha256,
+    maxBytes: DEFAULT_MAX_MEDIA_DOWNLOAD_BYTES,
+  });
+  // file.bytes is a Uint8Array; persist it yourself
+});
+```
+
+Webhook media IDs are downloadable for 7 days. Download promptly and store
+the bytes yourself; WATS does not auto-persist webhook media. For Node/Bun
+file sends from disk, use the `@wats/graph/node-media` path helpers.
+
+## Related
+
+- [WhatsApp facade reference](/docs/reference/whatsapp-facade)
+- [Media reference](/docs/reference/media)
+
+---
+
+# Send a template message
+URL: https://wats.sh/docs/guides/send-template-message
+
+Templates are the only message type Meta lets you send to a user outside the
+24-hour customer-service window. The template must exist and be approved in
+your WABA before you can send it. WATS validates parameter counts locally
+before the request hits Graph.
+
+```ts
+import { createWhatsApp } from "@wats/core";
+
+const wa = createWhatsApp({
+  accessToken: process.env.WATS_ACCESS_TOKEN!,
+  phoneNumberId: process.env.WATS_PHONE_NUMBER_ID!,
+});
+
+const sent = await wa.sendTemplate({
+  to: "<recipient-e164>",
+  name: "order_confirmation",      // an approved template in your WABA
+  languageCode: "en_US",
+  components: [
+    {
+      type: "body",
+      parameters: [
+        { type: "text", text: "Order #4821" },
+        { type: "text", text: "Tuesday" },
+      ],
+    },
+  ],
+});
+
+console.log(sent.messages?.[0]?.id); // wamid.HR...
+```
+
+`sendTemplate` returns a waitable sent-result, so you can await a reply or a
+delivery status on the same call:
+
+```ts
+await sent.waitUntilDelivered();
+```
+
+If the component count does not match the template definition, the call
+rejects before transport — no Graph request leaves the process. For plain
+text inside the customer-service window, use
+[`sendText`](/docs/reference/whatsapp-facade) instead.
+
+## Related
+
+- [WhatsApp facade reference](/docs/reference/whatsapp-facade)
+- [Handle status callbacks](/docs/guides/handle-status-callbacks)
 
 ---
 
