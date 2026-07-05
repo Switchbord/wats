@@ -28,10 +28,10 @@ describe("WATS-122 message projection", () => {
     try {
       const report = await store.migrate();
       expect(report.currentVersion).toBe(CURRENT_SCHEMA_VERSION);
-      expect(report.currentVersion).toBe(3);
+      expect(report.currentVersion).toBe(4);
       expect(report.appliedMigrations).toContain("003_message_projection");
       const health = await store.health();
-      expect(health.currentVersion).toBe(3);
+      expect(health.currentVersion).toBe(4);
     } finally {
       await store.close();
     }
