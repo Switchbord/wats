@@ -3467,8 +3467,57 @@ Every HTTP concern — retry, auth-refresh, tracing, mocking — lives in a comp
 - `createFetchTransport(options?)` — production default wrapping `globalThis.fetch`
 - `createReliableTransport(inner, options?)` — opt-in retry/backoff/per-attempt-timeout decorator
 - `createMockTransport(config?)` — in-memory Transport for tests, via the `@wats/graph/testing` subpath
+- `createTokenBucketRateLimiter(options?)` — client-side token-bucket limiter (shape-only)
 
 The default transport does NOT retry. `createReliableTransport` retries transient `GET`/`DELETE` failures and HTTP `429` rate limits, honors `Retry-After`, composes native `AbortSignal.timeout` / `AbortSignal.any`, and does not retry non-idempotent POST `5xx`/network failures by default. Full recipe: [Transport and Testing](/docs/guides/transport-and-testing).
+
+### `retryPosts` — opt-in POST retry
+
+By default `createReliableTransport` retries a POST only on `429` (the server said "back off", not "I processed and failed"). A `502`/`503` or a socket reset on a send is never retried, which is the right safe default for an outbound messaging tool: blind POST retry duplicates sends.
+
+When you can make retry safe, opt in per transport:
+
+```ts
+const transport = createReliableTransport(inner, {
+  retries: 3,
+  retryPosts: "network-only"
+});
+```
+
+- `"never"` (default) — current behavior, byte-identical. POST retried only on `429`.
+- `"network-only"` — additionally retry a POST whose request threw `GraphNetworkError` BEFORE any response arrived, and only when the request carries an `Idempotency-Key` header (matched case-insensitively). A pre-response network failure is the one POST failure shape that cannot have reached the server, so an idempotency key makes the retry safe. POST `5xx` is still not retried — the server may have side-effected before returning.
+- `"always"` — additionally retry POST on `5xx`. This requires server-side idempotency for the endpoint. A `5xx` after the server began processing can otherwise duplicate a send. Use this only for endpoints you have verified are idempotent or dedupe by `Idempotency-Key`.
+
+Send the header yourself — WATS does not auto-attach one:
+
+```ts
+await client.request({
+  method: "POST",
+  path: "/123/messages",
+  headers: { "Idempotency-Key": crypto.randomUUID() },
+  body: payload
+});
+```
+
+Bad `retryPosts` values throw before the first request.
+
+### `rateLimiter` — proactive client-side smoothing
+
+`createTokenBucketRateLimiter` is a token-bucket limiter you wire into `createReliableTransport` via the `rateLimiter` option. When present, the transport calls `await rateLimiter.acquire()` before every attempt, including retries, so a burst of retries cannot overrun the bucket.
+
+```ts
+const limiter = createTokenBucketRateLimiter({
+  capacity: 20,          // integer 1..10000
+  refillPerSecond: 5     // finite > 0
+});
+const transport = createReliableTransport(inner, { retries: 3, rateLimiter: limiter });
+```
+
+`tryAcquire(cost?)` is the non-blocking counterpart for admission checks outside the transport. Both accept an optional integer `cost` in `[1, capacity]` (default `1`).
+
+This is client-side request smoothing, not Meta quota management. Meta publishes no per-token send budget, and a bucket sized from observed `429`s is a heuristic, not a contract. Tune `capacity` and `refillPerSecond` from your own telemetry. The limiter is shape-only — it has not been run against Meta's live API. Honesty tag: **shape-only, never run live**.
+
+A Prometheus-style note for operators wiring metrics: emit `rate_limiter_wait_ms` (time spent inside `acquire`) and `rate_limiter_try_acquire_denied_total` from the host process. Do not label the bucket as "Meta quota" — it is your own self-imposed ceiling.
 
 ## Messages endpoint scaffold
 
