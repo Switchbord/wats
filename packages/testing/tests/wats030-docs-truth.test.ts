@@ -50,7 +50,7 @@ describe("WATS 0.3.29 public docs truth contract", () => {
   });
 
   test("migration guide no longer lists implemented operator tooling as a gap", () => {
-    const migration = read("site/content/docs/migration/pywa.mdx");
+    const migration = read("site/content/docs/guides/migrating-from-pywa.mdx");
     expect(migration).not.toContain("full Meta Graph OpenAPI generation, CLI `serve`, CLI `init`, and deeper `doctor` diagnostics");
     expect(migration).toContain("full Meta Graph OpenAPI generation and production operator modes beyond the current credential-free `wats init`, `wats doctor`, dry-run `wats serve`, and credential-gated local live `wats serve` tooling");
   });

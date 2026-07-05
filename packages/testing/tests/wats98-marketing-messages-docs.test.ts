@@ -109,7 +109,7 @@ describe("WATS-98 Marketing Messages docs and package surface lockstep", () => {
     const parity = read("site/content/docs/parity.mdx");
     expect(parity).toContain("marketing");
 
-    const migration = read("site/content/docs/migration/pywa.mdx");
+    const migration = read("site/content/docs/guides/migrating-from-pywa.mdx");
     expect(migration).toContain("sendMarketingTemplate");
     expect(migration).toContain("marketing_lite");
 

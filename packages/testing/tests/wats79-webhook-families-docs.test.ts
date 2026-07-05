@@ -56,7 +56,7 @@ describe("WATS-79 webhook-family docs lockstep", () => {
 
   test("parity and migration docs no longer list these first-slice webhook families as deferred", () => {
     const parity = read("site/content/docs/parity.mdx");
-    const migration = read("site/content/docs/migration/pywa.mdx");
+    const migration = read("site/content/docs/guides/migrating-from-pywa.mdx");
     const changelog = read("CHANGELOG.md");
 
     // CHANGELOG is not voice-governed: keep full ticket + family traceability.

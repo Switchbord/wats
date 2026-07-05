@@ -1,0 +1,66 @@
+---
+title: Send and receive media
+description: Send images and documents by link or uploaded media id, and download inbound media bytes through the graph media runtime.
+---
+
+<DocMeta status="active" lastReviewed="2026-07-05" />
+
+Sends take either a public `link` (Meta fetches it) or a `mediaId` from a
+prior `uploadMedia` call. Both return a waitable sent-result.
+
+```ts
+import { createWhatsApp } from "@wats/core";
+
+const wa = createWhatsApp({
+  accessToken: process.env.WATS_ACCESS_TOKEN!,
+  phoneNumberId: process.env.WATS_PHONE_NUMBER_ID!,
+});
+
+await wa.sendImage({
+  to: "<recipient-e164>",
+  link: "https://example.com/receipt.png",
+  caption: "your receipt",
+});
+
+await wa.sendDocument({
+  to: "<recipient-e164>",
+  link: "https://example.com/invoice.pdf",
+  filename: "invoice-4821.pdf",
+});
+```
+
+Inbound media arrives as a typed message with a `MediaReference` carrying the
+id Meta assigns. Download the bytes with the graph media runtime — a two-step
+fetch: metadata by id, then the binary by URL.
+
+```ts
+import { createWhatsApp } from "@wats/core";
+import { downloadMedia, downloadMediaBytes, DEFAULT_MAX_MEDIA_DOWNLOAD_BYTES } from "@wats/graph";
+
+const wa = createWhatsApp({
+  accessToken: process.env.WATS_ACCESS_TOKEN!,
+  phoneNumberId: process.env.WATS_PHONE_NUMBER_ID!,
+});
+
+wa.onMessage(async (ctx) => {
+  const message = ctx.update.message;
+  if (message.type !== "image") return;
+
+  const meta = await downloadMedia(wa.graphClient, { mediaId: message.image.id });
+  const file = await downloadMediaBytes(wa.graphClient, {
+    url: meta.url,
+    expectedSha256: meta.sha256,
+    maxBytes: DEFAULT_MAX_MEDIA_DOWNLOAD_BYTES,
+  });
+  // file.bytes is a Uint8Array; persist it yourself
+});
+```
+
+Webhook media IDs are downloadable for 7 days. Download promptly and store
+the bytes yourself; WATS does not auto-persist webhook media. For Node/Bun
+file sends from disk, use the `@wats/graph/node-media` path helpers.
+
+## Related
+
+- [WhatsApp facade reference](/docs/reference/whatsapp-facade)
+- [Media reference](/docs/reference/media)

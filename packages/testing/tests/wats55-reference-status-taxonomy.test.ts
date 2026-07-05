@@ -113,7 +113,7 @@ describe("WATS-55 reference status taxonomy and metadata", () => {
   });
 
   test("migration import cheat sheet no longer carries stale root-only subpath warnings", () => {
-    const migration = read("site/content/docs/migration/pywa.mdx");
+    const migration = read("site/content/docs/guides/migrating-from-pywa.mdx");
 
     expectAll(migration, [
       "@wats/graph/endpoints/media",

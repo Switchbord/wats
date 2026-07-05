@@ -31,7 +31,7 @@ function expectAll(content: string, snippets: readonly string[]) {
 
 describe("WATS-44 pywa migration docs", () => {
   test("migration guide replaces scaffold with concrete pywa-to-WATS mapping", () => {
-    const migration = read("site/content/docs/migration/pywa.mdx");
+    const migration = read("site/content/docs/guides/migrating-from-pywa.mdx");
     expect(migration).not.toContain("TODO(A2)");
     // Voice-pass moved metadata into a JSX <DocMeta> tag and refreshed the
     // review date to the June 2026 live campaign.
