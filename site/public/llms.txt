@@ -9,7 +9,7 @@ Packages: @wats/core, @wats/graph, @wats/http, @wats/types, @wats/crypto,
 Playground (runs the real SDK in-browser, no credentials): https://wats.sh/playground
 
 ## Docs
-- [Quickstart](https://wats.sh/docs/quickstart): Run a WATS bot with zero credentials.
+- [Quickstart](https://wats.sh/docs/quickstart): Run a WATS bot offline — no credentials, no Meta app, no webhook tunnel.
 - [Guide](https://wats.sh/docs/guide): Start points for the WATS walkthrough — quickstart, CLI onboarding, live webhook, and deploy guides.
 - [CLI Onboarding Guide](https://wats.sh/docs/guides/cli-init): Credential-free local onboarding and inspection with the wats CLI.
 - [Community examples](https://wats.sh/docs/guides/community-examples): Offline-by-default examples for learning the public WATS package APIs without live WhatsApp credentials.

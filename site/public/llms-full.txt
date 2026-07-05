@@ -17,12 +17,14 @@ URL: https://wats.sh/docs/quickstart
 
 You get a bot that answers an inbound WhatsApp message — with zero
 credentials. The Graph client runs against a mock transport, so the demo is
-fully offline: no Meta app, no token, no webhook tunnel.
+fully offline: no Meta app, no token, no webhook tunnel. It exercises the
+same `createWhatsApp` / `onMessage` / `sendText` facade you will use live;
+only the transport is swapped.
 
 ## Install
 
 ```sh
-bun add @wats/core @wats/graph @wats/http
+bun add @wats/core @wats/graph
 ```
 
 ## Runtime
@@ -39,21 +41,34 @@ consume the packages directly with your own server; see
     published @wats packages and executed in CI; do not edit the code here. */}
 
 ```ts
-import { normalizeWebhookEnvelope } from "@wats/core";
-import { GraphClient, PhoneNumberClient } from "@wats/graph";
+import { createWhatsApp, normalizeWebhookEnvelope } from "@wats/core";
 import { createMockTransport } from "@wats/graph/testing";
 
 // Mock transport: Graph calls are captured locally. Nothing leaves the machine.
 const mock = createMockTransport({
-  defaultResponse: { status: 200, body: { messages: [{ id: "wamid.DEMO_REPLY" }] } },
+  defaultResponse: {
+    status: 200,
+    headers: { "content-type": "application/json" },
+    body: { messaging_product: "whatsapp", messages: [{ id: "wamid.DEMO_REPLY" }] },
+  },
 });
-const graphClient = new GraphClient({
-  accessToken: "demo-token", // placeholder; the mock never sends it anywhere
+
+// createWhatsApp wires the Graph client, typed router, and listener registry
+// behind one facade. accessToken is required but never sent anywhere — the
+// mock transport intercepts every request.
+const wa = createWhatsApp({
+  accessToken: "demo-token",
+  phoneNumberId: "15550000000",
   apiVersion: "v25.0",
-  baseUrl: "https://graph.facebook.com",
   transport: mock.transport,
 });
-const phone = new PhoneNumberClient({ graphClient, phoneNumberId: "15550000000" });
+
+// onMessage registers a handler fired for every inbound message update.
+wa.onMessage(async (ctx) => {
+  const message = ctx.update.message;
+  if (message.type !== "text") return;
+  await wa.sendText({ to: message.from, text: `pong: ${message.text.body}` });
+});
 
 // A synthetic inbound webhook, shaped exactly as Meta delivers it.
 const envelope = {
@@ -65,18 +80,19 @@ const envelope = {
       type: "text", text: { body: "ping" } }],
   } }] }],
 };
+
 for (const update of normalizeWebhookEnvelope(envelope).updates) {
-  if (update.kind !== "message") continue;
-  const reply = await phone.sendText({ to: update.message.from, text: "pong" });
-  console.log(`replied to ${update.message.from} with ${reply.messages?.[0]?.id}`);
+  await wa.dispatch(update);
 }
+
+console.log(`replied to 15550001111 with wamid.DEMO_REPLY`);
 console.log(`graph requests captured by mock: ${mock.requests.length}`);
 ```
 
 ## Run it
 
 ```sh
-bun run quickstart.ts
+bun run site/snippets/quickstart.ts
 ```
 
 Expected output:
@@ -86,13 +102,13 @@ replied to 15550001111 with wamid.DEMO_REPLY
 graph requests captured by mock: 1
 ```
 
-## Go deeper
+## Go live
 
-- [Guide](/docs/guide) — the full getting-started walkthrough.
-- [Playground](/playground) — explore the API in the browser, offline.
-- Live credentials: swap the mock transport for the default fetch transport
-  and a real access token. The [guide](/docs/guide) covers the credential
-  setup; this site never asks for or handles tokens.
+Swap the mock transport for the default fetch transport and a real access
+token. The [end-to-end tutorial](/docs/tutorials/send-and-receive) walks the
+credentialed path; this site never asks for or handles tokens. The
+[guide](/docs/guide) covers the full getting-started walkthrough and the
+[playground](/playground) explores the API in the browser, offline.
 
 ---
 
@@ -8576,7 +8592,7 @@ URL: https://wats.sh/docs
 
 WATS is a Bun-first TypeScript toolkit for the WhatsApp Cloud API. It ships as composable packages — Graph client, webhook adapter, typed routing, config, CLI, standalone service — not one monolithic framework. Take the parts you need.
 
-- [Quickstart](/docs/quickstart) — install the packages and send your first message.
+- [Quickstart](/docs/quickstart) — run a WATS bot offline, no credentials.
 - [CLI onboarding](/docs/guides/cli-init) — config scaffolding, setup wizard, doctor, dry-run serve.
 - [Live webhook](/docs/guides/live-webhook) — point Meta at a locally running service behind a public HTTPS tunnel.
 - [Deploy guides](/docs/guides/deploy-bun) — Bun, Node, Cloudflare Workers, and the Docker shape.
