@@ -325,7 +325,7 @@ profiles:
     }
   });
 
-  test("dist setup consumes piped answers in order and exits", () => {
+  test("dist setup refuses piped answers on non-TTY stdin and exits non-zero without consuming them", () => {
     const dir = makeTempDir();
     try {
       const input = validAnswers({
@@ -343,24 +343,22 @@ profiles:
       });
       expect(completed.error, `${completed.stdout}\n${completed.stderr}`).toBeUndefined();
       expect(completed.signal).toBeNull();
-      expect(completed.status, completed.stderr).toBe(0);
-      expect(completed.stdout).toContain("Meta access token\n  Input hidden. Paste the token, then press Enter.\nMeta access token: ");
-      expect(completed.stdout).toContain("Meta app secret\n  Input hidden. Paste the app secret, then press Enter.\nMeta app secret: ");
-      expect(completed.stdout).toContain("Webhook verify token\n  Optional; input hidden. Leave blank to generate a local token.\nWebhook verify token: ");
-      expect(completed.stdout).toContain("WATS service bearer token\n  Optional; input hidden. Leave blank to generate a local bearer token.\nWATS service bearer token: ");
-      expect(completed.stdout).toContain("setup complete");
-      expect(completed.stdout).toContain("files: 2");
-      expect(completed.stderr).toBe("");
+      expect(completed.status, completed.stderr).toBe(1);
+      // Non-interactive stdin is refused before any prompt is printed.
+      expect(completed.stdout).toBe("");
+      expect(completed.stderr).toContain("SetupNonInteractiveError");
+      expect(completed.stderr).toContain("wats init");
+      expect(completed.stderr).toContain(".env.local");
+      expect(completed.stderr).toContain("wats setup --help");
       expectNoSecrets(`${completed.stdout}\n${completed.stderr}`);
-      expect(existsSync(join(dir, "wats.config.yaml"))).toBe(true);
-      expect(existsSync(join(dir, ".env.local"))).toBe(true);
-      expect(envValue(read(join(dir, ".env.local")), "WATS_ACCESS_TOKEN")).toBe(ACCESS_TOKEN);
+      expect(existsSync(join(dir, "wats.config.yaml"))).toBe(false);
+      expect(existsSync(join(dir, ".env.local"))).toBe(false);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
   });
 
-  test("dist setup exits after enough answers even when stdin stays open", async () => {
+  test("dist setup fails fast on non-TTY stdin even when stdin stays open", async () => {
     const dir = makeTempDir();
     const child = spawn("bun", [distEntrypoint, "setup"], {
       cwd: dir,
@@ -380,15 +378,16 @@ profiles:
       const exit = await Promise.race([waitForExit(child), timeout]);
       expect(exit).not.toBe("timeout");
       if (exit === "timeout") return;
-      expect(exit.code).toBe(0);
+      expect(exit.code).toBe(1);
       expect(exit.signal).toBeNull();
       const stdoutText = await stdout;
       const stderrText = await stderr;
-      expect(stdoutText).toContain("setup complete");
-      expect(stderrText).toBe("");
+      expect(stdoutText).toBe("");
+      expect(stderrText).toContain("SetupNonInteractiveError");
+      expect(stderrText).toContain("wats init");
       expectNoSecrets(`${stdoutText}\n${stderrText}`);
-      expect(existsSync(join(dir, "wats.config.yaml"))).toBe(true);
-      expect(existsSync(join(dir, ".env.local"))).toBe(true);
+      expect(existsSync(join(dir, "wats.config.yaml"))).toBe(false);
+      expect(existsSync(join(dir, ".env.local"))).toBe(false);
     } finally {
       child.kill("SIGTERM");
       rmSync(dir, { recursive: true, force: true });
