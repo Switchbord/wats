@@ -522,7 +522,7 @@ function setupNonInteractiveError(hint: string): CliCommandResult {
   return fail(
     "SetupNonInteractiveError\n" +
     "`wats setup` is interactive and needs a terminal (TTY stdin). " +
-    "For non-interactive scaffolding run `wats init <dir>` and edit `.env.local`. " +
+    "For non-interactive scaffolding run `wats init <dir>`, copy `.env.example` to `.env.local`, and fill in real values. " +
     `Run \`${hint}\` for usage.\n`
   );
 }
