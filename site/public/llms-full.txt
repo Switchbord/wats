@@ -1796,23 +1796,26 @@ WATS is a Bun-first TypeScript toolkit for WhatsApp operations. It is built as s
 @wats/types
   shared domain contracts
 
-@wats/crypto        @wats/graph        @wats/http
-  crypto seam         graph client        webhook HTTP boundary
-  adapters            endpoints           runtime adapters
+@wats/crypto        @wats/graph
+  crypto seam         graph client
+  adapters            endpoints
 
 @wats/core
   typed updates, filters, router, listeners, WhatsApp facade
 ```
 
-Application-edge packages sit above these foundations:
+`@wats/core` is the composition root: it composes `@wats/graph`, `@wats/crypto`, and `@wats/types` and never imports the application-edge packages. Application-edge packages sit ABOVE `@wats/core` and compose it — they normalize raw inputs into typed values and dispatch them:
 
 ```text
-@wats/config   config schema, YAML/JSON loading, env-secret references
-@wats/service  standalone webhook/API service, OpenAPI 3.1
-@wats/cli      init, validate, doctor, serve, openapi commands
+@wats/http    webhook HTTP boundary — verifies signatures and normalizes
+              raw webhooks into typed updates before dispatch (composes
+              @wats/core + @wats/crypto)
+@wats/config  config schema, YAML/JSON loading, env-secret references
+@wats/service standalone webhook/API service, OpenAPI 3.1
+@wats/cli     init, validate, doctor, serve, openapi commands
 ```
 
-App-layer packages may depend on `@wats/core`; lower-level packages must not. The dependency arrows only point down.
+App-layer packages may depend on `@wats/core`; lower-level packages must not. The dependency arrows only point down — `@wats/core` never imports `@wats/http`. (`@wats/http` is an application-edge package, NOT a peer of `@wats/graph`: it sits above `@wats/core` and uses `normalizeWebhookEnvelope` from it.)
 
 ## Request flow
 
@@ -1938,11 +1941,12 @@ Media runtime:
 
 ### `@wats/http`
 
-Webhook challenge/signature primitives, runtime-neutral `WebhookAdapter`, and Bun/Node/Fetch wrappers.
+Application-edge webhook package: challenge/signature primitives, runtime-neutral `WebhookAdapter`, and Bun/Node/Fetch wrappers. It verifies signatures and normalizes raw webhooks into typed updates via `@wats/core`'s `normalizeWebhookEnvelope` before dispatching them to a structural `{ dispatch(update) }` facade-like object.
 
 - Runtime targets: Bun, Node, Workers, Deno-style Fetch runtimes.
 - Public: yes.
 - Dependencies out: `@wats/crypto`, `@wats/core`, `@wats/types`.
+- Layer: application-edge — composes `@wats/core` (NOT a peer of `@wats/graph`; it sits above `@wats/core`, while `@wats/graph` sits below it).
 - Stability: foundations-complete.
 
 `@wats/http` depends on `@wats/core` for the normalizer. Its adapter accepts only a structural `{ dispatch(update) }` facade-like object at runtime.
@@ -1956,7 +1960,7 @@ Typed webhook normalization, typed filters, raw filters, routers, listener regis
 - Dependencies out: `@wats/types`, `@wats/graph`.
 - Stability: foundations-complete.
 
-The facade binds a `GraphClient`, optional `PhoneNumberClient` / `WABAClient`, a `TypedRouter`, and optional listener registry support. `WhatsApp.startChat(...)` delegates through the bound `PhoneNumberClient` to start a text conversation with any valid phone-number-like recipient — no contacts lookup. Facade composer helpers (media, location, contacts, reaction, interactive variants, template send, mark-as-read, typing indicators) require a bound `phoneNumberId` and use the same phone-number client.
+The facade binds a `GraphClient`, optional `PhoneNumberClient` / `WABAClient`, a `TypedRouter`, and optional listener registry support. `WhatsApp.sendText(...)` (alias `startChat(...)`) delegates through the bound `PhoneNumberClient` to send a text with any valid phone-number-like recipient — no contacts lookup. Facade composer helpers (media, location, contacts, reaction, interactive variants, template send, mark-as-read, typing indicators) require a bound `phoneNumberId` and use the same phone-number client.
 
 ### `@wats/config`
 
@@ -2017,7 +2021,7 @@ Private workspace tests, consumer fixtures, fixture payloads, and policy checks.
 ## Invariants
 
 1. `@wats/types` has no runtime dependencies.
-2. `@wats/graph`, `@wats/http`, and `@wats/crypto` expose portable seams and keep runtime-specific behavior behind adapters.
+2. `@wats/graph` and `@wats/crypto` expose portable seams and keep runtime-specific behavior behind adapters. `@wats/http` also keeps its runtime wrappers behind adapters, but it is an application-edge package that composes `@wats/core` (it is not a foundation peer of `@wats/graph`).
 3. `@wats/core` is the core composition root; app-layer packages compose it rather than duplicating router/webhook semantics.
 4. `@wats/internal-utils` may be published only as an internal support package; `@wats/testing` stays private and is never published.
 5. Consumer fixtures import through package specifiers, never relative source paths.
@@ -2110,12 +2114,12 @@ Runtime orchestration and typed update handling.
 Primary exports:
 
 - `normalizeWebhookEnvelope` with message/status/account/unknown/calling update variants and deep camelCase normalization for common message body families
-- legacy raw parser/router helpers: `parseWebhookUpdate`, `createUpdateRouter`
+- legacy raw parser/router helpers: `parseWebhookUpdate`, `createUpdateRouter` — **deprecated**, marked `@deprecated` at the type level; superseded by `normalizeWebhookEnvelope` + `TypedRouter` and scheduled for barrel removal next minor
 - typed filter namespace and `@wats/core/filtersTyped`, including `filtersTyped.call` and `message.*` helpers for media, location, reaction, interactive replies, and quick-reply buttons
-- legacy raw filter namespace and `@wats/core/filters`
+- legacy raw filter namespace and `@wats/core/filters` — **deprecated**, marked `@deprecated` at the type level; superseded by `filtersTyped` and scheduled for barrel removal next minor
 - `TypedRouter`
 - `createListenerRegistry`
-- `WhatsApp` facade, including `startChat(...)` and composer helpers when `phoneNumberId` is bound
+- `WhatsApp` facade and the `createWhatsApp(...)` factory, including `sendText(...)` (alias `startChat(...)`), `onMessage`/`onStatus`, and composer helpers when `phoneNumberId` is bound
 
 The `WhatsApp` facade binds:
 
@@ -4080,7 +4084,9 @@ filtersTyped.message.textMatches(/^hello/);
 | Legacy | `@wats/core/filters` | untyped `and`/`or`/`not` + `hasMessageText`, `messageTextContains`, `messageFromWaId`, `hasMessageStatus`, `messageStatusIn` |
 | Typed | `@wats/core/filtersTyped` (this doc) | branded `TypedFilter<T>` + typed `and`/`or`/`not`/`custom` + `message.*` / `status.*` built-ins |
 
-The surfaces are independent — neither imports from the other. The names `and` / `or` / `not` exist on BOTH with different signatures and different brand semantics; do not mix them in one composition chain. Pick one per call site and migrate at your own pace. Removal of the legacy path is planned.
+The surfaces are independent — neither imports from the other. The names `and` / `or` / `not` exist on BOTH with different signatures and different brand semantics; do not mix them in one composition chain. Pick one per call site and migrate at your own pace.
+
+> **Deprecated.** The legacy `@wats/core/filters` surface (`UpdateFilter`, the untyped `and` / `or` / `not`, and the `hasMessageText` / `messageTextContains` / `messageFromWaId` / `hasMessageStatus` / `messageStatusIn` built-ins) is now marked `@deprecated` at the type level and is scheduled for **removal from the `@wats/core` barrel in the next minor release**. New code should use the typed `filtersTyped` surface on this page; the legacy `and` / `or` / `not` combinators will no longer be exported once the barrel is pruned. The typed and legacy surfaces remain independent until then — do not mix them in one composition chain.
 
 ## TypedFilter brand
 
@@ -6565,6 +6571,19 @@ if (message.type === "unsupported") {
 ```
 
 ## Parsed update event types
+
+:::note[Deprecated]
+The untyped `parseWebhookUpdate` parser and the `createUpdateRouter` /
+`UpdateRouter` / `ParsedUpdateEvent` / `UpdateFilter` legacy surfaces
+documented in this section are now marked `@deprecated` at the type
+level. They are superseded by `normalizeWebhookEnvelope` (which emits the
+discriminated `TypedUpdate` union — see
+[webhook-normalizer](/docs/reference/webhook-normalizer)) and the typed
+[`TypedRouter`](/docs/reference/router) /
+[`filtersTyped`](/docs/reference/filters) surfaces. The legacy exports
+remain in the `@wats/core` barrel for now but are scheduled for **removal
+in the next minor release**; new code should use the typed path.
+:::
 
 `@wats/core` provides normalized parsed-event contracts for handler routing.
 

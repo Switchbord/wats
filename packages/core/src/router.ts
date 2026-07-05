@@ -1,12 +1,33 @@
 import type { ParsedUpdateEvent } from "./updateParser.js";
 
+/**
+ * @deprecated WATS-176: the untyped `{field, subtype}` router is
+ * superseded by the typed {@link TypedRouter} (see `typedRouter.ts`,
+ * re-exported as `TypedRouter` / `createTypedRouter`). The typed
+ * system dispatches over `TypedUpdate` with branded `TypedFilter`s
+ * instead of string discriminators. Scheduled for removal from the
+ * barrel in the next minor release.
+ * @see TypedRouter
+ * @see DispatchReport
+ */
 export type UpdateRouteSelector = {
   field: string;
   subtype?: string;
 };
 
+/**
+ * @deprecated WATS-176: use the typed `Handler` from `typedRouter.ts`
+ * (dispatched over `TypedUpdate`). Scheduled for barrel removal next minor.
+ * @see TypedRouter
+ */
 export type UpdateRouteHandler = (event: ParsedUpdateEvent) => void | Promise<void>;
 
+/**
+ * @deprecated WATS-176: legacy router error record. The typed
+ * equivalent is the `DispatchReport.errors` entry shape from
+ * `typedRouter.ts`. Scheduled for barrel removal next minor.
+ * @see DispatchReport
+ */
 export interface DispatchErrorRecord {
   field: string;
   subtype?: string;
@@ -16,14 +37,32 @@ export interface DispatchErrorRecord {
   error: unknown;
 }
 
+/**
+ * @deprecated WATS-176: legacy dispatch limit error code. The typed
+ * `TypedRouter` surfaces caps via `DispatchReport.capped`. Scheduled for
+ * barrel removal next minor.
+ * @see DispatchReport
+ */
 export type DispatchLimitErrorCode = "handlers_per_event_limit_exceeded" | "dispatches_limit_exceeded";
 
+/**
+ * @deprecated WATS-176: legacy dispatch limit error. The typed
+ * equivalent is the cap reporting on `DispatchReport` from
+ * `typedRouter.ts`. Scheduled for barrel removal next minor.
+ * @see DispatchReport
+ */
 export interface DispatchLimitError {
   code: DispatchLimitErrorCode;
   message: string;
   eventIndex: number;
 }
 
+/**
+ * @deprecated WATS-176: legacy dispatch summary. Use `DispatchReport`
+ * from the typed `TypedRouter` (`typedRouter.ts`) instead. Scheduled
+ * for barrel removal next minor.
+ * @see DispatchReport
+ */
 export interface DispatchSummary {
   totalEvents: number;
   matchedHandlers: number;
@@ -36,6 +75,12 @@ export interface DispatchSummary {
   limitError?: DispatchLimitError;
 }
 
+/**
+ * @deprecated WATS-176: legacy router options. The typed equivalent is
+ * `TypedRouterOptions` from `typedRouter.ts`. Scheduled for barrel
+ * removal next minor.
+ * @see TypedRouterOptions
+ */
 export interface UpdateRouterOptions {
   maxHandlersPerEvent?: number;
   maxDispatches?: number;
@@ -47,6 +92,12 @@ interface RegisteredRoute {
   handlerIndex: number;
 }
 
+/**
+ * @deprecated WATS-176: legacy router defaults. The typed `TypedRouter`
+ * exposes its own defaults via `TypedRouterOptions` (`typedRouter.ts`).
+ * Scheduled for barrel removal next minor.
+ * @see TypedRouterOptions
+ */
 export const DEFAULT_UPDATE_ROUTER_LIMITS = {
   maxHandlersPerEvent: 64,
   maxDispatches: 10_000
@@ -66,11 +117,26 @@ function createRouteKey(field: string, subtype: string): string {
   return `${field}:${subtype}`;
 }
 
+/**
+ * @deprecated WATS-176: the untyped `UpdateRouter` is superseded by
+ * `TypedRouter` (`typedRouter.ts`), which dispatches over `TypedUpdate`
+ * with branded `TypedFilter`s. Scheduled for barrel removal next minor.
+ * @see TypedRouter
+ */
 export interface UpdateRouter {
   on(selector: UpdateRouteSelector, handler: UpdateRouteHandler): void;
   dispatch(events: readonly ParsedUpdateEvent[]): Promise<DispatchSummary>;
 }
 
+/**
+ * @deprecated WATS-176: construct a `TypedRouter` instead (see
+ * `typedRouter.ts`, re-exported as `TypedRouter` / `createTypedRouter`).
+ * The typed router dispatches over `TypedUpdate` with branded
+ * `TypedFilter`s and surfaces `DispatchReport`. Scheduled for barrel
+ * removal next minor.
+ * @see TypedRouter
+ * @see DispatchReport
+ */
 export function createUpdateRouter(options: UpdateRouterOptions = {}): UpdateRouter {
   const routesByField = new Map<string, RegisteredRoute[]>();
   const routesByFieldSubtype = new Map<string, RegisteredRoute[]>();
@@ -195,4 +261,11 @@ export function createUpdateRouter(options: UpdateRouterOptions = {}): UpdateRou
   };
 }
 
+/**
+ * @deprecated WATS-176: legacy parsed-event shape. Use `TypedUpdate`
+ * from `webhookNormalizer.ts` instead (produced by
+ * `normalizeWebhookEnvelope`). Scheduled for barrel removal next minor.
+ * @see TypedUpdate
+ * @see normalizeWebhookEnvelope
+ */
 export type { ParsedUpdateEvent } from "./updateParser.js";

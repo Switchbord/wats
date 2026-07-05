@@ -167,6 +167,19 @@ if (message.type === "unsupported") {
 
 ## Parsed update event types
 
+:::note[Deprecated]
+The untyped `parseWebhookUpdate` parser and the `createUpdateRouter` /
+`UpdateRouter` / `ParsedUpdateEvent` / `UpdateFilter` legacy surfaces
+documented in this section are now marked `@deprecated` at the type
+level. They are superseded by `normalizeWebhookEnvelope` (which emits the
+discriminated `TypedUpdate` union — see
+[webhook-normalizer](/docs/reference/webhook-normalizer)) and the typed
+[`TypedRouter`](/docs/reference/router) /
+[`filtersTyped`](/docs/reference/filters) surfaces. The legacy exports
+remain in the `@wats/core` barrel for now but are scheduled for **removal
+in the next minor release**; new code should use the typed path.
+:::
+
 `@wats/core` provides normalized parsed-event contracts for handler routing.
 
 - `ParsedUpdateEvent`
