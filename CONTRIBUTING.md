@@ -77,3 +77,7 @@ Before a PR is ready:
 ## Publication boundaries
 
 A GitHub-visible repository is not the same as an npm-ready release. Package publication remains gated on built artifacts, package smoke tests, release automation, and explicit maintainer approval.
+
+## Agent-assisted maintenance
+
+Commits from AI agents (for example, `hermes-agent`) are part of the normal workflow. Agent-authored changes go through the same CI, review, and docs gates as human-authored ones: tests, typecheck, voice checks, and redaction review. Agents do not get a bypass on the pull request checklist. Humans own releases, secrets, npm credentials, and the decision to merge. An agent can stage a change; a human ships it.
