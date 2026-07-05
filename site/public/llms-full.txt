@@ -1960,7 +1960,7 @@ Typed webhook normalization, typed filters, raw filters, routers, listener regis
 - Dependencies out: `@wats/types`, `@wats/graph`.
 - Stability: foundations-complete.
 
-The facade binds a `GraphClient`, optional `PhoneNumberClient` / `WABAClient`, a `TypedRouter`, and optional listener registry support. `WhatsApp.startChat(...)` delegates through the bound `PhoneNumberClient` to start a text conversation with any valid phone-number-like recipient — no contacts lookup. Facade composer helpers (media, location, contacts, reaction, interactive variants, template send, mark-as-read, typing indicators) require a bound `phoneNumberId` and use the same phone-number client.
+The facade binds a `GraphClient`, optional `PhoneNumberClient` / `WABAClient`, a `TypedRouter`, and optional listener registry support. `WhatsApp.sendText(...)` (alias `startChat(...)`) delegates through the bound `PhoneNumberClient` to send a text with any valid phone-number-like recipient — no contacts lookup. Facade composer helpers (media, location, contacts, reaction, interactive variants, template send, mark-as-read, typing indicators) require a bound `phoneNumberId` and use the same phone-number client.
 
 ### `@wats/config`
 
@@ -2119,7 +2119,7 @@ Primary exports:
 - legacy raw filter namespace and `@wats/core/filters` — **deprecated**, marked `@deprecated` at the type level; superseded by `filtersTyped` and scheduled for barrel removal next minor
 - `TypedRouter`
 - `createListenerRegistry`
-- `WhatsApp` facade, including `startChat(...)` and composer helpers when `phoneNumberId` is bound
+- `WhatsApp` facade and the `createWhatsApp(...)` factory, including `sendText(...)` (alias `startChat(...)`), `onMessage`/`onStatus`, and composer helpers when `phoneNumberId` is bound
 
 The `WhatsApp` facade binds:
 
