@@ -172,7 +172,7 @@ const METRICS_PATH = "/metrics";
 const DEBUG_DIAGNOSTICS_PATH = "/debug/diagnostics";
 const SERVER_START_MS = Date.now();
 const DEFAULT_OPENAPI_TITLE = "WATS Service API";
-const DEFAULT_OPENAPI_VERSION = "0.3.28";
+const DEFAULT_OPENAPI_VERSION = "0.3.29";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
