@@ -35,6 +35,7 @@ export {
 export type { WABAClientConfig } from "./subclients/wabaClient.js";
 export * from "./transport.js";
 export * from "./reliableTransport.js";
+export * from "./rateLimiter.js";
 export { createFetchTransport } from "./createFetchTransport.js";
 export type { CreateFetchTransportOptions } from "./createFetchTransport.js";
 // F-13 pagination primitive (WATS-25 / Arch-K).
