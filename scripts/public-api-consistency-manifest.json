@@ -18,7 +18,7 @@
         "site/content/docs/reference/index.mdx",
         "site/content/docs/concepts/public-api-surface.mdx",
         "site/content/docs/concepts/package-map.mdx",
-        "site/content/docs/migration/pywa.mdx",
+        "site/content/docs/guides/migrating-from-pywa.mdx",
         "CHANGELOG.md"
       ],
       "dist": "./dist/endpoints/messages.js"
@@ -38,7 +38,7 @@
         "site/content/docs/reference/index.mdx",
         "site/content/docs/concepts/public-api-surface.mdx",
         "site/content/docs/concepts/package-map.mdx",
-        "site/content/docs/migration/pywa.mdx",
+        "site/content/docs/guides/migrating-from-pywa.mdx",
         "CHANGELOG.md"
       ],
       "dist": "./dist/endpoints/media.js"
@@ -58,7 +58,7 @@
         "site/content/docs/reference/index.mdx",
         "site/content/docs/concepts/public-api-surface.mdx",
         "site/content/docs/concepts/package-map.mdx",
-        "site/content/docs/migration/pywa.mdx",
+        "site/content/docs/guides/migrating-from-pywa.mdx",
         "CHANGELOG.md"
       ],
       "dist": "./dist/endpoints/templates.js"
@@ -78,7 +78,7 @@
         "site/content/docs/reference/index.mdx",
         "site/content/docs/concepts/public-api-surface.mdx",
         "site/content/docs/concepts/package-map.mdx",
-        "site/content/docs/migration/pywa.mdx",
+        "site/content/docs/guides/migrating-from-pywa.mdx",
         "CHANGELOG.md"
       ],
       "dist": "./dist/endpoints/flows.js"
@@ -98,7 +98,7 @@
         "site/content/docs/reference/index.mdx",
         "site/content/docs/concepts/public-api-surface.mdx",
         "site/content/docs/concepts/package-map.mdx",
-        "site/content/docs/migration/pywa.mdx",
+        "site/content/docs/guides/migrating-from-pywa.mdx",
         "CHANGELOG.md"
       ],
       "dist": "./dist/endpoints/calling.js"
@@ -119,7 +119,7 @@
         "site/content/docs/reference/index.mdx",
         "site/content/docs/concepts/public-api-surface.mdx",
         "site/content/docs/concepts/package-map.mdx",
-        "site/content/docs/migration/pywa.mdx",
+        "site/content/docs/guides/migrating-from-pywa.mdx",
         "CHANGELOG.md"
       ],
       "dist": "./dist/endpoints/businessManagement.js"
@@ -139,7 +139,7 @@
         "site/content/docs/reference/index.mdx",
         "site/content/docs/concepts/public-api-surface.mdx",
         "site/content/docs/concepts/package-map.mdx",
-        "site/content/docs/migration/pywa.mdx",
+        "site/content/docs/guides/migrating-from-pywa.mdx",
         "CHANGELOG.md"
       ],
       "dist": "./dist/endpoints/groups.js"
