@@ -5,11 +5,11 @@
     "": {
       "name": "@wats-site/playground-build",
       "dependencies": {
-        "@wats/core": "0.3.28",
-        "@wats/crypto": "0.3.28",
-        "@wats/graph": "0.3.28",
-        "@wats/http": "0.3.28",
-        "@wats/types": "0.3.28",
+        "@wats/core": "0.3.29",
+        "@wats/crypto": "0.3.29",
+        "@wats/graph": "0.3.29",
+        "@wats/http": "0.3.29",
+        "@wats/types": "0.3.29",
       },
       "devDependencies": {
         "dts-bundle-generator": "9.5.1",
@@ -68,15 +68,15 @@
 
     "@esbuild/win32-x64": ["@esbuild/win32-x64@0.25.0", "", { "os": "win32", "cpu": "x64" }, "sha512-ZENoHJBxA20C2zFzh6AI4fT6RraMzjYw4xKWemRTRmRVtN9c5DcH9r/f2ihEkMjOW5eGgrwCslG/+Y/3bL+DHQ=="],
 
-    "@wats/core": ["@wats/core@0.3.28", "", { "dependencies": { "@wats/graph": "^0.3.28" } }, "sha512-L5nnh2Gv452g9qgu9CAyE/6T17kZ1kQC0hIJbV4o7D+q8RM7UEIlcjzyOykTz8C1sK4dpvec9YEmTb/OosVT2g=="],
+    "@wats/core": ["@wats/core@0.3.29", "", { "dependencies": { "@wats/graph": "^0.3.29" } }, "sha512-eMIDUltG1LNJtrWFCC9BVM0vLkswT5Ha/0wsYsU4G8fmToJVR2ucB/BqJQy/8yPOhLQzbbeJV7LzBcJEzoqmAw=="],
 
-    "@wats/crypto": ["@wats/crypto@0.3.28", "", {}, "sha512-CwDHUyn/N1XASV6O9zEkYb7xDs+3at+4AelWXtPWLWUxIVXBlmdzODOJcllgC3y29YZ0P1Gr7qyPICtmT6gC0g=="],
+    "@wats/crypto": ["@wats/crypto@0.3.29", "", {}, "sha512-WgScJqtW9Vd7prm6GLeUsLVs2/MYfgXuYmUPpRNlAkXw2VUR3xzsMRlYpzgqfjojhKsy8nAQO+qVmyhsao72VA=="],
 
-    "@wats/graph": ["@wats/graph@0.3.28", "", { "dependencies": { "@wats/crypto": "^0.3.28" } }, "sha512-W04SmY86VD4/37aZsdAJPO/hnxMC9/cNjJTNQ7DSkW0ETLz8QekLTPU2TThErYE4mziyMnRFK2ROOEb/XHEwag=="],
+    "@wats/graph": ["@wats/graph@0.3.29", "", { "dependencies": { "@wats/crypto": "^0.3.29" } }, "sha512-g8nXetXLy/vpj2mBOC4at1Yh1Ik3N2BT97ZXKkzViwt8WTgGx/HPNg4XfLAll54LLcEo9xLlMTfseG6PWXk2wg=="],
 
-    "@wats/http": ["@wats/http@0.3.28", "", { "dependencies": { "@wats/core": "^0.3.28", "@wats/crypto": "^0.3.28", "@wats/types": "^0.3.28" } }, "sha512-jT93kmQrjheAts6L2t+2JT6Nb5auvrOiGKQkoPY7F1ozrBvQFTe0Mtcn540fLJR+RJ2ihxkaV491o9xaBhkKUA=="],
+    "@wats/http": ["@wats/http@0.3.29", "", { "dependencies": { "@wats/core": "^0.3.29", "@wats/crypto": "^0.3.29", "@wats/types": "^0.3.29" } }, "sha512-kJlhblKVj/ex/C0VzbMt+Qe7d4t+/EJ9+UHajZQ6w9v9tHnBW0hcCAdoSk1rED7IS1Na+LtTtEVcezjKdoNTTg=="],
 
-    "@wats/types": ["@wats/types@0.3.28", "", {}, "sha512-MeIpwW7ThTKUBRU5/QGYVc/Ro2bpijI9FzBdluDqmEPYzi2vnOxDhQXQh/7CLl18MVMyhVlKGPn3aung0XLQZQ=="],
+    "@wats/types": ["@wats/types@0.3.29", "", {}, "sha512-jbPG8ukdkZVerVwEJLfbAj8BLGDMwG84/eHltLjPFYVogwVEz8kiqQRlw8OMp12wsYs74wgOgUtyb6Ne/oB+gw=="],
 
     "ansi-regex": ["ansi-regex@5.0.1", "", {}, "sha512-quJQXlTSUGL2LH9SUXo8VwsY4soanhgo6LNSm84E1LBcE8s3O0wpdiRzyR9z/ZZJMlMWv37qOOb9pdJlMUEKFQ=="],
 

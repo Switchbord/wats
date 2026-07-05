@@ -9,11 +9,11 @@
     "smoke": "bun run smoke.ts"
   },
   "dependencies": {
-    "@wats/core": "0.3.28",
-    "@wats/graph": "0.3.28",
-    "@wats/http": "0.3.28",
-    "@wats/types": "0.3.28",
-    "@wats/crypto": "0.3.28"
+    "@wats/core": "0.3.29",
+    "@wats/graph": "0.3.29",
+    "@wats/http": "0.3.29",
+    "@wats/types": "0.3.29",
+    "@wats/crypto": "0.3.29"
   },
   "devDependencies": {
     "esbuild": "0.25.0",
