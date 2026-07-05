@@ -64,6 +64,7 @@ import {
   type GraphMessagesSendTemplateInput,
   type GraphMessagesSendMarketingTemplateInput,
   type GraphMessagesMarketingTemplateResponse,
+  type GraphMessagesTextPayload,
   type GraphMessagesSendTextInput,
   type GraphMessagesSendVideoInput,
   type GraphMessagesTypingIndicatorInput,
@@ -911,20 +912,30 @@ export class WhatsApp {
     if (record.replyToMessageId !== undefined && (typeof record.replyToMessageId !== "string" || record.replyToMessageId.length === 0)) {
       throw new GraphRequestValidationError("Invalid WhatsApp.sendGroupMessage input: replyToMessageId must be a non-empty string when provided.");
     }
-    const body: Record<string, unknown> = {
+    // WATS-176: build the send body as a typed `GraphMessagesTextPayload`
+    // (a member of `GraphMessagesSendBody`) instead of an untyped
+    // `Record<string, unknown>` cast through `as never`. The `group`
+    // recipient_type is a valid `GraphMessagesRecipientType`, and the
+    // text-payload shape already covers `recipient_type`, `to`, `text`
+    // (with optional `preview_url`), and optional `context` — so no
+    // type widening or escape is needed. Behavior is unchanged: the
+    // endpoint-registry `sendMessage` callable still re-validates the
+    // group recipient + body shape at the Graph boundary.
+    const text: GraphMessagesTextPayload["text"] = { body: record.text };
+    if (record.previewUrl !== undefined) {
+      text.preview_url = record.previewUrl;
+    }
+    const body: GraphMessagesTextPayload = {
       messaging_product: "whatsapp",
       recipient_type: "group",
       to: record.groupId,
       type: "text",
-      text: { body: record.text }
+      text
     };
-    if (record.previewUrl !== undefined) {
-      (body.text as { preview_url?: boolean }).preview_url = record.previewUrl;
-    }
     if (record.replyToMessageId !== undefined) {
       body.context = { message_id: record.replyToMessageId };
     }
-    return this.#phoneNumberClient.sendMessage(body as never);
+    return this.#phoneNumberClient.sendMessage(body);
   }
 
   async sendImage(
