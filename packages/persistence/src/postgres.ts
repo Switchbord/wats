@@ -1,6 +1,7 @@
 import {
   CURRENT_SCHEMA_VERSION,
   PersistenceError,
+  type LatestInboundMessageInput,
   type ListMessagesInput,
   type ListMessagesResult,
   type MessageDirection,
@@ -135,6 +136,15 @@ const POSTGRES_MIGRATIONS: readonly MigrationDefinition[] = Object.freeze([
         timestamp TEXT NOT NULL
       )`,
       `CREATE INDEX IF NOT EXISTS wats_message_status_events_wa_message_id_idx ON wats_message_status_events (wa_message_id, id)`
+    ])
+  },
+  {
+    id: "004_inbound_window_index",
+    version: 4,
+    checksum: "sha256:wats-persistence-004-inbound-window-index-v1",
+    statements: Object.freeze([
+      `CREATE INDEX IF NOT EXISTS wats_messages_direction_from_phone_created_at_idx
+        ON wats_messages (direction, from_phone, created_at DESC)`
     ])
   }
 ]);
@@ -654,6 +664,21 @@ class PostgresPersistenceStore implements PersistenceStore {
     const items = Object.freeze(pageRows.map((row) => messageRowToRecord(row)));
     const nextCursor = rows.length > query.limit ? items[items.length - 1]?.rowId ?? null : null;
     return Object.freeze({ items, nextCursor });
+  }
+
+  async getLatestInboundMessageAt(input: LatestInboundMessageInput): Promise<string | null> {
+    this.#assertOpen();
+    const record = validateRecordInput(input, "latest inbound lookup");
+    const phone = validateRecordString(record.phone, "phone");
+    const result = await this.#client.query<{ created_at: string }>(
+      `SELECT created_at FROM wats_messages
+       WHERE direction = 'inbound' AND from_phone = $1
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [phone]
+    );
+    const row = result.rows[0];
+    return row === undefined ? null : row.created_at;
   }
 
   async close(): Promise<void> {
