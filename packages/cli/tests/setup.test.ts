@@ -557,6 +557,33 @@ profiles:
     }
   });
 
+  test("dist setup fails fast with a wats init pointer when stdin is not a TTY (non-interactive)", () => {
+    const dir = makeTempDir();
+    try {
+      const completed = spawnSync("bun", [distEntrypoint, "setup"], {
+        cwd: dir,
+        input: "",
+        encoding: "utf8",
+        timeout: 5_000
+      });
+      expect(completed.error, `${completed.stdout}\n${completed.stderr}`).toBeUndefined();
+      expect(completed.signal).toBeNull();
+      expect(completed.status, completed.stderr).toBe(1);
+      // Fail fast BEFORE printing any prompt: stdout stays empty.
+      expect(completed.stdout).toBe("");
+      // Typed error plus a pointer to the non-interactive scaffolding path.
+      expect(completed.stderr).toContain("SetupNonInteractiveError");
+      expect(completed.stderr).toContain("wats init");
+      expect(completed.stderr).toContain(".env.local");
+      expect(completed.stderr).toContain("wats setup --help");
+      expectNoSecrets(`${completed.stdout}\n${completed.stderr}`);
+      expect(existsSync(join(dir, "wats.config.yaml"))).toBe(false);
+      expect(existsSync(join(dir, ".env.local"))).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test(".env.local remains gitignored by repository policy", () => {
     expect(read(join(repoRoot, ".gitignore"))).toContain(".env.*");
   });
