@@ -3,7 +3,7 @@
 - status: maintainer-runbook
 - applies-to: WATS-110
 - publicDocs: excluded because maintainer runbooks live outside `site/content/docs`
-- lastReviewed: 2026-06-21
+- lastReviewed: 2026-07-05
 
 ## Purpose
 
@@ -266,6 +266,8 @@ Repo-side (done by this change):
       performs `npm publish`.
 
 Human-blocked (cannot be completed or faked from the repo):
+
+> These items remain the launch gate for the first real `@wats/*` publish as of 2026-07-05. Do not announce general availability while any are unchecked.
 
 - [ ] npm org `wats` has 2FA enforced for all members (org settings).
 - [ ] Every publisher account has account-level 2FA (`auth-and-writes`).
