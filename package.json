@@ -14,7 +14,8 @@
     "api:check": "bun run scripts/check-public-api-consistency.ts",
     "publish:dry-run": "bun run scripts/npm-publish-dry-run.ts",
     "examples:minimal-bot": "bun run --cwd examples/minimal-bot demo",
-    "examples:groups": "bun run --cwd examples/groups demo"
+    "examples:groups": "bun run --cwd examples/groups demo",
+    "examples:webhook-echo-bot": "bun run --cwd examples/webhook-echo-bot demo"
   },
   "devDependencies": {
     "@scalar/api-reference": "^1.55.1",
@@ -28,6 +29,7 @@
     "packages/testing/fixtures/*",
     "examples/minimal-bot",
     "examples/groups",
+    "examples/webhook-echo-bot",
     "site"
   ]
 }
