@@ -2266,6 +2266,12 @@ async function handleWebhook(ctx: RuntimeConfig, request: Request): Promise<Resp
     } catch {
       // Preserve WebhookAdapter's acknowledge-on-handler-failure contract.
     }
+    // WATS-175c: record an inbound projection for message-kind updates.
+    // Isolated from dispatch — projection failures are swallowed inside
+    // recordInboundProjection so they never break the ACK. Run after the
+    // dispatch attempt so the projection reflects every normalized message
+    // regardless of handler outcome.
+    await recordInboundProjection(ctx, update);
   }
   return jsonResponse(200, { status: "ok", received: dispatches.length, dispatched, skipped: 0 });
 }
@@ -2329,6 +2335,45 @@ async function recordOutboundProjection(
     recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "success");
   } catch {
     // Best-effort; projection failure must not break the send response.
+    recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "error");
+  }
+}
+
+// WATS-175c: inbound message projection. Mirrors recordOutboundProjection but
+// records the inbound half of a conversation. Called from the webhook
+// dispatch loop only for `message`-kind normalized updates; status/account/
+// other kinds are skipped. Persistence failure is isolated exactly like the
+// outbound path: it records a persistence-operation error and returns — a
+// projection failure must NEVER break the webhook ACK (the 200 is returned to
+// Meta regardless).
+async function recordInboundProjection(ctx: RuntimeConfig, update: unknown): Promise<void> {
+  if (ctx.persistence === undefined) return;
+  if (!isRecord(update)) return;
+  const kind = typeof update.kind === "string" ? update.kind : null;
+  if (kind !== "message") return;
+  const message = (update as { message?: unknown }).message;
+  if (!isRecord(message)) return;
+  const waMessageId = typeof message.id === "string" ? message.id : null;
+  if (waMessageId === null) return;
+  const fromPhone = typeof message.from === "string" ? message.from : null;
+  const messageType = typeof message.type === "string" ? message.type : null;
+  if (messageType === null) return;
+  const now = new Date().toISOString();
+  const rowId = cryptoRandomId();
+  try {
+    await ctx.persistence.recordMessage({
+      rowId,
+      waMessageId,
+      direction: "inbound",
+      ...(fromPhone !== null ? { fromPhone } : {}),
+      type: messageType,
+      status: "received",
+      createdAt: now,
+      updatedAt: now
+    });
+    recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "success");
+  } catch {
+    // Projection failure must not break the webhook ACK.
     recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "error");
   }
 }
