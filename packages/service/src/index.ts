@@ -40,6 +40,10 @@ import {
 import type { CryptoProvider } from "@wats/crypto";
 import type { PersistenceStore } from "@wats/persistence";
 import {
+  getConversationWindowState,
+  type ConversationWindowState
+} from "@wats/persistence";
+import {
   createFetchWebhookHandler,
   createWebhookAdapter,
   type WebhookFacadeLike
@@ -152,6 +156,7 @@ interface RuntimeConfig {
   readonly apiPrefix: string;
   readonly textPath: string;
   readonly messagesPath: string;
+  readonly conversationsPath: string;
   readonly enableGroupRoutes: boolean;
   readonly groupsPath: string;
   readonly metrics: MetricsRegistry;
@@ -278,6 +283,7 @@ function validatePersistence(value: unknown): PersistenceStore | undefined {
     typeof value.appendMessageStatus !== "function" ||
     typeof value.getMessage !== "function" ||
     typeof value.listMessages !== "function" ||
+    typeof value.getLatestInboundMessageAt !== "function" ||
     typeof value.close !== "function"
   ) {
     throw new WatsServiceError("invalid_persistence", "persistence must be a PersistenceStore.");
@@ -438,7 +444,8 @@ function buildRouteInventory(ctx: RuntimeConfig): string[] {
     ctx.webhookPath,
     ctx.textPath,
     ctx.messagesPath,
-    `${ctx.messagesPath}/:id`
+    `${ctx.messagesPath}/:id`,
+    `${ctx.conversationsPath}/:phone/window`
   ];
   if (ctx.enableGroupRoutes) {
     routes.push(
@@ -966,6 +973,7 @@ function templateRouteLabel(ctx: RuntimeConfig, path: string): string {
   if (path === ctx.textPath) return ctx.textPath;
   if (path === ctx.messagesPath) return ctx.messagesPath;
   if (path.startsWith(`${ctx.messagesPath}/`)) return `${ctx.messagesPath}/:id`;
+  if (path.startsWith(`${ctx.conversationsPath}/`) && path.endsWith("/window")) return `${ctx.conversationsPath}/:phone/window`;
   if (ctx.enableGroupRoutes) {
     const match = matchGroupRoute(ctx, path);
     if (match !== null) {
@@ -1629,6 +1637,17 @@ function createOpenApiSchemas(enableGroupRoutes = false): Record<string, Record<
         nextCursor: { type: "string", nullable: true, description: "rowId of the last returned item when more rows may exist; null otherwise." }
       }
     },
+    ConversationWindowState: {
+      type: "object",
+      additionalProperties: false,
+      required: ["open", "lastInboundAt", "expiresAt", "remainingMs"],
+      properties: {
+        open: { type: "boolean", description: "True when the 24-hour customer-service window is open (a recent inbound message exists within windowMs)." },
+        lastInboundAt: { type: "string", nullable: true, description: "ISO 8601 timestamp (ms precision) of the most recent inbound message from this phone; null when none." },
+        expiresAt: { type: "string", nullable: true, description: "ISO 8601 timestamp (ms precision) when the window closes; null when unknown or closed." },
+        remainingMs: { type: "integer", minimum: 0, description: "Milliseconds remaining before the window closes; 0 when closed or unknown." }
+      }
+    },
     MessageStatusEvent: {
       type: "object",
       additionalProperties: false,
@@ -1662,6 +1681,7 @@ export function createWatsServiceOpenApiDocument(
   assertNoRouteCollisions(webhookPath, apiPrefix, options.enableGroupRoutes === true);
   const textPath = `${apiPrefix}/messages/text`;
   const messagesPath = `${apiPrefix}/messages`;
+  const conversationsPath = `${apiPrefix}/conversations`;
   const groupsPath = `${apiPrefix}/groups`;
   const groupPath = `${groupsPath}/{groupId}`;
   const groupInvitePath = `${groupPath}/invite-link`;
@@ -1810,6 +1830,24 @@ export function createWatsServiceOpenApiDocument(
           "400": errorResponseSpec("Malformed message id."),
           "401": errorResponseSpec("Missing or invalid service bearer token."),
           "404": errorResponseSpec("Message not found."),
+          "405": errorResponseSpec("Method not allowed."),
+          "503": errorResponseSpec("No persistence store is configured.")
+        }
+      }
+    },
+    [`${conversationsPath}/{phone}/window`]: {
+      get: {
+        tags: ["conversations"],
+        summary: "Get the 24-hour customer-service-window state for a phone number",
+        description: "Returns the conversation-window state (open/closed, last inbound timestamp, expiry, remaining ms) computed from the injected persistence store via getConversationWindowState. Requires the service bearer token. On a missing or mismatched token the service returns 404 (not 401) so the endpoint's existence is not leaked, matching /metrics. Returns 503 persistence_not_configured when no persistence store is configured. The phone path param is validated strictly: an optional leading + followed by 1..15 digits.",
+        security: [{ serviceBearerAuth: [] }],
+        parameters: [
+          { name: "phone", in: "path", required: true, schema: { type: "string", pattern: "^\\+?\\d{1,15}$", minLength: 1, maxLength: 16 }, description: "Customer phone number (E.164-ish: optional leading +, 1..15 digits)." }
+        ],
+        responses: {
+          "200": okResponseSpec("Conversation window state.", "ConversationWindowState"),
+          "400": errorResponseSpec("Malformed phone path param."),
+          "404": errorResponseSpec("Route not found, or bearer token missing/invalid (existence hidden)."),
           "405": errorResponseSpec("Method not allowed."),
           "503": errorResponseSpec("No persistence store is configured.")
         }
@@ -2559,6 +2597,58 @@ async function handleGetMessage(ctx: RuntimeConfig, request: Request, path: stri
   }
 }
 
+// WATS-175c: strict phone path-param validator. Reuses the same E.164-ish
+// shape @wats/graph's assertValidRecipient enforces for outbound `to`
+// recipients: an optional leading + followed by 1..15 digits. Bounded length
+// keeps the route label low-cardinality and rejects path-traversal/CR-LF
+// attempts in one shot.
+const PHONE_PATH_RE = /^\+?\d{1,15}$/u;
+
+// WATS-175c: GET /api/conversations/:phone/window. Returns the 24-hour
+// customer-service-window state for a phone number, computed from the
+// injected persistence store via getConversationWindowState. Auth uses the
+// existence-hiding posture (404 byte-identical to the catch-all on a missing
+// or mismatched bearer token), matching /metrics rather than the sibling
+// /api/messages routes (401): the conversation-window endpoint is an operator
+// surface, not a public send surface, so its existence is hidden. Requires
+// persistence (503 persistence_not_configured when absent, matching
+// /api/messages).
+async function handleConversationWindow(
+  ctx: RuntimeConfig,
+  request: Request,
+  path: string
+): Promise<Response> {
+  if (!isAuthorized(request, ctx.secrets.serviceBearerToken)) return notFound();
+  if (request.method.toUpperCase() !== "GET") return methodNotAllowed("GET");
+  if (ctx.persistence === undefined) {
+    return errorResponse(503, "persistence_not_configured", "Conversation window state requires a persistence store.");
+  }
+  const prefix = `${ctx.conversationsPath}/`;
+  const suffix = "/window";
+  if (!path.startsWith(prefix) || !path.endsWith(suffix) || path.length <= prefix.length + suffix.length) {
+    return notFound();
+  }
+  const segment = path.slice(prefix.length, path.length - suffix.length);
+  let phone: string;
+  try {
+    phone = decodeURIComponent(segment);
+  } catch {
+    return errorResponse(400, "malformed_path", "phone path segment is invalid.");
+  }
+  if (!PHONE_PATH_RE.test(phone)) {
+    return errorResponse(400, "malformed_path", "phone must be digits with an optional leading +, 1..15 characters.");
+  }
+  try {
+    const now = new Date().toISOString();
+    const state: ConversationWindowState = await getConversationWindowState(ctx.persistence, { phone, now });
+    recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "success");
+    return jsonResponse(200, state);
+  } catch {
+    recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "error");
+    return errorResponse(503, "persistence_not_configured", "Conversation window state requires a persistence store.");
+  }
+}
+
 function matchGroupRoute(ctx: RuntimeConfig, path: string): ServiceRouteMatch | null {
   if (path === ctx.groupsPath) return { route: "groups" };
   if (!path.startsWith(`${ctx.groupsPath}/`)) return null;
@@ -2882,6 +2972,7 @@ function makeRuntimeConfig(config: WatsServiceConfig): RuntimeConfig {
     apiPrefix,
     textPath: `${apiPrefix}/messages/text`,
     messagesPath: `${apiPrefix}/messages`,
+    conversationsPath: `${apiPrefix}/conversations`,
     enableGroupRoutes,
     groupsPath: `${apiPrefix}/groups`,
     metrics: metricsRegistry,
@@ -2972,6 +3063,15 @@ export function createWatsServiceApp(config: WatsServiceConfig): WatsServiceApp 
     if (path.startsWith(`${ctx.messagesPath}/`)) {
       if (method !== "GET") return methodNotAllowed("GET");
       return handleGetMessage(ctx, request, path);
+    }
+
+    // WATS-175c: GET /api/conversations/:phone/window. Auth is checked
+    // inside the handler (existence-hiding 404, before method), mirroring
+    // /metrics rather than the sibling /api/messages routes. Matched by
+    // prefix + /window suffix so the handler can extract and validate the
+    // phone segment.
+    if (path.startsWith(`${ctx.conversationsPath}/`) && path.endsWith("/window")) {
+      return handleConversationWindow(ctx, request, path);
     }
 
     return notFound();

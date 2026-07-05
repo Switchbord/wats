@@ -46,6 +46,7 @@ function memoryStore() {
     async appendMessageStatus() {},
     async getMessage(): Promise<MessageRecord | null> { return null; },
     async listMessages() { return { items: [] as readonly MessageRecord[], nextCursor: null }; },
+    async getLatestInboundMessageAt(): Promise<string | null> { return null; },
     async close() {}
   };
 }
