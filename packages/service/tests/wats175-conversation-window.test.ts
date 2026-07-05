@@ -182,6 +182,20 @@ describe("WATS-175c GET /api/conversations/:phone/window", () => {
     expect(body.remainingMs).toBeGreaterThan(0);
   });
 
+  test("E.164 plus-prefixed path matches digits-only stored inbound phone", async () => {
+    const persistence = memoryStore();
+    const app = createWatsServiceApp({ ...config(), persistence });
+    await postInboundWebhook(app, "15550001111", "wamid.WIN.PLUS");
+
+    // Meta stores sender phones as bare digits; the endpoint accepts a
+    // leading + and must strip it before the store lookup.
+    const res = await app.fetch(new Request("https://service.test/api/conversations/%2B15550001111/window", authedGet()));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.open).toBe(true);
+    expect(body.lastInboundAt).not.toBeNull();
+  });
+
   test("closed window when no inbound message exists", async () => {
     const persistence = memoryStore();
     const app = createWatsServiceApp({ ...config(), persistence });

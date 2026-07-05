@@ -1892,7 +1892,7 @@ if (!open) {
 }
 ```
 
-The helper only sees inbound rows projected into `wats_messages`. The service projects outbound sends automatically; inbound projection wiring is landing separately, so until it ships the helper returns `closed` for every phone — the safe default (send a template). See the [Persistence Reference](/docs/reference/persistence) for the window state shape.
+The helper only sees inbound rows projected into `wats_messages`. The service projects both outbound sends and inbound messages automatically when a persistence store is configured. With no inbound rows for a phone the helper returns `closed` — the safe default (send a template). See the [Persistence Reference](/docs/reference/persistence) for the window state shape.
 
 ## Outbox worker with metrics
 

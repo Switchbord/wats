@@ -78,6 +78,7 @@ describe("WATS-161 telemetry privacy model and metric taxonomy", () => {
     expect(doc).toContain("graph_operations_total");
     expect(doc).toContain("http_request_duration_seconds");
     expect(doc).toContain("outbox_depth");
+    expect(doc).toContain("outbox_processed_total");
   });
 
   test("doc defines an explicit allowlist of label keys", () => {

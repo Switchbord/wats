@@ -1828,7 +1828,7 @@ function createOpenApiSchemas(enableGroupRoutes = false): Record<string, Record<
       properties: {
         open: { type: "boolean", description: "True when the 24-hour customer-service window is open (a recent inbound message exists within windowMs)." },
         lastInboundAt: { type: "string", nullable: true, description: "ISO 8601 timestamp (ms precision) of the most recent inbound message from this phone; null when none." },
-        expiresAt: { type: "string", nullable: true, description: "ISO 8601 timestamp (ms precision) when the window closes; null when unknown or closed." },
+        expiresAt: { type: "string", nullable: true, description: "ISO 8601 timestamp (ms precision) when the window closes or closed (lastInboundAt + windowMs); null when no inbound message exists." },
         remainingMs: { type: "integer", minimum: 0, description: "Milliseconds remaining before the window closes; 0 when closed or unknown." }
       }
     },
@@ -2822,14 +2822,19 @@ async function handleConversationWindow(
   if (!PHONE_PATH_RE.test(phone)) {
     return errorResponse(400, "malformed_path", "phone must be digits with an optional leading +, 1..15 characters.");
   }
+  // Meta's webhook payloads carry sender phones as bare digits (no +), and
+  // recordInboundProjection stores message.from verbatim. Strip an optional
+  // leading + before the store lookup so E.164-formatted queries
+  // (/api/conversations/+15550001111/window) match the stored rows.
+  const lookupPhone = phone.startsWith("+") ? phone.slice(1) : phone;
   try {
     const now = new Date().toISOString();
-    const state: ConversationWindowState = await getConversationWindowState(ctx.persistence, { phone, now });
+    const state: ConversationWindowState = await getConversationWindowState(ctx.persistence, { phone: lookupPhone, now });
     recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "success");
     return jsonResponse(200, state);
   } catch {
     recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "error");
-    return errorResponse(503, "persistence_not_configured", "Conversation window state requires a persistence store.");
+    return errorResponse(503, "conversation_window_unavailable", "Conversation window state could not be computed.");
   }
 }
 
