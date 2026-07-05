@@ -219,6 +219,18 @@ describe("wats doctor offline diagnostics", () => {
     }
   });
 
+  test("without --config points to wats init instead of opaque invalid arguments", () => {
+    const result = runCli(["doctor"]);
+    expect(result.exitCode, result.stderr).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain("No config path was provided");
+    expect(result.stderr).toContain("wats init");
+    expect(result.stderr).toContain("--config");
+    expect(result.stderr).toContain("wats doctor --help");
+    expect(result.stderr).not.toContain("Invalid doctor arguments");
+    expectNoSecrets(result.stderr);
+  });
+
   test("unsafe arguments fail closed without echoing attacker values", () => {
     const cases = [
       ["--config"],

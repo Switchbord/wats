@@ -53,24 +53,37 @@ The CLI does not:
 
 ## First-run flow
 
+`wats init` writes `wats.config.yaml` and `.env.example` only — it does not
+create a `package.json` or `tsconfig.json`. From an empty directory, bootstrap
+a TypeScript project and add the WATS runtime packages first, then run the
+CLI onboarding commands:
+
 ```bash
+mkdir ./my-bot && cd ./my-bot
+bun init -y
+bun add @wats/core @wats/graph @wats/http
+bun add @wats/config @wats/service
 wats init --dry-run
-wats init ./my-bot --format yaml --profile local
-cd ./my-bot
+wats init --format yaml --profile local
 wats config validate --config wats.config.yaml
 wats --version
 wats doctor --config wats.config.yaml --check-env
 wats serve --config wats.config.yaml --dry-run
 ```
 
-1. Preview generated files with `wats init --dry-run`.
-2. Generate config/env placeholder files with `wats init`.
-3. Validate the generated config through `@wats/config`.
-4. Run doctor offline diagnostics.
-5. Start a local dry-run service wrapper around `@wats/service`.
+1. Create a project directory and a TypeScript baseline with `bun init -y`.
+2. Add the WATS runtime packages (`@wats/core`, `@wats/graph`, `@wats/http`,
+   `@wats/config`, `@wats/service`).
+3. Preview generated files with `wats init --dry-run`.
+4. Generate config/env placeholder files with `wats init`.
+5. Validate the generated config through `@wats/config`.
+6. Run doctor offline diagnostics.
+7. Start a local dry-run service wrapper around `@wats/service`.
 
 There is no `wats init --yes` flag. Non-interactive setup passes the target
-directory, format, and profile explicitly as shown above.
+directory, format, and profile explicitly as shown above. `wats setup` is an
+interactive wizard that needs a terminal (TTY stdin); in non-interactive
+shells use `wats init` and edit `.env.local` instead.
 
 ## Env placeholder policy
 

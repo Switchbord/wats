@@ -159,7 +159,7 @@ function createBufferedPrompt(): CliPromptProvider {
 }
 
 const processPrompt = process.stdin?.isTTY === true ? createTtyPrompt() : createBufferedPrompt();
-const result = await runCli(process.argv.slice(2), { prompt: processPrompt }).finally(() => {
+const result = await runCli(process.argv.slice(2), { prompt: processPrompt, stdin: process.stdin }).finally(() => {
   (processPrompt as PromptWithClose).close?.();
 });
 
