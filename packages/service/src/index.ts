@@ -284,6 +284,7 @@ function validatePersistence(value: unknown): PersistenceStore | undefined {
     typeof value.getMessage !== "function" ||
     typeof value.listMessages !== "function" ||
     typeof value.getLatestInboundMessageAt !== "function" ||
+    typeof value.countOutboxPending !== "function" ||
     typeof value.close !== "function"
   ) {
     throw new WatsServiceError("invalid_persistence", "persistence must be a PersistenceStore.");

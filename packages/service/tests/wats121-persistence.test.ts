@@ -21,6 +21,7 @@ type MemoryStore = {
   getMessage(input: { waMessageId: string }): Promise<MessageRecord | null>;
   listMessages(input: { limit: number; beforeRowId?: string }): Promise<{ items: readonly MessageRecord[]; nextCursor: string | null }>;
   getLatestInboundMessageAt(input: { phone: string }): Promise<string | null>;
+  countOutboxPending(): Promise<number>;
   close(): Promise<void>;
 };
 
@@ -56,6 +57,7 @@ function memoryStore(): MemoryStore {
     async getMessage() { return null; },
     async listMessages() { return { items: [], nextCursor: null }; },
     async getLatestInboundMessageAt() { return null; },
+    async countOutboxPending() { return 0; },
     async close() {}
   };
 }

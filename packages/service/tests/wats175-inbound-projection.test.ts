@@ -38,6 +38,7 @@ type MemoryStore = {
   appendMessageStatus(input: { waMessageId: string; status: string; timestamp: string }): Promise<void>;
   getMessage(input: { waMessageId: string }): Promise<StoredMessage | null>;
   getLatestInboundMessageAt(input: { phone: string }): Promise<string | null>;
+  countOutboxPending(): Promise<number>;
   listMessages(input: { limit: number; beforeRowId?: string }): Promise<{ items: StoredMessage[]; nextCursor: string | null }>;
   migrate(): Promise<{ currentVersion: number; appliedMigrations: readonly string[]; alreadyCurrent: boolean }>;
   health(): Promise<{ ok: boolean; backend: "sqlite"; currentVersion: number; redactedLocation: string }>;
@@ -84,6 +85,9 @@ function memoryStore(): MemoryStore {
         if (latest === null || row.createdAt.localeCompare(latest) > 0) latest = row.createdAt;
       }
       return latest;
+    },
+    async countOutboxPending() {
+      return 0;
     },
     async listMessages(input) {
       const all = Array.from(this.messages.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));

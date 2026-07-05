@@ -681,6 +681,16 @@ class PostgresPersistenceStore implements PersistenceStore {
     return row === undefined ? null : row.created_at;
   }
 
+  async countOutboxPending(): Promise<number> {
+    this.#assertOpen();
+    const result = await this.#client.query<{ count: string | number }>(
+      "SELECT COUNT(*) AS count FROM wats_outbox WHERE status = $1",
+      ["pending"]
+    );
+    const row = result.rows[0];
+    return row === undefined ? 0 : numeric(row.count);
+  }
+
   async close(): Promise<void> {
     if (this.#closed) return;
     this.#closed = true;

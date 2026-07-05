@@ -781,6 +781,14 @@ class SqlitePersistenceStore implements PersistenceStore {
     return row === null ? null : row.created_at;
   }
 
+  async countOutboxPending(): Promise<number> {
+    this.#assertOpen();
+    const row = this.#database.query<{ count: number }>(
+      "SELECT COUNT(*) AS count FROM wats_outbox WHERE status = ?"
+    ).get("pending");
+    return row === null ? 0 : row.count;
+  }
+
   async close(): Promise<void> {
     if (this.#closed) return;
     this.#closed = true;

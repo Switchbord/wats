@@ -47,6 +47,7 @@ function memoryStore() {
     async getMessage(): Promise<MessageRecord | null> { return null; },
     async listMessages() { return { items: [] as readonly MessageRecord[], nextCursor: null }; },
     async getLatestInboundMessageAt(): Promise<string | null> { return null; },
+    async countOutboxPending(): Promise<number> { return 0; },
     async close() {}
   };
 }

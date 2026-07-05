@@ -42,6 +42,8 @@ const windowState: ConversationWindowState = await getConversationWindowState(st
 checks.conversationWindowHelper = checks.conversationWindowHelper && windowState.open === false && windowState.lastInboundAt === null;
 checks.canSendFreeFormHelper = checks.canSendFreeFormHelper && (await canSendFreeForm(store, { phone: "15550001111", now: "2026-06-01T00:00:00.000Z" })) === false;
 
+checks.countOutboxPending = typeof store.countOutboxPending === "function" && (await store.countOutboxPending()) === 0;
+
 await store.close();
 
 console.log(JSON.stringify({ ok: Object.values(checks).every(Boolean), checks }));

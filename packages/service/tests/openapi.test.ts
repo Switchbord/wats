@@ -88,6 +88,7 @@ describe("WATS-35 OpenAPI document generator", () => {
     expect(doc.servers).toEqual([{ url: "https://service.test" }]);
 
     expect(Object.keys(doc.paths).sort()).toEqual([
+      "/api/conversations/{phone}/window",
       "/api/messages",
       "/api/messages/text",
       "/api/messages/{messageId}",
@@ -205,6 +206,7 @@ describe("WATS-35 OpenAPI document generator", () => {
       "/openapi.json",
       "/readyz",
       "/status",
+      "/v1/internal/conversations/{phone}/window",
       "/v1/internal/messages",
       "/v1/internal/messages/text",
       "/v1/internal/messages/{messageId}"

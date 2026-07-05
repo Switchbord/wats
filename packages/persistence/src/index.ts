@@ -170,6 +170,7 @@ export interface PersistenceStore {
   getMessage(input: { waMessageId: string }): Promise<MessageRecord | null>;
   listMessages(input: ListMessagesInput): Promise<ListMessagesResult>;
   getLatestInboundMessageAt(input: LatestInboundMessageInput): Promise<string | null>;
+  countOutboxPending(): Promise<number>;
   close(): Promise<void>;
 }
 
