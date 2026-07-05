@@ -78,6 +78,7 @@ If you inject your own `whatsapp` facade, these flags do nothing. The service pa
 | `${profile.service.apiPrefix}/messages` | POST | service bearer | Sends a supported generic text, media, location, reaction, contacts, or interactive message body through Graph; group text/pin bodies are accepted only when `enableGroupRoutes` is true. |
 | `${profile.service.apiPrefix}/messages` | GET | service bearer | Lists the projected outbound message send-attempt page (newest-first) when a `PersistenceStore` is injected. |
 | `${profile.service.apiPrefix}/messages/{messageId}` | GET | service bearer | Returns a single projected message record by WhatsApp message id (`wamid.*`) when a `PersistenceStore` is injected. |
+| `${profile.service.apiPrefix}/conversations/{phone}/window` | GET | service bearer | Returns the 24-hour customer-service window state for a phone number when a `PersistenceStore` is injected. Auth uses the existence-hiding posture (404 byte-identical to the catch-all on a missing or mismatched token), matching `/metrics` rather than the sibling `/api/messages` routes. Returns `503 persistence_not_configured` when no store is injected. |
 | `${profile.service.apiPrefix}/groups` | GET, POST | service bearer | Opt-in (`enableGroupRoutes`) list/create Groups using the configured business phone-number id. |
 | `${profile.service.apiPrefix}/groups/{groupId}` | GET, POST, DELETE | service bearer | Opt-in get/update/delete a Group. |
 | `${profile.service.apiPrefix}/groups/{groupId}/invite-link` | GET, POST | service bearer | Opt-in get/reset a Group invite link. |
@@ -125,6 +126,8 @@ Metric families:
 | `graph_operations_total` | counter | `endpoint_family`, `status_class`, `outcome` |
 | `send_outcomes_total` | counter | `endpoint_family`, `outcome` |
 | `persistence_operations_total` | counter | `adapter`, `outcome` — absent entirely when no `PersistenceStore` is injected |
+| `outbox_depth` | gauge | `adapter`, `state` — registry-only (not forwarded to `TelemetrySink`); the shipped reporter sets only `state="pending"` from `OutboxWorkerTickReport.pending` |
+| `outbox_processed_total` | counter | `outcome` — emitted only when an outbox metrics reporter is wired to `startOutboxWorker` |
 
 `route` values are templated (`/api/messages/:id`, `/api/groups/:groupId`) — never a raw id. `update_kind` and `endpoint_family` values are enum-clamped to `unknown` when the underlying data doesn't match a known category, so a malformed webhook or an unexpected Graph path can never inject an arbitrary label value. Labels never carry phone numbers, WAMIDs, message text, or tokens.
 
@@ -177,6 +180,7 @@ Methods are intentionally synchronous so the calling code never awaits a remote 
 | `send_outcomes_total` | `wats.graph.endpoint_family`, `wats.operation.outcome` | |
 | `webhook_normalization_total` | `wats.webhook.update_kind`, `wats.operation.outcome` | update kind enum-clamped |
 | `persistence_operations_total` | `wats.persistence.adapter`, `wats.operation.outcome` | absent when no `PersistenceStore` is injected |
+| `outbox_processed_total` | `wats.operation.outcome` | emitted only when an outbox metrics reporter is wired to `startOutboxWorker` |
 
 Use `OTEL_ATTR.httpRoute`, `OTEL_ATTR.operationOutcome`, and the other exported constants instead of hard-coding the dotted strings. `incrementCounter` and `recordHistogram` are required; `recordSpan` and `recordEvent` are optional and are currently reserved for future request-scoped instrumentation. No `@opentelemetry/*` package appears in WATS runtime dependencies.
 
@@ -404,6 +408,8 @@ Example:
 - `appendMessageStatus(...)`
 - `getMessage(...)`
 - `listMessages(...)`
+- `getLatestInboundMessageAt(...)`
+- `countOutboxPending(...)`
 - `close()`
 
 Missing any method fails construction with `WatsServiceError` code `invalid_persistence`.
@@ -432,7 +438,13 @@ The repo ships a Railway-targeted root `Dockerfile` that wraps the implemented `
 
 ## Non-goals
 
-Not implemented: a full Meta Graph API OpenAPI document, live Meta credential checks, background queue/outbox workers, TLS, rate limiting, production container publication, or message schemas beyond the current text/media/location/contacts/reaction/interactive slices.
+Still not implemented: a full Meta Graph API OpenAPI document, live Meta credential checks, TLS, production container publication, or message schemas beyond the current text/media/location/contacts/reaction/interactive slices.
+
+Outbox and reliability surfaces that DO ship, in other packages:
+
+- `startOutboxWorker` in `@wats/persistence` runs a caller-owned timer loop with claim/lease/handler semantics and a `stop()` lifecycle. It is not a distributed scheduler: there is no multi-process coordination, leader election, or cross-instance lease arbitration. Run one worker per process; the lease fence keeps a killed worker from completing a reclaimed item but does not prevent two live workers from both claiming under a shared store.
+- `createReliableTransport` and `createTokenBucketRateLimiter` in `@wats/graph` ship a client-side retry + rate-limit seam. This is your outbound traffic shaping, not Meta quota management.
+- The service send paths remain synchronous. Enqueuing a send into the outbox is caller-managed: the service does not automatically route `POST /api/messages` through the outbox. A caller that wants durable, retried sends enqueues items itself and points an outbox worker handler at its own send state.
 
 ## Related docs
 

@@ -29,6 +29,11 @@ The following metric families are the only ones WATS service telemetry may expos
 | Send outcomes | `send_outcomes_total` | counter | Message send attempts by outcome. Labels: `endpoint_family`, `outcome`. |
 | Persistence operations | `persistence_operations_total` | counter | Persistence store operations by adapter and outcome. Labels: `adapter`, `outcome`. |
 | Outbox depth | `outbox_depth` | gauge | Number of items in the persistence outbox, partitioned by `state`. The `state` label values mirror the `OutboxStatus` type in `@wats/persistence` (`pending`, `processing`, `succeeded`). Labels: `adapter`, `state`. |
+| Outbox processed | `outbox_processed_total` | counter | Outbox worker items processed by outcome. Labels: `outcome`. |
+
+### Gauge exposition contract
+
+Gauges are registry-only. The `TelemetrySink` seam exposes `incrementCounter` and `recordHistogram` (plus optional `recordSpan` / `recordEvent`) but no `setGauge`, so gauge samples are observable through `/metrics` and are not forwarded to user-owned OpenTelemetry bridges. The shipped outbox metrics reporter sets only the pending state series of `outbox_depth` from `OutboxWorkerTickReport.pending`; the processing and succeeded states are not emitted by this reporter. A future store-query reporter could populate them without amending this taxonomy.
 
 ## Allowed label keys
 
@@ -101,6 +106,7 @@ Attribute keys use OpenTelemetry conventions where they exist:
 | `send_outcomes_total` | `wats.graph.endpoint_family`, `wats.operation.outcome` |
 | `webhook_normalization_total` | `wats.webhook.update_kind`, `wats.operation.outcome` |
 | `persistence_operations_total` | `wats.persistence.adapter`, `wats.operation.outcome` |
+| `outbox_processed_total` | `wats.operation.outcome` |
 
 The same PII denylist and enum-clamping rules apply to sink attributes as to Prometheus labels. No `@opentelemetry/*` package may appear in runtime dependencies.
 

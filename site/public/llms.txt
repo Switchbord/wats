@@ -22,6 +22,7 @@ Playground (runs the real SDK in-browser, no credentials): https://wats.sh/playg
 - [Handle status callbacks](https://wats.sh/docs/guides/handle-status-callbacks): Track sent, delivered, read, and failed status webhooks with onStatus, typed filters, and per-send waiters.
 - [Live webhook](https://wats.sh/docs/guides/live-webhook): Point Meta at a locally running WATS service behind a public HTTPS tunnel — live serve, webhook onboarding, and the credential-safety contract.
 - [Migration: pywa to WATS](https://wats.sh/docs/guides/migrating-from-pywa): A migration map from Python pywa integrations to WATS, with honest live-parity status and known gaps.
+- [Operate reliably](https://wats.sh/docs/guides/operate-reliably): Wire reliable outbound transport, the 24-hour window gate, the outbox worker, and the metrics that tell you when something is wrong.
 - [React and reply in context](https://wats.sh/docs/guides/react-and-reply-in-context): Send a reaction to an inbound message and reply to it by id using replyToMessageId on send inputs.
 - [Send and receive media](https://wats.sh/docs/guides/send-and-receive-media): Send images and documents by link or uploaded media id, and download inbound media bytes through the graph media runtime.
 - [Send a template message](https://wats.sh/docs/guides/send-template-message): Send a pre-approved template with typed parameter components through the WhatsApp facade.

@@ -78,6 +78,7 @@ describe("WATS-161 telemetry privacy model and metric taxonomy", () => {
     expect(doc).toContain("graph_operations_total");
     expect(doc).toContain("http_request_duration_seconds");
     expect(doc).toContain("outbox_depth");
+    expect(doc).toContain("outbox_processed_total");
   });
 
   test("doc defines an explicit allowlist of label keys", () => {
@@ -284,10 +285,10 @@ describe("WATS-161 telemetry privacy model and metric taxonomy", () => {
     // contract and the code cannot drift apart in either direction.
     const serviceSource = readFileSync(join(repoRoot, "packages", "service", "src", "index.ts"), "utf8");
     const declaredNames = Array.from(
-      serviceSource.matchAll(/registry\.declare(?:Counter|Histogram)\("([a-z_]+)"/gu),
+      serviceSource.matchAll(/registry\.declare(?:Counter|Histogram|Gauge)\("([a-z_]+)"/gu),
       (m) => m[1]
     ).sort();
-    expect(declaredNames.length, "no declareCounter/declareHistogram calls found in @wats/service").toBeGreaterThan(0);
+    expect(declaredNames.length, "no declareCounter/declareHistogram/declareGauge calls found in @wats/service").toBeGreaterThan(0);
 
     const doc = read("maintainers/telemetry-taxonomy.md");
     for (const name of declaredNames) {

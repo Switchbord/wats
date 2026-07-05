@@ -1,4 +1,4 @@
-export const CURRENT_SCHEMA_VERSION = 3 as const;
+export const CURRENT_SCHEMA_VERSION = 4 as const;
 export const REDACTED_SQLITE_LOCATION = "[REDACTED_SQLITE_DATABASE]" as const;
 
 export type PersistenceBackend = "sqlite" | "postgres";
@@ -137,6 +137,23 @@ export interface ListMessagesResult {
   readonly nextCursor: string | null;  // rowId of last item if more may exist, else null
 }
 
+export interface LatestInboundMessageInput {
+  readonly phone: string;
+}
+
+export interface ConversationWindowInput {
+  readonly phone: string;
+  readonly now: string;            // strict ISO ms
+  readonly windowMs?: number;      // integer 1..7*86400000; default 24h
+}
+
+export interface ConversationWindowState {
+  readonly open: boolean;
+  readonly lastInboundAt: string | null;
+  readonly expiresAt: string | null;   // ISO ms when the window closes, null when unknown
+  readonly remainingMs: number;        // 0 when closed or unknown
+}
+
 export interface PersistenceStore {
   readonly backend: PersistenceBackend;
   migrate(): Promise<MigrationReport>;
@@ -152,6 +169,8 @@ export interface PersistenceStore {
   appendMessageStatus(input: MessageStatusEventInput): Promise<void>;
   getMessage(input: { waMessageId: string }): Promise<MessageRecord | null>;
   listMessages(input: ListMessagesInput): Promise<ListMessagesResult>;
+  getLatestInboundMessageAt(input: LatestInboundMessageInput): Promise<string | null>;
+  countOutboxPending(): Promise<number>;
   close(): Promise<void>;
 }
 
@@ -169,6 +188,18 @@ export { createSqlitePersistence } from "./sqlite";
 export type { SqlitePersistenceOptions } from "./sqlite";
 export { runOutboxWorkerOnce } from "./outbox";
 export type { OutboxWorkerOptions, OutboxWorkerReport } from "./outbox";
+export { startOutboxWorker } from "./outboxWorker";
+export type {
+  OutboxScheduler,
+  OutboxTimerHandle,
+  OutboxWorkerHandle,
+  OutboxWorkerTickReport,
+  StartOutboxWorkerOptions
+} from "./outboxWorker";
+export {
+  getConversationWindowState,
+  canSendFreeForm
+} from "./conversationWindow";
 
 // WATS-176: re-export the postgres adapter from the package barrel so
 // consumers can reach it via `@wats/persistence` (the `./postgres`

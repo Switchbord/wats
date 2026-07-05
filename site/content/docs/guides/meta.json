@@ -11,6 +11,7 @@
     "handle-status-callbacks",
     "send-and-receive-media",
     "react-and-reply-in-context",
+    "operate-reliably",
     "community-examples",
     "telemetry",
     "deploy-bun",

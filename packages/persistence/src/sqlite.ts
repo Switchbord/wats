@@ -2,6 +2,7 @@ import {
   CURRENT_SCHEMA_VERSION,
   PersistenceError,
   REDACTED_SQLITE_LOCATION,
+  type LatestInboundMessageInput,
   type ListMessagesInput,
   type ListMessagesResult,
   type MessageDirection,
@@ -137,6 +138,15 @@ const MIGRATIONS: readonly MigrationDefinition[] = Object.freeze([
         timestamp TEXT NOT NULL
       )`,
       `CREATE INDEX IF NOT EXISTS wats_message_status_events_wa_message_id_idx ON wats_message_status_events (wa_message_id, id)`
+    ])
+  },
+  {
+    id: "004_inbound_window_index",
+    version: 4,
+    checksum: "sha256:wats-persistence-004-inbound-window-index-v1",
+    statements: Object.freeze([
+      `CREATE INDEX IF NOT EXISTS wats_messages_direction_from_phone_created_at_idx
+        ON wats_messages (direction, from_phone, created_at DESC)`
     ])
   }
 ]);
@@ -756,6 +766,27 @@ class SqlitePersistenceStore implements PersistenceStore {
     const items = Object.freeze(pageRows.map((row) => messageRowToRecord(row)));
     const nextCursor = rows.length > query.limit ? items[items.length - 1]?.rowId ?? null : null;
     return Object.freeze({ items, nextCursor });
+  }
+
+  async getLatestInboundMessageAt(input: LatestInboundMessageInput): Promise<string | null> {
+    this.#assertOpen();
+    const record = validateRecordInput(input, "latest inbound lookup");
+    const phone = validateRecordString(record.phone, "phone");
+    const row = this.#database.query<{ created_at: string }>(
+      `SELECT created_at FROM wats_messages
+       WHERE direction = 'inbound' AND from_phone = ?
+       ORDER BY created_at DESC
+       LIMIT 1`
+    ).get(phone);
+    return row === null ? null : row.created_at;
+  }
+
+  async countOutboxPending(): Promise<number> {
+    this.#assertOpen();
+    const row = this.#database.query<{ count: number }>(
+      "SELECT COUNT(*) AS count FROM wats_outbox WHERE status = ?"
+    ).get("pending");
+    return row === null ? 0 : row.count;
   }
 
   async close(): Promise<void> {

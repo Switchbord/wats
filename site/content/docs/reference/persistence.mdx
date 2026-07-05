@@ -10,6 +10,7 @@ import {
   CURRENT_SCHEMA_VERSION,
   PersistenceError,
   runOutboxWorkerOnce,
+  startOutboxWorker,
   type MigrationReport,
   type OutboxItem,
   type PersistenceHealth,
@@ -59,7 +60,7 @@ The migration runner creates:
 - `wats_messages`
 - `wats_message_status_events`
 
-Migrations are forward-only for alpha. Already-applied migration checksums must match the package migration definitions; checksum drift fails closed with `PersistenceError`. `001_initial` keeps its originally shipped checksum; `002_outbox_lease_id` upgrades existing v1 databases with the `leaseId` outbox column; `003_message_projection` adds the message projection tables and indexes. A held migration lock fails closed with `PersistenceError` code `migration_lock_failed`.
+Migrations are forward-only for alpha. Already-applied migration checksums must match the package migration definitions; checksum drift fails closed with `PersistenceError`. `001_initial` keeps its originally shipped checksum; `002_outbox_lease_id` upgrades existing v1 databases with the `leaseId` outbox column; `003_message_projection` adds the message projection tables and indexes; `004_inbound_window_index` adds the composite index backing `getLatestInboundMessageAt`. A held migration lock fails closed with `PersistenceError` code `migration_lock_failed`.
 
 ## Runtime contract
 
@@ -79,6 +80,8 @@ Migrations are forward-only for alpha. Already-applied migration checksums must 
 - `appendMessageStatus(...)`
 - `getMessage(...)`
 - `listMessages(...)`
+- `getLatestInboundMessageAt(...)`
+- `countOutboxPending()`
 - `close(): Promise<void>`
 
 Webhook event records store safe event keys and hashes, not raw webhook bodies. Duplicate event keys return `"duplicate"`, so the service can acknowledge Meta retries without dispatching the same update twice.
@@ -112,6 +115,41 @@ const page = await store.listMessages({ limit: 50 });
 
 The service records outbound projections automatically after a successful Graph send and exposes them read-only through `GET /messages` and `GET /messages/{messageId}` (see the Service Reference). Projection failures are swallowed and never break the send response.
 
+## Conversation window
+
+The 24-hour customer-service window decides whether you can send free-form text or must reach for an approved template. Meta's rule: free-form is allowed within 24h of the customer's last inbound message; outside that, only templates.
+
+```ts
+import {
+  getConversationWindowState,
+  canSendFreeForm
+} from "@wats/persistence";
+
+const state = await getConversationWindowState(store, {
+  phone: "15551230000",
+  now: new Date().toISOString()
+});
+
+if (state.open) {
+  // free-form is allowed; state.remainingMs tells you how long you have
+} else {
+  // send a template — the window closed (or never opened)
+}
+
+const ok = await canSendFreeForm(store, {
+  phone: "15551230000",
+  now: new Date().toISOString()
+});
+```
+
+`ConversationWindowState` is `{ open, lastInboundAt, expiresAt, remainingMs }`. `remainingMs` is `0` when the window is closed or there is no inbound history. The boundary is strict: an inbound exactly `windowMs` ago closes the window (send a template). Override the window with `windowMs` (integer `1`..`604800000`; default 24h) for non-standard rules.
+
+Clock skew: if the customer's last inbound lands after `now`, the window is treated as open with the full `windowMs` remaining. A free-form send that Meta rejects costs a retry; wrongly forcing a template silences a live conversation. The skew branch picks the cheaper failure.
+
+`getLatestInboundMessageAt({ phone })` powers the helper: it returns the `createdAt` ISO of the most recent `wats_messages` row with `direction = 'inbound'` and `from_phone` matching, or `null`. Schema migration `004_inbound_window_index` adds the composite index `(direction, from_phone, created_at DESC)` so the lookup does not table-scan as the projection grows.
+
+Honesty caveats: the helper only sees inbound rows that have been projected into `wats_messages`. The service records outbound projections today; inbound projection wiring is landing separately, so until it ships the helper returns `closed` for every phone — which is the safe default (send a template). The Postgres adapter is shape-only and mock-client tested; the window helper works against any `PersistenceStore`, but live Postgres validation is not in default CI.
+
 ## Outbox
 
 At-least-once local work scheduling:
@@ -136,6 +174,53 @@ const report = await runOutboxWorkerOnce(store, {
 The outbox table stores only payload hashes, status, attempt counts, `leaseId`, and retry timestamps — no raw webhook bodies, message text, Graph request bodies, or contacts. `runOutboxWorkerOnce(...)` claims due `pending` items, calls the handler, marks successes `succeeded`, and reschedules failures with `nextAttemptAt = now + retryDelayMs`.
 
 Claimed items use a five-minute processing lease; stale `processing` rows become claimable again, so a killed worker does not strand records forever. The lease is fenced: `markOutboxItemFailed(...)` and `markOutboxItemSucceeded(...)` require the current `leaseId`, so a stale worker cannot complete a newer reclaimed lease.
+
+## Outbox worker
+
+`startOutboxWorker(store, options)` arms a timer that fires `runOutboxWorkerOnce` on a fixed interval. It returns a handle with `stop()` (cancels the pending timer and awaits any in-flight tick) and `running()` (true until `stop()`). Overlap is skipped: a tick that arrives while a previous tick is still running is a no-op, and the in-flight run re-arms the next timer in its `finally` block.
+
+```ts
+import { startOutboxWorker } from "@wats/persistence";
+
+const worker = startOutboxWorker(store, {
+  handler: async (item) => {
+    // Reconstruct/send from application-owned state keyed by item.id.
+  },
+  intervalMs: 5_000,
+  batchLimit: 10,
+  retryDelayMs: 30_000,
+  onReport: (report) => {
+    // report: { processed, succeeded, failed, pending }
+  },
+  onError: (error) => {
+    // claim/count/store errors swallowed inside a tick land here
+  }
+});
+
+const pendingDepth = await store.countOutboxPending();
+await worker.stop();
+```
+
+`onReport` fires after each tick with `{ processed, succeeded, failed, pending }`. `pending` comes from `store.countOutboxPending()`. `onError` fires when claim/count/store errors are swallowed inside a tick — the loop never dies on its own errors. `now` and `schedule` are injectable for a deterministic virtual clock.
+
+Wire the tick report into the service metrics registry so `/metrics` exposes outbox depth and throughput:
+
+```ts
+import { createMetricsRegistry, createOutboxMetricsReporter, createWatsServiceApp } from "@wats/service";
+
+const metrics = createMetricsRegistry();
+const app = createWatsServiceApp({ profile, secrets, persistence: store, metricsRegistry: metrics });
+const reporter = createOutboxMetricsReporter(metrics, { adapter: store.backend });
+
+const worker = startOutboxWorker(store, {
+  handler: async (item) => { /* ... */ },
+  ...reporter
+});
+```
+
+`createOutboxMetricsReporter` sets `outbox_depth{adapter, state="pending"}` from `report.pending` and increments `outbox_processed_total{outcome="success"|"error"}` from `report.succeeded` / `report.failed`. The depth gauge is registry-only — it is not forwarded to a user-owned `TelemetrySink` (the sink seam has no `setGauge`). The reporter sets only the `pending` state series; `processing` and `succeeded` are not emitted.
+
+The worker is caller-owned and single-process. There is no distributed scheduling, multi-process coordination, or automatic send-path enqueueing — the service send routes stay synchronous, and enqueuing into the outbox is the caller's job.
 
 ## Redaction boundary
 

@@ -40,6 +40,10 @@ import {
 import type { CryptoProvider } from "@wats/crypto";
 import type { PersistenceStore } from "@wats/persistence";
 import {
+  getConversationWindowState,
+  type ConversationWindowState
+} from "@wats/persistence";
+import {
   createFetchWebhookHandler,
   createWebhookAdapter,
   type WebhookFacadeLike
@@ -82,6 +86,14 @@ export interface WatsServiceConfig {
    * collector receives telemetry.
    */
   readonly telemetrySink?: TelemetrySink;
+  /**
+   * Inject a pre-built MetricsRegistry to share between /metrics exposition
+   * and an outbox metrics reporter. Must be created via createMetricsRegistry
+   * (it declares every standard family); a bare MetricsRegistry would throw
+   * on the first instrumentation call. When omitted the service creates and
+   * owns its own registry.
+   */
+  readonly metricsRegistry?: MetricsRegistry;
 }
 
 export type WatsServiceErrorCode =
@@ -152,6 +164,7 @@ interface RuntimeConfig {
   readonly apiPrefix: string;
   readonly textPath: string;
   readonly messagesPath: string;
+  readonly conversationsPath: string;
   readonly enableGroupRoutes: boolean;
   readonly groupsPath: string;
   readonly metrics: MetricsRegistry;
@@ -278,11 +291,36 @@ function validatePersistence(value: unknown): PersistenceStore | undefined {
     typeof value.appendMessageStatus !== "function" ||
     typeof value.getMessage !== "function" ||
     typeof value.listMessages !== "function" ||
+    typeof value.getLatestInboundMessageAt !== "function" ||
+    typeof value.countOutboxPending !== "function" ||
     typeof value.close !== "function"
   ) {
     throw new WatsServiceError("invalid_persistence", "persistence must be a PersistenceStore.");
   }
   return value as unknown as PersistenceStore;
+}
+
+// A MetricsRegistry is structurally validated by the methods /metrics and the
+// outbox reporter call. The contract is: pass a registry from
+// createMetricsRegistry(). A bare `new MetricsRegistry()` (without the
+// standard declarations) is accepted structurally but would throw on the
+// first instrumentation call — documented on WatsServiceConfig.metricsRegistry.
+function validateMetricsRegistry(value: unknown): MetricsRegistry | undefined {
+  if (value === undefined) return undefined;
+  if (
+    !isRecord(value) ||
+    typeof value.declareCounter !== "function" ||
+    typeof value.declareHistogram !== "function" ||
+    typeof value.declareGauge !== "function" ||
+    typeof value.incrementCounter !== "function" ||
+    typeof value.observeHistogram !== "function" ||
+    typeof value.setGauge !== "function" ||
+    typeof value.render !== "function" ||
+    typeof value.families !== "function"
+  ) {
+    throw new WatsServiceError("invalid_config", "metricsRegistry must be a MetricsRegistry (use createMetricsRegistry).");
+  }
+  return value as unknown as MetricsRegistry;
 }
 
 function jsonResponse(status: number, payload: unknown, headers?: HeadersInit): Response {
@@ -438,7 +476,8 @@ function buildRouteInventory(ctx: RuntimeConfig): string[] {
     ctx.webhookPath,
     ctx.textPath,
     ctx.messagesPath,
-    `${ctx.messagesPath}/:id`
+    `${ctx.messagesPath}/:id`,
+    `${ctx.conversationsPath}/:phone/window`
   ];
   if (ctx.enableGroupRoutes) {
     routes.push(
@@ -626,11 +665,14 @@ interface HistogramState {
 // only ever exercise the allowlisted shape, so this never fires in normal
 // operation and exists to catch drift at the source rather than at scrape
 // time).
-class MetricsRegistry {
+export class MetricsRegistry {
   readonly #counters = new Map<string, Map<string, number>>();
   readonly #histograms = new Map<string, Map<string, HistogramState>>();
+  readonly #gauges = new Map<string, Map<string, number>>();
   readonly #counterHelp = new Map<string, string>();
   readonly #histogramHelp = new Map<string, string>();
+  readonly #gaugeHelp = new Map<string, string>();
+  readonly #gaugeLabelNames = new Map<string, ReadonlySet<string>>();
   readonly #histogramBuckets: readonly number[];
 
   constructor(histogramBucketsSeconds: readonly number[] = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]) {
@@ -645,6 +687,17 @@ class MetricsRegistry {
   declareHistogram(name: string, help: string): void {
     if (!this.#histograms.has(name)) this.#histograms.set(name, new Map());
     this.#histogramHelp.set(name, help);
+  }
+
+  // Gauges differ from counters: a setGauge call REPLACES the current value
+  // for a label set rather than adding to it. The label-key allowlist is
+  // declared up front so a caller cannot smuggle an unbounded or PII-bearing
+  // label key past the taxonomy's allowlist (counters/histograms predate this
+  // guard and remain open-shape; new gauge families pin their labels).
+  declareGauge(name: string, help: string, labelNames: readonly string[] = []): void {
+    if (!this.#gauges.has(name)) this.#gauges.set(name, new Map());
+    this.#gaugeHelp.set(name, help);
+    this.#gaugeLabelNames.set(name, new Set(labelNames));
   }
 
   incrementCounter(name: string, labels: Readonly<Record<string, string>>, value = 1): void {
@@ -670,6 +723,25 @@ class MetricsRegistry {
     }
     state.sum += valueSeconds;
     state.count += 1;
+  }
+
+  // Sets the current value of a gauge for a label set, replacing any prior
+  // value. Value must be a finite, non-negative number — gauges here model
+  // depths/counts, never signed deltas. Labels must exactly match the
+  // declared label-key set (no missing, no extra) so the exposition cannot
+  // sprout an unbounded label series.
+  setGauge(name: string, value: number, labels: Readonly<Record<string, string>>): void {
+    if (!Number.isFinite(value) || value < 0) throw new Error(`MetricsRegistry: gauge value must be a non-negative finite number, received ${value}`);
+    const series = this.#gauges.get(name);
+    if (series === undefined) throw new Error(`MetricsRegistry: gauge "${name}" was not declared.`);
+    const allowed = this.#gaugeLabelNames.get(name);
+    if (allowed !== undefined) {
+      const keys = Object.keys(labels);
+      if (keys.length !== allowed.size || keys.some((k) => !allowed.has(k))) {
+        throw new Error(`MetricsRegistry: gauge "${name}" labels must be {${Array.from(allowed).sort().join(", ")}}, received {${keys.sort().join(", ")}}.`);
+      }
+    }
+    series.set(labelKey(labels), value);
   }
 
   // Renders Prometheus text exposition format (version=0.0.4). Deterministic
@@ -706,12 +778,20 @@ class MetricsRegistry {
         lines.push(`${name}_count${key} ${state.count}`);
       }
     }
+    for (const [name, series] of this.#gauges) {
+      if (series.size === 0) continue;
+      lines.push(`# HELP ${name} ${this.#gaugeHelp.get(name) ?? ""}`);
+      lines.push(`# TYPE ${name} gauge`);
+      for (const [key, value] of series) {
+        lines.push(`${name}${key} ${value}`);
+      }
+    }
     return lines.length === 0 ? "" : `${lines.join("\n")}\n`;
   }
 
   // Names only — used by /debug/diagnostics. No values or label sets exposed.
   families(): readonly string[] {
-    return Array.from(new Set([...this.#counters.keys(), ...this.#histograms.keys()]));
+    return Array.from(new Set([...this.#counters.keys(), ...this.#histograms.keys(), ...this.#gauges.keys()]));
   }
 }
 
@@ -781,7 +861,7 @@ function labelKey(labels: Readonly<Record<string, string>>): string {
   return `{${rendered}}`;
 }
 
-function createMetricsRegistry(): MetricsRegistry {
+export function createMetricsRegistry(): MetricsRegistry {
   const registry = new MetricsRegistry();
   registry.declareCounter("http_requests_total", "Inbound HTTP requests to the service.");
   registry.declareHistogram("http_request_duration_seconds", "Request duration in seconds.");
@@ -789,7 +869,110 @@ function createMetricsRegistry(): MetricsRegistry {
   registry.declareCounter("graph_operations_total", "Outbound Graph API calls by endpoint family and status class.");
   registry.declareCounter("send_outcomes_total", "Message send attempts by outcome.");
   registry.declareCounter("persistence_operations_total", "Persistence store operations by adapter and outcome.");
+  // Outbox worker metrics. The depth gauge partitions by adapter and state
+  // (pending/processing/succeeded); the metrics reporter sets only the pending
+  // state series from OutboxWorkerTickReport.pending — a store-query reporter
+  // could populate the remaining states. The processed counter carries a
+  // success/error outcome mirroring the rest of the outcome enum.
+  registry.declareGauge(
+    "outbox_depth",
+    "Number of items in the persistence outbox, partitioned by adapter and state.",
+    ["adapter", "state"]
+  );
+  registry.declareCounter(
+    "outbox_processed_total",
+    "Outbox worker items processed by outcome."
+  );
   return registry;
+}
+
+// Shape of the tick report delivered to startOutboxWorker's onReport. Kept as
+// a local structural type so @wats/service does not take a hard runtime import
+// of @wats/persistence just for this wiring helper; the real
+// OutboxWorkerTickReport from @wats/persistence is structurally compatible.
+interface OutboxTickReport {
+  readonly processed: number;
+  readonly succeeded: number;
+  readonly failed: number;
+  readonly pending: number;
+}
+
+interface OutboxMetricsReporter {
+  /** Update outbox_depth + outbox_processed_total from a tick report. */
+  readonly onReport: (report: OutboxTickReport) => void;
+  /** Optional sink for loop infrastructure errors; not metric-emitting. */
+  readonly onError?: (error: unknown) => void;
+}
+
+const OUTBOX_ADAPTERS = ["sqlite", "postgres"] as const;
+
+function clampOutboxAdapter(adapter: unknown): string {
+  return typeof adapter === "string" && (OUTBOX_ADAPTERS as readonly string[]).includes(adapter.toLowerCase())
+    ? adapter.toLowerCase()
+    : "unknown";
+}
+
+// Wiring helper: translate an OutboxWorkerTickReport into registry state so a
+// long-running outbox worker's depth and throughput are visible from /metrics
+// without the worker knowing about the MetricsRegistry shape. The returned
+// { onReport, onError? } is structurally compatible with startOutboxWorker's
+// StartOutboxWorkerOptions, so the caller can spread it directly:
+//
+//   const metrics = createMetricsRegistry();
+//   const app = createWatsServiceApp({ ..., metricsRegistry: metrics });
+//   const reporter = createOutboxMetricsReporter(metrics, { adapter: store.backend });
+//   startOutboxWorker(store, { handler, ...reporter });
+//
+// onReport sets outbox_depth{adapter, state="pending"} = report.pending (the
+// only state the worker's countOutboxPending observes) and increments
+// outbox_processed_total{outcome="success"} by report.succeeded and
+// {outcome="error"} by report.failed. The depth gauge is registry-only: the
+// TelemetrySink seam has no setGauge, so user-owned OTel bridges do not
+// receive gauge samples — only /metrics scrapes see them.
+export function createOutboxMetricsReporter(
+  registry: MetricsRegistry,
+  options: { readonly adapter: string }
+): OutboxMetricsReporter {
+  if (registry === null || typeof registry !== "object" || typeof (registry as { setGauge?: unknown }).setGauge !== "function" || typeof (registry as { incrementCounter?: unknown }).incrementCounter !== "function") {
+    throw new TypeError("createOutboxMetricsReporter: registry must be a MetricsRegistry.");
+  }
+  if (options === null || typeof options !== "object") {
+    throw new TypeError("createOutboxMetricsReporter: options must be an object.");
+  }
+  if (typeof options.adapter !== "string" || options.adapter.length === 0) {
+    throw new TypeError("createOutboxMetricsReporter: options.adapter must be a non-empty string.");
+  }
+  const adapter = clampOutboxAdapter(options.adapter);
+  return {
+    onReport(report: OutboxTickReport): void {
+      // Defensive: a malformed report must not corrupt the registry. Non-finite
+      // or negative counts are clamped to 0 rather than throwing — the worker
+      // loop swallows onReport failures, so a throw here would be silent.
+      const pending = Number.isFinite(report?.pending) && report.pending >= 0 ? Math.floor(report.pending) : 0;
+      const succeeded = Number.isFinite(report?.succeeded) && report.succeeded >= 0 ? Math.floor(report.succeeded) : 0;
+      const failed = Number.isFinite(report?.failed) && report.failed >= 0 ? Math.floor(report.failed) : 0;
+      try {
+        registry.setGauge("outbox_depth", pending, { adapter, state: "pending" });
+      } catch {
+        // setGauge only throws on a misconfigured registry (undeclared metric
+        // or label drift) — surfacing that to the worker loop would be silent.
+      }
+      if (succeeded > 0) {
+        try {
+          registry.incrementCounter("outbox_processed_total", { outcome: "success" }, succeeded);
+        } catch {
+          // Same defensive swallow as setGauge.
+        }
+      }
+      if (failed > 0) {
+        try {
+          registry.incrementCounter("outbox_processed_total", { outcome: "error" }, failed);
+        } catch {
+          // Same defensive swallow as setGauge.
+        }
+      }
+    }
+  };
 }
 
 // WATS-164 bridge: a TelemetrySink that forwards to the internal Prometheus
@@ -813,6 +996,8 @@ class MetricsBridgeTelemetrySink implements TelemetrySink {
       this.#metrics.incrementCounter(name, this.#sendLabels(attributes), value);
     } else if (name === "persistence_operations_total") {
       this.#metrics.incrementCounter(name, this.#persistenceLabels(attributes), value);
+    } else if (name === "outbox_processed_total") {
+      this.#metrics.incrementCounter(name, this.#outboxLabels(attributes), value);
     }
   }
 
@@ -866,6 +1051,12 @@ class MetricsBridgeTelemetrySink implements TelemetrySink {
   #persistenceLabels(attributes: TelemetryAttributes): Readonly<Record<string, string>> {
     return {
       adapter: this.#getString(attributes, OTEL_ATTR.persistenceAdapter),
+      outcome: this.#getString(attributes, OTEL_ATTR.operationOutcome)
+    };
+  }
+
+  #outboxLabels(attributes: TelemetryAttributes): Readonly<Record<string, string>> {
+    return {
       outcome: this.#getString(attributes, OTEL_ATTR.operationOutcome)
     };
   }
@@ -966,6 +1157,7 @@ function templateRouteLabel(ctx: RuntimeConfig, path: string): string {
   if (path === ctx.textPath) return ctx.textPath;
   if (path === ctx.messagesPath) return ctx.messagesPath;
   if (path.startsWith(`${ctx.messagesPath}/`)) return `${ctx.messagesPath}/:id`;
+  if (path.startsWith(`${ctx.conversationsPath}/`) && path.endsWith("/window")) return `${ctx.conversationsPath}/:phone/window`;
   if (ctx.enableGroupRoutes) {
     const match = matchGroupRoute(ctx, path);
     if (match !== null) {
@@ -1629,6 +1821,17 @@ function createOpenApiSchemas(enableGroupRoutes = false): Record<string, Record<
         nextCursor: { type: "string", nullable: true, description: "rowId of the last returned item when more rows may exist; null otherwise." }
       }
     },
+    ConversationWindowState: {
+      type: "object",
+      additionalProperties: false,
+      required: ["open", "lastInboundAt", "expiresAt", "remainingMs"],
+      properties: {
+        open: { type: "boolean", description: "True when the 24-hour customer-service window is open (a recent inbound message exists within windowMs)." },
+        lastInboundAt: { type: "string", nullable: true, description: "ISO 8601 timestamp (ms precision) of the most recent inbound message from this phone; null when none." },
+        expiresAt: { type: "string", nullable: true, description: "ISO 8601 timestamp (ms precision) when the window closes or closed (lastInboundAt + windowMs); null when no inbound message exists." },
+        remainingMs: { type: "integer", minimum: 0, description: "Milliseconds remaining before the window closes; 0 when closed or unknown." }
+      }
+    },
     MessageStatusEvent: {
       type: "object",
       additionalProperties: false,
@@ -1662,6 +1865,7 @@ export function createWatsServiceOpenApiDocument(
   assertNoRouteCollisions(webhookPath, apiPrefix, options.enableGroupRoutes === true);
   const textPath = `${apiPrefix}/messages/text`;
   const messagesPath = `${apiPrefix}/messages`;
+  const conversationsPath = `${apiPrefix}/conversations`;
   const groupsPath = `${apiPrefix}/groups`;
   const groupPath = `${groupsPath}/{groupId}`;
   const groupInvitePath = `${groupPath}/invite-link`;
@@ -1810,6 +2014,24 @@ export function createWatsServiceOpenApiDocument(
           "400": errorResponseSpec("Malformed message id."),
           "401": errorResponseSpec("Missing or invalid service bearer token."),
           "404": errorResponseSpec("Message not found."),
+          "405": errorResponseSpec("Method not allowed."),
+          "503": errorResponseSpec("No persistence store is configured.")
+        }
+      }
+    },
+    [`${conversationsPath}/{phone}/window`]: {
+      get: {
+        tags: ["conversations"],
+        summary: "Get the 24-hour customer-service-window state for a phone number",
+        description: "Returns the conversation-window state (open/closed, last inbound timestamp, expiry, remaining ms) computed from the injected persistence store via getConversationWindowState. Requires the service bearer token. On a missing or mismatched token the service returns 404 (not 401) so the endpoint's existence is not leaked, matching /metrics. Returns 503 persistence_not_configured when no persistence store is configured. The phone path param is validated strictly: an optional leading + followed by 1..15 digits.",
+        security: [{ serviceBearerAuth: [] }],
+        parameters: [
+          { name: "phone", in: "path", required: true, schema: { type: "string", pattern: "^\\+?\\d{1,15}$", minLength: 1, maxLength: 16 }, description: "Customer phone number (E.164-ish: optional leading +, 1..15 digits)." }
+        ],
+        responses: {
+          "200": okResponseSpec("Conversation window state.", "ConversationWindowState"),
+          "400": errorResponseSpec("Malformed phone path param."),
+          "404": errorResponseSpec("Route not found, or bearer token missing/invalid (existence hidden)."),
           "405": errorResponseSpec("Method not allowed."),
           "503": errorResponseSpec("No persistence store is configured.")
         }
@@ -2266,6 +2488,12 @@ async function handleWebhook(ctx: RuntimeConfig, request: Request): Promise<Resp
     } catch {
       // Preserve WebhookAdapter's acknowledge-on-handler-failure contract.
     }
+    // WATS-175c: record an inbound projection for message-kind updates.
+    // Isolated from dispatch — projection failures are swallowed inside
+    // recordInboundProjection so they never break the ACK. Run after the
+    // dispatch attempt so the projection reflects every normalized message
+    // regardless of handler outcome.
+    await recordInboundProjection(ctx, update);
   }
   return jsonResponse(200, { status: "ok", received: dispatches.length, dispatched, skipped: 0 });
 }
@@ -2329,6 +2557,45 @@ async function recordOutboundProjection(
     recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "success");
   } catch {
     // Best-effort; projection failure must not break the send response.
+    recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "error");
+  }
+}
+
+// WATS-175c: inbound message projection. Mirrors recordOutboundProjection but
+// records the inbound half of a conversation. Called from the webhook
+// dispatch loop only for `message`-kind normalized updates; status/account/
+// other kinds are skipped. Persistence failure is isolated exactly like the
+// outbound path: it records a persistence-operation error and returns — a
+// projection failure must NEVER break the webhook ACK (the 200 is returned to
+// Meta regardless).
+async function recordInboundProjection(ctx: RuntimeConfig, update: unknown): Promise<void> {
+  if (ctx.persistence === undefined) return;
+  if (!isRecord(update)) return;
+  const kind = typeof update.kind === "string" ? update.kind : null;
+  if (kind !== "message") return;
+  const message = (update as { message?: unknown }).message;
+  if (!isRecord(message)) return;
+  const waMessageId = typeof message.id === "string" ? message.id : null;
+  if (waMessageId === null) return;
+  const fromPhone = typeof message.from === "string" ? message.from : null;
+  const messageType = typeof message.type === "string" ? message.type : null;
+  if (messageType === null) return;
+  const now = new Date().toISOString();
+  const rowId = cryptoRandomId();
+  try {
+    await ctx.persistence.recordMessage({
+      rowId,
+      waMessageId,
+      direction: "inbound",
+      ...(fromPhone !== null ? { fromPhone } : {}),
+      type: messageType,
+      status: "received",
+      createdAt: now,
+      updatedAt: now
+    });
+    recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "success");
+  } catch {
+    // Projection failure must not break the webhook ACK.
     recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "error");
   }
 }
@@ -2514,6 +2781,63 @@ async function handleGetMessage(ctx: RuntimeConfig, request: Request, path: stri
   }
 }
 
+// WATS-175c: strict phone path-param validator. Reuses the same E.164-ish
+// shape @wats/graph's assertValidRecipient enforces for outbound `to`
+// recipients: an optional leading + followed by 1..15 digits. Bounded length
+// keeps the route label low-cardinality and rejects path-traversal/CR-LF
+// attempts in one shot.
+const PHONE_PATH_RE = /^\+?\d{1,15}$/u;
+
+// WATS-175c: GET /api/conversations/:phone/window. Returns the 24-hour
+// customer-service-window state for a phone number, computed from the
+// injected persistence store via getConversationWindowState. Auth uses the
+// existence-hiding posture (404 byte-identical to the catch-all on a missing
+// or mismatched bearer token), matching /metrics rather than the sibling
+// /api/messages routes (401): the conversation-window endpoint is an operator
+// surface, not a public send surface, so its existence is hidden. Requires
+// persistence (503 persistence_not_configured when absent, matching
+// /api/messages).
+async function handleConversationWindow(
+  ctx: RuntimeConfig,
+  request: Request,
+  path: string
+): Promise<Response> {
+  if (!isAuthorized(request, ctx.secrets.serviceBearerToken)) return notFound();
+  if (request.method.toUpperCase() !== "GET") return methodNotAllowed("GET");
+  if (ctx.persistence === undefined) {
+    return errorResponse(503, "persistence_not_configured", "Conversation window state requires a persistence store.");
+  }
+  const prefix = `${ctx.conversationsPath}/`;
+  const suffix = "/window";
+  if (!path.startsWith(prefix) || !path.endsWith(suffix) || path.length <= prefix.length + suffix.length) {
+    return notFound();
+  }
+  const segment = path.slice(prefix.length, path.length - suffix.length);
+  let phone: string;
+  try {
+    phone = decodeURIComponent(segment);
+  } catch {
+    return errorResponse(400, "malformed_path", "phone path segment is invalid.");
+  }
+  if (!PHONE_PATH_RE.test(phone)) {
+    return errorResponse(400, "malformed_path", "phone must be digits with an optional leading +, 1..15 characters.");
+  }
+  // Meta's webhook payloads carry sender phones as bare digits (no +), and
+  // recordInboundProjection stores message.from verbatim. Strip an optional
+  // leading + before the store lookup so E.164-formatted queries
+  // (/api/conversations/+15550001111/window) match the stored rows.
+  const lookupPhone = phone.startsWith("+") ? phone.slice(1) : phone;
+  try {
+    const now = new Date().toISOString();
+    const state: ConversationWindowState = await getConversationWindowState(ctx.persistence, { phone: lookupPhone, now });
+    recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "success");
+    return jsonResponse(200, state);
+  } catch {
+    recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "error");
+    return errorResponse(503, "conversation_window_unavailable", "Conversation window state could not be computed.");
+  }
+}
+
 function matchGroupRoute(ctx: RuntimeConfig, path: string): ServiceRouteMatch | null {
   if (path === ctx.groupsPath) return { route: "groups" };
   if (!path.startsWith(`${ctx.groupsPath}/`)) return null;
@@ -2669,7 +2993,7 @@ function makeRuntimeConfig(config: WatsServiceConfig): RuntimeConfig {
     baseUrl: profile.graph.baseUrl,
     ...(transport !== undefined ? { transport } : {})
   });
-  const metricsRegistry = createMetricsRegistry();
+  const metricsRegistry = validateMetricsRegistry(config.metricsRegistry) ?? createMetricsRegistry();
   const metricsBridge = new MetricsBridgeTelemetrySink(metricsRegistry);
   const userSink = config.telemetrySink;
   const telemetrySink: TelemetrySink = userSink !== undefined
@@ -2837,6 +3161,7 @@ function makeRuntimeConfig(config: WatsServiceConfig): RuntimeConfig {
     apiPrefix,
     textPath: `${apiPrefix}/messages/text`,
     messagesPath: `${apiPrefix}/messages`,
+    conversationsPath: `${apiPrefix}/conversations`,
     enableGroupRoutes,
     groupsPath: `${apiPrefix}/groups`,
     metrics: metricsRegistry,
@@ -2927,6 +3252,15 @@ export function createWatsServiceApp(config: WatsServiceConfig): WatsServiceApp 
     if (path.startsWith(`${ctx.messagesPath}/`)) {
       if (method !== "GET") return methodNotAllowed("GET");
       return handleGetMessage(ctx, request, path);
+    }
+
+    // WATS-175c: GET /api/conversations/:phone/window. Auth is checked
+    // inside the handler (existence-hiding 404, before method), mirroring
+    // /metrics rather than the sibling /api/messages routes. Matched by
+    // prefix + /window suffix so the handler can extract and validate the
+    // phone segment.
+    if (path.startsWith(`${ctx.conversationsPath}/`) && path.endsWith("/window")) {
+      return handleConversationWindow(ctx, request, path);
     }
 
     return notFound();

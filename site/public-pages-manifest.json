@@ -19,6 +19,7 @@
     "/docs/guides/handle-status-callbacks",
     "/docs/guides/live-webhook",
     "/docs/guides/migrating-from-pywa",
+    "/docs/guides/operate-reliably",
     "/docs/guides/react-and-reply-in-context",
     "/docs/guides/send-and-receive-media",
     "/docs/guides/send-template-message",
