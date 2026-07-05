@@ -1,6 +1,6 @@
 // examples/webhook-echo-bot/src/index.ts
 //
-// WATS-173 runnable offline echo bot. Demonstrates the WATS-172
+// Runnable offline echo bot. Demonstrates the
 // `createWhatsApp` / `onMessage` / `sendText` loop end-to-end without
 // any credentials or live Meta calls:
 //
@@ -37,7 +37,7 @@ const wa = createWhatsApp({
 
 let captured: { from: string; text: string; replyWamid: string | undefined } | undefined;
 
-// Register the echo handler. `wa.onMessage` is the WATS-172 sugar for
+// Register the echo handler. `wa.onMessage` is sugar for
 // "fire on any inbound message update". The handler receives a
 // `HandlerContext` whose `.update` is the typed inbound message. We
 // narrow to text messages (the echo bot only echoes text).

@@ -2,7 +2,7 @@
 
 - safety default: offline by default
 
-A runnable, credential-free demonstration of the receive-a-message → reply-to-it loop using the WATS-172 facade API (`createWhatsApp`, `onMessage`, `sendText`).
+A runnable, credential-free demonstration of the receive-a-message → reply-to-it loop using the facade API (`createWhatsApp`, `onMessage`, `sendText`).
 
 No credentials, no live WABA ids, no live phone-number ids, no live Meta calls. The Graph send is captured by `createMockTransport`; the inbound message is a synthetic webhook envelope normalized by `normalizeWebhookEnvelope` and dispatched through `wa.dispatch`.
 

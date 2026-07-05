@@ -22,7 +22,7 @@ Credential-free community examples for WATS. The scaffold is intentionally small
 - `examples/offline-bot/README.md` — offline MockTransport bot walkthrough with synthetic webhook payloads/envelopes.
 - `examples/minimal-bot/` — runnable 60-second offline minimal bot using `@wats/service`, MockTransport, and `bun run demo`.
 - `examples/groups/` — runnable offline Groups flow using `@wats/graph`, `@wats/core`, MockTransport, and synthetic group webhooks (`bun run examples:groups`).
-- `examples/webhook-echo-bot/` — runnable offline echo bot using the WATS-172 `createWhatsApp` / `onMessage` / `sendText` loop with a mock transport and a synthetic webhook envelope (`bun run examples:webhook-echo-bot`).
+- `examples/webhook-echo-bot/` — runnable offline echo bot using the `createWhatsApp` / `onMessage` / `sendText` loop with a mock transport and a synthetic webhook envelope (`bun run examples:webhook-echo-bot`).
 
 ## Running an example outside this repo
 
