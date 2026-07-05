@@ -1,0 +1,97 @@
+---
+title: Operate reliably
+description: Wire reliable outbound transport, the 24-hour window gate, the outbox worker, and the metrics that tell you when something is wrong.
+---
+
+<DocMeta status="active" appliesTo="@wats/graph, @wats/persistence, @wats/service" lastReviewed="2026-07-05" />
+
+This page wires the reliability surfaces that ship across packages. None of them are on by default — you opt into each one. Lead with code, then read the prose only when a snippet does not explain itself.
+
+## Reliable transport with retry and rate limiting
+
+```ts
+import { GraphClient, createFetchTransport, createReliableTransport, createTokenBucketRateLimiter } from "@wats/graph";
+
+const transport = createReliableTransport(
+  createFetchTransport(),
+  {
+    retries: 3,
+    baseDelayMs: 500,
+    maxDelayMs: 8_000,
+    retryPosts: "network-only",
+    rateLimiter: createTokenBucketRateLimiter({ capacity: 20, refillPerSecond: 5 })
+  }
+);
+
+const client = new GraphClient({ accessToken, apiVersion, baseUrl, transport });
+```
+
+`retryPosts: "network-only"` retries a POST only when the request threw before any response arrived AND carries an `Idempotency-Key` header. A pre-response network failure is the one POST shape that cannot have been processed by the server, so an idempotency key makes the retry safe. POST 5xx is not retried — the server may have side-effected. `"always"` retries POST on 5xx too; use it only for endpoints you have verified are idempotent or dedupe by key.
+
+The token bucket smooths YOUR outbound rate so a burst does not trip Meta's 429. It is not Meta quota management — Meta has no published per-token send budget. Tune capacity and refill from your own telemetry; never assume a bucket rate equals Meta's limit.
+
+## Idempotency-Key header on sends
+
+```ts
+await fetch(`${origin}/api/messages/text`, {
+  method: "POST",
+  headers: {
+    authorization: `Bearer ${bearer}`,
+    "content-type": "application/json",
+    "idempotency-key": crypto.randomUUID()
+  },
+  body: JSON.stringify({ to, text })
+});
+```
+
+When a `PersistenceStore` is injected, the service stores the request hash keyed by `Idempotency-Key`. A retry with the same key and body replays the stored response; the same key with a different body returns `409 idempotency_conflict`. Pair this with `retryPosts: "network-only"` so a retried POST carries the key.
+
+## 24-hour window gate before free-form sends
+
+```ts
+import { canSendFreeForm, getConversationWindowState } from "@wats/persistence";
+
+const open = await canSendFreeForm(store, { phone, now: new Date().toISOString() });
+if (!open) {
+  // send an approved template instead — free-form outside the window is rejected by Meta
+}
+```
+
+The helper only sees inbound rows projected into `wats_messages`. The service projects outbound sends automatically; inbound projection wiring is landing separately, so until it ships the helper returns `closed` for every phone — the safe default (send a template). See the [Persistence Reference](/docs/reference/persistence) for the window state shape.
+
+## Outbox worker with metrics
+
+```ts
+import { startOutboxWorker } from "@wats/persistence";
+import { createMetricsRegistry, createOutboxMetricsReporter, createWatsServiceApp } from "@wats/service";
+
+const metrics = createMetricsRegistry();
+const app = createWatsServiceApp({ profile, secrets, persistence: store, metricsRegistry: metrics });
+const reporter = createOutboxMetricsReporter(metrics, { adapter: store.backend });
+
+const worker = startOutboxWorker(store, {
+  handler: async (item) => {
+    // Reconstruct and send from application-owned state keyed by item.id.
+  },
+  intervalMs: 5_000,
+  ...reporter
+});
+```
+
+The worker is caller-owned and single-process. There is no distributed scheduling or multi-process coordination. Run one worker per process. The service send routes stay synchronous; enqueuing into the outbox is the caller's job — point a worker handler at your own send state. See the [Persistence Reference](/docs/reference/persistence) for the lease, `stop()`, and `onReport` shape.
+
+## What to alert on
+
+- `graph_operations_total{outcome="error"}` rate — outbound Graph failures. Spike means Meta is rejecting sends or the network is degraded.
+- `outbox_depth{adapter, state="pending"}` growth — pending items accumulating faster than the worker drains them. Sustained growth means the handler is failing or the worker interval is too coarse.
+- `webhook_normalization_total{outcome="error"}` — handler failures inside webhook dispatch. Non-zero means your listener threw; the webhook is still acknowledged so the failure is silent without this signal.
+- Webhook auth failures — a spike in 401/404 on `profile.webhook.path` POST means someone (or something) is hitting the webhook without a valid signature.
+
+The depth gauge is registry-only: it is observable through `/metrics` and is not forwarded to a user-owned `TelemetrySink`. The counter `outbox_processed_total{outcome}` does flow through the sink seam.
+
+## Related docs
+
+- [Service Reference](/docs/reference/service)
+- [Persistence Reference](/docs/reference/persistence)
+- [Telemetry for operators](/docs/guides/telemetry)
+- [Transport and Testing](/docs/guides/transport-and-testing)
