@@ -44,3 +44,5 @@ for (const update of normalized.updates) await router.dispatch(update);
 ```
 
 If this sketch becomes runnable code in a later slice, keep imports public (`@wats/core`, `@wats/graph`, `@wats/graph/testing`) and keep it offline by default.
+
+For a runnable version of this pattern, see `../webhook-echo-bot` — it implements the receive-a-message → reply-to-it loop offline using `createWhatsApp`, `onMessage`, and `sendText` with a mock transport and a synthetic webhook envelope.
