@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.3.29] - 2026-07-05
+
+Patch release: the facade front door, public-surface integrity fixes, and community-open repository hygiene.
+
+### Added
+
+- `createWhatsApp(options)` factory in `@wats/core`: constructs the Graph client internally (fetch transport by default) so the facade is reachable without manual transport wiring. Validates all inputs with typed errors; the access token never appears in error messages.
+- `WhatsApp.sendText(...)` as the primary text-send name; `startChat(...)` remains as an alias.
+- `WhatsApp.onMessage(...)` and `WhatsApp.onStatus(...)` registration sugar over the typed filters.
+- Waitable sent-results (`waitForReply`, `waitForClick`, `waitForSelection`, `waitForFlowCompletion`, delivery waiters) on all facade send methods, not only text sends.
+- `@wats/persistence` barrel now exports `createPostgresPersistence`, `createPostgresPersistenceWithClient`, and the Postgres option and client types the `PersistenceBackend` type already advertised.
+- New runnable example `examples/webhook-echo-bot`: credential-free receive-a-message, reply-to-it loop; wired into CI smoke.
+- `SUPPORT.md` with solo-maintained alpha expectations.
+
+### Changed
+
+- `wats setup` fails fast with a typed error when stdin is not a terminal, pointing at `wats init` for non-interactive scaffolding.
+- `wats doctor` without `--config` explains how to create or point at a config instead of a generic usage error.
+- The legacy untyped filter and router exports (`createUpdateRouter`, top-level `and`/`or`/`not`, `parseWebhookUpdate`) are marked `@deprecated`; the typed system (`TypedRouter`, `filtersTyped`) is the supported path. Barrel removal is planned for the next minor.
+- `WhatsApp.sendGroupMessage` builds a typed messages payload (internal type escape removed; wire behavior unchanged).
+- Architecture docs and README describe `@wats/http` as an application-edge package composing `@wats/core`, matching the code; the cycle check confirmed no cross-package dependency cycle.
+- README and quickstart document runtime support: the packages run on Bun, Node 20+, Workers, and Deno; the CLI `serve` and `upgrade` commands require Bun.
+- CONTRIBUTING documents the `bun run build:packages` step and decouples external contributions from the maintainers' internal tracker; the PR template accepts GitHub issue references.
+- `@wats/internal-utils` README carries a do-not-import banner; `@wats/persistence` README carries an experimental banner.
+- Changelog release sections carry an "Upgrade safety" one-liner.
+
+### Build
+
+- Table-driven test suite constructs every Graph error subclass through the real registry and factory path; `errorSubclasses.ts` line coverage rose from 27% to 100%.
+- GitHub repository hygiene applied: branch protection on `main` with the required CI check, Discussions enabled, topics and homepage set.
+- No new dependencies in any publishable `@wats/*` package.
+
+### Release
+
+Upgrade safety: no breaking changes; no new dependencies; no migration required. Deprecation warnings added on the legacy untyped filter and router exports.
+
+No change to the secret surface: config still never resolves secrets; the new `createWhatsApp` factory validates the access token without echoing it.
+
+Release metadata is aligned for 0.3.29.
+
 ## [0.3.28] - 2026-07-04
 
 Patch release: the `@wats/service` operator telemetry surfaces and a docs voice pass.
