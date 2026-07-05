@@ -86,8 +86,12 @@ breaking changes.
 | `@wats/internal-utils` | published internal support package |
 
 Dependency direction is deliberate: low-level packages stay portable,
-`@wats/core` composes them, and the application-edge packages compose `core`.
-See the generated dependency graph at
+`@wats/core` composes them, and the application-edge packages compose
+`core`. `@wats/http` is an application-edge package — it verifies
+signatures and normalizes raw webhooks into typed updates via
+`@wats/core`'s `normalizeWebhookEnvelope` before dispatch (it is not a
+peer of `@wats/graph`; it sits above `@wats/core`). See the generated
+dependency graph at
 [wats.sh/docs/concepts/package-map](https://wats.sh/docs/concepts/package-map).
 
 ## Local development

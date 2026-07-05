@@ -62,7 +62,7 @@ filtersTyped.message.textMatches(/^hello/);
 
 The surfaces are independent — neither imports from the other. The names `and` / `or` / `not` exist on BOTH with different signatures and different brand semantics; do not mix them in one composition chain. Pick one per call site and migrate at your own pace.
 
-> **Deprecated (WATS-176).** The legacy `@wats/core/filters` surface (`UpdateFilter`, the untyped `and` / `or` / `not`, and the `hasMessageText` / `messageTextContains` / `messageFromWaId` / `hasMessageStatus` / `messageStatusIn` built-ins) is now marked `@deprecated` at the type level and is scheduled for **removal from the `@wats/core` barrel in the next minor release**. New code should use the typed `filtersTyped` surface on this page; the legacy `and` / `or` / `not` combinators will no longer be exported once the barrel is pruned. The typed and legacy surfaces remain independent until then — do not mix them in one composition chain.
+> **Deprecated.** The legacy `@wats/core/filters` surface (`UpdateFilter`, the untyped `and` / `or` / `not`, and the `hasMessageText` / `messageTextContains` / `messageFromWaId` / `hasMessageStatus` / `messageStatusIn` built-ins) is now marked `@deprecated` at the type level and is scheduled for **removal from the `@wats/core` barrel in the next minor release**. New code should use the typed `filtersTyped` surface on this page; the legacy `and` / `or` / `not` combinators will no longer be exported once the barrel is pruned. The typed and legacy surfaces remain independent until then — do not mix them in one composition chain.
 
 ## TypedFilter brand
 
