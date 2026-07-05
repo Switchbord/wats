@@ -56,7 +56,8 @@ export type OtelMetricName =
   | "webhook_normalization_total"
   | "graph_operations_total"
   | "send_outcomes_total"
-  | "persistence_operations_total";
+  | "persistence_operations_total"
+  | "outbox_processed_total";
 
 // Prometheus-style label names used by the internal MetricsRegistry.
 const INTERNAL_LABEL = {
@@ -98,6 +99,9 @@ const METRIC_LABEL_MAP: Record<
   },
   persistence_operations_total: {
     [OTEL_ATTR.persistenceAdapter]: "adapter",
+    [OTEL_ATTR.operationOutcome]: "outcome",
+  },
+  outbox_processed_total: {
     [OTEL_ATTR.operationOutcome]: "outcome",
   },
 };

@@ -86,6 +86,14 @@ export interface WatsServiceConfig {
    * collector receives telemetry.
    */
   readonly telemetrySink?: TelemetrySink;
+  /**
+   * Inject a pre-built MetricsRegistry to share between /metrics exposition
+   * and an outbox metrics reporter. Must be created via createMetricsRegistry
+   * (it declares every standard family); a bare MetricsRegistry would throw
+   * on the first instrumentation call. When omitted the service creates and
+   * owns its own registry.
+   */
+  readonly metricsRegistry?: MetricsRegistry;
 }
 
 export type WatsServiceErrorCode =
@@ -290,6 +298,29 @@ function validatePersistence(value: unknown): PersistenceStore | undefined {
     throw new WatsServiceError("invalid_persistence", "persistence must be a PersistenceStore.");
   }
   return value as unknown as PersistenceStore;
+}
+
+// A MetricsRegistry is structurally validated by the methods /metrics and the
+// outbox reporter call. The contract is: pass a registry from
+// createMetricsRegistry(). A bare `new MetricsRegistry()` (without the
+// standard declarations) is accepted structurally but would throw on the
+// first instrumentation call — documented on WatsServiceConfig.metricsRegistry.
+function validateMetricsRegistry(value: unknown): MetricsRegistry | undefined {
+  if (value === undefined) return undefined;
+  if (
+    !isRecord(value) ||
+    typeof value.declareCounter !== "function" ||
+    typeof value.declareHistogram !== "function" ||
+    typeof value.declareGauge !== "function" ||
+    typeof value.incrementCounter !== "function" ||
+    typeof value.observeHistogram !== "function" ||
+    typeof value.setGauge !== "function" ||
+    typeof value.render !== "function" ||
+    typeof value.families !== "function"
+  ) {
+    throw new WatsServiceError("invalid_config", "metricsRegistry must be a MetricsRegistry (use createMetricsRegistry).");
+  }
+  return value as unknown as MetricsRegistry;
 }
 
 function jsonResponse(status: number, payload: unknown, headers?: HeadersInit): Response {
@@ -634,11 +665,14 @@ interface HistogramState {
 // only ever exercise the allowlisted shape, so this never fires in normal
 // operation and exists to catch drift at the source rather than at scrape
 // time).
-class MetricsRegistry {
+export class MetricsRegistry {
   readonly #counters = new Map<string, Map<string, number>>();
   readonly #histograms = new Map<string, Map<string, HistogramState>>();
+  readonly #gauges = new Map<string, Map<string, number>>();
   readonly #counterHelp = new Map<string, string>();
   readonly #histogramHelp = new Map<string, string>();
+  readonly #gaugeHelp = new Map<string, string>();
+  readonly #gaugeLabelNames = new Map<string, ReadonlySet<string>>();
   readonly #histogramBuckets: readonly number[];
 
   constructor(histogramBucketsSeconds: readonly number[] = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]) {
@@ -653,6 +687,17 @@ class MetricsRegistry {
   declareHistogram(name: string, help: string): void {
     if (!this.#histograms.has(name)) this.#histograms.set(name, new Map());
     this.#histogramHelp.set(name, help);
+  }
+
+  // Gauges differ from counters: a setGauge call REPLACES the current value
+  // for a label set rather than adding to it. The label-key allowlist is
+  // declared up front so a caller cannot smuggle an unbounded or PII-bearing
+  // label key past the taxonomy's allowlist (counters/histograms predate this
+  // guard and remain open-shape; new gauge families pin their labels).
+  declareGauge(name: string, help: string, labelNames: readonly string[] = []): void {
+    if (!this.#gauges.has(name)) this.#gauges.set(name, new Map());
+    this.#gaugeHelp.set(name, help);
+    this.#gaugeLabelNames.set(name, new Set(labelNames));
   }
 
   incrementCounter(name: string, labels: Readonly<Record<string, string>>, value = 1): void {
@@ -678,6 +723,25 @@ class MetricsRegistry {
     }
     state.sum += valueSeconds;
     state.count += 1;
+  }
+
+  // Sets the current value of a gauge for a label set, replacing any prior
+  // value. Value must be a finite, non-negative number — gauges here model
+  // depths/counts, never signed deltas. Labels must exactly match the
+  // declared label-key set (no missing, no extra) so the exposition cannot
+  // sprout an unbounded label series.
+  setGauge(name: string, value: number, labels: Readonly<Record<string, string>>): void {
+    if (!Number.isFinite(value) || value < 0) throw new Error(`MetricsRegistry: gauge value must be a non-negative finite number, received ${value}`);
+    const series = this.#gauges.get(name);
+    if (series === undefined) throw new Error(`MetricsRegistry: gauge "${name}" was not declared.`);
+    const allowed = this.#gaugeLabelNames.get(name);
+    if (allowed !== undefined) {
+      const keys = Object.keys(labels);
+      if (keys.length !== allowed.size || keys.some((k) => !allowed.has(k))) {
+        throw new Error(`MetricsRegistry: gauge "${name}" labels must be {${Array.from(allowed).sort().join(", ")}}, received {${keys.sort().join(", ")}}.`);
+      }
+    }
+    series.set(labelKey(labels), value);
   }
 
   // Renders Prometheus text exposition format (version=0.0.4). Deterministic
@@ -714,12 +778,20 @@ class MetricsRegistry {
         lines.push(`${name}_count${key} ${state.count}`);
       }
     }
+    for (const [name, series] of this.#gauges) {
+      if (series.size === 0) continue;
+      lines.push(`# HELP ${name} ${this.#gaugeHelp.get(name) ?? ""}`);
+      lines.push(`# TYPE ${name} gauge`);
+      for (const [key, value] of series) {
+        lines.push(`${name}${key} ${value}`);
+      }
+    }
     return lines.length === 0 ? "" : `${lines.join("\n")}\n`;
   }
 
   // Names only — used by /debug/diagnostics. No values or label sets exposed.
   families(): readonly string[] {
-    return Array.from(new Set([...this.#counters.keys(), ...this.#histograms.keys()]));
+    return Array.from(new Set([...this.#counters.keys(), ...this.#histograms.keys(), ...this.#gauges.keys()]));
   }
 }
 
@@ -789,7 +861,7 @@ function labelKey(labels: Readonly<Record<string, string>>): string {
   return `{${rendered}}`;
 }
 
-function createMetricsRegistry(): MetricsRegistry {
+export function createMetricsRegistry(): MetricsRegistry {
   const registry = new MetricsRegistry();
   registry.declareCounter("http_requests_total", "Inbound HTTP requests to the service.");
   registry.declareHistogram("http_request_duration_seconds", "Request duration in seconds.");
@@ -797,7 +869,110 @@ function createMetricsRegistry(): MetricsRegistry {
   registry.declareCounter("graph_operations_total", "Outbound Graph API calls by endpoint family and status class.");
   registry.declareCounter("send_outcomes_total", "Message send attempts by outcome.");
   registry.declareCounter("persistence_operations_total", "Persistence store operations by adapter and outcome.");
+  // Outbox worker metrics. The depth gauge partitions by adapter and state
+  // (pending/processing/succeeded); the metrics reporter sets only the pending
+  // state series from OutboxWorkerTickReport.pending — a store-query reporter
+  // could populate the remaining states. The processed counter carries a
+  // success/error outcome mirroring the rest of the outcome enum.
+  registry.declareGauge(
+    "outbox_depth",
+    "Number of items in the persistence outbox, partitioned by adapter and state.",
+    ["adapter", "state"]
+  );
+  registry.declareCounter(
+    "outbox_processed_total",
+    "Outbox worker items processed by outcome."
+  );
   return registry;
+}
+
+// Shape of the tick report delivered to startOutboxWorker's onReport. Kept as
+// a local structural type so @wats/service does not take a hard runtime import
+// of @wats/persistence just for this wiring helper; the real
+// OutboxWorkerTickReport from @wats/persistence is structurally compatible.
+interface OutboxTickReport {
+  readonly processed: number;
+  readonly succeeded: number;
+  readonly failed: number;
+  readonly pending: number;
+}
+
+interface OutboxMetricsReporter {
+  /** Update outbox_depth + outbox_processed_total from a tick report. */
+  readonly onReport: (report: OutboxTickReport) => void;
+  /** Optional sink for loop infrastructure errors; not metric-emitting. */
+  readonly onError?: (error: unknown) => void;
+}
+
+const OUTBOX_ADAPTERS = ["sqlite", "postgres"] as const;
+
+function clampOutboxAdapter(adapter: unknown): string {
+  return typeof adapter === "string" && (OUTBOX_ADAPTERS as readonly string[]).includes(adapter.toLowerCase())
+    ? adapter.toLowerCase()
+    : "unknown";
+}
+
+// Wiring helper: translate an OutboxWorkerTickReport into registry state so a
+// long-running outbox worker's depth and throughput are visible from /metrics
+// without the worker knowing about the MetricsRegistry shape. The returned
+// { onReport, onError? } is structurally compatible with startOutboxWorker's
+// StartOutboxWorkerOptions, so the caller can spread it directly:
+//
+//   const metrics = createMetricsRegistry();
+//   const app = createWatsServiceApp({ ..., metricsRegistry: metrics });
+//   const reporter = createOutboxMetricsReporter(metrics, { adapter: store.backend });
+//   startOutboxWorker(store, { handler, ...reporter });
+//
+// onReport sets outbox_depth{adapter, state="pending"} = report.pending (the
+// only state the worker's countOutboxPending observes) and increments
+// outbox_processed_total{outcome="success"} by report.succeeded and
+// {outcome="error"} by report.failed. The depth gauge is registry-only: the
+// TelemetrySink seam has no setGauge, so user-owned OTel bridges do not
+// receive gauge samples — only /metrics scrapes see them.
+export function createOutboxMetricsReporter(
+  registry: MetricsRegistry,
+  options: { readonly adapter: string }
+): OutboxMetricsReporter {
+  if (registry === null || typeof registry !== "object" || typeof (registry as { setGauge?: unknown }).setGauge !== "function" || typeof (registry as { incrementCounter?: unknown }).incrementCounter !== "function") {
+    throw new TypeError("createOutboxMetricsReporter: registry must be a MetricsRegistry.");
+  }
+  if (options === null || typeof options !== "object") {
+    throw new TypeError("createOutboxMetricsReporter: options must be an object.");
+  }
+  if (typeof options.adapter !== "string" || options.adapter.length === 0) {
+    throw new TypeError("createOutboxMetricsReporter: options.adapter must be a non-empty string.");
+  }
+  const adapter = clampOutboxAdapter(options.adapter);
+  return {
+    onReport(report: OutboxTickReport): void {
+      // Defensive: a malformed report must not corrupt the registry. Non-finite
+      // or negative counts are clamped to 0 rather than throwing — the worker
+      // loop swallows onReport failures, so a throw here would be silent.
+      const pending = Number.isFinite(report?.pending) && report.pending >= 0 ? Math.floor(report.pending) : 0;
+      const succeeded = Number.isFinite(report?.succeeded) && report.succeeded >= 0 ? Math.floor(report.succeeded) : 0;
+      const failed = Number.isFinite(report?.failed) && report.failed >= 0 ? Math.floor(report.failed) : 0;
+      try {
+        registry.setGauge("outbox_depth", pending, { adapter, state: "pending" });
+      } catch {
+        // setGauge only throws on a misconfigured registry (undeclared metric
+        // or label drift) — surfacing that to the worker loop would be silent.
+      }
+      if (succeeded > 0) {
+        try {
+          registry.incrementCounter("outbox_processed_total", { outcome: "success" }, succeeded);
+        } catch {
+          // Same defensive swallow as setGauge.
+        }
+      }
+      if (failed > 0) {
+        try {
+          registry.incrementCounter("outbox_processed_total", { outcome: "error" }, failed);
+        } catch {
+          // Same defensive swallow as setGauge.
+        }
+      }
+    }
+  };
 }
 
 // WATS-164 bridge: a TelemetrySink that forwards to the internal Prometheus
@@ -821,6 +996,8 @@ class MetricsBridgeTelemetrySink implements TelemetrySink {
       this.#metrics.incrementCounter(name, this.#sendLabels(attributes), value);
     } else if (name === "persistence_operations_total") {
       this.#metrics.incrementCounter(name, this.#persistenceLabels(attributes), value);
+    } else if (name === "outbox_processed_total") {
+      this.#metrics.incrementCounter(name, this.#outboxLabels(attributes), value);
     }
   }
 
@@ -874,6 +1051,12 @@ class MetricsBridgeTelemetrySink implements TelemetrySink {
   #persistenceLabels(attributes: TelemetryAttributes): Readonly<Record<string, string>> {
     return {
       adapter: this.#getString(attributes, OTEL_ATTR.persistenceAdapter),
+      outcome: this.#getString(attributes, OTEL_ATTR.operationOutcome)
+    };
+  }
+
+  #outboxLabels(attributes: TelemetryAttributes): Readonly<Record<string, string>> {
+    return {
       outcome: this.#getString(attributes, OTEL_ATTR.operationOutcome)
     };
   }
@@ -2805,7 +2988,7 @@ function makeRuntimeConfig(config: WatsServiceConfig): RuntimeConfig {
     baseUrl: profile.graph.baseUrl,
     ...(transport !== undefined ? { transport } : {})
   });
-  const metricsRegistry = createMetricsRegistry();
+  const metricsRegistry = validateMetricsRegistry(config.metricsRegistry) ?? createMetricsRegistry();
   const metricsBridge = new MetricsBridgeTelemetrySink(metricsRegistry);
   const userSink = config.telemetrySink;
   const telemetrySink: TelemetrySink = userSink !== undefined
