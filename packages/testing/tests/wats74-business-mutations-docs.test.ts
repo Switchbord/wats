@@ -30,7 +30,7 @@ describe("WATS-74 business mutation docs lockstep", () => {
 
   test("parity, migration, changelog, and consumer fixture expose WATS-74", () => {
     const parity = read("site/content/docs/parity.mdx");
-    const migration = read("site/content/docs/migration/pywa.mdx");
+    const migration = read("site/content/docs/guides/migrating-from-pywa.mdx");
     const changelog = read("CHANGELOG.md");
     const fixture = read("packages/testing/fixtures/graph-consumer/verify-imports.ts");
 

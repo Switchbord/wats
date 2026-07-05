@@ -23,7 +23,7 @@ describe("WATS-93 auth-template/local-storage docs", () => {
   test("reference docs and changelog document supported_apps, storage_configuration, and removed register localization", () => {
     const endpoints = read("site/content/docs/reference/endpoints.mdx");
     const scoped = read("site/content/docs/reference/scoped-clients.mdx");
-    const migration = read("site/content/docs/migration/pywa.mdx");
+    const migration = read("site/content/docs/guides/migrating-from-pywa.mdx");
     const changelog = read("CHANGELOG.md");
 
     // E3: WATS-93 ticket traceability legitimately lives in the changelog (not

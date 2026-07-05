@@ -15,7 +15,7 @@ const REQUIRED_DOC_PATHS = [
   "site/content/docs/reference/cli.mdx",
   "site/content/docs/reference/service.mdx",
   "site/content/docs/guides/cli-init.mdx",
-  "site/content/docs/migration/pywa.mdx",
+  "site/content/docs/guides/migrating-from-pywa.mdx",
   "site/content/docs/parity.mdx",
   "site/content/docs/concepts/overview.mdx",
   "site/content/docs/concepts/package-map.mdx",

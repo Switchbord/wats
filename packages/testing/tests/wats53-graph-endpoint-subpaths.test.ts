@@ -59,7 +59,7 @@ describe("WATS-53 docs lockstep", () => {
     const referenceIndex = read("site/content/docs/reference/index.mdx");
     const publicApi = read("site/content/docs/concepts/public-api-surface.mdx");
     const packageMap = read("site/content/docs/concepts/package-map.mdx");
-    const migration = read("site/content/docs/migration/pywa.mdx");
+    const migration = read("site/content/docs/guides/migrating-from-pywa.mdx");
     const changelog = read("CHANGELOG.md");
 
     for (const doc of [publicApi, packageMap, migration, changelog]) {

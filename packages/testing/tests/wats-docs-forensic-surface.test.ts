@@ -69,7 +69,7 @@ describe("forensic docs current-surface reconciliation", () => {
     expect(parity).toContain("Embedded Signup token exchange is shape-only");
     expect(parity).toContain("planned for catalog CRUD");
 
-    const migration = read("site/content/docs/migration/pywa.mdx");
+    const migration = read("site/content/docs/guides/migrating-from-pywa.mdx");
     expect(migration).not.toContain("one-call local-file/bytes media send polymorphism");
     expect(migration).not.toContain("compare/migrate/unpause");
     expect(migration).not.toContain("calling permissions, calling settings/SIP mutations");

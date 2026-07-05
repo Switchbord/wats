@@ -23,7 +23,7 @@ describe("WATS-94 template group docs", () => {
   test("reference, consumer docs, parity, and changelog document template_groups and analytics", () => {
     const changelog = read("CHANGELOG.md");
     const parity = read("site/content/docs/parity.mdx");
-    const migration = read("site/content/docs/migration/pywa.mdx");
+    const migration = read("site/content/docs/guides/migrating-from-pywa.mdx");
     // Detailed template-group APIs live in the reference docs, package map, and
     // changelog; parity/migration are condensed status views.
     const detailedDocs = [

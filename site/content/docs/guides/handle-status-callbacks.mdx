@@ -1,0 +1,54 @@
+---
+title: Handle status callbacks
+description: Track sent, delivered, read, and failed status webhooks with onStatus, typed filters, and per-send waiters.
+---
+
+<DocMeta status="active" lastReviewed="2026-07-05" />
+
+A send accepted with HTTP 200 only proves Meta took the request. Delivered,
+read, and failed state arrives as inbound status webhooks. `onStatus`
+registers a handler that fires on every status update; the typed filter
+namespace narrows to a specific status.
+
+```ts
+import { createWhatsApp } from "@wats/core";
+import { status } from "@wats/core/filtersTyped";
+
+const wa = createWhatsApp({
+  accessToken: process.env.WATS_ACCESS_TOKEN!,
+  phoneNumberId: process.env.WATS_PHONE_NUMBER_ID!,
+});
+
+// Broad: every status update.
+wa.onStatus((ctx) => {
+  const s = ctx.update.status;
+  console.log(s.id, s.status); // wamid.HR... delivered
+});
+
+// Narrow: only failures.
+wa.on(status.failed(), (ctx) => {
+  const errors = ctx.update.status.errors;
+  // surface to your alerting
+});
+```
+
+For a single send, the waitable result resolves on the matching status for
+that message id — no manual id correlation:
+
+```ts
+const sent = await wa.sendText({ to: "<recipient-e164>", text: "ship notice" });
+
+await sent.waitUntilDelivered();
+await sent.waitUntilRead({ timeoutMs: 5 * 60_000 });
+```
+
+`status.sent()`, `status.delivered()`, `status.read()`, and `status.failed()`
+are the four statuses you usually branch on. Failed updates carry an
+`errors` array from Meta; inspect it before retrying, because Meta retries
+the webhook until you acknowledge it.
+
+## Related
+
+- [WhatsApp facade reference](/docs/reference/whatsapp-facade)
+- [Typed filters](/docs/reference/filters)
+- [Send and receive a live message](/docs/tutorials/send-and-receive)

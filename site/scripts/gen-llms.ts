@@ -5,8 +5,8 @@
 // MDX -> text: strip frontmatter (keep title/description), drop JSX component
 // lines (<DocMeta .../> etc.), keep markdown body verbatim. Code fences stay —
 // agents read those better than prose.
-import { readFileSync, writeFileSync, readdirSync, statSync } from "node:fs"
-import { join, relative, dirname } from "node:path"
+import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from "node:fs"
+import { join, relative, dirname, extname } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const siteRoot = dirname(dirname(fileURLToPath(import.meta.url)))
@@ -36,6 +36,17 @@ function parse(file: string): Page {
   const title = /^title:\s*["']?(.*?)["']?\s*$/m.exec(meta)?.[1] ?? ""
   const description = /^description:\s*["']?(.*?)["']?\s*$/m.exec(meta)?.[1] ?? ""
   let body = raw.slice(fm?.[0].length ?? 0)
+  // Resolve <include>relative/path.ext</include> tags by inlining the file
+  // contents (relative to the mdx file) as a fenced code block. The site
+  // renders these via an MDX component; for the LLM corpus we inline the raw
+  // source so agents see the actual code instead of an unresolved tag.
+  body = body.replace(/<include>([^<]+)<\/include>/g, (_match, rel: string) => {
+    const target = join(dirname(file), rel.trim())
+    if (!existsSync(target)) return `<!-- include not found: ${rel.trim()} -->`
+    const lang = extname(target).replace(/^\./, "") || ""
+    const content = readFileSync(target, "utf8").replace(/\s+$/, "\n")
+    return "```" + lang + "\n" + content + "```"
+  })
   // Drop standalone JSX component lines (DocMeta, Callout wrappers) but keep
   // everything inside code fences untouched.
   const lines = body.split("\n")
@@ -54,7 +65,7 @@ function parse(file: string): Page {
   return { route, title, description, body }
 }
 
-const ORDER = ["quickstart", "guide", "concepts/", "reference/", "guides/", "migration/", "parity", "meta/"]
+const ORDER = ["quickstart", "guide", "concepts/", "reference/", "tutorials/", "guides/", "parity", "meta/"]
 function rank(route: string): number {
   const p = route.replace(/^\/docs\/?/, "")
   const i = ORDER.findIndex((prefix) => p === prefix.replace(/\/$/, "") || p.startsWith(prefix))

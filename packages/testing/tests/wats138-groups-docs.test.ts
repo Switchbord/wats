@@ -168,7 +168,7 @@ describe("WATS-138 public Groups documentation", () => {
 
   test("parity and migration docs mark Groups as a beyond-pywa addition with live status separate", () => {
     const parity = read("site/content/docs/parity.mdx");
-    const migration = read("site/content/docs/migration/pywa.mdx");
+    const migration = read("site/content/docs/guides/migrating-from-pywa.mdx");
 
     // Voice pass reworded "Groups API … beyond-pywa addition" to the parity matrix
     // row marking Groups as having no pywa equivalent. Match the surviving phrasing.

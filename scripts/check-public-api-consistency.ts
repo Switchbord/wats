@@ -28,7 +28,7 @@ const DOC_PACKET = [
   "site/content/docs/reference/index.mdx",
   "site/content/docs/concepts/public-api-surface.mdx",
   "site/content/docs/concepts/package-map.mdx",
-  "site/content/docs/migration/pywa.mdx",
+  "site/content/docs/guides/migrating-from-pywa.mdx",
   "CHANGELOG.md"
 ] as const;
 
