@@ -47,6 +47,17 @@ bun add @wats/config @wats/service
 The `@wats/*` packages are standard npm packages; `npm i` works too. No
 credentials are needed to install, test, or develop against the mock transport.
 
+## Runtime support
+
+The `@wats/*` runtime packages target Bun, Node 20+, Cloudflare Workers, and
+Deno — they use only portable Web platform APIs. The `@wats/cli` `serve` and
+`upgrade` commands are Bun-only: `serve` is built on `Bun.serve` and `upgrade`
+shells out to `bun update`. On Node, Workers, or Deno, consume the runtime
+packages directly with your own server — see
+[deploy on Node](https://wats.sh/docs/guides/deploy-node) for a
+`node:http` example. Use `wats init`/`wats setup`/`wats doctor` (offline,
+credential-free) from a Bun shell to scaffold config.
+
 ## CLI
 
 ```bash
