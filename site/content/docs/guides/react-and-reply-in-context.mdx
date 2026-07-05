@@ -1,0 +1,58 @@
+---
+title: React and reply in context
+description: Send a reaction to an inbound message and reply to it by id using replyToMessageId on send inputs.
+---
+
+<DocMeta status="active" lastReviewed="2026-07-05" />
+
+A reply quotes the inbound message. Pass its id as `replyToMessageId` on any
+send input — Meta renders the quoted bubble in the client. A reaction is a
+send keyed on the message id with an emoji.
+
+```ts
+import { createWhatsApp } from "@wats/core";
+import { message } from "@wats/core/filtersTyped";
+
+const wa = createWhatsApp({
+  accessToken: process.env.WATS_ACCESS_TOKEN!,
+  phoneNumberId: process.env.WATS_PHONE_NUMBER_ID!,
+});
+
+wa.on(message.text(), async (ctx) => {
+  const inbound = ctx.update.message;
+
+  await wa.sendReaction({
+    to: inbound.from,
+    messageId: inbound.id,
+    emoji: "👍",
+  });
+
+  await wa.sendText({
+    to: inbound.from,
+    text: `you said: ${inbound.text.body}`,
+    replyToMessageId: inbound.id,
+  });
+});
+```
+
+`sendReaction` accepts a single emoji; pass an empty string (or call
+`removeReaction`) to clear one. The `message.reaction()`,
+`message.reactionAdded()`, and `message.reactionRemoved()` filters narrow
+inbound reaction updates so a handler can track emoji state on your own
+messages.
+
+```ts
+wa.on(message.reactionAdded(), (ctx) => {
+  const r = ctx.update.message.reaction;
+  console.log(r.emoji, "on", ctx.update.message.id);
+});
+```
+
+The inbound `context.messageId` on a reply or reaction tells you which of
+your sent messages it targets; the sent-result waiters use the same field to
+correlate `waitForReply`.
+
+## Related
+
+- [WhatsApp facade reference](/docs/reference/whatsapp-facade)
+- [Typed filters](/docs/reference/filters)

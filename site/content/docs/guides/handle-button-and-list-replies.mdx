@@ -1,0 +1,74 @@
+---
+title: Handle button and list replies
+description: Send interactive buttons and lists, await the click or selection, and route inbound replies with typed filters.
+---
+
+<DocMeta status="active" lastReviewed="2026-07-05" />
+
+`sendButtons` and `sendList` return waitable sent-results. The facade
+resolves `waitForClick` on an inbound `button_reply` and `waitForSelection`
+on a `list_reply` whose `context.messageId` matches the sent message id — no
+manual correlation, no polling.
+
+```ts
+import { createWhatsApp } from "@wats/core";
+
+const wa = createWhatsApp({
+  accessToken: process.env.WATS_ACCESS_TOKEN!,
+  phoneNumberId: process.env.WATS_PHONE_NUMBER_ID!,
+});
+
+const sent = await wa.sendButtons({
+  to: "<recipient-e164>",
+  bodyText: "Pick a shipping speed",
+  buttons: [
+    { id: "standard", title: "Standard" },
+    { id: "express", title: "Express" },
+  ],
+});
+
+const click = await sent.waitForClick({ timeoutMs: 60_000 });
+const choice = click.message.interactive.buttonReply.id; // "express"
+```
+
+For a list:
+
+```ts
+const list = await wa.sendList({
+  to: "<recipient-e164>",
+  bodyText: "Choose a slot",
+  buttonText: "Slots",
+  sections: [
+    {
+      rows: [
+        { id: "mon-am", title: "Mon AM" },
+        { id: "tue-pm", title: "Tue PM" },
+      ],
+    },
+  ],
+});
+
+const pick = await list.waitForSelection({ timeoutMs: 60_000 });
+const slot = pick.message.interactive.listReply.id; // "mon-am"
+```
+
+To route replies as they arrive (not as a waiter on a specific send), use
+typed filters. The `interactiveButtonReply` and `interactiveListReply`
+predicates narrow the update so the handler sees a typed reply:
+
+```ts
+import { message } from "@wats/core/filtersTyped";
+
+wa.on(message.interactiveButtonReply(), (ctx) => {
+  const id = ctx.update.message.interactive.buttonReply.id;
+  // dispatch on id
+});
+```
+
+The waiter and the router share the same listener substrate, so a click
+resolves a pending `waitForClick` and fires any matching `on` handler.
+
+## Related
+
+- [WhatsApp facade reference](/docs/reference/whatsapp-facade)
+- [Typed filters](/docs/reference/filters)

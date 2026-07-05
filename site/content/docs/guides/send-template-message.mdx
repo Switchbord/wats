@@ -1,0 +1,54 @@
+---
+title: Send a template message
+description: Send a pre-approved template with typed parameter components through the WhatsApp facade.
+---
+
+<DocMeta status="active" lastReviewed="2026-07-05" />
+
+Templates are the only message type Meta lets you send to a user outside the
+24-hour customer-service window. The template must exist and be approved in
+your WABA before you can send it. WATS validates parameter counts locally
+before the request hits Graph.
+
+```ts
+import { createWhatsApp } from "@wats/core";
+
+const wa = createWhatsApp({
+  accessToken: process.env.WATS_ACCESS_TOKEN!,
+  phoneNumberId: process.env.WATS_PHONE_NUMBER_ID!,
+});
+
+const sent = await wa.sendTemplate({
+  to: "<recipient-e164>",
+  name: "order_confirmation",      // an approved template in your WABA
+  languageCode: "en_US",
+  components: [
+    {
+      type: "body",
+      parameters: [
+        { type: "text", text: "Order #4821" },
+        { type: "text", text: "Tuesday" },
+      ],
+    },
+  ],
+});
+
+console.log(sent.messages?.[0]?.id); // wamid.HR...
+```
+
+`sendTemplate` returns a waitable sent-result, so you can await a reply or a
+delivery status on the same call:
+
+```ts
+await sent.waitUntilDelivered();
+```
+
+If the component count does not match the template definition, the call
+rejects before transport — no Graph request leaves the process. For plain
+text inside the customer-service window, use
+[`sendText`](/docs/reference/whatsapp-facade) instead.
+
+## Related
+
+- [WhatsApp facade reference](/docs/reference/whatsapp-facade)
+- [Handle status callbacks](/docs/guides/handle-status-callbacks)
