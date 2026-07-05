@@ -1,0 +1,111 @@
+---
+title: Send and receive a live message
+description: The end-to-end credentialed path — send a template, expose a webhook, receive a reply, reply back.
+---
+
+<DocMeta status="live-validated" lastReviewed="2026-07-05" />
+
+The [quickstart](/docs/quickstart) runs offline against a mock transport.
+This walkthrough swaps in real credentials and live Meta traffic. The send
+path here has carried live traffic; the webhook receive path is the same
+code the mock exercises, wired to a public HTTPS endpoint.
+
+## Prerequisites
+
+You need a Meta WhatsApp Business app, a WhatsApp Business Account (WABA), a
+phone number id, and a permanent access token with the `whatsapp_business_messaging`
+permission. Set up those assets in the
+[Meta WhatsApp Business Platform console](https://developers.facebook.com/docs/whatsapp/overview);
+WATS does not provision them. This site never asks for or handles tokens —
+export them as env vars.
+
+```sh
+export WATS_ACCESS_TOKEN=EAA...
+export WATS_PHONE_NUMBER_ID=103...      # from your test number
+export WATS_WABA_ID=...
+export WATS_APP_SECRET=...              # App Secret from your Meta app
+export WATS_VERIFY_TOKEN=...            # any string you choose; Meta echoes it on verify
+```
+
+## Install
+
+```sh
+bun add @wats/core @wats/graph @wats/http
+```
+
+## Send a message
+
+`createWhatsApp` wires the Graph client (default fetch transport) and typed
+router behind one facade. `accessToken` is the only required option; the
+token flows into the Authorization header and is never logged.
+
+```ts
+import { createWhatsApp } from "@wats/core";
+
+const wa = createWhatsApp({
+  accessToken: process.env.WATS_ACCESS_TOKEN!,
+  phoneNumberId: process.env.WATS_PHONE_NUMBER_ID!,
+});
+
+// A template must exist and be approved in your WABA before you can send it.
+// Use a plain text send instead if you just want to see traffic.
+const sent = await wa.sendText({ to: "<your-test-number-e164>", text: "hello from wats" });
+console.log(sent.messages?.[0]?.id); // wamid.HR...
+```
+
+Template sends validate parameter counts locally before they hit Graph:
+
+```ts
+await wa.sendTemplate({
+  to: "<your-test-number-e164>",
+  name: "hello_world",        // an approved template in your WABA
+  languageCode: "en_US",
+});
+```
+
+## Receive a webhook
+
+A send accepted with HTTP 200 only proves Meta took the request. Delivered and
+read state arrives as inbound webhooks. Meta requires a public HTTPS callback
+URL; use a tunnel for local development — the
+[live webhook guide](/docs/guides/live-webhook) covers the tunnel, the verify
+token, and the `wats serve` live path.
+
+The adapter verifies `X-Hub-Signature-256` (HMAC over the raw body), normalizes
+the envelope, and dispatches typed updates through the facade:
+
+```ts
+import { createWhatsApp } from "@wats/core";
+import { createWebhookAdapter, createFetchWebhookHandler } from "@wats/http";
+
+const wa = createWhatsApp({
+  accessToken: process.env.WATS_ACCESS_TOKEN!,
+  phoneNumberId: process.env.WATS_PHONE_NUMBER_ID!,
+});
+
+// Reply to inbound text with sendText.
+wa.onMessage(async (ctx) => {
+  const message = ctx.update.message;
+  if (message.type !== "text") return;
+  await wa.sendText({ to: message.from, text: `you said: ${message.text.body}` });
+});
+
+const adapter = createWebhookAdapter({
+  verifyToken: process.env.WATS_VERIFY_TOKEN!,
+  appSecret: process.env.WATS_APP_SECRET!,
+  whatsapp: wa,
+});
+
+export default { fetch: createFetchWebhookHandler(adapter) };
+```
+
+Run it behind a tunnel, point Meta's webhook at `https://<your-tunnel>/webhook`,
+complete the verify challenge, and send yourself a message. Status webhooks
+(sent/delivered/read/failed) flow through `wa.onStatus` — see
+[handle status callbacks](/docs/guides/handle-status-callbacks).
+
+## Related
+
+- [Reference: webhook adapter](/docs/reference/webhook-adapter)
+- [Reference: WhatsApp facade](/docs/reference/whatsapp-facade)
+- [Capability status](/docs/parity)

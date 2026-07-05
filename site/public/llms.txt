@@ -19,6 +19,7 @@ Playground (runs the real SDK in-browser, no credentials): https://wats.sh/playg
 - [Deploying a WATS webhook on Node](https://wats.sh/docs/guides/deploy-node): Deploy a WATS webhook server under Node.js using createNodeWebhookHandler and node:http.
 - [Groups quickstart](https://wats.sh/docs/guides/groups-quickstart): The credential-free Groups flow WATS supports today — create, read the lifecycle webhook, send the invite, approve joins, and message the group.
 - [Live webhook](https://wats.sh/docs/guides/live-webhook): Point Meta at a locally running WATS service behind a public HTTPS tunnel — live serve, webhook onboarding, and the credential-safety contract.
+- [Migration: pywa to WATS](https://wats.sh/docs/guides/migrating-from-pywa): A migration map from Python pywa integrations to WATS, with honest live-parity status and known gaps.
 - [Telemetry for operators](https://wats.sh/docs/guides/telemetry): Operate WATS telemetry endpoints safely — Prometheus scraping, OpenTelemetry adapters, and the privacy threat model.
 - [Transport and Testing](https://wats.sh/docs/guides/transport-and-testing): The @wats/graph Transport seam — testing with MockTransport, opt-in reliable transport, and the interceptor primer.
 - [Async integration contract](https://wats.sh/docs/concepts/async-integration-contract): Stable WATS import surface for app-side queues, workers, idempotency, throttling, and media offload.
@@ -48,8 +49,8 @@ Playground (runs the real SDK in-browser, no credentials): https://wats.sh/playg
 - [Webhook Adapter](https://wats.sh/docs/reference/webhook-adapter): The @wats/http runtime-neutral WebhookAdapter and its Bun, Node, and Fetch wrappers.
 - [Webhook Normalizer](https://wats.sh/docs/reference/webhook-normalizer): normalizeWebhookEnvelope: raw Meta webhook envelope in, TypedUpdate discriminated union out.
 - [WhatsApp facade reference (`WhatsApp`)](https://wats.sh/docs/reference/whatsapp-facade): The WhatsApp composition root: what it binds, what it exposes, and when to bypass it.
-- [Migration: pywa to WATS](https://wats.sh/docs/migration/pywa): A migration map from Python pywa integrations to WATS, with honest live-parity status and known gaps.
-- [pywa Parity Matrix](https://wats.sh/docs/parity): Capability-by-capability status of WATS against pywa, tagged live-validated, shape-only, or planned.
+- [Send and receive a live message](https://wats.sh/docs/tutorials/send-and-receive): The end-to-end credentialed path — send a template, expose a webhook, receive a reply, reply back.
+- [Capability status](https://wats.sh/docs/parity): Per-capability status of WATS against the WhatsApp Cloud API, tagged live-validated, shape-only, or planned.
 - [Live-testing campaign](https://wats.sh/docs/parity/live-campaign): How WATS gets validated against live Meta assets, and the redacted run log.
 - [API Stability Policy](https://wats.sh/docs/meta/api-stability): How to read stable-for-0.x, experimental, and internal WATS surfaces during the alpha line.
 - [Privacy and Telemetry](https://wats.sh/docs/meta/privacy): WATS sends no telemetry by default; what traffic occurs, how data is handled, and redaction expectations.

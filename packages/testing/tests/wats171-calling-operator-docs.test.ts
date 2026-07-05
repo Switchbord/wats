@@ -10,7 +10,7 @@ describe("WATS-171 calling operator docs", () => {
     const scoped = read("site/content/docs/reference/scoped-clients.mdx");
     const liveCampaign = read("site/content/docs/parity/live-campaign.mdx");
     const parity = read("site/content/docs/parity.mdx");
-    const migration = read("site/content/docs/migration/pywa.mdx");
+    const migration = read("site/content/docs/guides/migrating-from-pywa.mdx");
     const combined = `${scoped}\n${liveCampaign}\n${parity}\n${migration}`;
 
     for (const phrase of [

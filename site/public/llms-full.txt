@@ -1462,6 +1462,251 @@ The general CLI safety contract lives in
 
 ---
 
+# Migration: pywa to WATS
+URL: https://wats.sh/docs/guides/migrating-from-pywa
+
+WATS is a Bun-first TypeScript implementation: async-only APIs, camelCase
+public names, package-scoped primitives, strict runtime validation,
+MockTransport-first tests. This page maps pywa names to their WATS
+equivalents. For per-capability status, the [capability status matrix](/docs/parity) is
+authoritative; the [live campaign log](/docs/parity/live-campaign) is the
+evidence.
+
+Status tags below use the honesty taxonomy: **live-validated** (exercised
+against live Meta), **shape-only** (implemented and tested locally), and
+**planned** (no WATS equivalent yet).
+
+## Package and construction map
+
+| pywa concept | WATS equivalent | Status | Notes |
+| --- | --- | --- | --- |
+| `pywa.WhatsApp(...)` | `new GraphClient(...)` plus `new WhatsApp({ graphClient, phoneNumberId?, wabaId? })` from `@wats/core` | live-validated | WATS separates Graph transport from facade orchestration. |
+| `pywa_async.WhatsApp` | WATS Promise-returning APIs | live-validated | WATS is async-only; there is no sync API. |
+| `wa.api` / low-level Graph API | `GraphClient.request`, `requestRaw`, `defineEndpoint` | live-validated | Prefer first-class endpoints before custom `defineEndpoint`. |
+| `phone_id`-bound methods | `PhoneNumberClient` or `WhatsApp` with `phoneNumberId` | live-validated | Constructor-bound ids are validated and cannot be caller-overridden. |
+| `business_account_id` / WABA methods | `WABAClient` or `WhatsApp` with `wabaId` | live-validated | Templates, Flows, and read-only admin inventory hang from WABA. |
+| pywa server config | `@wats/http` adapter or `@wats/service` | live-validated | WATS keeps the standalone service separate from SDK primitives. |
+| pywa env/token constructor args | `@wats/config` env-secret references | shape-only | WATS config stores `{ env: "..." }`, never raw secrets. |
+
+## Client construction and auth
+
+pywa commonly puts token, phone id, WABA id, server, webhook, and app secret into one `WhatsApp(...)` constructor. WATS separates those responsibilities:
+
+```ts
+import { GraphClient, createFetchTransport } from "@wats/graph";
+import { WhatsApp } from "@wats/core";
+
+const graphClient = new GraphClient({
+  accessToken: process.env.WATS_ACCESS_TOKEN!,
+  apiVersion: "v25.0",
+  transport: createFetchTransport()
+});
+
+const wa = new WhatsApp({
+  graphClient,
+  phoneNumberId: process.env.WATS_PHONE_NUMBER_ID,
+  wabaId: process.env.WATS_WABA_ID
+});
+```
+
+Migration notes:
+
+- Public WATS options are camelCase: `phoneNumberId`, `wabaId`, `accessToken`, `apiVersion`.
+- Graph wire names remain snake_case only at the HTTP boundary.
+- WATS constructors reject unsafe ids before transport.
+- WATS does not resolve env-secret refs in the SDK; config/service/CLI boundaries own env indirection.
+
+## Message sending map
+
+| pywa usage | WATS usage | Status | Notes |
+| --- | --- | --- | --- |
+| pywa `send_message` / `send_text` | WATS `PhoneNumberClient.sendText` or `WhatsApp.startChat` | live-validated | Sends text to arbitrary E.164-ish recipients without contact lookup. |
+| `send_image`, `send_video`, `send_audio`, `send_document`, `send_sticker` | `PhoneNumberClient.sendImage` / `.sendVideo` / `.sendAudio` / `.sendDocument` / `.sendSticker` or matching `WhatsApp` helpers | live-validated (image by media id); others shape-only | WATS accepts existing media ids or http(s) links for message sends. |
+| pywa local file / bytes / file-like media sends | `uploadAndSendImage` / `uploadAndSendVideo` / `uploadAndSendAudio` / `uploadAndSendDocument` / `uploadAndSendSticker` for in-memory `Blob` / `ArrayBuffer` / `Uint8Array`; `@wats/graph/node-media` adds `uploadAndSend*FromPath` helpers for Node/Bun filesystem paths | shape-only | Root `@wats/graph` stays runtime-neutral; path helpers live behind the explicit Node/Bun-only subpath. |
+| `send_location` / `request_location` | `sendLocation` / `requestLocation` | shape-only | |
+| `send_contact` | `sendContacts` | shape-only | WATS uses bounded arrays and strict contact shapes. |
+| `send_reaction` / `remove_reaction` | `sendReaction` / `removeReaction` | shape-only | Reactions route through `POST /{phoneNumberId}/messages`. |
+| pywa buttons / lists / CTA objects | `sendButtons`, `sendList`, `sendCtaUrl`, `sendVoiceCall` | shape-only | WATS exposes separate helpers rather than pywa's overloaded `send_message(buttons=...)`; `sendVoiceCall` emits Meta `interactive.type = "voice_call"`. |
+| pywa catalog/product sends | `sendCatalog`, `sendProduct`, `sendProducts` | shape-only | Requires commerce/catalog assets for live validation. |
+| `mark_message_as_read` / `indicate_typing` | `markMessageAsRead` / `indicateTyping` | shape-only | Only use on test conversations during live campaigns. |
+| pywa `tracker` | WATS `bizOpaqueCallbackData`-style inputs where supported | shape-only | Check the specific WATS helper; WATS uses camelCase. Not on every composer. |
+
+## Media map
+
+| pywa usage | WATS usage | Status | Notes |
+| --- | --- | --- | --- |
+| `upload_media` | `uploadMedia` | live-validated | Validates caps and body shape locally. |
+| `get_media_url` / metadata | `downloadMedia` | live-validated | Returns Meta media metadata / resolved URL shape. |
+| `download_media` / `get_media_bytes` | `downloadMediaBytes` | live-validated | Use `maxBytes` and integrity checks. Meta returns hex sha256 digests. |
+| `delete_media` | `deleteMedia` | live-validated | Destructive; cleanup-only in live campaigns. |
+| encrypted media decrypt helpers | `decryptEncryptedMedia` | shape-only | Local crypto/integrity checks. |
+| resumable upload sessions | `createUploadSession`, `uploadFileToSession`, `getUploadSession` | shape-only | Import from `@wats/graph` or `@wats/graph/endpoints/media`; no `PhoneNumberClient.uploadMedia` convenience yet. |
+
+## Templates map
+
+| pywa usage | WATS usage | Status | Notes |
+| --- | --- | --- | --- |
+| pywa `create_template` / `get_templates` / `delete_template` | WATS `WABAClient.createMessageTemplate`, `.listMessageTemplates`, `.getMessageTemplate`, `.updateMessageTemplate`, `.deleteMessageTemplate` | live-validated (list); mutations shape-only | Auth OTP buttons use `supportedApps` → Graph `supported_apps` with nested `package_name` / `signature_hash`; auth template DSL fields `autofillText` / `zeroTapTermsAccepted` map to Graph `autofill_text` / `zero_tap_terms_accepted`. Template Group helpers: `listTemplateGroups`, `createTemplateGroup`, `getTemplateGroupAnalytics`. |
+| pywa `send_template` | `PhoneNumberClient.sendTemplate` or `WhatsApp.sendTemplate`; `PhoneNumberClient.sendMarketingTemplate` for Meta `/marketing_messages` | live-validated (approved-template send); marketing send shape-only | Parameter-count validation runs locally. Marketing Messages status webhooks (`marketing_lite`) are modeled. |
+| pywa template component DSL | WATS component builders such as `buildTemplateHeaderComponent` | shape-only | Core HEADER/BODY/FOOTER/BUTTONS helpers exist; pywa's larger DSL is broader. |
+| template status/category/quality/components handlers | `normalizeWebhookEnvelope` account helpers plus `filtersTyped.template` | shape-only | Synthetic webhook coverage. |
+| `compare_templates`, `unpause_template`, `migrate_templates`, `archive_templates`, `unarchive_templates`, `upsert_authentication_template`, `LibraryTemplate` create fields | `compareTemplates`, `unpauseTemplate`, `migrateTemplates`, `archiveTemplates`, `unarchiveTemplates`, `upsertAuthenticationTemplate`, and `createMessageTemplate` library-template fields | shape-only | Archive/unarchive use Meta's documented `hsm_ids` array body on `api.facebook.com`; pywa sends a comma string. `migrateTemplates` normalizes both documented `failed_templates` map responses and pywa-style list responses. |
+
+## Flows map
+
+| pywa usage | WATS usage | Status | Notes |
+| --- | --- | --- | --- |
+| pywa `create_flow` / `get_flows` / `publish_flow` | WATS `WABAClient.createFlow`, `.listFlows`, `.getFlow`, `.publishFlow` | shape-only | Publish/deprecate are state transitions; require explicit live opt-in. |
+| update metadata / JSON | `updateFlowMetadata`, `updateFlowJson` | shape-only | Flow JSON validation is bounded and descriptor-safe. |
+| delete / deprecate / assets | `deleteFlow`, `deprecateFlow`, `getFlowAssets` | shape-only | Delete/deprecate only resources created by the test run. |
+| Flow response builders | `buildFlowScreenResponse`, `buildFlowCloseResponse`, `buildFlowErrorResponse` | shape-only | Local data-exchange response construction only. |
+| pywa FlowJSON dataclasses | typed DSL builders (`flowJson`, `screen`, `singleColumnLayout`, `form`, every component + action builder) | shape-only | camelCase builders serialize to the hyphenated FlowJSON wire shape; output passes `validateFlowJson`. |
+| encrypted Flow request decrypt/encrypt | `decryptRequest` / `encryptResponse` / `handleFlowRequest` (RSA-OAEP + AES-GCM, IV-flip response), backed by `@wats/crypto` | shape-only | Local crypto round-trip; no hosted endpoint. |
+| Flow media-upload decryption | `decryptFlowMedia`, `decryptFlowMediaFile` | shape-only | PhotoPicker/DocumentPicker uploads use AES-CBC + HMAC-SHA256; WATS verifies encrypted hash, HMAC, and plaintext hash. |
+| Flow metrics / migration | `getFlowMetrics` and `migrateFlows` | shape-only | Credentialed and account-dependent; Meta marks Metrics API deprecated after 2026-04-30, replacement unverified. |
+
+## Calling map
+
+| pywa usage | WATS usage | Status | Notes |
+| --- | --- | --- | --- |
+| pywa `initiate_call` / `accept_call` / `terminate_call` | WATS `PhoneNumberClient.initiateCall`, `.acceptCall`, `.terminateCall` | shape-only | Also includes `preAcceptCall` and `rejectCall`. |
+| call connect/status/terminate handlers | `normalizeWebhookEnvelope` calling variants plus `filtersTyped.call` | shape-only | Synthetic payloads only. Calling webhook fields are normalized to camelCase; see [Calling Reference](/docs/reference/calling) and [Webhook Normalizer](/docs/reference/webhook-normalizer). |
+| call permission request/update | `getCallPermissions` typed permission/action/limit models; `call_permission_reply` webhook carries `isPermanent`/`responseSource`, plus `fromUserId`/`fromParentUserId` | shape-only | Waiters still planned; pywa also exposes permission waiters. |
+| calling settings/SIP models | Read via `getPhoneNumberSettings`; writes via the `calling` sub-object on `updatePhoneNumberSettings` (status, call hours, call icons, callback permission, SIP servers) | shape-only | `includeSipCredentials` may return secret-bearing SIP material as camelCase `sipUserPassword`; `sip_user_password` is never serialized into update bodies. WABA `health_status.can_receive_call_sip` is exposed as `healthStatus.canReceiveCallSip`. |
+| live WebRTC/media orchestration | No first-class WATS equivalent yet | planned | Call buttons/deep links can initiate supported client calls, but WATS still has no WebRTC/SIP server implementation. Requires real calling-enabled phone numbers and explicit authorization. Meta modes include Graph APIs + webhooks + WebRTC, SIP + WebRTC, and SIP + SDES SRTP; SDP may negotiate OPUS or G.711 (`PCMA`/`PCMU`). |
+
+## Business and admin map
+
+| pywa usage | WATS usage | Status | Notes |
+| --- | --- | --- | --- |
+| pywa `get_business_account` | `WABAClient.getInfo` / `getWabaInfo` | live-validated | |
+| pywa `get_business_phone_numbers` | `WABAClient.listPhoneNumbers` | live-validated | Supports `fields`, `limit`, `after`, `before`. |
+| pywa `get_business_phone_number_settings` | `PhoneNumberClient.getSettings` | shape-only | `includeSipCredentials` is sensitive; SIP password responses are exposed as `sipUserPassword`, not logged by WATS. |
+| pywa phone local-storage settings update | `PhoneNumberClient.updateSettings({ storageConfiguration })` / `updatePhoneNumberSettings` | shape-only | Emits `storage_configuration`; WATS does not emit the removed register field `data_localization_region` on settings updates (it IS accepted on `registerPhoneNumber`). |
+| pywa `get_business_profile` / `get_commerce_settings` | WATS `PhoneNumberClient.getBusinessProfile` / `.getCommerceSettings` | live-validated | |
+| pywa profile/commerce updates | WATS `PhoneNumberClient.updateBusinessProfile` / `.updateCommerceSettings`, also direct `updateBusinessProfile` / `updateCommerceSettings` from `@wats/graph/endpoints/business-management` | shape-only | Profile updates map camelCase `profilePictureHandle` to Graph `profile_picture_handle`; commerce updates map `isCartEnabled` / `isCatalogVisible` to `is_cart_enabled` / `is_catalog_visible`. |
+| pywa `create_phone_number` | WATS `WABAClient.createPhoneNumber` / `createPhoneNumber` from `@wats/graph` | shape-only | Mirrors pywa `WhatsApp.create_phone_number`; body fields `countryCode` / `phoneNumber` / `verifiedName` map to Graph `country_code` / `phone_number` / `verified_name`. |
+| pywa `request_verification_code` | WATS `PhoneNumberClient.requestVerificationCode` / `requestVerificationCode` from `@wats/graph` | shape-only | Sends `code_method` and `language` as URL query params (matches pywa + Meta), not a body. |
+| pywa `verify_phone_number` | WATS `PhoneNumberClient.verifyPhoneNumber` / `verifyPhoneNumber` from `@wats/graph` | shape-only | Sends `code` as a URL query param; the code is never echoed in validation error messages. |
+| pywa `register_phone_number` | WATS `PhoneNumberClient.registerPhoneNumber` / `registerPhoneNumber` from `@wats/graph` | shape-only | Body includes `messaging_product: "whatsapp"`, `pin`, and optional `data_localization_region`; the pin is never echoed in validation error messages. |
+| pywa `deregister_phone_number` | WATS `PhoneNumberClient.deregisterPhoneNumber` / `deregisterPhoneNumber` from `@wats/graph` | shape-only | No body, no query params. |
+| (no pywa equivalent) Meta two-step verification PIN | WATS `PhoneNumberClient.setTwoStepVerificationPin` / `setTwoStepVerificationPin` from `@wats/graph` | shape-only | `POST /{phoneNumberId}` with body `{ two_step_verification: { pin } }`; the pin is never echoed in validation error messages. |
+| public key | `getBusinessPublicKey`, `setBusinessPublicKey` | shape-only | Setter mirrors pywa's form-encoded `business_public_key`; getter is tolerant until live-validated. |
+| pywa `create_qr_code` | WATS `PhoneNumberClient.createQrCode` / `createQrCode` from `@wats/graph` | shape-only | `POST /{phoneNumberId}/message_qrdls` with body `{ prefilled_message, generate_qr_image }`; `generateQrImage` enum enforced (`SVG`/`PNG`), case-insensitive; prefilled message capped at 140 chars. |
+| pywa `get_qr_codes` | WATS `PhoneNumberClient.listQrCodes` / `listQrCodes` from `@wats/graph` | shape-only | `GET /{phoneNumberId}/message_qrdls`; optional `fields` + `before`/`after` cursor pagination. |
+| pywa `get_qr_code` | WATS `PhoneNumberClient.getQrCode` / `getQrCode` from `@wats/graph` | shape-only | `GET /{phoneNumberId}/message_qrdls/{code}`; optional `fields`. Response is `data`-wrapped (per Meta/pywa). |
+| pywa `update_qr_code` | WATS `PhoneNumberClient.updateQrCode` / `updateQrCode` from `@wats/graph` | shape-only | `POST /{phoneNumberId}/message_qrdls` with body `{ code, prefilled_message }` (same path as create, body carries existing `code`). |
+| pywa `delete_qr_code` | WATS `PhoneNumberClient.deleteQrCode` / `deleteQrCode` from `@wats/graph` | shape-only | `DELETE /{phoneNumberId}/message_qrdls/{code}`; no body. |
+| token exchange | `exchangeBusinessAccessToken` | shape-only | Exchanges Embedded Signup code for a business access token; client secret/code are never echoed in validation errors. |
+| WABA callback overrides | `setWabaCallbackOverride`, `clearWabaCallbackOverride`, plus existing `listSubscribedApps` readback | shape-only | Uses `verify_token` wire key; verify token is never echoed in validation errors. Phone-level callback override remains planned if needed. |
+| remaining profile/commerce updates | No first-class WATS helper yet | planned | Requires explicit operator authorization when it lands. |
+| QR code CRUD, block/unblock users, token exchange | Block API helpers exist (`listBlockedUsers`, `blockUsers`, `unblockUsers`); QR code CRUD exists (`createQrCode`, `listQrCodes`, `getQrCode`, `updateQrCode`, `deleteQrCode` on `PhoneNumberClient`); token exchange exists as `exchangeBusinessAccessToken` | shape-only | |
+
+## Groups map
+
+Groups are a WATS addition with no pywa equivalent. Use them only when you intentionally target the official WhatsApp Business Platform Groups API.
+
+| Need | WATS usage | Status | Notes |
+| --- | --- | --- | --- |
+| Group entity/webhook types | `@wats/types/groups` | shape-only | Types cover group entities and the four group webhook fields. |
+| Graph endpoint callables | `@wats/graph/endpoints/groups` (`createGroup`, `listGroups`, `resetGroupInviteLink`, `approveGroupJoinRequests`) | shape-only; `listGroups` live-validated | Groups hang off the business phone-number id, not WABA. |
+| Scoped clients | `PhoneNumberClient.createGroup`, `.listGroups`, `.group(groupId)`, `GroupClient` | shape-only | Create returns `request_id`; group id and invite link arrive via `group_lifecycle_update`. |
+| Facade and filters | `WhatsApp.sendGroupMessage`, `WhatsApp.listen({ groupId })`, `filtersTyped.group` | shape-only | Group messages carry `message.groupId`; group statuses carry `recipientType: "group"`. |
+| Service routes | `createWatsServiceApp({ enableGroupRoutes: true })` | shape-only | Route opt-in; the default service path is unchanged. |
+| Live mutation validation | pending | planned | Blocked on a Groups-entitled test number; see the [campaign log](/docs/parity/live-campaign). |
+
+## Webhook, handler, filter, and listener migration
+
+pywa decorators such as `@wa.on_message`, `@wa.on_callback_button`, `@wa.on_flow_completion`, and `@wa.on_call_status` map to WATS router/listener primitives:
+
+```ts
+import { WhatsApp, filtersTyped } from "@wats/core";
+
+wa.on(filtersTyped.message.text("hello"), async (update) => {
+  await wa.startChat({ to: update.message.from, text: "hi" });
+});
+```
+
+Migration differences:
+
+- WATS `TypedRouter.on(...)` returns a registration handle with `unregister()` instead of pywa decorator registration.
+- WATS handlers receive `TypedUpdate` variants rather than pywa Python classes.
+- WATS `wa.listen(...)` is the lower-level one-shot listener primitive. For text starts, `WhatsApp.startChat(...)` returns a waitable result with `waitForReply`, `waitForClick`, `waitForSelection`, `waitForFlowCompletion`, `waitUntilDelivered`, `waitUntilRead`, and `waitUntilFailed`, all backed by observed webhook updates through the listener registry. Broader send helpers remain planned.
+- WATS filters use function composition (`and`, `or`, `not`, `custom`) rather than Python `&`, `|`, and `~` operators.
+- WATS deep-normalizes common inbound message body families and adds typed filters for media, location, reaction, interactive button/list/nfm Flow-completion replies, and quick-reply buttons. This covers the most common `@wa.on_callback_button`, `@wa.on_callback_selection`, and `@wa.on_flow_completion` migration paths while keeping the update kind as `"message"`.
+- `user_preferences` maps to `TypedUserPreferencesUpdate` plus `filtersTyped.userPreferences`; `system` maps phone/identity changes to `TypedSystemUpdate` plus `filtersTyped.system`; `chat_opened` maps `REQUEST_WELCOME` to `TypedChatOpenedUpdate` plus `filtersTyped.chatOpened`.
+- WATS still has fewer first-class typed update families than pywa for call permission updates and several status/account details. Calling webhook fields (connect/terminate/status/`call_permission_reply`) are fully normalized to camelCase, but `call_permission_reply` remains an `interactive` message rather than a dedicated `TypedUpdate` kind.
+
+## Error handling migration
+
+pywa raises `WhatsAppError` subclasses keyed from Graph error codes. WATS exposes `GraphApiError` subclasses and a seeded registry mirroring pywa error codes where possible:
+
+```ts
+import { ExpiredAccessTokenError, GraphApiError } from "@wats/graph";
+
+try {
+  await phone.sendText({ to: "+155****4567", text: "hello" });
+} catch (error) {
+  if (error instanceof ExpiredAccessTokenError) {
+    // refresh / rotate the token
+  } else if (error instanceof GraphApiError) {
+    // inspect error.code, error.subcode, error.classification
+  }
+}
+```
+
+Migration notes:
+
+- Do not match Python class names in TypeScript code; import WATS subclasses from `@wats/graph`.
+- WATS validation failures reject before transport with WATS-specific validation errors.
+- Rate-limit retry/backoff is the opt-in `createReliableTransport` decorator, not automatic. The default GraphClient transport does not retry; opt in explicitly and avoid non-idempotent POST retries unless you also provide idempotency.
+
+## Import and subpath cheat sheet
+
+| Need | Import |
+| --- | --- |
+| Graph client, scoped clients, endpoints | `@wats/graph` |
+| Mock transport | `@wats/graph/testing` |
+| Message endpoint helpers | `@wats/graph/endpoints/messages` |
+| Media runtime helpers | `@wats/graph/endpoints/media` |
+| Message-template helpers | `@wats/graph/endpoints/templates` |
+| Flow management helpers | `@wats/graph/endpoints/flows` |
+| Calling endpoint helpers | `@wats/graph/endpoints/calling` |
+| Business-management read/admin helpers (`getPhoneNumberInfo`, `blockUsers`, `submitDisplayNameForReview`) | `@wats/graph/endpoints/business-management` |
+| Groups API helpers (`createGroup`, `listGroups`, `resetGroupInviteLink`, `approveGroupJoinRequests`) — WATS addition, no pywa equivalent | `@wats/graph/endpoints/groups` |
+| Facade/router/filters/listeners | `@wats/core` |
+| Typed filter subpath | `@wats/core/filtersTyped` |
+| Webhook adapters | `@wats/http` or `@wats/http/adapters/fetch` / `bun` / `node` |
+| Config | `@wats/config` |
+| Service app / OpenAPI document | `@wats/service` |
+| CLI testable entry | `@wats/cli` |
+
+## Known gaps to plan around
+
+Do not migrate code assuming WATS already has pywa parity for:
+
+- pywa's full decorator and handler taxonomy for callback selections/buttons, Flow request sub-actions, user marketing preferences, phone-number changes, and identity changes.
+- pywa sent-update waiters beyond the currently shipped process-local sent-result/click/selection/Flow-completion waiters.
+- pywa's broad filter catalog: commands, MIME/extension filters, location radius, per-error-code status filters, user marketing filters, and call permission filters.
+- Flow hosting and live Flow data-channel validation.
+- real WebRTC/SIP call orchestration beyond WATS request/webhook shapes and call-button/deep-link helpers.
+- catalog/product inventory CRUD and phone-level callback override. WATS already has profile/commerce updates, phone registration/deregistration, QR code CRUD, token exchange, and WABA callback override as shape-only helpers.
+- full Meta Graph OpenAPI generation and production operator modes beyond the current credential-free `wats init`, `wats doctor`, dry-run `wats serve`, and credential-gated local live `wats serve` tooling.
+
+## Migration checklist
+
+1. Inventory pywa imports and method names.
+2. Replace constructor setup with `GraphClient`, `PhoneNumberClient`, `WABAClient`, and `WhatsApp` facade composition.
+3. Convert snake_case names to camelCase.
+4. Move raw secrets to env vars or `@wats/config` env-secret refs.
+5. Replace pywa send methods with WATS scoped-client methods and root builders.
+6. Replace decorators with `TypedRouter.on(...)` / `WhatsApp.on(...)` and `filtersTyped`.
+7. Replace conversational waits with `wa.listen(...)` or `startChat(...).waitForReply()` / status waiters where applicable.
+8. Add MockTransport tests before using real credentials.
+9. Keep live operations behind the [campaign gates](/docs/parity/live-campaign): read-only before side-effecting before destructive, redact everything.
+
+---
+
 # Telemetry for operators
 URL: https://wats.sh/docs/guides/telemetry
 
@@ -7763,252 +8008,117 @@ Future CLI/service packages should compose this facade rather than embedding new
 
 ---
 
-# Migration: pywa to WATS
-URL: https://wats.sh/docs/migration/pywa
+# Send and receive a live message
+URL: https://wats.sh/docs/tutorials/send-and-receive
 
-WATS is a Bun-first TypeScript implementation: async-only APIs, camelCase
-public names, package-scoped primitives, strict runtime validation,
-MockTransport-first tests. This page maps pywa names to their WATS
-equivalents. For per-capability status, the [parity matrix](/docs/parity) is
-authoritative; the [live campaign log](/docs/parity/live-campaign) is the
-evidence.
+The [quickstart](/docs/quickstart) runs offline against a mock transport.
+This walkthrough swaps in real credentials and live Meta traffic. The send
+path here has carried live traffic; the webhook receive path is the same
+code the mock exercises, wired to a public HTTPS endpoint.
 
-Status tags below use the honesty taxonomy: **live-validated** (exercised
-against live Meta), **shape-only** (implemented and tested locally), and
-**planned** (no WATS equivalent yet).
+## Prerequisites
 
-## Package and construction map
+You need a Meta WhatsApp Business app, a WhatsApp Business Account (WABA), a
+phone number id, and a permanent access token with the `whatsapp_business_messaging`
+permission. Set up those assets in the
+[Meta WhatsApp Business Platform console](https://developers.facebook.com/docs/whatsapp/overview);
+WATS does not provision them. This site never asks for or handles tokens —
+export them as env vars.
 
-| pywa concept | WATS equivalent | Status | Notes |
-| --- | --- | --- | --- |
-| `pywa.WhatsApp(...)` | `new GraphClient(...)` plus `new WhatsApp({ graphClient, phoneNumberId?, wabaId? })` from `@wats/core` | live-validated | WATS separates Graph transport from facade orchestration. |
-| `pywa_async.WhatsApp` | WATS Promise-returning APIs | live-validated | WATS is async-only; there is no sync API. |
-| `wa.api` / low-level Graph API | `GraphClient.request`, `requestRaw`, `defineEndpoint` | live-validated | Prefer first-class endpoints before custom `defineEndpoint`. |
-| `phone_id`-bound methods | `PhoneNumberClient` or `WhatsApp` with `phoneNumberId` | live-validated | Constructor-bound ids are validated and cannot be caller-overridden. |
-| `business_account_id` / WABA methods | `WABAClient` or `WhatsApp` with `wabaId` | live-validated | Templates, Flows, and read-only admin inventory hang from WABA. |
-| pywa server config | `@wats/http` adapter or `@wats/service` | live-validated | WATS keeps the standalone service separate from SDK primitives. |
-| pywa env/token constructor args | `@wats/config` env-secret references | shape-only | WATS config stores `{ env: "..." }`, never raw secrets. |
+```sh
+export WATS_ACCESS_TOKEN=EAA...
+export WATS_PHONE_NUMBER_ID=103...      # from your test number
+export WATS_WABA_ID=...
+export WATS_APP_SECRET=...              # App Secret from your Meta app
+export WATS_VERIFY_TOKEN=...            # any string you choose; Meta echoes it on verify
+```
 
-## Client construction and auth
+## Install
 
-pywa commonly puts token, phone id, WABA id, server, webhook, and app secret into one `WhatsApp(...)` constructor. WATS separates those responsibilities:
+```sh
+bun add @wats/core @wats/graph @wats/http
+```
+
+## Send a message
+
+`createWhatsApp` wires the Graph client (default fetch transport) and typed
+router behind one facade. `accessToken` is the only required option; the
+token flows into the Authorization header and is never logged.
 
 ```ts
-import { GraphClient, createFetchTransport } from "@wats/graph";
-import { WhatsApp } from "@wats/core";
+import { createWhatsApp } from "@wats/core";
 
-const graphClient = new GraphClient({
+const wa = createWhatsApp({
   accessToken: process.env.WATS_ACCESS_TOKEN!,
-  apiVersion: "v25.0",
-  transport: createFetchTransport()
+  phoneNumberId: process.env.WATS_PHONE_NUMBER_ID!,
 });
 
-const wa = new WhatsApp({
-  graphClient,
-  phoneNumberId: process.env.WATS_PHONE_NUMBER_ID,
-  wabaId: process.env.WATS_WABA_ID
-});
+// A template must exist and be approved in your WABA before you can send it.
+// Use a plain text send instead if you just want to see traffic.
+const sent = await wa.sendText({ to: "<your-test-number-e164>", text: "hello from wats" });
+console.log(sent.messages?.[0]?.id); // wamid.HR...
 ```
 
-Migration notes:
-
-- Public WATS options are camelCase: `phoneNumberId`, `wabaId`, `accessToken`, `apiVersion`.
-- Graph wire names remain snake_case only at the HTTP boundary.
-- WATS constructors reject unsafe ids before transport.
-- WATS does not resolve env-secret refs in the SDK; config/service/CLI boundaries own env indirection.
-
-## Message sending map
-
-| pywa usage | WATS usage | Status | Notes |
-| --- | --- | --- | --- |
-| pywa `send_message` / `send_text` | WATS `PhoneNumberClient.sendText` or `WhatsApp.startChat` | live-validated | Sends text to arbitrary E.164-ish recipients without contact lookup. |
-| `send_image`, `send_video`, `send_audio`, `send_document`, `send_sticker` | `PhoneNumberClient.sendImage` / `.sendVideo` / `.sendAudio` / `.sendDocument` / `.sendSticker` or matching `WhatsApp` helpers | live-validated (image by media id); others shape-only | WATS accepts existing media ids or http(s) links for message sends. |
-| pywa local file / bytes / file-like media sends | `uploadAndSendImage` / `uploadAndSendVideo` / `uploadAndSendAudio` / `uploadAndSendDocument` / `uploadAndSendSticker` for in-memory `Blob` / `ArrayBuffer` / `Uint8Array`; `@wats/graph/node-media` adds `uploadAndSend*FromPath` helpers for Node/Bun filesystem paths | shape-only | Root `@wats/graph` stays runtime-neutral; path helpers live behind the explicit Node/Bun-only subpath. |
-| `send_location` / `request_location` | `sendLocation` / `requestLocation` | shape-only | |
-| `send_contact` | `sendContacts` | shape-only | WATS uses bounded arrays and strict contact shapes. |
-| `send_reaction` / `remove_reaction` | `sendReaction` / `removeReaction` | shape-only | Reactions route through `POST /{phoneNumberId}/messages`. |
-| pywa buttons / lists / CTA objects | `sendButtons`, `sendList`, `sendCtaUrl`, `sendVoiceCall` | shape-only | WATS exposes separate helpers rather than pywa's overloaded `send_message(buttons=...)`; `sendVoiceCall` emits Meta `interactive.type = "voice_call"`. |
-| pywa catalog/product sends | `sendCatalog`, `sendProduct`, `sendProducts` | shape-only | Requires commerce/catalog assets for live validation. |
-| `mark_message_as_read` / `indicate_typing` | `markMessageAsRead` / `indicateTyping` | shape-only | Only use on test conversations during live campaigns. |
-| pywa `tracker` | WATS `bizOpaqueCallbackData`-style inputs where supported | shape-only | Check the specific WATS helper; WATS uses camelCase. Not on every composer. |
-
-## Media map
-
-| pywa usage | WATS usage | Status | Notes |
-| --- | --- | --- | --- |
-| `upload_media` | `uploadMedia` | live-validated | Validates caps and body shape locally. |
-| `get_media_url` / metadata | `downloadMedia` | live-validated | Returns Meta media metadata / resolved URL shape. |
-| `download_media` / `get_media_bytes` | `downloadMediaBytes` | live-validated | Use `maxBytes` and integrity checks. Meta returns hex sha256 digests. |
-| `delete_media` | `deleteMedia` | live-validated | Destructive; cleanup-only in live campaigns. |
-| encrypted media decrypt helpers | `decryptEncryptedMedia` | shape-only | Local crypto/integrity checks. |
-| resumable upload sessions | `createUploadSession`, `uploadFileToSession`, `getUploadSession` | shape-only | Import from `@wats/graph` or `@wats/graph/endpoints/media`; no `PhoneNumberClient.uploadMedia` convenience yet. |
-
-## Templates map
-
-| pywa usage | WATS usage | Status | Notes |
-| --- | --- | --- | --- |
-| pywa `create_template` / `get_templates` / `delete_template` | WATS `WABAClient.createMessageTemplate`, `.listMessageTemplates`, `.getMessageTemplate`, `.updateMessageTemplate`, `.deleteMessageTemplate` | live-validated (list); mutations shape-only | Auth OTP buttons use `supportedApps` → Graph `supported_apps` with nested `package_name` / `signature_hash`; auth template DSL fields `autofillText` / `zeroTapTermsAccepted` map to Graph `autofill_text` / `zero_tap_terms_accepted`. Template Group helpers: `listTemplateGroups`, `createTemplateGroup`, `getTemplateGroupAnalytics`. |
-| pywa `send_template` | `PhoneNumberClient.sendTemplate` or `WhatsApp.sendTemplate`; `PhoneNumberClient.sendMarketingTemplate` for Meta `/marketing_messages` | live-validated (approved-template send); marketing send shape-only | Parameter-count validation runs locally. Marketing Messages status webhooks (`marketing_lite`) are modeled. |
-| pywa template component DSL | WATS component builders such as `buildTemplateHeaderComponent` | shape-only | Core HEADER/BODY/FOOTER/BUTTONS helpers exist; pywa's larger DSL is broader. |
-| template status/category/quality/components handlers | `normalizeWebhookEnvelope` account helpers plus `filtersTyped.template` | shape-only | Synthetic webhook coverage. |
-| `compare_templates`, `unpause_template`, `migrate_templates`, `archive_templates`, `unarchive_templates`, `upsert_authentication_template`, `LibraryTemplate` create fields | `compareTemplates`, `unpauseTemplate`, `migrateTemplates`, `archiveTemplates`, `unarchiveTemplates`, `upsertAuthenticationTemplate`, and `createMessageTemplate` library-template fields | shape-only | Archive/unarchive use Meta's documented `hsm_ids` array body on `api.facebook.com`; pywa sends a comma string. `migrateTemplates` normalizes both documented `failed_templates` map responses and pywa-style list responses. |
-
-## Flows map
-
-| pywa usage | WATS usage | Status | Notes |
-| --- | --- | --- | --- |
-| pywa `create_flow` / `get_flows` / `publish_flow` | WATS `WABAClient.createFlow`, `.listFlows`, `.getFlow`, `.publishFlow` | shape-only | Publish/deprecate are state transitions; require explicit live opt-in. |
-| update metadata / JSON | `updateFlowMetadata`, `updateFlowJson` | shape-only | Flow JSON validation is bounded and descriptor-safe. |
-| delete / deprecate / assets | `deleteFlow`, `deprecateFlow`, `getFlowAssets` | shape-only | Delete/deprecate only resources created by the test run. |
-| Flow response builders | `buildFlowScreenResponse`, `buildFlowCloseResponse`, `buildFlowErrorResponse` | shape-only | Local data-exchange response construction only. |
-| pywa FlowJSON dataclasses | typed DSL builders (`flowJson`, `screen`, `singleColumnLayout`, `form`, every component + action builder) | shape-only | camelCase builders serialize to the hyphenated FlowJSON wire shape; output passes `validateFlowJson`. |
-| encrypted Flow request decrypt/encrypt | `decryptRequest` / `encryptResponse` / `handleFlowRequest` (RSA-OAEP + AES-GCM, IV-flip response), backed by `@wats/crypto` | shape-only | Local crypto round-trip; no hosted endpoint. |
-| Flow media-upload decryption | `decryptFlowMedia`, `decryptFlowMediaFile` | shape-only | PhotoPicker/DocumentPicker uploads use AES-CBC + HMAC-SHA256; WATS verifies encrypted hash, HMAC, and plaintext hash. |
-| Flow metrics / migration | `getFlowMetrics` and `migrateFlows` | shape-only | Credentialed and account-dependent; Meta marks Metrics API deprecated after 2026-04-30, replacement unverified. |
-
-## Calling map
-
-| pywa usage | WATS usage | Status | Notes |
-| --- | --- | --- | --- |
-| pywa `initiate_call` / `accept_call` / `terminate_call` | WATS `PhoneNumberClient.initiateCall`, `.acceptCall`, `.terminateCall` | shape-only | Also includes `preAcceptCall` and `rejectCall`. |
-| call connect/status/terminate handlers | `normalizeWebhookEnvelope` calling variants plus `filtersTyped.call` | shape-only | Synthetic payloads only. Calling webhook fields are normalized to camelCase; see [Calling Reference](/docs/reference/calling) and [Webhook Normalizer](/docs/reference/webhook-normalizer). |
-| call permission request/update | `getCallPermissions` typed permission/action/limit models; `call_permission_reply` webhook carries `isPermanent`/`responseSource`, plus `fromUserId`/`fromParentUserId` | shape-only | Waiters still planned; pywa also exposes permission waiters. |
-| calling settings/SIP models | Read via `getPhoneNumberSettings`; writes via the `calling` sub-object on `updatePhoneNumberSettings` (status, call hours, call icons, callback permission, SIP servers) | shape-only | `includeSipCredentials` may return secret-bearing SIP material as camelCase `sipUserPassword`; `sip_user_password` is never serialized into update bodies. WABA `health_status.can_receive_call_sip` is exposed as `healthStatus.canReceiveCallSip`. |
-| live WebRTC/media orchestration | No first-class WATS equivalent yet | planned | Call buttons/deep links can initiate supported client calls, but WATS still has no WebRTC/SIP server implementation. Requires real calling-enabled phone numbers and explicit authorization. Meta modes include Graph APIs + webhooks + WebRTC, SIP + WebRTC, and SIP + SDES SRTP; SDP may negotiate OPUS or G.711 (`PCMA`/`PCMU`). |
-
-## Business and admin map
-
-| pywa usage | WATS usage | Status | Notes |
-| --- | --- | --- | --- |
-| pywa `get_business_account` | `WABAClient.getInfo` / `getWabaInfo` | live-validated | |
-| pywa `get_business_phone_numbers` | `WABAClient.listPhoneNumbers` | live-validated | Supports `fields`, `limit`, `after`, `before`. |
-| pywa `get_business_phone_number_settings` | `PhoneNumberClient.getSettings` | shape-only | `includeSipCredentials` is sensitive; SIP password responses are exposed as `sipUserPassword`, not logged by WATS. |
-| pywa phone local-storage settings update | `PhoneNumberClient.updateSettings({ storageConfiguration })` / `updatePhoneNumberSettings` | shape-only | Emits `storage_configuration`; WATS does not emit the removed register field `data_localization_region` on settings updates (it IS accepted on `registerPhoneNumber`). |
-| pywa `get_business_profile` / `get_commerce_settings` | WATS `PhoneNumberClient.getBusinessProfile` / `.getCommerceSettings` | live-validated | |
-| pywa profile/commerce updates | WATS `PhoneNumberClient.updateBusinessProfile` / `.updateCommerceSettings`, also direct `updateBusinessProfile` / `updateCommerceSettings` from `@wats/graph/endpoints/business-management` | shape-only | Profile updates map camelCase `profilePictureHandle` to Graph `profile_picture_handle`; commerce updates map `isCartEnabled` / `isCatalogVisible` to `is_cart_enabled` / `is_catalog_visible`. |
-| pywa `create_phone_number` | WATS `WABAClient.createPhoneNumber` / `createPhoneNumber` from `@wats/graph` | shape-only | Mirrors pywa `WhatsApp.create_phone_number`; body fields `countryCode` / `phoneNumber` / `verifiedName` map to Graph `country_code` / `phone_number` / `verified_name`. |
-| pywa `request_verification_code` | WATS `PhoneNumberClient.requestVerificationCode` / `requestVerificationCode` from `@wats/graph` | shape-only | Sends `code_method` and `language` as URL query params (matches pywa + Meta), not a body. |
-| pywa `verify_phone_number` | WATS `PhoneNumberClient.verifyPhoneNumber` / `verifyPhoneNumber` from `@wats/graph` | shape-only | Sends `code` as a URL query param; the code is never echoed in validation error messages. |
-| pywa `register_phone_number` | WATS `PhoneNumberClient.registerPhoneNumber` / `registerPhoneNumber` from `@wats/graph` | shape-only | Body includes `messaging_product: "whatsapp"`, `pin`, and optional `data_localization_region`; the pin is never echoed in validation error messages. |
-| pywa `deregister_phone_number` | WATS `PhoneNumberClient.deregisterPhoneNumber` / `deregisterPhoneNumber` from `@wats/graph` | shape-only | No body, no query params. |
-| (no pywa equivalent) Meta two-step verification PIN | WATS `PhoneNumberClient.setTwoStepVerificationPin` / `setTwoStepVerificationPin` from `@wats/graph` | shape-only | `POST /{phoneNumberId}` with body `{ two_step_verification: { pin } }`; the pin is never echoed in validation error messages. |
-| public key | `getBusinessPublicKey`, `setBusinessPublicKey` | shape-only | Setter mirrors pywa's form-encoded `business_public_key`; getter is tolerant until live-validated. |
-| pywa `create_qr_code` | WATS `PhoneNumberClient.createQrCode` / `createQrCode` from `@wats/graph` | shape-only | `POST /{phoneNumberId}/message_qrdls` with body `{ prefilled_message, generate_qr_image }`; `generateQrImage` enum enforced (`SVG`/`PNG`), case-insensitive; prefilled message capped at 140 chars. |
-| pywa `get_qr_codes` | WATS `PhoneNumberClient.listQrCodes` / `listQrCodes` from `@wats/graph` | shape-only | `GET /{phoneNumberId}/message_qrdls`; optional `fields` + `before`/`after` cursor pagination. |
-| pywa `get_qr_code` | WATS `PhoneNumberClient.getQrCode` / `getQrCode` from `@wats/graph` | shape-only | `GET /{phoneNumberId}/message_qrdls/{code}`; optional `fields`. Response is `data`-wrapped (per Meta/pywa). |
-| pywa `update_qr_code` | WATS `PhoneNumberClient.updateQrCode` / `updateQrCode` from `@wats/graph` | shape-only | `POST /{phoneNumberId}/message_qrdls` with body `{ code, prefilled_message }` (same path as create, body carries existing `code`). |
-| pywa `delete_qr_code` | WATS `PhoneNumberClient.deleteQrCode` / `deleteQrCode` from `@wats/graph` | shape-only | `DELETE /{phoneNumberId}/message_qrdls/{code}`; no body. |
-| token exchange | `exchangeBusinessAccessToken` | shape-only | Exchanges Embedded Signup code for a business access token; client secret/code are never echoed in validation errors. |
-| WABA callback overrides | `setWabaCallbackOverride`, `clearWabaCallbackOverride`, plus existing `listSubscribedApps` readback | shape-only | Uses `verify_token` wire key; verify token is never echoed in validation errors. Phone-level callback override remains planned if needed. |
-| remaining profile/commerce updates | No first-class WATS helper yet | planned | Requires explicit operator authorization when it lands. |
-| QR code CRUD, block/unblock users, token exchange | Block API helpers exist (`listBlockedUsers`, `blockUsers`, `unblockUsers`); QR code CRUD exists (`createQrCode`, `listQrCodes`, `getQrCode`, `updateQrCode`, `deleteQrCode` on `PhoneNumberClient`); token exchange exists as `exchangeBusinessAccessToken` | shape-only | |
-
-## Groups map
-
-Groups are a WATS addition with no pywa equivalent. Use them only when you intentionally target the official WhatsApp Business Platform Groups API.
-
-| Need | WATS usage | Status | Notes |
-| --- | --- | --- | --- |
-| Group entity/webhook types | `@wats/types/groups` | shape-only | Types cover group entities and the four group webhook fields. |
-| Graph endpoint callables | `@wats/graph/endpoints/groups` (`createGroup`, `listGroups`, `resetGroupInviteLink`, `approveGroupJoinRequests`) | shape-only; `listGroups` live-validated | Groups hang off the business phone-number id, not WABA. |
-| Scoped clients | `PhoneNumberClient.createGroup`, `.listGroups`, `.group(groupId)`, `GroupClient` | shape-only | Create returns `request_id`; group id and invite link arrive via `group_lifecycle_update`. |
-| Facade and filters | `WhatsApp.sendGroupMessage`, `WhatsApp.listen({ groupId })`, `filtersTyped.group` | shape-only | Group messages carry `message.groupId`; group statuses carry `recipientType: "group"`. |
-| Service routes | `createWatsServiceApp({ enableGroupRoutes: true })` | shape-only | Route opt-in; the default service path is unchanged. |
-| Live mutation validation | pending | planned | Blocked on a Groups-entitled test number; see the [campaign log](/docs/parity/live-campaign). |
-
-## Webhook, handler, filter, and listener migration
-
-pywa decorators such as `@wa.on_message`, `@wa.on_callback_button`, `@wa.on_flow_completion`, and `@wa.on_call_status` map to WATS router/listener primitives:
+Template sends validate parameter counts locally before they hit Graph:
 
 ```ts
-import { WhatsApp, filtersTyped } from "@wats/core";
-
-wa.on(filtersTyped.message.text("hello"), async (update) => {
-  await wa.startChat({ to: update.message.from, text: "hi" });
+await wa.sendTemplate({
+  to: "<your-test-number-e164>",
+  name: "hello_world",        // an approved template in your WABA
+  languageCode: "en_US",
 });
 ```
 
-Migration differences:
+## Receive a webhook
 
-- WATS `TypedRouter.on(...)` returns a registration handle with `unregister()` instead of pywa decorator registration.
-- WATS handlers receive `TypedUpdate` variants rather than pywa Python classes.
-- WATS `wa.listen(...)` is the lower-level one-shot listener primitive. For text starts, `WhatsApp.startChat(...)` returns a waitable result with `waitForReply`, `waitForClick`, `waitForSelection`, `waitForFlowCompletion`, `waitUntilDelivered`, `waitUntilRead`, and `waitUntilFailed`, all backed by observed webhook updates through the listener registry. Broader send helpers remain planned.
-- WATS filters use function composition (`and`, `or`, `not`, `custom`) rather than Python `&`, `|`, and `~` operators.
-- WATS deep-normalizes common inbound message body families and adds typed filters for media, location, reaction, interactive button/list/nfm Flow-completion replies, and quick-reply buttons. This covers the most common `@wa.on_callback_button`, `@wa.on_callback_selection`, and `@wa.on_flow_completion` migration paths while keeping the update kind as `"message"`.
-- `user_preferences` maps to `TypedUserPreferencesUpdate` plus `filtersTyped.userPreferences`; `system` maps phone/identity changes to `TypedSystemUpdate` plus `filtersTyped.system`; `chat_opened` maps `REQUEST_WELCOME` to `TypedChatOpenedUpdate` plus `filtersTyped.chatOpened`.
-- WATS still has fewer first-class typed update families than pywa for call permission updates and several status/account details. Calling webhook fields (connect/terminate/status/`call_permission_reply`) are fully normalized to camelCase, but `call_permission_reply` remains an `interactive` message rather than a dedicated `TypedUpdate` kind.
+A send accepted with HTTP 200 only proves Meta took the request. Delivered and
+read state arrives as inbound webhooks. Meta requires a public HTTPS callback
+URL; use a tunnel for local development — the
+[live webhook guide](/docs/guides/live-webhook) covers the tunnel, the verify
+token, and the `wats serve` live path.
 
-## Error handling migration
-
-pywa raises `WhatsAppError` subclasses keyed from Graph error codes. WATS exposes `GraphApiError` subclasses and a seeded registry mirroring pywa error codes where possible:
+The adapter verifies `X-Hub-Signature-256` (HMAC over the raw body), normalizes
+the envelope, and dispatches typed updates through the facade:
 
 ```ts
-import { ExpiredAccessTokenError, GraphApiError } from "@wats/graph";
+import { createWhatsApp } from "@wats/core";
+import { createWebhookAdapter, createFetchWebhookHandler } from "@wats/http";
 
-try {
-  await phone.sendText({ to: "+155****4567", text: "hello" });
-} catch (error) {
-  if (error instanceof ExpiredAccessTokenError) {
-    // refresh / rotate the token
-  } else if (error instanceof GraphApiError) {
-    // inspect error.code, error.subcode, error.classification
-  }
-}
+const wa = createWhatsApp({
+  accessToken: process.env.WATS_ACCESS_TOKEN!,
+  phoneNumberId: process.env.WATS_PHONE_NUMBER_ID!,
+});
+
+// Reply to inbound text with sendText.
+wa.onMessage(async (ctx) => {
+  const message = ctx.update.message;
+  if (message.type !== "text") return;
+  await wa.sendText({ to: message.from, text: `you said: ${message.text.body}` });
+});
+
+const adapter = createWebhookAdapter({
+  verifyToken: process.env.WATS_VERIFY_TOKEN!,
+  appSecret: process.env.WATS_APP_SECRET!,
+  whatsapp: wa,
+});
+
+export default { fetch: createFetchWebhookHandler(adapter) };
 ```
 
-Migration notes:
+Run it behind a tunnel, point Meta's webhook at `https://<your-tunnel>/webhook`,
+complete the verify challenge, and send yourself a message. Status webhooks
+(sent/delivered/read/failed) flow through `wa.onStatus` — see
+[handle status callbacks](/docs/guides/handle-status-callbacks).
 
-- Do not match Python class names in TypeScript code; import WATS subclasses from `@wats/graph`.
-- WATS validation failures reject before transport with WATS-specific validation errors.
-- Rate-limit retry/backoff is the opt-in `createReliableTransport` decorator, not automatic. The default GraphClient transport does not retry; opt in explicitly and avoid non-idempotent POST retries unless you also provide idempotency.
+## Related
 
-## Import and subpath cheat sheet
-
-| Need | Import |
-| --- | --- |
-| Graph client, scoped clients, endpoints | `@wats/graph` |
-| Mock transport | `@wats/graph/testing` |
-| Message endpoint helpers | `@wats/graph/endpoints/messages` |
-| Media runtime helpers | `@wats/graph/endpoints/media` |
-| Message-template helpers | `@wats/graph/endpoints/templates` |
-| Flow management helpers | `@wats/graph/endpoints/flows` |
-| Calling endpoint helpers | `@wats/graph/endpoints/calling` |
-| Business-management read/admin helpers (`getPhoneNumberInfo`, `blockUsers`, `submitDisplayNameForReview`) | `@wats/graph/endpoints/business-management` |
-| Groups API helpers (`createGroup`, `listGroups`, `resetGroupInviteLink`, `approveGroupJoinRequests`) — WATS addition, no pywa equivalent | `@wats/graph/endpoints/groups` |
-| Facade/router/filters/listeners | `@wats/core` |
-| Typed filter subpath | `@wats/core/filtersTyped` |
-| Webhook adapters | `@wats/http` or `@wats/http/adapters/fetch` / `bun` / `node` |
-| Config | `@wats/config` |
-| Service app / OpenAPI document | `@wats/service` |
-| CLI testable entry | `@wats/cli` |
-
-## Known gaps to plan around
-
-Do not migrate code assuming WATS already has pywa parity for:
-
-- pywa's full decorator and handler taxonomy for callback selections/buttons, Flow request sub-actions, user marketing preferences, phone-number changes, and identity changes.
-- pywa sent-update waiters beyond the currently shipped process-local sent-result/click/selection/Flow-completion waiters.
-- pywa's broad filter catalog: commands, MIME/extension filters, location radius, per-error-code status filters, user marketing filters, and call permission filters.
-- Flow hosting and live Flow data-channel validation.
-- real WebRTC/SIP call orchestration beyond WATS request/webhook shapes and call-button/deep-link helpers.
-- catalog/product inventory CRUD and phone-level callback override. WATS already has profile/commerce updates, phone registration/deregistration, QR code CRUD, token exchange, and WABA callback override as shape-only helpers.
-- full Meta Graph OpenAPI generation and production operator modes beyond the current credential-free `wats init`, `wats doctor`, dry-run `wats serve`, and credential-gated local live `wats serve` tooling.
-
-## Migration checklist
-
-1. Inventory pywa imports and method names.
-2. Replace constructor setup with `GraphClient`, `PhoneNumberClient`, `WABAClient`, and `WhatsApp` facade composition.
-3. Convert snake_case names to camelCase.
-4. Move raw secrets to env vars or `@wats/config` env-secret refs.
-5. Replace pywa send methods with WATS scoped-client methods and root builders.
-6. Replace decorators with `TypedRouter.on(...)` / `WhatsApp.on(...)` and `filtersTyped`.
-7. Replace conversational waits with `wa.listen(...)` or `startChat(...).waitForReply()` / status waiters where applicable.
-8. Add MockTransport tests before using real credentials.
-9. Keep live operations behind the [campaign gates](/docs/parity/live-campaign): read-only before side-effecting before destructive, redact everything.
+- [Reference: webhook adapter](/docs/reference/webhook-adapter)
+- [Reference: WhatsApp facade](/docs/reference/whatsapp-facade)
+- [Capability status](/docs/parity)
 
 ---
 
-# pywa Parity Matrix
+# Capability status
 URL: https://wats.sh/docs/parity
 
 Three tags. **live-validated**: exercised against live Meta Graph/webhooks.
@@ -8597,11 +8707,11 @@ WATS is a Bun-first TypeScript toolkit for the WhatsApp Cloud API. It ships as c
 - [Live webhook](/docs/guides/live-webhook) — point Meta at a locally running service behind a public HTTPS tunnel.
 - [Deploy guides](/docs/guides/deploy-bun) — Bun, Node, Cloudflare Workers, and the Docker shape.
 - [Reference](/docs/reference) — per-package API documentation.
-- [Endpoint status](/docs/parity) — per-endpoint implementation and live status.
+- [Capability status](/docs/parity) — per-capability implementation and live status.
 
 ## When not to use WATS
 
-- You need every endpoint proven against live Meta today. Much of the surface is tested against the wire contract but has not carried live traffic — check [endpoint status](/docs/parity) first.
+- You need every endpoint proven against live Meta today. Much of the surface is tested against the wire contract but has not carried live traffic — check [capability status](/docs/parity) first.
 - You need a frozen API. The 0.x line still makes breaking changes.
 - You're happy on pywa and Python. WATS started as "pywa, but TypeScript" — if the Python side works for you, there's no reason to move.
 

@@ -28,8 +28,8 @@ const MENU = [
       { label: "Concepts", href: "/docs/concepts/overview" },
       { label: "Reference", href: "/docs/reference" },
       { label: "Guides", href: "/docs/guides/transport-and-testing" },
-      { label: "Migrating from pywa", href: "/docs/migration/pywa" },
-      { label: "Parity & live status", href: "/docs/parity" },
+      { label: "Migrating from pywa", href: "/docs/guides/migrating-from-pywa" },
+      { label: "Capability status", href: "/docs/parity" },
     ],
   },
   {

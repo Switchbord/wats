@@ -65,7 +65,7 @@ function parse(file: string): Page {
   return { route, title, description, body }
 }
 
-const ORDER = ["quickstart", "guide", "concepts/", "reference/", "guides/", "migration/", "parity", "meta/"]
+const ORDER = ["quickstart", "guide", "concepts/", "reference/", "tutorials/", "guides/", "parity", "meta/"]
 function rank(route: string): number {
   const p = route.replace(/^\/docs\/?/, "")
   const i = ORDER.findIndex((prefix) => p === prefix.replace(/\/$/, "") || p.startsWith(prefix))

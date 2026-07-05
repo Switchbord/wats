@@ -23,7 +23,7 @@ describe("WATS-75 auth-template DSL docs and consumer lockstep", () => {
   test("docs and consumer fixture document zero-tap auth-template fields", () => {
     const endpoints = read("site/content/docs/reference/endpoints.mdx");
     const scoped = read("site/content/docs/reference/scoped-clients.mdx");
-    const migration = read("site/content/docs/migration/pywa.mdx");
+    const migration = read("site/content/docs/guides/migrating-from-pywa.mdx");
     const changelog = read("CHANGELOG.md");
     const fixture = read("packages/testing/fixtures/graph-consumer/verify-imports.ts");
 

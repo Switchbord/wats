@@ -5,6 +5,10 @@
   "outputDirectory": "dist/client",
   "cleanUrls": true,
   "trailingSlash": false,
+  "redirects": [
+    { "source": "/docs/migration/pywa", "destination": "/docs/guides/migrating-from-pywa", "permanent": true },
+    { "source": "/docs/migration", "destination": "/docs/guides/migrating-from-pywa", "permanent": true }
+  ],
   "ignoreCommand": "git diff --quiet HEAD^ HEAD -- .",
   "headers": [
     {

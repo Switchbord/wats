@@ -15,13 +15,13 @@
   <url><loc>https://wats.sh/docs/guides/deploy-node</loc></url>
   <url><loc>https://wats.sh/docs/guides/groups-quickstart</loc></url>
   <url><loc>https://wats.sh/docs/guides/live-webhook</loc></url>
+  <url><loc>https://wats.sh/docs/guides/migrating-from-pywa</loc></url>
   <url><loc>https://wats.sh/docs/guides/telemetry</loc></url>
   <url><loc>https://wats.sh/docs/guides/transport-and-testing</loc></url>
   <url><loc>https://wats.sh/docs/meta/api-stability</loc></url>
   <url><loc>https://wats.sh/docs/meta/privacy</loc></url>
   <url><loc>https://wats.sh/docs/meta/release-policy</loc></url>
   <url><loc>https://wats.sh/docs/meta/roadmap</loc></url>
-  <url><loc>https://wats.sh/docs/migration/pywa</loc></url>
   <url><loc>https://wats.sh/docs/parity</loc></url>
   <url><loc>https://wats.sh/docs/parity/live-campaign</loc></url>
   <url><loc>https://wats.sh/docs/quickstart</loc></url>
@@ -48,5 +48,6 @@
   <url><loc>https://wats.sh/docs/reference/webhook-adapter</loc></url>
   <url><loc>https://wats.sh/docs/reference/webhook-normalizer</loc></url>
   <url><loc>https://wats.sh/docs/reference/whatsapp-facade</loc></url>
+  <url><loc>https://wats.sh/docs/tutorials/send-and-receive</loc></url>
   <url><loc>https://wats.sh/playground</loc></url>
 </urlset>
