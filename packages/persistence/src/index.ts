@@ -188,6 +188,14 @@ export { createSqlitePersistence } from "./sqlite";
 export type { SqlitePersistenceOptions } from "./sqlite";
 export { runOutboxWorkerOnce } from "./outbox";
 export type { OutboxWorkerOptions, OutboxWorkerReport } from "./outbox";
+export { startOutboxWorker } from "./outboxWorker";
+export type {
+  OutboxScheduler,
+  OutboxTimerHandle,
+  OutboxWorkerHandle,
+  OutboxWorkerTickReport,
+  StartOutboxWorkerOptions
+} from "./outboxWorker";
 export {
   getConversationWindowState,
   canSendFreeForm
