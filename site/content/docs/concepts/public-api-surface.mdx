@@ -72,9 +72,9 @@ Runtime orchestration and typed update handling.
 Primary exports:
 
 - `normalizeWebhookEnvelope` with message/status/account/unknown/calling update variants and deep camelCase normalization for common message body families
-- legacy raw parser/router helpers: `parseWebhookUpdate`, `createUpdateRouter`
+- legacy raw parser/router helpers: `parseWebhookUpdate`, `createUpdateRouter` — **deprecated (WATS-176)**, marked `@deprecated` at the type level; superseded by `normalizeWebhookEnvelope` + `TypedRouter` and scheduled for barrel removal next minor
 - typed filter namespace and `@wats/core/filtersTyped`, including `filtersTyped.call` and `message.*` helpers for media, location, reaction, interactive replies, and quick-reply buttons
-- legacy raw filter namespace and `@wats/core/filters`
+- legacy raw filter namespace and `@wats/core/filters` — **deprecated (WATS-176)**, marked `@deprecated` at the type level; superseded by `filtersTyped` and scheduled for barrel removal next minor
 - `TypedRouter`
 - `createListenerRegistry`
 - `WhatsApp` facade, including `startChat(...)` and composer helpers when `phoneNumberId` is bound

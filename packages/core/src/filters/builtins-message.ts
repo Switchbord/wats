@@ -1,5 +1,11 @@
 import type { UpdateFilter } from "./base.js";
 
+/**
+ * @deprecated WATS-176: legacy untyped filter options. The typed
+ * `filtersTyped.message` helpers carry their own option shapes over
+ * `TypedMessageUpdate`. Scheduled for barrel removal next minor.
+ * @see filtersTyped.message
+ */
 export interface MessageTextContainsOptions {
   caseSensitive?: boolean;
 }
@@ -67,10 +73,23 @@ function getContactWaId(value: unknown): string | undefined {
   return firstContact.wa_id;
 }
 
+/**
+ * @deprecated WATS-176: legacy untyped message filter. Use the typed
+ * `filtersTyped.message` namespace (e.g. `filtersTyped.message()`) over
+ * `TypedMessageUpdate` instead. Scheduled for barrel removal next minor.
+ * @see filtersTyped.message
+ */
 export const hasMessageText: UpdateFilter = (event) => {
   return typeof getMessageTextBody(event.change.value) === "string";
 };
 
+/**
+ * @deprecated WATS-176: legacy untyped message text filter. Use the
+ * typed `filtersTyped.message.textMatches` / `message.textContains`
+ * helpers (re-exported via the `filtersTyped` namespace) over
+ * `TypedMessageUpdate` instead. Scheduled for barrel removal next minor.
+ * @see filtersTyped.message
+ */
 export function messageTextContains(query: string, options: MessageTextContainsOptions = {}): UpdateFilter {
   const safeQuery = typeof query === "string" ? query : undefined;
   const safeOptions = asRecord(options);
@@ -96,6 +115,13 @@ export function messageTextContains(query: string, options: MessageTextContainsO
   };
 }
 
+/**
+ * @deprecated WATS-176: legacy untyped sender filter. Use the typed
+ * `filtersTyped.message.from` helper (re-exported via the
+ * `filtersTyped` namespace) over `TypedMessageUpdate` instead.
+ * Scheduled for barrel removal next minor.
+ * @see filtersTyped.message
+ */
 export function messageFromWaId(waId: string): UpdateFilter {
   return (event) => {
     const messageFrom = getMessageFrom(event.change.value);

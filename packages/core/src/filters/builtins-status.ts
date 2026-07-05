@@ -26,6 +26,12 @@ function getStatuses(value: unknown): readonly Record<string, unknown>[] {
   return statuses;
 }
 
+/**
+ * @deprecated WATS-176: legacy untyped status filter. Use the typed
+ * `filtersTyped.status` namespace (e.g. `filtersTyped.status()`) over
+ * `TypedStatusUpdate` instead. Scheduled for barrel removal next minor.
+ * @see filtersTyped.status
+ */
 export const hasMessageStatus: UpdateFilter = (event) => {
   for (const status of getStatuses(event.change.value)) {
     if (typeof status.status === "string") {
@@ -36,6 +42,13 @@ export const hasMessageStatus: UpdateFilter = (event) => {
   return false;
 };
 
+/**
+ * @deprecated WATS-176: legacy untyped status filter. Use the typed
+ * `filtersTyped.status.in` / `status.is` helpers (re-exported via the
+ * `filtersTyped` namespace) over `TypedStatusUpdate` instead. Scheduled
+ * for barrel removal next minor.
+ * @see filtersTyped.status
+ */
 export function messageStatusIn(...statuses: readonly string[]): UpdateFilter {
   const expected = new Set(statuses);
 
