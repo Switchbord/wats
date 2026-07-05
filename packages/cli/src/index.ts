@@ -24,6 +24,7 @@ export type CliCommandContext = Readonly<{
   cwd?: string;
   prompt?: CliPromptProvider;
   spawn?: CliSpawnProvider;
+  stdin?: Readonly<{ isTTY?: boolean }>;
 }>;
 
 export type CliSpawnResult = Readonly<{
@@ -112,7 +113,7 @@ type DoctorArgs = Readonly<{
   format: DoctorFormat;
 }> | Readonly<{
   ok: false;
-  reason: "help" | "usage";
+  reason: "help" | "usage" | "missing_config";
 }>;
 
 type UpgradeArgs = Readonly<{
@@ -515,6 +516,15 @@ function promptInputError(hint: string): CliCommandResult {
 
 function setupInputError(hint: string): CliCommandResult {
   return fail(`SetupInputError\nInvalid setup input. Run \`${hint}\` for usage.\n`);
+}
+
+function setupNonInteractiveError(hint: string): CliCommandResult {
+  return fail(
+    "SetupNonInteractiveError\n" +
+    "`wats setup` is interactive and needs a terminal (TTY stdin). " +
+    "For non-interactive scaffolding run `wats init <dir>`, copy `.env.example` to `.env.local`, and fill in real values. " +
+    `Run \`${hint}\` for usage.\n`
+  );
 }
 
 function outputError(message: string, hint: string): CliCommandResult {
@@ -1138,6 +1148,14 @@ async function setupCommand(args: readonly string[], context: CliCommandContext 
   if (!parsed.ok) {
     if (parsed.reason === "help") return ok(SETUP_HELP);
     return cliUsageError("wats setup --help");
+  }
+
+  // `wats setup` is an interactive wizard. When stdin is present but not a TTY
+  // (piped, redirected, or empty in CI) fail fast BEFORE printing any prompt:
+  // the buffered prompt would echo every prompt onto one line and then fail
+  // with an opaque SetupInputError. Point users at the non-interactive path.
+  if (context.stdin !== undefined && context.stdin.isTTY !== true) {
+    return setupNonInteractiveError("wats setup --help");
   }
 
   const answers = await collectSetupAnswers(parsed, context.prompt);
@@ -1868,7 +1886,8 @@ function parseDoctorArgs(args: readonly string[]): DoctorArgs {
   const configFlag = parseFlagValue(valueArgs, ["--config"], DOCTOR_VALUE_FLAGS);
   const profileFlag = parseFlagValue(valueArgs, ["--profile"], DOCTOR_VALUE_FLAGS);
   const formatFlag = parseFlagValue(valueArgs, ["--format"], DOCTOR_VALUE_FLAGS);
-  if (!configFlag.ok || !profileFlag.ok || !formatFlag.ok || !configFlag.present || configFlag.value === undefined) return { ok: false, reason: "usage" };
+  if (!configFlag.ok || !profileFlag.ok || !formatFlag.ok) return { ok: false, reason: "usage" };
+  if (!configFlag.present || configFlag.value === undefined) return { ok: false, reason: "missing_config" };
   const positionals = nonFlagArgs(valueArgs, DOCTOR_VALUE_FLAGS);
   if (positionals === null || positionals.some((arg) => arg.trim().length > 0)) return { ok: false, reason: "usage" };
   const format = formatFlag.value ?? "text";
@@ -1929,6 +1948,14 @@ async function doctorCommand(args: readonly string[], context: CliCommandContext
   const parsed = parseDoctorArgs(args);
   if (!parsed.ok) {
     if (parsed.reason === "help") return ok(DOCTOR_HELP);
+    if (parsed.reason === "missing_config") {
+      return fail(
+        "DoctorConfigError\n" +
+        "No config path was provided. Run `wats init` to create one, or pass " +
+        "`--config <path>` to point at an existing file. Run `wats doctor --help` " +
+        "for usage.\n"
+      );
+    }
     return fail("Invalid doctor arguments. Run `wats doctor --help` for usage.\n");
   }
 

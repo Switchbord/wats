@@ -13,6 +13,14 @@ fully offline: no Meta app, no token, no webhook tunnel.
 bun add @wats/core @wats/graph @wats/http
 ```
 
+## Runtime
+
+The `@wats/*` packages run on Bun, Node 20+, Cloudflare Workers, and Deno —
+they use portable Web platform APIs only. The `@wats/cli` `serve` and `upgrade`
+commands require Bun (`Bun.serve` and `bun update`). On Node, Workers, or Deno,
+consume the packages directly with your own server; see
+[deploy on Node](/docs/guides/deploy-node) for a `node:http` example.
+
 ## The bot
 
 {/* Canonical source: site/snippets/quickstart.ts — typechecked against the

@@ -42,6 +42,7 @@ import {
   GroupClient,
   PhoneNumberClient,
   WABAClient,
+  createFetchTransport,
   type CreateGroupBody,
   type GraphMessagesMarkMessageAsReadInput,
   type GraphMessagesRemoveReactionInput,
@@ -63,10 +64,12 @@ import {
   type GraphMessagesSendTemplateInput,
   type GraphMessagesSendMarketingTemplateInput,
   type GraphMessagesMarketingTemplateResponse,
+  type GraphMessagesTextPayload,
   type GraphMessagesSendTextInput,
   type GraphMessagesSendVideoInput,
   type GraphMessagesTypingIndicatorInput,
-  type GroupMutationResponse
+  type GroupMutationResponse,
+  type Transport
 } from "@wats/graph";
 import {
   and,
@@ -131,6 +134,33 @@ export interface WhatsAppFacadeConfig {
   readonly listenerRegistryOptions?: ListenerRegistryOptions;
 }
 
+/**
+ * WATS-172 factory options. `accessToken` is the only required field;
+ * the factory constructs the `GraphClient` internally so the 80% case
+ * is one call instead of a manual GraphClient + WhatsApp two-step.
+ * All other fields are optional and pass through to the underlying
+ * `WhatsAppFacadeConfig` / `GraphClientConfig`.
+ *
+ * `accessToken` flows into the Authorization header, so it is
+ * validated at the factory boundary: non-string / empty / whitespace /
+ * control-char / over-length values throw `WhatsAppFacadeConfigError`
+ * with code `invalid_access_token` BEFORE any client is constructed.
+ * The token value is never placed in an error message.
+ */
+export interface CreateWhatsAppOptions {
+  readonly accessToken: string;
+  readonly phoneNumberId?: string;
+  readonly wabaId?: string;
+  readonly apiVersion?: string;
+  readonly baseUrl?: string;
+  readonly transport?: Transport;
+  readonly router?: TypedRouter;
+  readonly observer?: RouterObserver;
+  readonly routerOptions?: TypedRouterOptions;
+  readonly listenerRegistry?: ListenerRegistry;
+  readonly listenerRegistryOptions?: ListenerRegistryOptions;
+}
+
 // Per-call listen options. `type` narrows the TypedUpdate discriminant
 // (e.g. "message" → TypedMessageUpdate). `from` optionally narrows
 // message updates to a single sender wa_id. `filter` (optional) allows
@@ -182,7 +212,14 @@ export interface WhatsAppSentWaitOptions {
   readonly signal?: AbortSignal;
 }
 
-export interface WhatsAppWaitableSentResult extends GraphMessagesSendResponse {
+/**
+ * Waiter methods attached to a sent-result. Extracted from
+ * `WhatsAppWaitableSentResult` so the facade can attach the same
+ * waiters to response supertypes (e.g.
+ * `GraphMessagesMarketingTemplateResponse`) without losing their
+ * type-specific fields.
+ */
+export interface WhatsAppSentResultWaiters {
   waitForReply(options?: WhatsAppSentWaitOptions): Promise<TypedMessageUpdate>;
   waitUntilDelivered(options?: WhatsAppSentWaitOptions): Promise<TypedStatusUpdate>;
   waitUntilRead(options?: WhatsAppSentWaitOptions): Promise<TypedStatusUpdate>;
@@ -211,6 +248,8 @@ export interface WhatsAppWaitableSentResult extends GraphMessagesSendResponse {
   waitForFlowCompletion(options?: WhatsAppSentWaitOptions): Promise<TypedMessageUpdate>;
 }
 
+export interface WhatsAppWaitableSentResult extends GraphMessagesSendResponse, WhatsAppSentResultWaiters {}
+
 export type WhatsAppListenErrorCode =
   | "invalid_listen_options"
   | "invalid_listen_type"
@@ -234,7 +273,11 @@ export type WhatsAppFacadeErrorCode =
   | "invalid_router"
   | "invalid_observer"
   | "invalid_listener_registry"
-  | "invalid_listener_registry_options";
+  | "invalid_listener_registry_options"
+  | "invalid_access_token"
+  | "invalid_api_version"
+  | "invalid_base_url"
+  | "invalid_transport";
 
 export class WhatsAppFacadeConfigError extends Error {
   readonly code: WhatsAppFacadeErrorCode;
@@ -251,6 +294,153 @@ function hasRequestMethod(
   if (candidate === null || typeof candidate !== "object") return false;
   const maybe = candidate as { request?: unknown };
   return typeof maybe.request === "function";
+}
+
+// ---- WATS-172 createWhatsApp factory validation -------------------
+
+const DEFAULT_WHATSAPP_API_VERSION = "v25.0";
+const FACTORY_ACCESS_TOKEN_MAX_LEN = 4096;
+const FACTORY_API_VERSION_REGEXP = /^v\d+(?:\.\d+)?$/;
+
+/**
+ * Validate an accessToken at the factory boundary. The token flows
+ * into the Authorization header, so non-string / empty / whitespace /
+ * control-char / over-length values throw before any client is built.
+ * The token value is NEVER placed in the error message — callers that
+ * log the error cannot leak it.
+ */
+function validateFactoryAccessToken(value: unknown): string {
+  if (typeof value !== "string") {
+    throw new WhatsAppFacadeConfigError(
+      "invalid_access_token",
+      "createWhatsApp: accessToken must be a non-empty string."
+    );
+  }
+  if (value.length === 0 || value.trim().length === 0) {
+    throw new WhatsAppFacadeConfigError(
+      "invalid_access_token",
+      "createWhatsApp: accessToken must be a non-empty string."
+    );
+  }
+  if (value.length > FACTORY_ACCESS_TOKEN_MAX_LEN) {
+    throw new WhatsAppFacadeConfigError(
+      "invalid_access_token",
+      `createWhatsApp: accessToken exceeds ${FACTORY_ACCESS_TOKEN_MAX_LEN}-character bound.`
+    );
+  }
+  for (let i = 0; i < value.length; i += 1) {
+    const code = value.charCodeAt(i);
+    if (code < 0x20 || code === 0x7f) {
+      throw new WhatsAppFacadeConfigError(
+        "invalid_access_token",
+        "createWhatsApp: accessToken must not contain control characters (CR/LF/NUL/etc.)."
+      );
+    }
+  }
+  return value;
+}
+
+function validateFactoryApiVersion(value: unknown): string {
+  if (typeof value !== "string" || value.length === 0) {
+    throw new WhatsAppFacadeConfigError(
+      "invalid_api_version",
+      "createWhatsApp: apiVersion must be a non-empty string matching /^v\\d+(\\.\\d+)?$/."
+    );
+  }
+  if (!FACTORY_API_VERSION_REGEXP.test(value)) {
+    throw new WhatsAppFacadeConfigError(
+      "invalid_api_version",
+      `createWhatsApp: apiVersion ${JSON.stringify(value)} does not match /^v\\d+(\\.\\d+)?$/.`
+    );
+  }
+  return value;
+}
+
+function validateFactoryBaseUrl(value: unknown): string {
+  if (typeof value !== "string" || value.length === 0) {
+    throw new WhatsAppFacadeConfigError(
+      "invalid_base_url",
+      "createWhatsApp: baseUrl must be a non-empty string URL."
+    );
+  }
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new WhatsAppFacadeConfigError(
+      "invalid_base_url",
+      `createWhatsApp: baseUrl ${JSON.stringify(value)} is not a valid URL.`
+    );
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new WhatsAppFacadeConfigError(
+      "invalid_base_url",
+      `createWhatsApp: baseUrl protocol must be http: or https: (got ${JSON.stringify(url.protocol)}).`
+    );
+  }
+  return value;
+}
+
+function validateFactoryTransport(value: unknown): Transport {
+  if (!hasRequestMethod(value)) {
+    throw new WhatsAppFacadeConfigError(
+      "invalid_transport",
+      "createWhatsApp: transport must expose a request() method if provided."
+    );
+  }
+  // Structural check (object with a request function) passed; the
+  // full Transport contract (Promise<TransportResponse> return) is
+  // enforced by GraphClient at request time.
+  return value as Transport;
+}
+
+/**
+ * WATS-172 factory. Constructs a `GraphClient` internally (transport
+ * defaults to `createFetchTransport()`, apiVersion defaults to
+ * `"v25.0"`) and returns a fully-wired `WhatsApp` instance. The only
+ * required option is `accessToken`; `phoneNumberId` / `wabaId` /
+ * router / listener options pass through unchanged.
+ *
+ * Throws `WhatsAppFacadeConfigError` for malformed `accessToken` /
+ * `apiVersion` / `baseUrl` / `transport` before any client is built.
+ * The remaining config (phoneNumberId, wabaId, router, observer,
+ * listenerRegistry, listenerRegistryOptions) is validated by the
+ * `WhatsApp` constructor itself.
+ */
+export function createWhatsApp(options: CreateWhatsAppOptions): WhatsApp {
+  if (typeof options !== "object" || options === null || Array.isArray(options)) {
+    throw new WhatsAppFacadeConfigError(
+      "invalid_config",
+      "createWhatsApp: options must be an options object."
+    );
+  }
+
+  const accessToken = validateFactoryAccessToken(options.accessToken);
+  const apiVersion = options.apiVersion === undefined
+    ? DEFAULT_WHATSAPP_API_VERSION
+    : validateFactoryApiVersion(options.apiVersion);
+  const baseUrl = options.baseUrl === undefined ? undefined : validateFactoryBaseUrl(options.baseUrl);
+  const transport = options.transport === undefined
+    ? createFetchTransport()
+    : validateFactoryTransport(options.transport);
+
+  const graphClient = new GraphClient({
+    accessToken,
+    apiVersion,
+    ...(baseUrl !== undefined ? { baseUrl } : {}),
+    transport
+  });
+
+  return new WhatsApp({
+    graphClient,
+    ...(options.phoneNumberId !== undefined ? { phoneNumberId: options.phoneNumberId } : {}),
+    ...(options.wabaId !== undefined ? { wabaId: options.wabaId } : {}),
+    ...(options.router !== undefined ? { router: options.router } : {}),
+    ...(options.observer !== undefined ? { observer: options.observer } : {}),
+    ...(options.routerOptions !== undefined ? { routerOptions: options.routerOptions } : {}),
+    ...(options.listenerRegistry !== undefined ? { listenerRegistry: options.listenerRegistry } : {}),
+    ...(options.listenerRegistryOptions !== undefined ? { listenerRegistryOptions: options.listenerRegistryOptions } : {})
+  });
 }
 
 // ---- kind → base filter dispatch ----------------------------------
@@ -528,10 +718,31 @@ export class WhatsApp {
     return this.#router.on(filter, handler);
   }
 
-  #toWaitableSentResult(
-    response: GraphMessagesSendResponse,
+  /**
+   * WATS-172 ergonomic handler sugar: registers a handler that fires
+   * on any inbound message update. Equivalent to
+   * `wa.on(filtersTyped.message, handler)` — the broadest message kind
+   * filter. Returns the same `RegistrationHandle` as `on`, so
+   * `.unregister()` works identically.
+   */
+  onMessage(handler: Handler<TypedMessageUpdate>): RegistrationHandle {
+    return this.#router.on(messageFilter, handler);
+  }
+
+  /**
+   * WATS-172 ergonomic handler sugar: registers a handler that fires
+   * on any inbound status update. Equivalent to
+   * `wa.on(filtersTyped.status, handler)` — the broadest status kind
+   * filter. Returns the same `RegistrationHandle` as `on`.
+   */
+  onStatus(handler: Handler<TypedStatusUpdate>): RegistrationHandle {
+    return this.#router.on(statusFilter, handler);
+  }
+
+  #toWaitableSentResult<T extends GraphMessagesSendResponse>(
+    response: T,
     sentRecipientId?: string
-  ): WhatsAppWaitableSentResult {
+  ): T & WhatsAppSentResultWaiters {
     const sentMessageId = firstSentMessageId(response);
     const recipientId = firstRecipientId(response) ?? sentRecipientId;
     const matchesSentMessage = (u: TypedMessageUpdate): boolean => {
@@ -625,6 +836,11 @@ export class WhatsApp {
    * constructed with a `phoneNumberId`; recipient `to` is intentionally
    * not checked against contacts, so callers can start chats with any
    * valid phone-number-like recipient allowed by the Graph API.
+   *
+   * WATS-172: `sendText` is the documented primary name for plain
+   * text sends. `startChat` remains public as a back-compat alias and
+   * delegates to the same code path; both return a waitable
+   * sent-result.
    */
   async startChat(
     input: WhatsAppStartChatInput
@@ -632,6 +848,23 @@ export class WhatsApp {
     if (this.#phoneNumberClient === undefined) {
       throw new GraphRequestValidationError(
         "WhatsApp.startChat requires a phoneNumberId-bound facade."
+      );
+    }
+    const response = await this.#phoneNumberClient.sendText(input);
+    return this.#toWaitableSentResult(response, input.to);
+  }
+
+  /**
+   * WATS-172 primary text-send name. Behaves identically to
+   * `startChat` — same code path, same waitable sent-result. Prefer
+   * `sendText` in new code; `startChat` is retained as an alias.
+   */
+  async sendText(
+    input: WhatsAppStartChatInput
+  ): Promise<WhatsAppWaitableSentResult> {
+    if (this.#phoneNumberClient === undefined) {
+      throw new GraphRequestValidationError(
+        "WhatsApp.sendText requires a phoneNumberId-bound facade."
       );
     }
     const response = await this.#phoneNumberClient.sendText(input);
@@ -679,174 +912,200 @@ export class WhatsApp {
     if (record.replyToMessageId !== undefined && (typeof record.replyToMessageId !== "string" || record.replyToMessageId.length === 0)) {
       throw new GraphRequestValidationError("Invalid WhatsApp.sendGroupMessage input: replyToMessageId must be a non-empty string when provided.");
     }
-    const body: Record<string, unknown> = {
+    // WATS-176: build the send body as a typed `GraphMessagesTextPayload`
+    // (a member of `GraphMessagesSendBody`) instead of an untyped
+    // `Record<string, unknown>` cast through `as never`. The `group`
+    // recipient_type is a valid `GraphMessagesRecipientType`, and the
+    // text-payload shape already covers `recipient_type`, `to`, `text`
+    // (with optional `preview_url`), and optional `context` — so no
+    // type widening or escape is needed. Behavior is unchanged: the
+    // endpoint-registry `sendMessage` callable still re-validates the
+    // group recipient + body shape at the Graph boundary.
+    const text: GraphMessagesTextPayload["text"] = { body: record.text };
+    if (record.previewUrl !== undefined) {
+      text.preview_url = record.previewUrl;
+    }
+    const body: GraphMessagesTextPayload = {
       messaging_product: "whatsapp",
       recipient_type: "group",
       to: record.groupId,
       type: "text",
-      text: { body: record.text }
+      text
     };
-    if (record.previewUrl !== undefined) {
-      (body.text as { preview_url?: boolean }).preview_url = record.previewUrl;
-    }
     if (record.replyToMessageId !== undefined) {
       body.context = { message_id: record.replyToMessageId };
     }
-    return this.#phoneNumberClient.sendMessage(body as never);
+    return this.#phoneNumberClient.sendMessage(body);
   }
 
   async sendImage(
     input: WhatsAppSendImageInput
-  ): Promise<GraphMessagesSendResponse> {
+  ): Promise<WhatsAppWaitableSentResult> {
     if (this.#phoneNumberClient === undefined) {
       throw new GraphRequestValidationError(
         "WhatsApp.sendImage requires a phoneNumberId-bound facade."
       );
     }
-    return this.#phoneNumberClient.sendImage(input);
+    const response = await this.#phoneNumberClient.sendImage(input);
+    return this.#toWaitableSentResult(response, input.to);
   }
 
   async sendVideo(
     input: WhatsAppSendVideoInput
-  ): Promise<GraphMessagesSendResponse> {
+  ): Promise<WhatsAppWaitableSentResult> {
     if (this.#phoneNumberClient === undefined) {
       throw new GraphRequestValidationError(
         "WhatsApp.sendVideo requires a phoneNumberId-bound facade."
       );
     }
-    return this.#phoneNumberClient.sendVideo(input);
+    const response = await this.#phoneNumberClient.sendVideo(input);
+    return this.#toWaitableSentResult(response, input.to);
   }
 
   async sendAudio(
     input: WhatsAppSendAudioInput
-  ): Promise<GraphMessagesSendResponse> {
+  ): Promise<WhatsAppWaitableSentResult> {
     if (this.#phoneNumberClient === undefined) {
       throw new GraphRequestValidationError(
         "WhatsApp.sendAudio requires a phoneNumberId-bound facade."
       );
     }
-    return this.#phoneNumberClient.sendAudio(input);
+    const response = await this.#phoneNumberClient.sendAudio(input);
+    return this.#toWaitableSentResult(response, input.to);
   }
 
   async sendDocument(
     input: WhatsAppSendDocumentInput
-  ): Promise<GraphMessagesSendResponse> {
+  ): Promise<WhatsAppWaitableSentResult> {
     if (this.#phoneNumberClient === undefined) {
       throw new GraphRequestValidationError(
         "WhatsApp.sendDocument requires a phoneNumberId-bound facade."
       );
     }
-    return this.#phoneNumberClient.sendDocument(input);
+    const response = await this.#phoneNumberClient.sendDocument(input);
+    return this.#toWaitableSentResult(response, input.to);
   }
 
   async sendSticker(
     input: WhatsAppSendStickerInput
-  ): Promise<GraphMessagesSendResponse> {
+  ): Promise<WhatsAppWaitableSentResult> {
     if (this.#phoneNumberClient === undefined) {
       throw new GraphRequestValidationError(
         "WhatsApp.sendSticker requires a phoneNumberId-bound facade."
       );
     }
-    return this.#phoneNumberClient.sendSticker(input);
+    const response = await this.#phoneNumberClient.sendSticker(input);
+    return this.#toWaitableSentResult(response, input.to);
   }
 
   async sendLocation(
     input: WhatsAppSendLocationInput
-  ): Promise<GraphMessagesSendResponse> {
+  ): Promise<WhatsAppWaitableSentResult> {
     if (this.#phoneNumberClient === undefined) {
       throw new GraphRequestValidationError("WhatsApp.sendLocation requires a phoneNumberId-bound facade.");
     }
-    return this.#phoneNumberClient.sendLocation(input);
+    const response = await this.#phoneNumberClient.sendLocation(input);
+    return this.#toWaitableSentResult(response, input.to);
   }
 
   async sendContacts(
     input: WhatsAppSendContactsInput
-  ): Promise<GraphMessagesSendResponse> {
+  ): Promise<WhatsAppWaitableSentResult> {
     if (this.#phoneNumberClient === undefined) {
       throw new GraphRequestValidationError("WhatsApp.sendContacts requires a phoneNumberId-bound facade.");
     }
-    return this.#phoneNumberClient.sendContacts(input);
+    const response = await this.#phoneNumberClient.sendContacts(input);
+    return this.#toWaitableSentResult(response, input.to);
   }
 
   async sendReaction(
     input: WhatsAppSendReactionInput
-  ): Promise<GraphMessagesSendResponse> {
+  ): Promise<WhatsAppWaitableSentResult> {
     if (this.#phoneNumberClient === undefined) {
       throw new GraphRequestValidationError("WhatsApp.sendReaction requires a phoneNumberId-bound facade.");
     }
-    return this.#phoneNumberClient.sendReaction(input);
+    const response = await this.#phoneNumberClient.sendReaction(input);
+    return this.#toWaitableSentResult(response, input.to);
   }
 
   async removeReaction(
     input: WhatsAppRemoveReactionInput
-  ): Promise<GraphMessagesSendResponse> {
+  ): Promise<WhatsAppWaitableSentResult> {
     if (this.#phoneNumberClient === undefined) {
       throw new GraphRequestValidationError("WhatsApp.removeReaction requires a phoneNumberId-bound facade.");
     }
-    return this.#phoneNumberClient.removeReaction(input);
+    const response = await this.#phoneNumberClient.removeReaction(input);
+    return this.#toWaitableSentResult(response, input.to);
   }
 
   async sendButtons(
     input: WhatsAppSendButtonsInput
-  ): Promise<GraphMessagesSendResponse> {
+  ): Promise<WhatsAppWaitableSentResult> {
     if (this.#phoneNumberClient === undefined) {
       throw new GraphRequestValidationError("WhatsApp.sendButtons requires a phoneNumberId-bound facade.");
     }
-    return this.#phoneNumberClient.sendButtons(input);
+    const response = await this.#phoneNumberClient.sendButtons(input);
+    return this.#toWaitableSentResult(response, input.to);
   }
 
   async sendList(
     input: WhatsAppSendListInput
-  ): Promise<GraphMessagesSendResponse> {
+  ): Promise<WhatsAppWaitableSentResult> {
     if (this.#phoneNumberClient === undefined) {
       throw new GraphRequestValidationError("WhatsApp.sendList requires a phoneNumberId-bound facade.");
     }
-    return this.#phoneNumberClient.sendList(input);
+    const response = await this.#phoneNumberClient.sendList(input);
+    return this.#toWaitableSentResult(response, input.to);
   }
 
   async sendCtaUrl(
     input: WhatsAppSendCtaUrlInput
-  ): Promise<GraphMessagesSendResponse> {
+  ): Promise<WhatsAppWaitableSentResult> {
     if (this.#phoneNumberClient === undefined) {
       throw new GraphRequestValidationError("WhatsApp.sendCtaUrl requires a phoneNumberId-bound facade.");
     }
-    return this.#phoneNumberClient.sendCtaUrl(input);
+    const response = await this.#phoneNumberClient.sendCtaUrl(input);
+    return this.#toWaitableSentResult(response, input.to);
   }
 
   async sendProduct(
     input: WhatsAppSendProductInput
-  ): Promise<GraphMessagesSendResponse> {
+  ): Promise<WhatsAppWaitableSentResult> {
     if (this.#phoneNumberClient === undefined) {
       throw new GraphRequestValidationError("WhatsApp.sendProduct requires a phoneNumberId-bound facade.");
     }
-    return this.#phoneNumberClient.sendProduct(input);
+    const response = await this.#phoneNumberClient.sendProduct(input);
+    return this.#toWaitableSentResult(response, input.to);
   }
 
   async sendProducts(
     input: WhatsAppSendProductsInput
-  ): Promise<GraphMessagesSendResponse> {
+  ): Promise<WhatsAppWaitableSentResult> {
     if (this.#phoneNumberClient === undefined) {
       throw new GraphRequestValidationError("WhatsApp.sendProducts requires a phoneNumberId-bound facade.");
     }
-    return this.#phoneNumberClient.sendProducts(input);
+    const response = await this.#phoneNumberClient.sendProducts(input);
+    return this.#toWaitableSentResult(response, input.to);
   }
 
   async sendCatalog(
     input: WhatsAppSendCatalogInput
-  ): Promise<GraphMessagesSendResponse> {
+  ): Promise<WhatsAppWaitableSentResult> {
     if (this.#phoneNumberClient === undefined) {
       throw new GraphRequestValidationError("WhatsApp.sendCatalog requires a phoneNumberId-bound facade.");
     }
-    return this.#phoneNumberClient.sendCatalog(input);
+    const response = await this.#phoneNumberClient.sendCatalog(input);
+    return this.#toWaitableSentResult(response, input.to);
   }
 
   async requestLocation(
     input: WhatsAppRequestLocationInput
-  ): Promise<GraphMessagesSendResponse> {
+  ): Promise<WhatsAppWaitableSentResult> {
     if (this.#phoneNumberClient === undefined) {
       throw new GraphRequestValidationError("WhatsApp.requestLocation requires a phoneNumberId-bound facade.");
     }
-    return this.#phoneNumberClient.requestLocation(input);
+    const response = await this.#phoneNumberClient.requestLocation(input);
+    return this.#toWaitableSentResult(response, input.to);
   }
 
   async markMessageAsRead(
@@ -869,20 +1128,22 @@ export class WhatsApp {
 
   async sendTemplate(
     input: WhatsAppSendTemplateInput
-  ): Promise<GraphMessagesSendResponse> {
+  ): Promise<WhatsAppWaitableSentResult> {
     if (this.#phoneNumberClient === undefined) {
       throw new GraphRequestValidationError("WhatsApp.sendTemplate requires a phoneNumberId-bound facade.");
     }
-    return this.#phoneNumberClient.sendTemplate(input);
+    const response = await this.#phoneNumberClient.sendTemplate(input);
+    return this.#toWaitableSentResult(response, input.to);
   }
 
   async sendMarketingTemplate(
     input: WhatsAppSendMarketingTemplateInput
-  ): Promise<GraphMessagesMarketingTemplateResponse> {
+  ): Promise<GraphMessagesMarketingTemplateResponse & WhatsAppSentResultWaiters> {
     if (this.#phoneNumberClient === undefined) {
       throw new GraphRequestValidationError("WhatsApp.sendMarketingTemplate requires a phoneNumberId-bound facade.");
     }
-    return this.#phoneNumberClient.sendMarketingTemplate(input);
+    const response = await this.#phoneNumberClient.sendMarketingTemplate(input);
+    return this.#toWaitableSentResult(response, input.to);
   }
 
   // F-11: facade-owned dispatch wrapper. Listeners evaluate BEFORE

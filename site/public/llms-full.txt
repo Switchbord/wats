@@ -25,6 +25,14 @@ fully offline: no Meta app, no token, no webhook tunnel.
 bun add @wats/core @wats/graph @wats/http
 ```
 
+## Runtime
+
+The `@wats/*` packages run on Bun, Node 20+, Cloudflare Workers, and Deno —
+they use portable Web platform APIs only. The `@wats/cli` `serve` and `upgrade`
+commands require Bun (`Bun.serve` and `bun update`). On Node, Workers, or Deno,
+consume the packages directly with your own server; see
+[deploy on Node](/docs/guides/deploy-node) for a `node:http` example.
+
 ## The bot
 
 {/* Canonical source: site/snippets/quickstart.ts — typechecked against the
@@ -122,24 +130,37 @@ The CLI does not:
 
 ## First-run flow
 
+`wats init` writes `wats.config.yaml` and `.env.example` only — it does not
+create a `package.json` or `tsconfig.json`. From an empty directory, bootstrap
+a TypeScript project and add the WATS runtime packages first, then run the
+CLI onboarding commands:
+
 ```bash
+mkdir ./my-bot && cd ./my-bot
+bun init -y
+bun add @wats/core @wats/graph @wats/http
+bun add @wats/config @wats/service
 wats init --dry-run
-wats init ./my-bot --format yaml --profile local
-cd ./my-bot
+wats init --format yaml --profile local
 wats config validate --config wats.config.yaml
 wats --version
 wats doctor --config wats.config.yaml --check-env
 wats serve --config wats.config.yaml --dry-run
 ```
 
-1. Preview generated files with `wats init --dry-run`.
-2. Generate config/env placeholder files with `wats init`.
-3. Validate the generated config through `@wats/config`.
-4. Run doctor offline diagnostics.
-5. Start a local dry-run service wrapper around `@wats/service`.
+1. Create a project directory and a TypeScript baseline with `bun init -y`.
+2. Add the WATS runtime packages (`@wats/core`, `@wats/graph`, `@wats/http`,
+   `@wats/config`, `@wats/service`).
+3. Preview generated files with `wats init --dry-run`.
+4. Generate config/env placeholder files with `wats init`.
+5. Validate the generated config through `@wats/config`.
+6. Run doctor offline diagnostics.
+7. Start a local dry-run service wrapper around `@wats/service`.
 
 There is no `wats init --yes` flag. Non-interactive setup passes the target
-directory, format, and profile explicitly as shown above.
+directory, format, and profile explicitly as shown above. `wats setup` is an
+interactive wizard that needs a terminal (TTY stdin); in non-interactive
+shells use `wats init` and edit `.env.local` instead.
 
 ## Env placeholder policy
 
@@ -1796,23 +1817,26 @@ WATS is a Bun-first TypeScript toolkit for WhatsApp operations. It is built as s
 @wats/types
   shared domain contracts
 
-@wats/crypto        @wats/graph        @wats/http
-  crypto seam         graph client        webhook HTTP boundary
-  adapters            endpoints           runtime adapters
+@wats/crypto        @wats/graph
+  crypto seam         graph client
+  adapters            endpoints
 
 @wats/core
   typed updates, filters, router, listeners, WhatsApp facade
 ```
 
-Application-edge packages sit above these foundations:
+`@wats/core` is the composition root: it composes `@wats/graph`, `@wats/crypto`, and `@wats/types` and never imports the application-edge packages. Application-edge packages sit ABOVE `@wats/core` and compose it — they normalize raw inputs into typed values and dispatch them:
 
 ```text
-@wats/config   config schema, YAML/JSON loading, env-secret references
-@wats/service  standalone webhook/API service, OpenAPI 3.1
-@wats/cli      init, validate, doctor, serve, openapi commands
+@wats/http    webhook HTTP boundary — verifies signatures and normalizes
+              raw webhooks into typed updates before dispatch (composes
+              @wats/core + @wats/crypto)
+@wats/config  config schema, YAML/JSON loading, env-secret references
+@wats/service standalone webhook/API service, OpenAPI 3.1
+@wats/cli     init, validate, doctor, serve, openapi commands
 ```
 
-App-layer packages may depend on `@wats/core`; lower-level packages must not. The dependency arrows only point down.
+App-layer packages may depend on `@wats/core`; lower-level packages must not. The dependency arrows only point down — `@wats/core` never imports `@wats/http`. (`@wats/http` is an application-edge package, NOT a peer of `@wats/graph`: it sits above `@wats/core` and uses `normalizeWebhookEnvelope` from it.)
 
 ## Request flow
 
@@ -1938,11 +1962,12 @@ Media runtime:
 
 ### `@wats/http`
 
-Webhook challenge/signature primitives, runtime-neutral `WebhookAdapter`, and Bun/Node/Fetch wrappers.
+Application-edge webhook package: challenge/signature primitives, runtime-neutral `WebhookAdapter`, and Bun/Node/Fetch wrappers. It verifies signatures and normalizes raw webhooks into typed updates via `@wats/core`'s `normalizeWebhookEnvelope` before dispatching them to a structural `{ dispatch(update) }` facade-like object.
 
 - Runtime targets: Bun, Node, Workers, Deno-style Fetch runtimes.
 - Public: yes.
 - Dependencies out: `@wats/crypto`, `@wats/core`, `@wats/types`.
+- Layer: application-edge — composes `@wats/core` (NOT a peer of `@wats/graph`; it sits above `@wats/core`, while `@wats/graph` sits below it).
 - Stability: foundations-complete.
 
 `@wats/http` depends on `@wats/core` for the normalizer. Its adapter accepts only a structural `{ dispatch(update) }` facade-like object at runtime.
@@ -1956,7 +1981,7 @@ Typed webhook normalization, typed filters, raw filters, routers, listener regis
 - Dependencies out: `@wats/types`, `@wats/graph`.
 - Stability: foundations-complete.
 
-The facade binds a `GraphClient`, optional `PhoneNumberClient` / `WABAClient`, a `TypedRouter`, and optional listener registry support. `WhatsApp.startChat(...)` delegates through the bound `PhoneNumberClient` to start a text conversation with any valid phone-number-like recipient — no contacts lookup. Facade composer helpers (media, location, contacts, reaction, interactive variants, template send, mark-as-read, typing indicators) require a bound `phoneNumberId` and use the same phone-number client.
+The facade binds a `GraphClient`, optional `PhoneNumberClient` / `WABAClient`, a `TypedRouter`, and optional listener registry support. `WhatsApp.sendText(...)` (alias `startChat(...)`) delegates through the bound `PhoneNumberClient` to send a text with any valid phone-number-like recipient — no contacts lookup. Facade composer helpers (media, location, contacts, reaction, interactive variants, template send, mark-as-read, typing indicators) require a bound `phoneNumberId` and use the same phone-number client.
 
 ### `@wats/config`
 
@@ -2017,7 +2042,7 @@ Private workspace tests, consumer fixtures, fixture payloads, and policy checks.
 ## Invariants
 
 1. `@wats/types` has no runtime dependencies.
-2. `@wats/graph`, `@wats/http`, and `@wats/crypto` expose portable seams and keep runtime-specific behavior behind adapters.
+2. `@wats/graph` and `@wats/crypto` expose portable seams and keep runtime-specific behavior behind adapters. `@wats/http` also keeps its runtime wrappers behind adapters, but it is an application-edge package that composes `@wats/core` (it is not a foundation peer of `@wats/graph`).
 3. `@wats/core` is the core composition root; app-layer packages compose it rather than duplicating router/webhook semantics.
 4. `@wats/internal-utils` may be published only as an internal support package; `@wats/testing` stays private and is never published.
 5. Consumer fixtures import through package specifiers, never relative source paths.
@@ -2110,12 +2135,12 @@ Runtime orchestration and typed update handling.
 Primary exports:
 
 - `normalizeWebhookEnvelope` with message/status/account/unknown/calling update variants and deep camelCase normalization for common message body families
-- legacy raw parser/router helpers: `parseWebhookUpdate`, `createUpdateRouter`
+- legacy raw parser/router helpers: `parseWebhookUpdate`, `createUpdateRouter` — **deprecated**, marked `@deprecated` at the type level; superseded by `normalizeWebhookEnvelope` + `TypedRouter` and scheduled for barrel removal next minor
 - typed filter namespace and `@wats/core/filtersTyped`, including `filtersTyped.call` and `message.*` helpers for media, location, reaction, interactive replies, and quick-reply buttons
-- legacy raw filter namespace and `@wats/core/filters`
+- legacy raw filter namespace and `@wats/core/filters` — **deprecated**, marked `@deprecated` at the type level; superseded by `filtersTyped` and scheduled for barrel removal next minor
 - `TypedRouter`
 - `createListenerRegistry`
-- `WhatsApp` facade, including `startChat(...)` and composer helpers when `phoneNumberId` is bound
+- `WhatsApp` facade and the `createWhatsApp(...)` factory, including `sendText(...)` (alias `startChat(...)`), `onMessage`/`onStatus`, and composer helpers when `phoneNumberId` is bound
 
 The `WhatsApp` facade binds:
 
@@ -4080,7 +4105,9 @@ filtersTyped.message.textMatches(/^hello/);
 | Legacy | `@wats/core/filters` | untyped `and`/`or`/`not` + `hasMessageText`, `messageTextContains`, `messageFromWaId`, `hasMessageStatus`, `messageStatusIn` |
 | Typed | `@wats/core/filtersTyped` (this doc) | branded `TypedFilter<T>` + typed `and`/`or`/`not`/`custom` + `message.*` / `status.*` built-ins |
 
-The surfaces are independent — neither imports from the other. The names `and` / `or` / `not` exist on BOTH with different signatures and different brand semantics; do not mix them in one composition chain. Pick one per call site and migrate at your own pace. Removal of the legacy path is planned.
+The surfaces are independent — neither imports from the other. The names `and` / `or` / `not` exist on BOTH with different signatures and different brand semantics; do not mix them in one composition chain. Pick one per call site and migrate at your own pace.
+
+> **Deprecated.** The legacy `@wats/core/filters` surface (`UpdateFilter`, the untyped `and` / `or` / `not`, and the `hasMessageText` / `messageTextContains` / `messageFromWaId` / `hasMessageStatus` / `messageStatusIn` built-ins) is now marked `@deprecated` at the type level and is scheduled for **removal from the `@wats/core` barrel in the next minor release**. New code should use the typed `filtersTyped` surface on this page; the legacy `and` / `or` / `not` combinators will no longer be exported once the barrel is pruned. The typed and legacy surfaces remain independent until then — do not mix them in one composition chain.
 
 ## TypedFilter brand
 
@@ -6566,6 +6593,19 @@ if (message.type === "unsupported") {
 
 ## Parsed update event types
 
+:::note[Deprecated]
+The untyped `parseWebhookUpdate` parser and the `createUpdateRouter` /
+`UpdateRouter` / `ParsedUpdateEvent` / `UpdateFilter` legacy surfaces
+documented in this section are now marked `@deprecated` at the type
+level. They are superseded by `normalizeWebhookEnvelope` (which emits the
+discriminated `TypedUpdate` union — see
+[webhook-normalizer](/docs/reference/webhook-normalizer)) and the typed
+[`TypedRouter`](/docs/reference/router) /
+[`filtersTyped`](/docs/reference/filters) surfaces. The legacy exports
+remain in the `@wats/core` barrel for now but are scheduled for **removal
+in the next minor release**; new code should use the typed path.
+:::
+
 `@wats/core` provides normalized parsed-event contracts for handler routing.
 
 - `ParsedUpdateEvent`
@@ -6841,9 +6881,19 @@ import {
   createWebhookAdapter,
   createFetchWebhookHandler
 } from "@wats/http";
-import { WhatsApp } from "@wats/core";
+import { createWhatsApp } from "@wats/core";
 
-const wa = new WhatsApp({ graphClient, phoneNumberId: "12345" });
+const wa = createWhatsApp({
+  accessToken: process.env.ACCESS_TOKEN!,
+  phoneNumberId: "12345"
+});
+
+// Echo inbound text messages back to the sender.
+wa.onMessage(async (ctx) => {
+  const message = ctx.update.message;
+  if (message.type !== "text") return;
+  await wa.sendText({ to: message.from, text: message.text.body });
+});
 
 const adapter = createWebhookAdapter({
   verifyToken: process.env.VERIFY_TOKEN!,
@@ -7423,7 +7473,7 @@ URL: https://wats.sh/docs/reference/whatsapp-facade
 ## Construction
 
 ```ts
-import { WhatsApp } from "@wats/core";
+import { WhatsApp, createWhatsApp } from "@wats/core";
 import { GraphClient, createFetchTransport } from "@wats/graph";
 
 const graphClient = new GraphClient({
@@ -7455,6 +7505,27 @@ Optional (`WhatsAppFacadeConfig`):
 - `listenerRegistryOptions?: ListenerRegistryOptions` — options for lazy registry creation.
 
 Construction-time validation checks required shapes immediately. Facade config failures throw `WhatsAppFacadeConfigError`; path-unsafe scoped ids propagate the underlying `GraphRequestValidationError` from the Graph scoped-client validators.
+
+### Factory
+
+`createWhatsApp(options)` is the one-call path for the 80% case. It constructs the `GraphClient` internally so you do not wire one by hand. The only required option is `accessToken`; `apiVersion` defaults to `"v25.0"` and `transport` defaults to `createFetchTransport()`.
+
+```ts
+import { createWhatsApp } from "@wats/core";
+
+const wa = createWhatsApp({
+  accessToken: process.env.META_WA_TOKEN!,
+  phoneNumberId: "1234567890"
+});
+```
+
+`CreateWhatsAppOptions` accepts the same `phoneNumberId` / `wabaId` / `router` / `observer` / `routerOptions` / `listenerRegistry` / `listenerRegistryOptions` fields as `WhatsAppFacadeConfig`, plus:
+
+- `apiVersion?: string` — defaults to `"v25.0"`.
+- `baseUrl?: string` — Graph base URL; defaults to `https://graph.facebook.com/`.
+- `transport?: Transport` — defaults to `createFetchTransport()`.
+
+`accessToken` flows into the Authorization header, so the factory validates it at the boundary: non-string / empty / whitespace / control-char / over-4096-char values throw `WhatsAppFacadeConfigError` with code `invalid_access_token` before any client is built. The token value is never placed in an error message. Malformed `apiVersion`, `baseUrl`, and `transport` throw `invalid_api_version`, `invalid_base_url`, and `invalid_transport` respectively. The remaining config is validated by the `WhatsApp` constructor.
 
 ## Exposed components
 
@@ -7515,6 +7586,18 @@ const handle = wa.on(and(message, message.textMatches(/hello/i)), async (ctx) =>
 handle.unregister();
 ```
 
+`onMessage(handler)` and `onStatus(handler)` are sugar over the broadest kind filter — equivalent to `wa.on(filtersTyped.message, handler)` and `wa.on(filtersTyped.status, handler)`. Use them when you want every inbound message or status update without composing a filter.
+
+```ts
+wa.onMessage(async (ctx) => {
+  await wa.sendText({ to: ctx.update.message.from, text: "ack" });
+});
+
+wa.onStatus((ctx) => {
+  // every status update — sent, delivered, read, failed
+});
+```
+
 Router dispatch rules apply unchanged:
 
 - registration-order matching
@@ -7552,14 +7635,20 @@ Listener evaluation runs before normal handler dispatch when `wa.dispatch(update
 
 ## Sent-result waiters
 
-`wa.startChat(...)` returns a `WhatsAppWaitableSentResult`: the normal Graph send response plus pywa-like helper methods:
+`wa.sendText(...)` (and `wa.startChat(...)`, retained as an alias) return a `WhatsAppWaitableSentResult`: the normal Graph send response plus pywa-like helper methods:
 
 ```ts
-const sent = await wa.startChat({ to: "15551230000", text: "Need help?" });
+const sent = await wa.sendText({ to: "15551230000", text: "Need help?" });
 
 const reply = await sent.waitForReply({ timeoutMs: 30_000 });
 const read = await sent.waitUntilRead({ timeoutMs: 60_000 });
 ```
+
+Every facade send method that produces a sent message returns the same waitable shape — `sendButtons`, `sendList`, `sendCtaUrl`, `sendImage`, `sendVideo`, `sendAudio`, `sendDocument`, `sendSticker`, `sendLocation`, `sendContacts`, `sendReaction`, `removeReaction`, `sendProduct`, `sendProducts`, `sendCatalog`, `requestLocation`, `sendTemplate`, and `sendMarketingTemplate`. The recipient for the waiters is the input `to` field, falling back to the `contacts[].wa_id` in the Graph response.
+
+`sendMarketingTemplate` returns `GraphMessagesMarketingTemplateResponse & WhatsAppSentResultWaiters`, so the marketing-specific `messages[].message_status` and `contacts[].user_id` fields are preserved alongside the waiters.
+
+`markMessageAsRead` and `indicateTyping` are not waitable: they mutate read/typing state and return `{ success: true }` with no sent message id, so there is nothing for the waiters to key on. `sendGroupMessage` is also not waitable: its recipient is a group id, and the wait helpers match on a phone-number `from`/recipient, so group semantics do not fit the existing waiter substrate.
 
 Helpers:
 
@@ -7591,6 +7680,10 @@ const report = await wa.dispatch(typedUpdate);
   - `invalid_observer`
   - `invalid_listener_registry`
   - `invalid_listener_registry_options`
+  - `invalid_access_token` — factory only
+  - `invalid_api_version` — factory only
+  - `invalid_base_url` — factory only
+  - `invalid_transport` — factory only
 
 - `WhatsAppListenOptionsError`
   - `invalid_listen_options`
@@ -7604,8 +7697,6 @@ Scoped-client id safety errors may be `GraphRequestValidationError` rather than 
 
 The facade currently does not provide:
 
-- a `createWhatsApp(...)` factory
-- shorthand `onMessage(...)` / `onStatus(...)` methods
 - a standalone HTTP service
 - endpoint breadth beyond current `PhoneNumberClient` / `WABAClient` methods
 - persistence for router or listener state

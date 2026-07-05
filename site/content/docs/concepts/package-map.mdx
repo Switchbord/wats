@@ -78,11 +78,12 @@ Media runtime:
 
 ### `@wats/http`
 
-Webhook challenge/signature primitives, runtime-neutral `WebhookAdapter`, and Bun/Node/Fetch wrappers.
+Application-edge webhook package: challenge/signature primitives, runtime-neutral `WebhookAdapter`, and Bun/Node/Fetch wrappers. It verifies signatures and normalizes raw webhooks into typed updates via `@wats/core`'s `normalizeWebhookEnvelope` before dispatching them to a structural `{ dispatch(update) }` facade-like object.
 
 - Runtime targets: Bun, Node, Workers, Deno-style Fetch runtimes.
 - Public: yes.
 - Dependencies out: `@wats/crypto`, `@wats/core`, `@wats/types`.
+- Layer: application-edge — composes `@wats/core` (NOT a peer of `@wats/graph`; it sits above `@wats/core`, while `@wats/graph` sits below it).
 - Stability: foundations-complete.
 
 `@wats/http` depends on `@wats/core` for the normalizer. Its adapter accepts only a structural `{ dispatch(update) }` facade-like object at runtime.
@@ -96,7 +97,7 @@ Typed webhook normalization, typed filters, raw filters, routers, listener regis
 - Dependencies out: `@wats/types`, `@wats/graph`.
 - Stability: foundations-complete.
 
-The facade binds a `GraphClient`, optional `PhoneNumberClient` / `WABAClient`, a `TypedRouter`, and optional listener registry support. `WhatsApp.startChat(...)` delegates through the bound `PhoneNumberClient` to start a text conversation with any valid phone-number-like recipient — no contacts lookup. Facade composer helpers (media, location, contacts, reaction, interactive variants, template send, mark-as-read, typing indicators) require a bound `phoneNumberId` and use the same phone-number client.
+The facade binds a `GraphClient`, optional `PhoneNumberClient` / `WABAClient`, a `TypedRouter`, and optional listener registry support. `WhatsApp.sendText(...)` (alias `startChat(...)`) delegates through the bound `PhoneNumberClient` to send a text with any valid phone-number-like recipient — no contacts lookup. Facade composer helpers (media, location, contacts, reaction, interactive variants, template send, mark-as-read, typing indicators) require a bound `phoneNumberId` and use the same phone-number client.
 
 ### `@wats/config`
 
@@ -157,7 +158,7 @@ Private workspace tests, consumer fixtures, fixture payloads, and policy checks.
 ## Invariants
 
 1. `@wats/types` has no runtime dependencies.
-2. `@wats/graph`, `@wats/http`, and `@wats/crypto` expose portable seams and keep runtime-specific behavior behind adapters.
+2. `@wats/graph` and `@wats/crypto` expose portable seams and keep runtime-specific behavior behind adapters. `@wats/http` also keeps its runtime wrappers behind adapters, but it is an application-edge package that composes `@wats/core` (it is not a foundation peer of `@wats/graph`).
 3. `@wats/core` is the core composition root; app-layer packages compose it rather than duplicating router/webhook semantics.
 4. `@wats/internal-utils` may be published only as an internal support package; `@wats/testing` stays private and is never published.
 5. Consumer fixtures import through package specifiers, never relative source paths.

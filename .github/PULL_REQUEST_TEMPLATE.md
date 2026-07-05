@@ -6,10 +6,11 @@
 
 ## Issue tracking
 
-<!-- Link the Linear issue, GitHub issue, or discussion this PR closes or contributes to.
-     Maintainers may create/link a Linear issue during triage for behavior-bearing changes. -->
+<!-- Link the GitHub issue or discussion this PR closes or contributes to.
+     External contributors: reference a GitHub issue (open one if none exists yet).
+     Maintainers may additionally cross-link the Linear issue (WATS-nn) during triage. -->
 
-Closes WATS-
+Closes #<GitHub issue> (or WATS-nn for maintainers)
 
 ## Type of change
 
@@ -59,8 +60,9 @@ Behavior-bearing changes must update docs in the same PR. Check what applies:
 
 ## Scope ledger
 
-<!-- Required. Bullet what is in scope and what is intentionally deferred to other Linear issues.
-     Deferred items must reference issue IDs (WATS-NN); do not introduce deferred ledgers in this repo. -->
+<!-- Required. Bullet what is in scope and what is intentionally deferred to other issues.
+     Deferred items must reference issue IDs (GitHub issue # or WATS-NN for maintainers);
+     do not introduce deferred ledgers in this repo. -->
 
 - Included:
 - Not included (tracked separately):

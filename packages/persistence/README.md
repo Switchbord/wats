@@ -1,5 +1,7 @@
 # @wats/persistence
 
+> Experimental. Breaking changes are expected within `0.x`, including renames, shape changes, and schema migrations. Pin the version. See [api-stability](https://wats.sh/docs/meta/api-stability).
+
 Experimental WATS persistence contracts and adapters.
 
 Install:

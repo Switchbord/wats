@@ -1,0 +1,13 @@
+{
+  "name": "wats-example-webhook-echo-bot",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "demo": "bun run src/index.ts"
+  },
+  "dependencies": {
+    "@wats/core": "workspace:*",
+    "@wats/graph": "workspace:*"
+  },
+  "devDependencies": {}
+}

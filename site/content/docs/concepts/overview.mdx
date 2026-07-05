@@ -13,23 +13,26 @@ WATS is a Bun-first TypeScript toolkit for WhatsApp operations. It is built as s
 @wats/types
   shared domain contracts
 
-@wats/crypto        @wats/graph        @wats/http
-  crypto seam         graph client        webhook HTTP boundary
-  adapters            endpoints           runtime adapters
+@wats/crypto        @wats/graph
+  crypto seam         graph client
+  adapters            endpoints
 
 @wats/core
   typed updates, filters, router, listeners, WhatsApp facade
 ```
 
-Application-edge packages sit above these foundations:
+`@wats/core` is the composition root: it composes `@wats/graph`, `@wats/crypto`, and `@wats/types` and never imports the application-edge packages. Application-edge packages sit ABOVE `@wats/core` and compose it — they normalize raw inputs into typed values and dispatch them:
 
 ```text
-@wats/config   config schema, YAML/JSON loading, env-secret references
-@wats/service  standalone webhook/API service, OpenAPI 3.1
-@wats/cli      init, validate, doctor, serve, openapi commands
+@wats/http    webhook HTTP boundary — verifies signatures and normalizes
+              raw webhooks into typed updates before dispatch (composes
+              @wats/core + @wats/crypto)
+@wats/config  config schema, YAML/JSON loading, env-secret references
+@wats/service standalone webhook/API service, OpenAPI 3.1
+@wats/cli     init, validate, doctor, serve, openapi commands
 ```
 
-App-layer packages may depend on `@wats/core`; lower-level packages must not. The dependency arrows only point down.
+App-layer packages may depend on `@wats/core`; lower-level packages must not. The dependency arrows only point down — `@wats/core` never imports `@wats/http`. (`@wats/http` is an application-edge package, NOT a peer of `@wats/graph`: it sits above `@wats/core` and uses `normalizeWebhookEnvelope` from it.)
 
 ## Request flow
 

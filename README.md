@@ -47,6 +47,17 @@ bun add @wats/config @wats/service
 The `@wats/*` packages are standard npm packages; `npm i` works too. No
 credentials are needed to install, test, or develop against the mock transport.
 
+## Runtime support
+
+The `@wats/*` runtime packages target Bun, Node 20+, Cloudflare Workers, and
+Deno — they use only portable Web platform APIs. The `@wats/cli` `serve` and
+`upgrade` commands are Bun-only: `serve` is built on `Bun.serve` and `upgrade`
+shells out to `bun update`. On Node, Workers, or Deno, consume the runtime
+packages directly with your own server — see
+[deploy on Node](https://wats.sh/docs/guides/deploy-node) for a
+`node:http` example. Use `wats init`/`wats setup`/`wats doctor` (offline,
+credential-free) from a Bun shell to scaffold config.
+
 ## CLI
 
 ```bash
@@ -86,8 +97,12 @@ breaking changes.
 | `@wats/internal-utils` | published internal support package |
 
 Dependency direction is deliberate: low-level packages stay portable,
-`@wats/core` composes them, and the application-edge packages compose `core`.
-See the generated dependency graph at
+`@wats/core` composes them, and the application-edge packages compose
+`core`. `@wats/http` is an application-edge package — it verifies
+signatures and normalizes raw webhooks into typed updates via
+`@wats/core`'s `normalizeWebhookEnvelope` before dispatch (it is not a
+peer of `@wats/graph`; it sits above `@wats/core`). See the generated
+dependency graph at
 [wats.sh/docs/concepts/package-map](https://wats.sh/docs/concepts/package-map).
 
 ## Local development
@@ -117,6 +132,7 @@ Docs change in the same PR as the code they describe.
 - npm: [@wats](https://www.npmjs.com/org/wats)
 - `CONTRIBUTING.md` — contribution workflow and credential-free defaults
 - `SECURITY.md` — vulnerability reporting and live-credential policy
+- `SUPPORT.md` — where to ask questions and what makes a good report
 - `CODE_OF_CONDUCT.md` — Contributor Covenant 2.1 for community spaces
 
 MIT.

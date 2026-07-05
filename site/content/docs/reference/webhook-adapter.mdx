@@ -27,9 +27,19 @@ import {
   createWebhookAdapter,
   createFetchWebhookHandler
 } from "@wats/http";
-import { WhatsApp } from "@wats/core";
+import { createWhatsApp } from "@wats/core";
 
-const wa = new WhatsApp({ graphClient, phoneNumberId: "12345" });
+const wa = createWhatsApp({
+  accessToken: process.env.ACCESS_TOKEN!,
+  phoneNumberId: "12345"
+});
+
+// Echo inbound text messages back to the sender.
+wa.onMessage(async (ctx) => {
+  const message = ctx.update.message;
+  if (message.type !== "text") return;
+  await wa.sendText({ to: message.from, text: message.text.body });
+});
 
 const adapter = createWebhookAdapter({
   verifyToken: process.env.VERIFY_TOKEN!,

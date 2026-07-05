@@ -1,3 +1,11 @@
+/**
+ * @deprecated WATS-176: legacy untyped webhook parser error code. The
+ * typed `normalizeWebhookEnvelope` from `webhookNormalizer.ts` returns a
+ * `NormalizedWebhookResult` with its own error shape. Scheduled for
+ * barrel removal next minor.
+ * @see normalizeWebhookEnvelope
+ * @see NormalizedWebhookResult
+ */
 export type UpdateParserErrorCode =
   | "invalid_envelope"
   | "unsupported_object"
@@ -5,11 +13,24 @@ export type UpdateParserErrorCode =
   | "changes_limit_exceeded"
   | "events_limit_exceeded";
 
+/**
+ * @deprecated WATS-176: legacy untyped webhook parser error. The typed
+ * equivalent is the error channel of `NormalizedWebhookResult` from
+ * `webhookNormalizer.ts`. Scheduled for barrel removal next minor.
+ * @see normalizeWebhookEnvelope
+ * @see NormalizedWebhookResult
+ */
 export interface UpdateParserError {
   code: UpdateParserErrorCode;
   message: string;
 }
 
+/**
+ * @deprecated WATS-176: legacy untyped webhook parser options. The
+ * typed `normalizeWebhookEnvelope` from `webhookNormalizer.ts` takes its
+ * own options shape. Scheduled for barrel removal next minor.
+ * @see normalizeWebhookEnvelope
+ */
 export interface UpdateParserOptions {
   maxEntries?: number;
   maxChangesPerEntry?: number;
@@ -17,28 +38,60 @@ export interface UpdateParserOptions {
   supportedObjects?: readonly string[];
 }
 
+/**
+ * @deprecated WATS-176: legacy string discriminator. The typed system
+ * discriminates `TypedUpdate` by its `kind` literal instead. Scheduled
+ * for barrel removal next minor.
+ * @see TypedUpdate
+ */
 export interface ParsedUpdateDiscriminator {
   field: string;
   subtype?: string;
   eventType: string;
 }
 
+/**
+ * @deprecated WATS-176: legacy parsed-event entry metadata. Use the
+ * typed `TypedUpdate` from `webhookNormalizer.ts` instead. Scheduled
+ * for barrel removal next minor.
+ * @see TypedUpdate
+ */
 export interface ParsedUpdateEntryMetadata {
   index: number;
   id?: string;
   time?: number;
 }
 
+/**
+ * @deprecated WATS-176: legacy parsed-event change metadata. Use the
+ * typed `TypedUpdate` from `webhookNormalizer.ts` instead. Scheduled
+ * for barrel removal next minor.
+ * @see TypedUpdate
+ */
 export interface ParsedUpdateChangeMetadata {
   index: number;
   value: Record<string, unknown>;
 }
 
+/**
+ * @deprecated WATS-176: legacy raw envelope refs. The typed
+ * `TypedUpdate` from `webhookNormalizer.ts` carries normalized fields
+ * instead of raw envelope refs. Scheduled for barrel removal next minor.
+ * @see TypedUpdate
+ */
 export interface ParsedUpdateRawRefs {
   entry: Record<string, unknown>;
   change: Record<string, unknown>;
 }
 
+/**
+ * @deprecated WATS-176: the untyped `ParsedUpdateEvent` is superseded
+ * by the discriminated `TypedUpdate` union from
+ * `webhookNormalizer.ts` (produced by `normalizeWebhookEnvelope`).
+ * Scheduled for barrel removal next minor.
+ * @see TypedUpdate
+ * @see normalizeWebhookEnvelope
+ */
 export interface ParsedUpdateEvent {
   object: string;
   discriminator: ParsedUpdateDiscriminator;
@@ -47,6 +100,13 @@ export interface ParsedUpdateEvent {
   raw: ParsedUpdateRawRefs;
 }
 
+/**
+ * @deprecated WATS-176: legacy parse result. The typed equivalent is
+ * `NormalizedWebhookResult` from `webhookNormalizer.ts`. Scheduled for
+ * barrel removal next minor.
+ * @see normalizeWebhookEnvelope
+ * @see NormalizedWebhookResult
+ */
 export type ParseWebhookUpdateResult =
   | {
       ok: true;
@@ -97,6 +157,16 @@ function toSupportedObjects(value: readonly string[] | undefined): readonly stri
   return value;
 }
 
+/**
+ * @deprecated WATS-176: the untyped `parseWebhookUpdate` envelope parser
+ * is superseded by `normalizeWebhookEnvelope` from
+ * `webhookNormalizer.ts`, which produces a discriminated
+ * `NormalizedWebhookResult` of `TypedUpdate` variants. Scheduled for
+ * barrel removal next minor.
+ * @see normalizeWebhookEnvelope
+ * @see NormalizedWebhookResult
+ * @see TypedUpdate
+ */
 export function parseWebhookUpdate(rawEnvelope: unknown, options: UpdateParserOptions = {}): ParseWebhookUpdateResult {
   if (!isRecord(rawEnvelope) || !Array.isArray(rawEnvelope.entry)) {
     return {

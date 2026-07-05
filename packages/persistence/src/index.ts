@@ -169,3 +169,20 @@ export { createSqlitePersistence } from "./sqlite";
 export type { SqlitePersistenceOptions } from "./sqlite";
 export { runOutboxWorkerOnce } from "./outbox";
 export type { OutboxWorkerOptions, OutboxWorkerReport } from "./outbox";
+
+// WATS-176: re-export the postgres adapter from the package barrel so
+// consumers can reach it via `@wats/persistence` (the `./postgres`
+// subpath export already existed, but the type union
+// `PersistenceBackend = "sqlite" | "postgres"` advertised a backend
+// the root entry never surfaced). These re-exports close that gap
+// without weakening the existing input validation in `postgres.ts`.
+export {
+  createPostgresPersistence,
+  createPostgresPersistenceWithClient,
+  REDACTED_POSTGRES_LOCATION
+} from "./postgres";
+export type {
+  PostgresPersistenceOptions,
+  PostgresClientLike,
+  PostgresQueryResult
+} from "./postgres";

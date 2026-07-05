@@ -45,6 +45,8 @@ Patch release: the `@wats/service` operator telemetry surfaces and a docs voice 
 
 - Release metadata is aligned for 0.3.28: all publishable `@wats/*` packages, the service OpenAPI default version, README, and release-contract locks move together. No live Meta validation, Railway deployment, npm provenance attestation, or GitHub release side effect is implied by this changelog entry until the release commands below complete.
 
+Upgrade safety: no breaking changes; no new dependencies; no migration required.
+
 ## [0.3.27] - 2026-06-24
 
 Patch alpha compatibility and current-surface release. Publishes the post-0.3.26 Calling, persistence/operator-runtime, Flow media, and business-management helper surfaces that were already merged to `main`, plus the docs cleanup that reconciles those surfaces.
@@ -64,6 +66,8 @@ Patch alpha compatibility and current-surface release. Publishes the post-0.3.26
 
 - Release metadata is aligned for 0.3.27: all publishable `@wats/*` packages, the service OpenAPI default version, README, and release-contract locks move together. No live Meta validation, Railway deployment, npm provenance attestation, or GitHub release side effect is implied by this changelog entry until the release commands below complete.
 
+Upgrade safety: no breaking changes to public APIs; the Postgres adapter is optional and adds no required dependency; persistence users must run the schema-v3 migration.
+
 ## [0.3.26] - 2026-06-10
 
 ### Fixed
@@ -77,6 +81,8 @@ Patch alpha compatibility and current-surface release. Publishes the post-0.3.26
 ### Release
 
 - Release metadata is aligned for 0.3.26: all publishable `@wats/*` packages, the service OpenAPI default version, README, and release-contract locks move together. No new dependencies are added to any publishable `@wats/*` package.
+
+Upgrade safety: no breaking changes; no new dependencies; no migration required.
 
 ## [0.3.25] - 2026-06-10
 

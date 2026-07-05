@@ -3,7 +3,7 @@ title: "WhatsApp facade reference (`WhatsApp`)"
 description: "The WhatsApp composition root: what it binds, what it exposes, and when to bypass it."
 ---
 
-<DocMeta status="active" lastReviewed="2026-04-28" />
+<DocMeta status="active" lastReviewed="2026-07-05" />
 
 ## WhatsApp
 
@@ -12,7 +12,7 @@ description: "The WhatsApp composition root: what it binds, what it exposes, and
 ## Construction
 
 ```ts
-import { WhatsApp } from "@wats/core";
+import { WhatsApp, createWhatsApp } from "@wats/core";
 import { GraphClient, createFetchTransport } from "@wats/graph";
 
 const graphClient = new GraphClient({
@@ -44,6 +44,27 @@ Optional (`WhatsAppFacadeConfig`):
 - `listenerRegistryOptions?: ListenerRegistryOptions` — options for lazy registry creation.
 
 Construction-time validation checks required shapes immediately. Facade config failures throw `WhatsAppFacadeConfigError`; path-unsafe scoped ids propagate the underlying `GraphRequestValidationError` from the Graph scoped-client validators.
+
+### Factory
+
+`createWhatsApp(options)` is the one-call path for the 80% case. It constructs the `GraphClient` internally so you do not wire one by hand. The only required option is `accessToken`; `apiVersion` defaults to `"v25.0"` and `transport` defaults to `createFetchTransport()`.
+
+```ts
+import { createWhatsApp } from "@wats/core";
+
+const wa = createWhatsApp({
+  accessToken: process.env.META_WA_TOKEN!,
+  phoneNumberId: "1234567890"
+});
+```
+
+`CreateWhatsAppOptions` accepts the same `phoneNumberId` / `wabaId` / `router` / `observer` / `routerOptions` / `listenerRegistry` / `listenerRegistryOptions` fields as `WhatsAppFacadeConfig`, plus:
+
+- `apiVersion?: string` — defaults to `"v25.0"`.
+- `baseUrl?: string` — Graph base URL; defaults to `https://graph.facebook.com/`.
+- `transport?: Transport` — defaults to `createFetchTransport()`.
+
+`accessToken` flows into the Authorization header, so the factory validates it at the boundary: non-string / empty / whitespace / control-char / over-4096-char values throw `WhatsAppFacadeConfigError` with code `invalid_access_token` before any client is built. The token value is never placed in an error message. Malformed `apiVersion`, `baseUrl`, and `transport` throw `invalid_api_version`, `invalid_base_url`, and `invalid_transport` respectively. The remaining config is validated by the `WhatsApp` constructor.
 
 ## Exposed components
 
@@ -104,6 +125,18 @@ const handle = wa.on(and(message, message.textMatches(/hello/i)), async (ctx) =>
 handle.unregister();
 ```
 
+`onMessage(handler)` and `onStatus(handler)` are sugar over the broadest kind filter — equivalent to `wa.on(filtersTyped.message, handler)` and `wa.on(filtersTyped.status, handler)`. Use them when you want every inbound message or status update without composing a filter.
+
+```ts
+wa.onMessage(async (ctx) => {
+  await wa.sendText({ to: ctx.update.message.from, text: "ack" });
+});
+
+wa.onStatus((ctx) => {
+  // every status update — sent, delivered, read, failed
+});
+```
+
 Router dispatch rules apply unchanged:
 
 - registration-order matching
@@ -141,14 +174,20 @@ Listener evaluation runs before normal handler dispatch when `wa.dispatch(update
 
 ## Sent-result waiters
 
-`wa.startChat(...)` returns a `WhatsAppWaitableSentResult`: the normal Graph send response plus pywa-like helper methods:
+`wa.sendText(...)` (and `wa.startChat(...)`, retained as an alias) return a `WhatsAppWaitableSentResult`: the normal Graph send response plus pywa-like helper methods:
 
 ```ts
-const sent = await wa.startChat({ to: "15551230000", text: "Need help?" });
+const sent = await wa.sendText({ to: "15551230000", text: "Need help?" });
 
 const reply = await sent.waitForReply({ timeoutMs: 30_000 });
 const read = await sent.waitUntilRead({ timeoutMs: 60_000 });
 ```
+
+Every facade send method that produces a sent message returns the same waitable shape — `sendButtons`, `sendList`, `sendCtaUrl`, `sendImage`, `sendVideo`, `sendAudio`, `sendDocument`, `sendSticker`, `sendLocation`, `sendContacts`, `sendReaction`, `removeReaction`, `sendProduct`, `sendProducts`, `sendCatalog`, `requestLocation`, `sendTemplate`, and `sendMarketingTemplate`. The recipient for the waiters is the input `to` field, falling back to the `contacts[].wa_id` in the Graph response.
+
+`sendMarketingTemplate` returns `GraphMessagesMarketingTemplateResponse & WhatsAppSentResultWaiters`, so the marketing-specific `messages[].message_status` and `contacts[].user_id` fields are preserved alongside the waiters.
+
+`markMessageAsRead` and `indicateTyping` are not waitable: they mutate read/typing state and return `{ success: true }` with no sent message id, so there is nothing for the waiters to key on. `sendGroupMessage` is also not waitable: its recipient is a group id, and the wait helpers match on a phone-number `from`/recipient, so group semantics do not fit the existing waiter substrate.
 
 Helpers:
 
@@ -180,6 +219,10 @@ const report = await wa.dispatch(typedUpdate);
   - `invalid_observer`
   - `invalid_listener_registry`
   - `invalid_listener_registry_options`
+  - `invalid_access_token` — factory only
+  - `invalid_api_version` — factory only
+  - `invalid_base_url` — factory only
+  - `invalid_transport` — factory only
 
 - `WhatsAppListenOptionsError`
   - `invalid_listen_options`
@@ -193,8 +236,6 @@ Scoped-client id safety errors may be `GraphRequestValidationError` rather than 
 
 The facade currently does not provide:
 
-- a `createWhatsApp(...)` factory
-- shorthand `onMessage(...)` / `onStatus(...)` methods
 - a standalone HTTP service
 - endpoint breadth beyond current `PhoneNumberClient` / `WABAClient` methods
 - persistence for router or listener state

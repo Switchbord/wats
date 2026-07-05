@@ -6,11 +6,11 @@ Participation in WATS community spaces is governed by `CODE_OF_CONDUCT.md` (Cont
 
 ## Source of truth
 
-Linear is the source of truth for issue-level planning and prioritization. Repository docs may summarize current roadmap shape, but do not add repo-local deferred ledgers for backlog tracking.
+Linear is the maintainers' internal planning tool and is not visible to outside contributors. Open or reference a GitHub issue (or Discussion) for the change you intend to make; maintainers cross-link it to Linear during triage. Do not add repo-local deferred ledgers for backlog tracking; repository docs may summarize current roadmap shape only.
 
 Before starting substantial work:
 
-1. Link the change to a Linear issue or maintainer-approved scope.
+1. Link the change to a GitHub issue or maintainer-approved scope.
 2. Write a short scope ledger: included, not included, credential requirements, docs to update, and tests to run.
 3. Keep docs move with code: reference docs, guides, parity matrix, and changelog updates belong in the same change as implementation.
 
@@ -20,10 +20,13 @@ WATS uses Bun and TypeScript workspaces.
 
 ```bash
 bun install --frozen-lockfile
+bun run build:packages
 bun test
 bun run typecheck
 bun run check-publish
 ```
+
+Run `bun run build:packages` once after install and again after switching branches: workspace tests import built `dist` artifacts, so a stale or missing build fails tests for reasons unrelated to your change.
 
 Use targeted tests while developing, then run the relevant shared gates before opening or merging a PR.
 
@@ -77,3 +80,7 @@ Before a PR is ready:
 ## Publication boundaries
 
 A GitHub-visible repository is not the same as an npm-ready release. Package publication remains gated on built artifacts, package smoke tests, release automation, and explicit maintainer approval.
+
+## Agent-assisted maintenance
+
+Commits from AI agents (for example, `hermes-agent`) are part of the normal workflow. Agent-authored changes go through the same CI, review, and docs gates as human-authored ones: tests, typecheck, voice checks, and redaction review. Agents do not get a bypass on the pull request checklist. Humans own releases, secrets, npm credentials, and the decision to merge. An agent can stage a change; a human ships it.

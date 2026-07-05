@@ -22,6 +22,17 @@ Credential-free community examples for WATS. The scaffold is intentionally small
 - `examples/offline-bot/README.md` — offline MockTransport bot walkthrough with synthetic webhook payloads/envelopes.
 - `examples/minimal-bot/` — runnable 60-second offline minimal bot using `@wats/service`, MockTransport, and `bun run demo`.
 - `examples/groups/` — runnable offline Groups flow using `@wats/graph`, `@wats/core`, MockTransport, and synthetic group webhooks (`bun run examples:groups`).
+- `examples/webhook-echo-bot/` — runnable offline echo bot using the `createWhatsApp` / `onMessage` / `sendText` loop with a mock transport and a synthetic webhook envelope (`bun run examples:webhook-echo-bot`).
+
+## Running an example outside this repo
+
+Example `package.json` files pin `@wats/*` deps to `workspace:*` so they install inside this monorepo. Copying a directory out of the repo breaks `bun install` because `workspace:*` is not a published range. To run a copy elsewhere, swap the workspace pins for the published range:
+
+```sh
+sed -i 's/"@wats\/\([^"]*\)": "workspace:\*"/"@wats\/\1": "^0.3.28"/g' examples/webhook-echo-bot/package.json
+```
+
+Then `bun install` in the copied directory resolves from the npm registry. No other changes are needed.
 
 ## How to run local checks
 
