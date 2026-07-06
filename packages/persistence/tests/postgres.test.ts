@@ -61,6 +61,11 @@ function successLockMigrationResponses(): PostgresQueryResult[] {
     { rows: [], rowCount: 0 }, // migration 3 stmt 5
     { rows: [], rowCount: 1 }, // record migration 3
     { rows: [], rowCount: 0 }, // COMMIT
+    { rows: [], rowCount: 0 }, // migration 4 existing?
+    { rows: [], rowCount: 0 }, // BEGIN
+    { rows: [], rowCount: 0 }, // migration 4 stmt
+    { rows: [], rowCount: 1 }, // record migration 4
+    { rows: [], rowCount: 0 }, // COMMIT
     { rows: [], rowCount: 1 } // release lock
   ];
 }
@@ -103,12 +108,13 @@ describe("WATS-125 Postgres persistence adapter", () => {
     const report = await store.migrate();
 
     expect(report.currentVersion).toBe(CURRENT_SCHEMA_VERSION);
-    expect(report.currentVersion).toBe(3);
-    expect(report.appliedMigrations).toEqual(["001_initial", "002_outbox_lease_id", "003_message_projection"]);
+    expect(report.currentVersion).toBe(4);
+    expect(report.appliedMigrations).toEqual(["001_initial", "002_outbox_lease_id", "003_message_projection", "004_inbound_window_index"]);
     const joined = client.queries.map((q) => q.sql).join("\n");
     expect(joined).toContain("CREATE TABLE IF NOT EXISTS wats_messages");
     expect(joined).toContain("CREATE TABLE IF NOT EXISTS wats_message_status_events");
     expect(joined).toContain("wats_messages_created_at_idx");
+    expect(joined).toContain("wats_messages_direction_from_phone_created_at_idx");
   });
 
   test("health returns redacted Postgres location", async () => {

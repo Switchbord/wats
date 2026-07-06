@@ -53,6 +53,8 @@ function memoryStore() {
     async appendMessageStatus() {},
     async getMessage(): Promise<MessageRecord | null> { return null; },
     async listMessages() { return { items: [] as readonly MessageRecord[], nextCursor: null }; },
+    async getLatestInboundMessageAt(): Promise<string | null> { return null; },
+    async countOutboxPending(): Promise<number> { return 0; },
     async close() {}
   };
 }
@@ -156,7 +158,9 @@ describe("WATS-162 Prometheus/OpenMetrics /metrics endpoint", () => {
       "webhook_normalization_total",
       "graph_operations_total",
       "send_outcomes_total",
-      "persistence_operations_total"
+      "persistence_operations_total",
+      "outbox_depth",
+      "outbox_processed_total"
     ];
     // Every metric line (non-comment, non-blank) must start with one of the
     // allowed metric names (histograms emit _bucket/_sum/_count suffixes).
@@ -168,7 +172,7 @@ describe("WATS-162 Prometheus/OpenMetrics /metrics endpoint", () => {
       expect(allowedMetricNames, `unexpected metric name in exposition: ${name}`).toContain(baseName);
     }
 
-    const allowedLabelKeys = ["route", "method", "status_class", "update_kind", "endpoint_family", "outcome", "adapter", "le"];
+    const allowedLabelKeys = ["route", "method", "status_class", "update_kind", "endpoint_family", "outcome", "adapter", "state", "le"];
     const labelBlocks = Array.from(text.matchAll(/\{([^}]*)\}/gu), (m) => m[1]);
     for (const block of labelBlocks) {
       const keys = Array.from(block.matchAll(/([a-z_]+)=/gu), (m) => m[1]);
