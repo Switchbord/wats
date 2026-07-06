@@ -1,10 +1,10 @@
 {
-  "version": "0.3.29",
-  "testCount": 2547,
-  "testCountRounded": 2500,
-  "generatedAt": "2026-07-05T14:25:35.195Z",
+  "version": "0.3.30",
+  "testCount": 2638,
+  "testCountRounded": 2600,
+  "generatedAt": "2026-07-06T07:12:07.579Z",
   "source": {
     "cmd": "bun test",
-    "commit": "6703da4b060095cb521406c149765198ef490dec"
+    "commit": "746d9ed064f0026eb88dd7675ffbc5e5e3044c12"
   }
 }

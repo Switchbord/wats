@@ -3,8 +3,8 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@wats/core": "0.3.29",
-    "@wats/graph": "0.3.29"
+    "@wats/core": "0.3.30",
+    "@wats/graph": "0.3.30"
   },
   "devDependencies": {
     "typescript": "6.0.3"
