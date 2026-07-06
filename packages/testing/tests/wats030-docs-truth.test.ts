@@ -21,7 +21,7 @@ function read(path: string): string {
   return readFileSync(join(repoRoot, path), "utf8");
 }
 
-describe("WATS 0.3.29 public docs truth contract", () => {
+describe("WATS 0.3.30 public docs truth contract", () => {
   test("README announces the alpha release and credential-safe install path without stale publication wording", () => {
     const readme = read("README.md");
     expect(readme).toContain("Alpha");
@@ -35,13 +35,13 @@ describe("WATS 0.3.29 public docs truth contract", () => {
     expect(readme).not.toContain("After the alpha packages are published");
   });
 
-  test("changelog has a top 0.3.29 section and keeps release side-effect boundaries honest", () => {
+  test("changelog has a top 0.3.30 section and keeps release side-effect boundaries honest", () => {
     const changelog = read("CHANGELOG.md");
-    expect(changelog.startsWith("# Changelog\n\n## [0.3.29]")).toBe(true);
+    expect(changelog.startsWith("# Changelog\n\n## [0.3.30]")).toBe(true);
     expect(changelog).toContain("### WATS-108 — community governance files");
     expect(changelog).toContain("canonical `@wats/*` package scope");
     expect(changelog).toContain("### WATS-98 — Marketing Messages API compatibility surfaces");
-    expect(changelog).toContain("Release metadata is aligned for 0.3.29");
+    expect(changelog).toContain("Release metadata is aligned for 0.3.30");
     expect(changelog).toContain("credential-gated live `wats serve`");
     expect(changelog).toContain("### WATS-126 — CLI version and package upgrades");
     expect(changelog).toContain("Adds `wats --version`");

@@ -29,7 +29,7 @@ Credential-free community examples for WATS. The scaffold is intentionally small
 Example `package.json` files pin `@wats/*` deps to `workspace:*` so they install inside this monorepo. Copying a directory out of the repo breaks `bun install` because `workspace:*` is not a published range. To run a copy elsewhere, swap the workspace pins for the published range:
 
 ```sh
-sed -i 's/"@wats\/\([^"]*\)": "workspace:\*"/"@wats\/\1": "^0.3.29"/g' examples/webhook-echo-bot/package.json
+sed -i 's/"@wats\/\([^"]*\)": "workspace:\*"/"@wats\/\1": "^0.3.30"/g' examples/webhook-echo-bot/package.json
 ```
 
 Then `bun install` in the copied directory resolves from the npm registry. No other changes are needed.
