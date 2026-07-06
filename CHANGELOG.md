@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.3.30] - 2026-07-05
+
+Patch release: the ops runtime — POST retry safety, rate limiter seam, conversation window, outbox worker, outbox metrics.
+
+### Added
+
+- Opt-in POST retry on the reliable transport: `retryPosts` ("never" default, "network-only", "always"). The network-only mode retries a POST only when the failure occurred before any response was received and the request carries an `Idempotency-Key` header, so a processed send is never duplicated.
+- `createTokenBucketRateLimiter` in `@wats/graph` and a `rateLimiter` option on the reliable transport (token acquired before every attempt). Client-side smoothing; shape-only.
+- Conversation-window helpers in `@wats/persistence`: `getConversationWindowState` and `canSendFreeForm` answer "free-form or template right now?" from projected inbound messages. Strict 24-hour boundary; closed by default when no inbound history exists. New store method `getLatestInboundMessageAt` on both adapters plus an index migration.
+- Outbox worker loop: `startOutboxWorker` with injectable scheduling, overlap-skipping ticks, error-isolated callbacks, and a `stop()` that cancels the timer and awaits any in-flight run. New store method `countOutboxPending`. Single-process by design.
+- Inbound message projection in `@wats/service`: inbound webhook messages are recorded to persistence alongside outbound sends (failure-isolated; never breaks the webhook acknowledgement).
+- `GET /api/conversations/{phone}/window` operator endpoint (existence-hiding auth, 503 without persistence, `+` prefix normalized to Meta's bare-digit storage).
+- Metrics: gauge support in the service metrics registry, `wats_outbox_depth` gauge, `wats_outbox_processed_total` counter, and a `createOutboxMetricsReporter` wiring helper. Optional `metricsRegistry` config injection shares one registry between `/metrics` and the reporter.
+- New guide: operate reliably (retry + idempotency + rate limiter, window gate, outbox worker + metrics, alerting).
+
+### Changed
+
+- Service reference non-goals rewritten: the worker loop ships in `@wats/persistence` with an explicit start/stop lifecycle and rate limiting ships as a `@wats/graph` seam; still excluded are distributed scheduling, multi-process coordination, and automatic send-path enqueue (service sends remain synchronous).
+- Persistence reference documents the outbox worker and metrics wiring.
+
+### Build
+
+- Telemetry taxonomy doc and drift-guard test updated in lockstep with the new metric families.
+
+### Release
+
+Upgrade safety: no breaking changes; no new dependencies; persistence users get schema migration 004 (an index) applied automatically on open.
+
+No change to the secret surface. The new endpoint reuses the existing service bearer token with the existence-hiding 404 posture.
+
+Release metadata is aligned for 0.3.30.
+
 ## [0.3.29] - 2026-07-05
 
 Patch release: the facade front door, public-surface integrity fixes, and community-open repository hygiene.
