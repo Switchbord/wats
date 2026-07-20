@@ -1,4 +1,4 @@
-// WATS 0.3.6 release-prep contract.
+// WATS release-prep contract.
 
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";

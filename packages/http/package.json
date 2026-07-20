@@ -1,5 +1,6 @@
 {
   "name": "@wats/http",
+  "description": "Webhook verification and Bun/Node/Fetch adapters.",
   "version": "0.3.30",
   "private": false,
   "license": "MIT",

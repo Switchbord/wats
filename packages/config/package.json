@@ -1,5 +1,6 @@
 {
   "name": "@wats/config",
+  "description": "YAML/JSON config validation and env-secret references.",
   "version": "0.3.30",
   "private": false,
   "license": "MIT",
