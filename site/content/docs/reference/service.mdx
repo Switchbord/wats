@@ -334,9 +334,9 @@ Returns a newest-first page of projected messages. Query parameters:
 
 ### `GET /messages/{messageId}`
 
-Returns a single `MessageRecord` by WhatsApp message id (`wamid.*`). Unknown ids return `404 not_found`; unsafe id segments return `400`.
+Returns a single `MessageRecord` by WhatsApp message id (`wamid.*`). A `null` record returns `404 not_found`; unsafe id segments return `400`.
 
-Both routes return `503 persistence_not_configured` when no `PersistenceStore` is injected. A `GET /messages/text` request is treated as the message-id lookup segment `text` only by method — the `POST /messages/text` route takes precedence for POST, and a `GET` to that exact path returns `405` (the `text` segment is reserved by the text-send route).
+Both routes return `503 persistence_not_configured` when no `PersistenceStore` is injected. If the injected store throws (outage, lock, corruption), they return `503 persistence_unavailable` instead. A store failure is never misreported as `404 not_found`. A `GET /messages/text` request is treated as the message-id lookup segment `text` only by method — the `POST /messages/text` route takes precedence for POST, and a `GET` to that exact path returns `405` (the `text` segment is reserved by the text-send route).
 
 ## Groups routes (opt-in)
 
@@ -374,6 +374,7 @@ HTTP errors use JSON bodies:
 - `404` route not found
 - `405` method not allowed
 - `502` Graph request failure (auth-class and uncategorized Meta errors). When the underlying `GraphApiError` exposes sanitized Meta details, the body includes `metaCode`, `metaSubcode`, `metaType`, and `fbtraceId` alongside the stable `graph_request_failed` code. The service deliberately omits Meta's free-form error message because it may quote request/account identifiers; it never includes access tokens, app secrets, verify tokens, service bearer tokens, request bodies, or `Authorization` headers.
+- `503` persistence failure on a projection route. `persistence_not_configured` means no `PersistenceStore` was injected. `persistence_unavailable` means the injected store threw (outage, lock, corruption); it is never reported as `404 not_found`. `conversation_window_unavailable` covers a throw in the conversation-window lookup specifically.
 - `503` Graph rate-limit failure. When Meta classifies the failure as rate limiting (`GraphRateLimitError`: codes 4, 80007, 130429, 131048, 131056, or HTTP 429), the service returns `503` with the same sanitized `graph_request_failed` body. If Meta supplied a `Retry-After` header, it is echoed verbatim on the `503` response so callers can back off correctly.
 
 The 5xx boundary holds on every Graph failure: Meta's own 4xx never passes through as the service's status, because the caller did not send a bad request to the service — the cause surfaces inside the body. Each Graph failure also emits one `warn`-level JSON log line (`{"event":"wats.graph.failure","metaCode":…,"metaSubcode":…,"metaType":…,"fbtraceId":…,"at":…}`) carrying only sanitized structured identifiers, so container logs are diagnosable without probing Meta.

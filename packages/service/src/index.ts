@@ -1997,7 +1997,7 @@ export function createWatsServiceOpenApiDocument(
           "400": errorResponseSpec("Malformed limit or cursor query."),
           "401": errorResponseSpec("Missing or invalid service bearer token."),
           "405": errorResponseSpec("Method not allowed."),
-          "503": errorResponseSpec("No persistence store is configured.")
+          "503": errorResponseSpec("No persistence store configured (persistence_not_configured), or the configured store could not be reached (persistence_unavailable).")
         }
       }
     },
@@ -2013,9 +2013,9 @@ export function createWatsServiceOpenApiDocument(
           "200": okResponseSpec("Projected message record.", "MessageRecord"),
           "400": errorResponseSpec("Malformed message id."),
           "401": errorResponseSpec("Missing or invalid service bearer token."),
-          "404": errorResponseSpec("Message not found."),
+          "404": errorResponseSpec("Message not found (record === null)."),
           "405": errorResponseSpec("Method not allowed."),
-          "503": errorResponseSpec("No persistence store is configured.")
+          "503": errorResponseSpec("No persistence store configured (persistence_not_configured), or the configured store could not be reached (persistence_unavailable).")
         }
       }
     },
@@ -2750,8 +2750,12 @@ async function handleListMessages(ctx: RuntimeConfig, request: Request, url: URL
     recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "success");
     return jsonResponse(200, { items: result.items, nextCursor: result.nextCursor });
   } catch {
+    // The store is configured but the call threw (DB outage, locked, etc.).
+    // Surface 503 persistence_unavailable so an outage is not misreported as
+    // "no store configured". 503 persistence_not_configured is reserved for
+    // ctx.persistence === undefined (guarded above).
     recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "error");
-    return errorResponse(503, "persistence_not_configured", "Message projections require a persistence store.");
+    return errorResponse(503, "persistence_unavailable", "Message projection store could not be reached.");
   }
 }
 
@@ -2776,8 +2780,12 @@ async function handleGetMessage(ctx: RuntimeConfig, request: Request, path: stri
     if (record === null) return errorResponse(404, "not_found", "Message not found.");
     return jsonResponse(200, record);
   } catch {
+    // The store is configured but the call threw. Returning 404 here would
+    // misreport a DB outage as a missing message. Reserve 404 not_found for
+    // record === null (guarded above) and surface 503 persistence_unavailable
+    // so operators can tell a store failure from an absent record.
     recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "error");
-    return errorResponse(404, "not_found", "Message not found.");
+    return errorResponse(503, "persistence_unavailable", "Message projection store could not be reached.");
   }
 }
 
