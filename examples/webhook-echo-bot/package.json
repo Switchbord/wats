@@ -1,5 +1,5 @@
 {
-  "name": "wats-example-webhook-echo-bot",
+  "name": "@wats/example-webhook-echo-bot",
   "private": true,
   "type": "module",
   "scripts": {

@@ -1,5 +1,6 @@
 {
   "name": "@wats/graph",
+  "description": "Graph client, transport, endpoints, errors, pagination.",
   "version": "0.3.30",
   "private": false,
   "license": "MIT",

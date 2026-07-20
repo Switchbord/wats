@@ -66,8 +66,8 @@ Then point Meta App Dashboard > WhatsApp > Configuration at:
   exposes an `onRetry(ctx)` hook as the redacted-telemetry primitive surface —
   the caller controls what (if anything) to record and is responsible for
   redaction. WATS ships no built-in redacted telemetry sink and no per-endpoint
-  concurrency cap; both remain deferred under WATS-86, pending live-campaign
-  evidence and the WATS-111 no-maintainer-owned-telemetry-by-default stance.
+  concurrency cap; both remain deferred pending live-campaign evidence and the
+  no-maintainer-owned-telemetry-by-default stance.
 - `@wats/persistence` now ships SQLite plus an optional Postgres adapter subpath, but `wats serve` still needs explicit operator wiring for durable/HA production persistence; no automatic HA topology is enabled by this Railway scaffold.
 
 ## Inbound webhook observability

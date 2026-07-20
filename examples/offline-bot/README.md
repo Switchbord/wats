@@ -1,9 +1,8 @@
 # Offline MockTransport bot example
 
-- status: WATS-52 community examples scaffold
 - safety default: offline by default
 
-This example is intentionally docs-only for WATS-52A. It demonstrates the shape of a safe community bot without adding behavior-bearing runtime code.
+This example is docs-only by design. It demonstrates the shape of a safe community bot without adding behavior-bearing runtime code.
 
 ## Contract
 
@@ -43,6 +42,6 @@ const normalized = normalizeWebhookEnvelope({
 for (const update of normalized.updates) await router.dispatch(update);
 ```
 
-If this sketch becomes runnable code in a later slice, keep imports public (`@wats/core`, `@wats/graph`, `@wats/graph/testing`) and keep it offline by default.
+If this sketch becomes runnable code later, keep imports public (`@wats/core`, `@wats/graph`, `@wats/graph/testing`) and keep it offline by default.
 
 For a runnable version of this pattern, see `../webhook-echo-bot` — it implements the receive-a-message → reply-to-it loop offline using `createWhatsApp`, `onMessage`, and `sendText` with a mock transport and a synthetic webhook envelope.

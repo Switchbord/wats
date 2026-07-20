@@ -1,5 +1,6 @@
 {
   "name": "@wats/cli",
+  "description": "Local operator tooling for WATS.",
   "version": "0.3.30",
   "private": false,
   "license": "MIT",

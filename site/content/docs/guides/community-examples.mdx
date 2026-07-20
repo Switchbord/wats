@@ -31,6 +31,14 @@ Config template starting points:
 Copy those files into ignored local paths before filling any real values. The
 checked-in files stay placeholders.
 
+## Available examples
+
+- `examples/minimal-bot/` — runnable 60-second offline bot using `@wats/service`, MockTransport, and `bun run demo`.
+- `examples/groups/` — runnable offline Groups flow using `@wats/graph`, `@wats/core`, MockTransport, and synthetic group webhooks (`bun run examples:groups`).
+- `examples/webhook-echo-bot/` — runnable offline echo bot using the `createWhatsApp` / `onMessage` / `sendText` loop with a mock transport and a synthetic webhook envelope (`bun run examples:webhook-echo-bot`).
+- `examples/offline-bot/README.md` — docs-only walkthrough of an offline MockTransport bot with synthetic webhook payloads/envelopes (no runnable package).
+- `examples/config/` — placeholder YAML and JSON config templates plus `.env.example` for local ignored copies.
+
 ## Quickstart flow with checked templates
 
 1. Read the example index in `examples/README.md`.

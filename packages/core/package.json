@@ -1,5 +1,6 @@
 {
   "name": "@wats/core",
+  "description": "Typed updates, filters, router, listeners, WhatsApp facade.",
   "version": "0.3.30",
   "private": false,
   "license": "MIT",

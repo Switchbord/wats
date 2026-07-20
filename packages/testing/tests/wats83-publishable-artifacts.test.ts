@@ -64,7 +64,7 @@ describe("WATS-83 publishable artifact smoke contract", () => {
   test("publishable package manifests point at dist artifacts and constrain packed files", () => {
     for (const pkg of PUBLISHABLE_PACKAGES) {
       const manifest = readJson(`packages/${pkg}/package.json`);
-      expect(manifest.private, `${pkg} is publishable for the 0.2.1 alpha launch`).toBe(false);
+      expect(manifest.private, `${pkg} is publishable`).toBe(false);
       expect(manifest.main, `${pkg} main`).toBe("./dist/index.js");
       expect(manifest.types, `${pkg} types`).toBe("./dist/index.d.ts");
       expect(manifest.files, `${pkg} files`).toEqual(["dist", "README.md", "LICENSE"]);

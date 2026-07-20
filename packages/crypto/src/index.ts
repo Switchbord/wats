@@ -1,4 +1,4 @@
-// @wats/crypto barrel — RED stub; GREEN re-exports implementations.
+// @wats/crypto — barrel re-exports for the crypto provider surface.
 
 export type {
   CryptoProvider,

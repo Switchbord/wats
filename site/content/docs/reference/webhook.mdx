@@ -21,7 +21,7 @@ These are the low-level webhook primitives. Most applications should start with 
 
 ## mTLS CA transition boundary
 
-Meta's webhook delivery may sit behind an optional infrastructure-level mTLS client certificate check as Meta transitions outbound client certificate validation to the Meta-owned root `meta-outbound-api-ca-2025-12.pem`. That check is separate from WATS application behavior.
+Meta's webhook delivery may sit behind an optional infrastructure-level mTLS client certificate check. Meta is transitioning outbound client certificate validation to the Meta-owned root `meta-outbound-api-ca-2025-12.pem`. That check is separate from WATS application behavior.
 
 WATS always treats `X-Hub-Signature-256` as the app-level HMAC verification boundary: `validateWebhookSignature(...)` computes HMAC-SHA256 over the exact raw body bytes using your app secret after the request reaches WATS. Infrastructure-level mTLS client certificate validation, if you use it, belongs at the TLS terminator, load balancer, reverse proxy, CDN/edge product, or platform ingress before the WATS handler is invoked.
 

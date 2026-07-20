@@ -1,15 +1,15 @@
-# playground-build — wats.sh playground asset pipeline (T18)
+# playground-build — wats.sh playground asset pipeline
 
 Isolated mini-package that bundles the PUBLISHED `@wats/*` packages (pinned
 `0.3.30`) into the two static assets the `/playground` route will load at
-runtime (T19). It is **not** part of the `site` build graph and adds no deps to
+runtime. It is **not** part of the `site` build graph and adds no deps to
 `site/package.json`.
 
 ## Outputs (committed to site/public/playground/)
 
 - `wats-bundle.js`  — single browser ESM file (esbuild, platform=browser,
   target=es2022, minified). Bare `@wats/...` imports in scenario code get
-  rewritten to this file via an import map (T19, §3 of 06-playground-spec).
+  rewritten to this file via an import map.
 - `wats-types.d.ts` — self-contained ambient declarations (dts-bundle-generator
   with `--external-inlines` for all five `@wats/*`), for the CodeMirror TS
   integration.
@@ -53,7 +53,7 @@ Resolution (no shimming):
 - Result: `@wats/graph` and `@wats/core` are node-builtin-free; the emitted
   bundle contains zero `node:` references and no `process`/`Buffer`/`require`.
 
-Upstream follow-up suggestion (not in T18 scope): add a `browser` export
+Upstream follow-up suggestion: add a `browser` export
 condition to `@wats/crypto` so `.` resolves to the WebCrypto adapter in browser
 bundlers.
 
@@ -61,4 +61,4 @@ bundlers.
 
 `wats-bundle.js` and `wats-types.d.ts` regenerate byte-identically (verified via
 sha256 across two runs). The wiring of a no-diff regeneration check into
-`site` `check` is deferred to T19/T20 per the task boundary.
+`site` `check` is deferred.

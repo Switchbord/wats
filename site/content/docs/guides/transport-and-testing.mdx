@@ -80,7 +80,7 @@ The handle exposes `respond(spec)` to push into the queue mid-test and `reset()`
 
 ## Recipe 2 — Opt-in reliable transport
 
-Any `Transport` is just an object with a `request` method. WATS ships `createReliableTransport` as an opt-in decorator for ky-like retries, backoff, and per-attempt timeouts without adding a dependency or changing the default `GraphClient` behavior.
+Any `Transport` is just an object with a `request` method. WATS ships `createReliableTransport` as an opt-in decorator for retries with jittered backoff, `Retry-After` handling, and per-attempt timeouts without adding a dependency or changing the default `GraphClient` behavior.
 
 ```ts
 import {
