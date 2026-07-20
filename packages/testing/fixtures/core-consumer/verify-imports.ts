@@ -600,6 +600,102 @@ async function verify(): Promise<VerifyReportOk> {
     call.outgoing().predicate(callTerminateUpdate) === true &&
     call.connect().predicate(templateUpdate) === false;
 
+  // ---- WATS-198 inbound contact normalization -------------------
+  //
+  // Asserts the normalizer maps Meta wire contacts to camelCase:
+  //   - field-value contacts[] (sender profile data) -> NormalizedContact
+  //     on TypedMessageUpdate (wa_id -> waId).
+  //   - contacts-type message entries -> camelCase WhatsAppContact on the
+  //     normalized message (formatted_name -> formattedName, wa_id -> waId,
+  //     country_code -> countryCode).
+  // Malformed entries are skipped without throw.
+
+  const contactsEnvelope = {
+    object: "whatsapp_business_account",
+    entry: [
+      {
+        id: "WABA-CONTACTS",
+        changes: [
+          {
+            field: "messages",
+            value: {
+              messaging_product: "whatsapp",
+              metadata: { display_phone_number: "15550001111", phone_number_id: "1234567890" },
+              contacts: [
+                { wa_id: "15551234567", profile: { name: "Ada Lovelace" } },
+                null,
+                "not-an-object"
+              ],
+              messages: [
+                {
+                  from: "15551234567",
+                  id: "wamid.FVC",
+                  timestamp: "1713697100",
+                  type: "text",
+                  text: { body: "contact normalization" }
+                },
+                {
+                  from: "15551234567",
+                  id: "wamid.CMC",
+                  timestamp: "1713697101",
+                  type: "contacts",
+                  contacts: [
+                    {
+                      name: { formatted_name: "John Doe", first_name: "John", last_name: "Doe" },
+                      phones: [{ phone: "+1234567890", type: "CELL", wa_id: "1234567890" }],
+                      addresses: [{ street: "123 Main St", country_code: "US", type: "HOME" }]
+                    },
+                    null
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  };
+  const contactsResult = normalizeWebhookEnvelope(contactsEnvelope);
+  const fvUpdate = contactsResult.updates[0] as TypedMessageUpdate;
+  const cmUpdate = contactsResult.updates[1] as TypedMessageUpdate;
+
+  // Field-value contacts: only the valid entry survives (null + primitive skipped).
+  const fvContacts = (fvUpdate as unknown as { contacts?: ReadonlyArray<Record<string, unknown>> }).contacts;
+  checks["WATS-198 field-value contacts surfaced as camelCase on message update"] =
+    Array.isArray(fvContacts) &&
+    fvContacts.length === 1 &&
+    fvContacts[0].waId === "15551234567" &&
+    (fvContacts[0].profile as Record<string, unknown> | undefined)?.name === "Ada Lovelace" &&
+    !("wa_id" in fvContacts[0]);
+
+  // Contacts-message: wire sub-fields mapped to camelCase.
+  const cmContacts = (cmUpdate.message as unknown as { contacts?: ReadonlyArray<Record<string, unknown>> }).contacts;
+  const cmContact0 = cmContacts?.[0];
+  const cmName = cmContact0?.name as Record<string, unknown> | undefined;
+  const cmPhones = cmContact0?.phones as ReadonlyArray<Record<string, unknown>> | undefined;
+  const cmAddresses = cmContact0?.addresses as ReadonlyArray<Record<string, unknown>> | undefined;
+  checks["WATS-198 contacts-message name maps to camelCase"] =
+    cmName !== undefined &&
+    cmName.formattedName === "John Doe" &&
+    cmName.firstName === "John" &&
+    cmName.lastName === "Doe" &&
+    !("formatted_name" in cmName) &&
+    !("first_name" in cmName);
+  checks["WATS-198 contacts-message phones map wa_id -> waId"] =
+    cmPhones !== undefined &&
+    cmPhones.length === 1 &&
+    cmPhones[0].phone === "+1234567890" &&
+    cmPhones[0].waId === "1234567890" &&
+    !("wa_id" in cmPhones[0]);
+  checks["WATS-198 contacts-message addresses map country_code -> countryCode"] =
+    cmAddresses !== undefined &&
+    cmAddresses.length === 1 &&
+    cmAddresses[0].street === "123 Main St" &&
+    cmAddresses[0].countryCode === "US" &&
+    !("country_code" in cmAddresses[0]);
+  checks["WATS-198 malformed contacts-message entry (null) skipped without throw"] =
+    cmContacts !== undefined && cmContacts.length === 1;
+
   // ---- F-10 TypedRouter + WhatsApp facade round-trip -----------
   //
   // Exercise the composition root: a `WhatsApp` facade wrapping a
