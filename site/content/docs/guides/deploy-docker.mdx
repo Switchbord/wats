@@ -1,19 +1,103 @@
 ---
 title: Docker Deployment Guide
-description: Container deployment shapes around the implemented wats serve contract — the shipped Railway Dockerfile, future Compose patterns, current PaaS support.
+description: The shipped Railway Dockerfile (active) and the generic Compose/registry shape (planned) for container deployment around the wats serve contract.
 ---
 
-<DocMeta status="planned" lastReviewed="2026-07-05" />
+<DocMeta status="active — Railway Dockerfile ships; generic Compose/registry shape is planned" lastReviewed="2026-07-20" />
 
-> Planned. The commands on this page do not run today; they document the
-> intended shape. The repo ships a Railway-targeted Dockerfile for Railway
-> deploys; production container publication is not supported.
+The repo ships a Railway-targeted root `Dockerfile` that wraps the
+`wats serve` contract. The Railway section below documents real, shipped
+artifacts. The generic Compose/registry shape further down is planned — those
+commands do not run today.
 
 `wats serve --config <path> --dry-run` is implemented for local Bun smoke
 checks, and
 `wats serve --config <path> --live --yes-live --env-file .env.local`
-is implemented for local live testing behind a secure HTTPS
-tunnel. The repo ships a Railway-targeted root `Dockerfile` that wraps the serve contract. There is still no supported Compose file, container image release, production hosting contract, or container-registry workflow.
+is implemented for local live testing behind a secure HTTPS tunnel.
+
+## Railway (shipped Dockerfile)
+
+Shape-only — deployed by maintainers, not a supported contract. The artifacts
+below are real and ship from the repo root, but container publication is not
+supported and the image is not exercised in CI.
+
+### What ships
+
+- `Dockerfile` (repo root) — Bun multi-stage build on `oven/bun:1.3.13`;
+  Railway auto-detects it.
+- `railway.json` (repo root) — config-as-code: Dockerfile builder +
+  `/healthz` healthcheck.
+- `deploy/railway/entrypoint.sh` — maps Railway's `$PORT` onto
+  `wats serve --host 0.0.0.0 --port $PORT`.
+- `deploy/railway/wats.config.yaml` — a `0.0.0.0:8080`-binding service profile
+  with env-secret refs.
+
+### Image build
+
+The Dockerfile is a two-stage Bun build. The builder stage installs deps and
+runs `bun run build:packages` (produces `packages/*/dist`). The runtime stage
+copies the built tree into `oven/bun:1.3.13-slim` and sets:
+
+```dockerfile
+ENV NODE_ENV=production \
+    WATS_SERVE_MODE=dry-run \
+    WATS_CONFIG=/app/deploy/railway/wats.config.yaml
+ENV PORT=8080
+EXPOSE 8080
+ENTRYPOINT ["/app/deploy/railway/entrypoint.sh"]
+```
+
+### Modes
+
+- `WATS_SERVE_MODE=dry-run` (default) — synthetic in-memory secrets, no live
+  Meta calls. Safe for verifying the deploy, healthcheck, and routing.
+- `WATS_SERVE_MODE=live` — resolves real credentials from the service env and
+  uses the fetch-backed Graph transport. The entrypoint synthesizes a temp
+  `.env.local` (umask 077, trap-cleaned) to satisfy the CLI's
+  `--live --yes-live --env-file` guard, then runs
+  `bun /app/packages/cli/dist/bin.js serve`.
+
+### Required Railway service variables (live mode)
+
+Set these in the Railway service Variables UI — never commit them:
+
+```ini
+WATS_ACCESS_TOKEN=...        # Meta WhatsApp access token
+WATS_APP_SECRET=...          # Meta app secret (webhook HMAC)
+WATS_VERIFY_TOKEN=...        # webhook verify token (you choose this)
+WATS_SERVICE_TOKEN=...       # bearer token for authenticated message routes
+WATS_WABA_ID=...             # WhatsApp Business Account id
+WATS_PHONE_NUMBER_ID=...     # phone number id
+WATS_SERVE_MODE=live
+```
+
+`PORT` is injected by Railway automatically — do not set it.
+
+### Deploy
+
+```bash
+railway init            # create/select project in your workspace
+railway up              # build + deploy from this repo (uses Dockerfile)
+railway domain          # generate the public HTTPS domain
+```
+
+Then point Meta App Dashboard > WhatsApp > Configuration at:
+
+```text
+Callback URL:  https://<your-service-domain>/webhooks/whatsapp
+Verify token:  <the WATS_VERIFY_TOKEN value you set>
+```
+
+### Local smoke test
+
+```bash
+docker build -t wats-railway .
+docker run --rm -e PORT=9090 -p 9090:9090 wats-railway
+curl http://127.0.0.1:9090/healthz     # {"ok":true,"service":"wats"}
+```
+
+Fork-friendly: delete `Dockerfile`, `railway.json`, and `deploy/railway/` to
+strip Railway support. Nothing in the SDK packages depends on these files.
 
 ## Safety defaults
 
@@ -41,10 +125,15 @@ outside WATS. WATS does not vendor the CA, bake PEM contents into images, or
 configure your infrastructure. Obtain and rotate the CA from Meta's
 authoritative channel rather than committing certificate material.
 
-## Future Dockerfile shape
+## Planned: generic Compose/registry shape
 
-A future Bun-first Dockerfile should follow this pattern once live/deploy
-packaging is authorized:
+Planned. The Dockerfile and compose file below are not shipped and the
+commands do not run today; they document the intended shape once live/deploy
+packaging is authorized.
+
+### Future Dockerfile shape
+
+A future Bun-first Dockerfile should follow this pattern:
 
 ```docker
 FROM oven/bun:1 AS deps
@@ -65,9 +154,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 CMD ["bun", "run", "wats", "serve", "--config", "/app/config/wats.config.yaml", "--profile", "prod", "--host", "0.0.0.0", "--port", "3000"]
 ```
 
-This is not a supported root Dockerfile. It is a future shape only.
-
-## Future compose.yaml shape
+### Future compose.yaml shape
 
 A future compose file should inject runtime environment values rather than
 baking secrets into the image:
@@ -105,7 +192,17 @@ services:
       - ALL
 ```
 
-This is not a supported Compose file. It is a future shape only.
+### Future smoke checks
+
+Once a real generic Dockerfile exists, the credential-free verification is:
+
+```sh
+docker build -t wats:local .
+docker run --rm -p 127.0.0.1:3000:3000 wats:local
+curl -fsS http://127.0.0.1:3000/healthz
+curl -fsS http://127.0.0.1:3000/readyz
+curl -fsS http://127.0.0.1:3000/openapi.json
+```
 
 ## Managed PaaS platforms (`--paas`)
 
@@ -171,20 +268,6 @@ Postgres once the adapter and service integration exist.
 Future container artifacts should run as a non-root user, bind a high port,
 avoid privileged mode, and avoid Docker socket mounts. The app source should
 be read-only where practical.
-
-## Future smoke checks
-
-Once a real Dockerfile exists, the credential-free verification is:
-
-```sh
-docker build -t wats:local .
-docker run --rm -p 127.0.0.1:3000:3000 wats:local
-curl -fsS http://127.0.0.1:3000/healthz
-curl -fsS http://127.0.0.1:3000/readyz
-curl -fsS http://127.0.0.1:3000/openapi.json
-```
-
-These are future commands only; Docker is not required in CI.
 
 ## Related
 
