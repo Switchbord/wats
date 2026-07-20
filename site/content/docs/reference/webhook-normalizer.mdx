@@ -287,7 +287,7 @@ The normalizer does NOT:
 - Register handlers — that's the [router](/docs/reference/router).
 - Provide Graph API calls — no `@wats/graph` coupling.
 - Persist dedup state — caller's responsibility.
-- Modify the legacy `parseWebhookUpdate` — the normalizer is an independent producer above it.
+- Modify raw envelope shape — the normalizer is a read-only producer above the parsed body; it never mutates its input.
 - Verify webhook signatures — that is `@wats/http`'s job.
 - Talk to live Meta endpoints or require credentials.
 
