@@ -1,6 +1,7 @@
 # WATS
 
 [![CI](https://github.com/Switchbord/wats/actions/workflows/ci.yml/badge.svg)](https://github.com/Switchbord/wats/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/@wats/core)](https://www.npmjs.com/package/@wats/core)
 
 WATS is a TypeScript toolkit for the WhatsApp Cloud API: typed Graph calls,
 webhook ingestion, routing, and a standalone service. Bun-first, runs on Node,
@@ -40,8 +41,11 @@ local workflow all work.
 ## Install
 
 ```bash
-bun add @wats/core @wats/graph @wats/http
-bun add @wats/config @wats/service
+# Client packages — most apps need only these two
+bun add @wats/core @wats/graph
+
+# Standalone webhook/API service (optional)
+bun add @wats/service
 ```
 
 The `@wats/*` packages are standard npm packages; `npm i` works too. No
@@ -93,7 +97,7 @@ breaking changes.
 | `@wats/config` | YAML/JSON config validation and env-secret references |
 | `@wats/cli` | local operator tooling |
 | `@wats/service` | runtime-neutral webhook/API service foundation |
-| `@wats/persistence` | experimental persistence contracts + SQLite adapter |
+| `@wats/persistence` | experimental persistence contracts + SQLite and Postgres adapters |
 | `@wats/internal-utils` | published internal support package |
 
 Dependency direction is deliberate: low-level packages stay portable,

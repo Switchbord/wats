@@ -438,9 +438,9 @@ try {
 }
 ```
 
-The sibling-NOT language matters: an `instanceof UnsupportedMessageTypeError` on a 131051 response is NOT also an `instanceof InvalidParameterError` and NOT an `instanceof GraphAuthError` — the taxonomy is axis-exclusive. The sub-client test suites pin this for at least two error pairs each.
+The axis-exclusive language matters: an `instanceof UnsupportedMessageTypeError` on a 131051 response is not also an `instanceof InvalidParameterError` and not an `instanceof GraphAuthError` — the taxonomy is axis-exclusive. The sub-client test suites pin this for at least two error pairs each.
 
-## What the sub-clients deliberately do NOT do
+## What the sub-clients deliberately do not do
 
 - No separate `TemplateClient`, `MediaClient`, or `FlowClient`; WABA-scoped template and Flow operations live on `WABAClient` plus direct callables.
 - No OAuth token refresh or lifecycle management.

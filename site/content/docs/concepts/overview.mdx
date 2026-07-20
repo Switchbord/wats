@@ -32,7 +32,7 @@ WATS is a Bun-first TypeScript toolkit for WhatsApp operations. It is built as s
 @wats/cli     init, validate, doctor, serve, openapi commands
 ```
 
-App-layer packages may depend on `@wats/core`; lower-level packages must not. The dependency arrows only point down — `@wats/core` never imports `@wats/http`. (`@wats/http` is an application-edge package, NOT a peer of `@wats/graph`: it sits above `@wats/core` and uses `normalizeWebhookEnvelope` from it.)
+App-layer packages may depend on `@wats/core`; lower-level packages must not. The dependency arrows only point down — `@wats/core` never imports `@wats/http`. `@wats/http` is an application-edge package that sits above `@wats/core` (see the [package map](/docs/concepts/package-map) for the full dependency graph).
 
 ## Request flow
 

@@ -28,7 +28,7 @@
       },
     },
     "examples/webhook-echo-bot": {
-      "name": "wats-example-webhook-echo-bot",
+      "name": "@wats/example-webhook-echo-bot",
       "dependencies": {
         "@wats/core": "workspace:*",
         "@wats/graph": "workspace:*",
@@ -36,7 +36,7 @@
     },
     "packages/cli": {
       "name": "@wats/cli",
-      "version": "0.3.28",
+      "version": "0.3.30",
       "bin": {
         "wats": "dist/bin.js",
       },
@@ -47,32 +47,32 @@
     },
     "packages/config": {
       "name": "@wats/config",
-      "version": "0.3.28",
+      "version": "0.3.30",
       "dependencies": {
         "@wats/internal-utils": "^0.3.26",
       },
     },
     "packages/core": {
       "name": "@wats/core",
-      "version": "0.3.28",
+      "version": "0.3.30",
       "dependencies": {
-        "@wats/graph": "^0.3.28",
+        "@wats/graph": "^0.3.30",
       },
     },
     "packages/crypto": {
       "name": "@wats/crypto",
-      "version": "0.3.28",
+      "version": "0.3.30",
     },
     "packages/graph": {
       "name": "@wats/graph",
-      "version": "0.3.28",
+      "version": "0.3.30",
       "dependencies": {
-        "@wats/crypto": "^0.3.28",
+        "@wats/crypto": "^0.3.30",
       },
     },
     "packages/http": {
       "name": "@wats/http",
-      "version": "0.3.28",
+      "version": "0.3.30",
       "dependencies": {
         "@wats/core": "^0.3.26",
         "@wats/crypto": "^0.3.26",
@@ -81,11 +81,11 @@
     },
     "packages/internal-utils": {
       "name": "@wats/internal-utils",
-      "version": "0.3.28",
+      "version": "0.3.30",
     },
     "packages/persistence": {
       "name": "@wats/persistence",
-      "version": "0.3.28",
+      "version": "0.3.30",
       "peerDependencies": {
         "pg": "^8.11.0",
       },
@@ -95,7 +95,7 @@
     },
     "packages/service": {
       "name": "@wats/service",
-      "version": "0.3.28",
+      "version": "0.3.30",
       "dependencies": {
         "@wats/config": "^0.3.26",
         "@wats/core": "^0.3.26",
@@ -107,7 +107,7 @@
     },
     "packages/testing": {
       "name": "@wats/testing",
-      "version": "0.2.0",
+      "version": "0.3.30",
       "dependencies": {
         "@wats/crypto": "workspace:*",
         "@wats/graph": "workspace:*",
@@ -193,7 +193,7 @@
     },
     "packages/types": {
       "name": "@wats/types",
-      "version": "0.3.28",
+      "version": "0.3.30",
     },
     "site": {
       "name": "@wats/site",
@@ -784,6 +784,8 @@
     "@wats/example-groups": ["@wats/example-groups@workspace:examples/groups"],
 
     "@wats/example-minimal-bot": ["@wats/example-minimal-bot@workspace:examples/minimal-bot"],
+
+    "@wats/example-webhook-echo-bot": ["@wats/example-webhook-echo-bot@workspace:examples/webhook-echo-bot"],
 
     "@wats/graph": ["@wats/graph@workspace:packages/graph"],
 
@@ -1460,8 +1462,6 @@
     "vue-sonner": ["vue-sonner@1.3.2", "", {}, "sha512-UbZ48E9VIya3ToiRHAZUbodKute/z/M1iT8/3fU8zEbwBRE11AKuHikssv18LMk2gTTr6eMQT4qf6JoLHWuj/A=="],
 
     "w3c-keyname": ["w3c-keyname@2.2.8", "", {}, "sha512-dpojBhNsCNN7T82Tm7k26A6G9ML3NkhDsnw9n/eoxSRlVBB4CEtIQ/KTCLI2Fwf3ataSXRhYFkQi3SlnFwPvPQ=="],
-
-    "wats-example-webhook-echo-bot": ["wats-example-webhook-echo-bot@workspace:examples/webhook-echo-bot"],
 
     "web-namespaces": ["web-namespaces@2.0.1", "", {}, "sha512-bKr1DkiNa2krS7qxNtdrtHAmzuYGFQLiQ13TsorsdT6ULTkPLKuu5+GsFpDlg6JFjUTwX2DyhMPG2be8uPrqsQ=="],
 

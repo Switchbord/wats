@@ -44,8 +44,8 @@ await sent.waitUntilRead({ timeoutMs: 5 * 60_000 });
 
 `status.sent()`, `status.delivered()`, `status.read()`, and `status.failed()`
 are the four statuses you usually branch on. Failed updates carry an
-`errors` array from Meta; inspect it before retrying, because Meta retries
-the webhook until you acknowledge it.
+`errors` array from Meta; inspect it before retrying. Meta retries the webhook
+until you acknowledge it.
 
 ## Related
 
