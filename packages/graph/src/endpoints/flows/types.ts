@@ -112,8 +112,8 @@ export interface GetFlowAssetsInput {
  * Canonical Flow metric names mirrored from pywa's `FlowMetricName` enum.
  * Unknown values are preserved as raw strings (see {@link FlowMetric.name}).
  *
- * Reference: REFERENCE-154.md §1. The Metrics API is documented as
- * deprecated 2026-04-30; whether a replacement exists is UNVERIFIED.
+ * Reference: Meta Flow Metrics API docs. The Metrics API is documented as
+ * deprecated 2026-04-30; whether a replacement exists is unverified.
  */
 export const KNOWN_FLOW_METRIC_NAMES = [
   "ENDPOINT_REQUEST_COUNT",

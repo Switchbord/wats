@@ -7438,20 +7438,41 @@ Other fields: `id`, `recipientId`, `timestamp`, optional `conversation?`, `prici
 
 ## WhatsAppContact
 
-Closed shape (no `[key: string]: unknown`). Optional fields:
+Closed shape (no `[key: string]: unknown`), camelCase-only. The Meta wire
+payload uses snake_case sub-fields (`wa_id`, `first_name`, `formatted_name`,
+`country_code`, ...); the `@wats/core` webhook normalizer owns the
+snake→camel mapping for inbound contacts. The original wire record is
+preserved on the normalizer output via `raw` and is reachable on the raw
+envelope via `rawChange`. Optional fields:
 
-- `wa_id?` (snake_case retained for compatibility; see note below)
+- `waId?`
 - `profile?: { name? }`
-- `name?: WhatsAppContactName` (carries both snake_case wire fields such as `first_name` / `formatted` and camelCase mirrors `firstName` / `formattedName` for forward compatibility)
-- `phones?: ContactPhone[]`
-- `emails?: ContactEmail[]`
-- `addresses?: ContactAddress[]`
-- `org?: ContactOrg`
-- `urls?: ContactUrl[]`
+- `name?: WhatsAppContactName` (`formattedName`, `firstName`, `lastName`, `middleName`, `suffix`, `prefix`)
+- `phones?: ContactPhone[]` (`phone`, `type`, `waId`)
+- `emails?: ContactEmail[]` (`email`, `type`)
+- `addresses?: ContactAddress[]` (`street`, `city`, `state`, `zip`, `country`, `countryCode`, `type`)
+- `org?: ContactOrg` (`company`, `department`, `title`)
+- `urls?: ContactUrl[]` (`url`, `type`)
 - `birthday?: string`
 - `raw?: unknown`
 
-The snake_case sub-fields (`first_name`, `formatted`, `country_code`, ...) are slated to migrate to camelCase-only as the typed update normalizer extends coverage. Until then both casings are accepted.
+### Inbound contact normalization
+
+The normalizer (`normalizeWebhookEnvelope`) maps two inbound contact
+surfaces to camelCase:
+
+1. **Field-value contacts[]** — sender profile data accompanying inbound
+   messages (`value.contacts[]`). Mapped from Meta wire `{ wa_id, profile:
+   { name } }` to `NormalizedContact` (`waId`, `profile.name`, `raw`) and
+   surfaced on each `TypedMessageUpdate.contacts`. Malformed entries (null,
+   primitive, array, garbage records with no `waId` or valid `profile`) are
+   skipped without throwing.
+2. **Contacts-message entries** — a contact card sent by a user
+   (`messages[].contacts[]` when `type: "contacts"`). Wire sub-fields are
+   mapped to camelCase on the normalized message payload: `formatted_name` →
+   `formattedName`, `first_name` → `firstName`, `wa_id` → `waId` on phones,
+   `country_code` → `countryCode` on addresses, etc. Malformed entries are
+   skipped; the original wire is preserved via `raw` on each contact.
 
 ## WhatsAppWebhookValue (discriminated union)
 

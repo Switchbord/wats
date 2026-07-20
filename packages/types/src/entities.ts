@@ -11,15 +11,16 @@
 //     now a discriminated union keyed by `type`.
 //   - WhatsAppContact: was open on `[key: string]: unknown`; now closed
 //     with explicit sub-shapes. Additional unmapped wire fields ride
-//     through `raw`.
+//     through `raw`. F-8 made the sub-shapes camelCase-only; the
+//     @wats/core normalizer owns the snake→camel mapping for inbound
+//     contacts.
 //   - WhatsAppMessageStatus: `status` was `string`; now the closed
 //     union `WhatsAppMessageStatusKind`.
 //
 // Preserved (so existing callers still compile):
 //   - WhatsAppMessageText structural alias.
 //   - WhatsAppMessageContext legacy context shape.
-//   - WhatsAppContactName legacy name shape (now with snake_case wire
-//     field mirrors; see contacts.ts TODO(F-8)).
+//   - WhatsAppContactName camelCase-only name shape.
 //   - WhatsAppErrorPayload loose payload shape.
 
 export type { WhatsAppMessage } from "./messages/union.js";

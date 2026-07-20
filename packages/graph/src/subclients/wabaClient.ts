@@ -577,7 +577,7 @@ export class WABAClient {
    * into the bound destination WABA. Mirrors pywa's
    * `WhatsApp.migrate_templates`. The bound wabaId is used as the
    * destination and wins over any caller-supplied `destinationWabaId`
-   * (mirrors `migrateFlows`). See REFERENCE-160 / handoff.
+   * (mirrors `migrateFlows`).
    */
   async migrateTemplates(
     params: Omit<MigrateTemplatesInput, "destinationWabaId">,
@@ -791,7 +791,7 @@ export class WABAClient {
    * Graph `GET /{flowId}?fields=metric.name(...).granularity(...)...`
    * (WATS-154). Flow-id scoped edge that returns Flow metrics; the bound
    * wabaId is not used because the path is flow-id scoped (mirrors
-   * getFlow / getFlowAssets). See REFERENCE-154.md §1.
+   * getFlow / getFlowAssets).
    */
   async getFlowMetrics(
     params: GetFlowMetricsInput,
@@ -810,7 +810,7 @@ export class WABAClient {
    * Graph `POST /{wabaId}/migrate_flows?source_waba_id=...&source_flow_names=...`
    * (WATS-154). Copies (not moves) Flows from a source WABA into the bound
    * destination WABA. Mirrors pywa's `WhatsApp.migrate_flows`. The bound
-   * wabaId is used as the destination; see REFERENCE-154.md §2.
+   * wabaId is used as the destination.
    */
   async migrateFlows(
     params: Omit<MigrateFlowsInput, "destinationWabaId">,
