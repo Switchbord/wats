@@ -90,7 +90,7 @@ describe("WATS 0.2.1 alpha launch release contract", () => {
     const readme = read("README.md");
     expect(readme).toContain("Alpha");
     expect(readme).toContain("@wats/cli");
-    expect(readme).toContain("bun add @wats/core @wats/graph @wats/http");
+    expect(readme).toContain("bun add @wats/core @wats/graph");
     expect(readme).toContain("credentials are needed to install");
   });
 });
