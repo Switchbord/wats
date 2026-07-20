@@ -33,6 +33,10 @@
       "regex": "\\b(?:F-\\d{1,2}|B[12]|C[12]|D1)\\b(?=[^a-z]|$)"
     },
     {
+      "name": "phase label (T-nn)",
+      "regex": "\\bT\\d{1,2}\\b(?=[^a-z]|$)"
+    },
+    {
       "name": "architecture ticket (Arch-X)",
       "regex": "\\bArch-[A-Z]\\b"
     },

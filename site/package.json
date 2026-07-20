@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit",
     "gen:meta": "bun scripts/gen-meta.ts",
     "gen:sitemap": "bun scripts/gen-sitemap.ts",
-    "check": "bun run gen:source && bun run typecheck && bun run typecheck:snippets && bun run typecheck:scenarios && bun run gen:hero && bun run gen:depgraph && bun run gen:sitemap && bun run gen:llms && bun run gen:playground-assets && bun run build && bun scripts/check-canaries.ts && bun scripts/check-pages.ts && bun scripts/check-banned-phrases.ts && bun run check:playground",
+    "check": "bun run gen:source && bun run typecheck && bun run typecheck:snippets && bun run typecheck:scenarios && bun run gen:hero && bun run gen:depgraph && bun run gen:sitemap && bun run gen:llms && bun run gen:playground-assets && bun run build && bun scripts/check-canaries.ts && bun scripts/check-pages.ts && bun scripts/check-banned-phrases.ts && bun scripts/check-banned-phrases-markdown.ts && bun run check:playground",
     "typecheck:snippets": "cd snippets && bun install --frozen-lockfile && bun run typecheck",
     "typecheck:scenarios": "cd playground-build && bun install --frozen-lockfile && cd ../src/playground/scenarios && bunx tsc --noEmit -p tsconfig.json",
     "check:playground": "bun scripts/check-playground.ts",

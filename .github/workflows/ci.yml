@@ -45,6 +45,9 @@ jobs:
       - name: Typecheck full source tree (all packages, Bun runtime types)
         run: bun run typecheck:full
 
+      - name: Banned-phrase markdown gate
+        run: bun site/scripts/check-banned-phrases-markdown.ts
+
       - name: Check publishability guard
         run: bun run check-publish
 
