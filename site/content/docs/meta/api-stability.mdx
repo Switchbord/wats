@@ -3,9 +3,19 @@ title: API Stability Policy
 description: How to read stable-for-0.x, experimental, and internal WATS surfaces during the alpha line.
 ---
 
-<DocMeta status="active" appliesTo="WATS 0.x alpha package line" lastReviewed="2026-05-24" />
+<DocMeta appliesTo="WATS 0.x alpha package line" lastReviewed="2026-07-20" />
 
 WATS public APIs carry one of three labels during the 0.x alpha line: stable-for-0.x, experimental, or internal. Pick your coupling accordingly.
+
+## Page honesty tags (DocMeta `status`)
+
+The `status` attribute on a page's `<DocMeta>` tag carries a **capability honesty tag**, not a stability or maintenance label. Stability lives in the stable-for-0.x / experimental / internal taxonomy below. The closed set for `status` is:
+
+- `live-validated` — the page's capability claims are exercised against live Meta Graph/webhook traffic (per the [parity matrix](/docs/parity)).
+- `shape-only` — implemented and validated locally (MockTransport, synthetic webhooks, consumer fixtures); Meta has not seen it. Optionally suffixed ` — <short reason>` to state what is or is not live-validated.
+- `planned` — not built yet.
+
+Each tag is optionally suffixed ` — <short reason>`. Pages that make no capability claim can omit `status`. Old values (`active`, `canonical`, `stable`, `experimental`, `internal`, `implemented credential-free; live validation pending`, `active — <reason>`) are retired: stability meaning moved into the taxonomy below, and capability meaning mapped to the honesty tag that fits the page's content.
 
 ## Stable-for-0.x surfaces
 

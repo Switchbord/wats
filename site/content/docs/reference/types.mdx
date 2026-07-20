@@ -3,7 +3,7 @@ title: "Types Reference"
 description: "Shared TypeScript contracts: discriminated-union domain types for inbound WhatsApp objects."
 ---
 
-<DocMeta status="active" lastReviewed="2026-04-21" />
+<DocMeta status="shape-only — shared domain types; locally tested" lastReviewed="2026-04-21" />
 
 `@wats/types` ships discriminated-union shapes for every inbound WhatsApp domain object the types package exposes. Narrow via `switch` on the `type` discriminator; exhaustive switches with a `never` default branch catch any future variant added to the union.
 
