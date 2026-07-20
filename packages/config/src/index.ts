@@ -1,4 +1,4 @@
-import { isRecord } from "@wats/internal-utils";
+import { isRecord, containsUnsafePathSegment } from "@wats/internal-utils";
 
 export const WATS_CONFIG_VERSION = 1 as const;
 export const DEFAULT_WEBHOOK_MAX_BODY_BYTES = 1_048_576 as const;
@@ -163,19 +163,6 @@ function validateBaseUrl(value: unknown, path: string): string {
     fail("invalid_base_url", path, "graph.baseUrl must not contain CR, LF, or NUL");
   }
   return raw;
-}
-
-function containsUnsafePathSegment(path: string): boolean {
-  const lower = path.toLowerCase();
-  return (
-    path.includes("\\") ||
-    path.includes("?") ||
-    path.includes("#") ||
-    /[\u0000-\u001f\u007f]/u.test(path) ||
-    path.split("/").some((segment) => segment === "..") ||
-    lower.includes("%2e%2e") ||
-    lower.includes("%252e%252e")
-  );
 }
 
 function validateAbsolutePath(value: unknown, code: ConfigErrorCode, path: string, label: string): string {

@@ -24,6 +24,7 @@ import {
   type WebhookEventRecordInput,
   type WebhookEventRecordResult
 } from "./index";
+import { containsUnsafePathSegment } from "@wats/internal-utils";
 
 interface BunSqliteRunResult {
   readonly changes?: number;
@@ -156,23 +157,6 @@ function hasControlChars(value: string): boolean {
     const code = char.codePointAt(0) ?? 0;
     return code < 0x20 || code === 0x7f;
   });
-}
-
-function containsUnsafePathSegment(value: string): boolean {
-  const lower = value.toLowerCase();
-  return (
-    value.includes("\\") ||
-    value.includes("?") ||
-    value.includes("#") ||
-    value.includes(":") ||
-    value.split("/").some((segment) => segment === ".." || segment === ".") ||
-    lower.includes("%2e%2e") ||
-    lower.includes("%252e%252e") ||
-    lower.includes("%2f") ||
-    lower.includes("%252f") ||
-    lower.includes("%5c") ||
-    lower.includes("%255c")
-  );
 }
 
 function looksTokenLike(value: string): boolean {

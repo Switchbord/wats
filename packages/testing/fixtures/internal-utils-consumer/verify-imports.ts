@@ -9,7 +9,7 @@
 // A failure inside verify() must throw; the runner treats a non-zero
 // exit code as a fixture failure.
 
-import { isRecord } from "@wats/internal-utils";
+import { isRecord, containsUnsafePathSegment } from "@wats/internal-utils";
 
 interface VerifyReportOk {
   readonly ok: true;
@@ -25,7 +25,18 @@ function verify(): VerifyReportOk {
     "isRecord([]) === false": isRecord([]) === false,
     "isRecord(Object.create(null)) === true": isRecord(Object.create(null) as unknown) === true,
     "isRecord(new Date()) === false": isRecord(new Date()) === false,
-    "isRecord('s') === false": isRecord("s") === false
+    "isRecord('s') === false": isRecord("s") === false,
+    "containsUnsafePathSegment is a function": typeof containsUnsafePathSegment === "function",
+    "containsUnsafePathSegment('..') === true": containsUnsafePathSegment("..") === true,
+    "containsUnsafePathSegment('%2e%2e') === true": containsUnsafePathSegment("%2e%2e") === true,
+    "containsUnsafePathSegment('\\\\') === true": containsUnsafePathSegment("\\") === true,
+    "containsUnsafePathSegment(':') === true": containsUnsafePathSegment(":") === true,
+    "containsUnsafePathSegment('%2f') === true": containsUnsafePathSegment("%2f") === true,
+    "containsUnsafePathSegment('%5c') === true": containsUnsafePathSegment("%5c") === true,
+    "containsUnsafePathSegment('') === true": containsUnsafePathSegment("") === true,
+    "containsUnsafePathSegment(42) === true": containsUnsafePathSegment(42) === true,
+    "containsUnsafePathSegment('wats.sqlite') === false": containsUnsafePathSegment("wats.sqlite") === false,
+    "containsUnsafePathSegment('/var/lib/wats') === false": containsUnsafePathSegment("/var/lib/wats") === false
   };
 
   for (const [label, ok] of Object.entries(checks)) {

@@ -43,6 +43,7 @@
     "@wats/crypto": "^0.3.30",
     "@wats/graph": "^0.3.30",
     "@wats/http": "^0.3.30",
+    "@wats/internal-utils": "^0.3.30",
     "@wats/persistence": "^0.3.30"
   }
 }

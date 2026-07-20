@@ -1,3 +1,5 @@
+import { isRecord } from "@wats/internal-utils";
+
 export interface GraphApiErrorPayload {
   message?: string;
   type?: string;
@@ -170,10 +172,6 @@ export class GraphSerializationError extends GraphApiError {
     this.name = "GraphSerializationError";
     this.cause = cause;
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }
 
 export function isGraphApiErrorPayload(value: unknown): value is GraphApiErrorPayload {

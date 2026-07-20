@@ -68,6 +68,7 @@
       "version": "0.3.30",
       "dependencies": {
         "@wats/crypto": "^0.3.30",
+        "@wats/internal-utils": "^0.3.30",
       },
     },
     "packages/http": {
@@ -86,6 +87,9 @@
     "packages/persistence": {
       "name": "@wats/persistence",
       "version": "0.3.30",
+      "dependencies": {
+        "@wats/internal-utils": "^0.3.30",
+      },
       "peerDependencies": {
         "pg": "^8.11.0",
       },
@@ -102,6 +106,7 @@
         "@wats/crypto": "^0.3.30",
         "@wats/graph": "^0.3.30",
         "@wats/http": "^0.3.30",
+        "@wats/internal-utils": "^0.3.30",
         "@wats/persistence": "^0.3.30",
       },
     },

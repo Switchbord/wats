@@ -17,7 +17,6 @@ import { isRecord, containsUnsafePathSegment } from "@wats/internal-utils";
 import {
   validateConfig,
   ConfigValidationError,
-  type WatsConfig,
   type WatsProfileConfig
 } from "@wats/config";
 import {
@@ -55,15 +54,6 @@ function validProfile(overrides: Partial<WatsProfileConfig> = {}): WatsProfileCo
   };
 }
 
-function validConfig(overrides: Partial<WatsConfig> = {}): WatsConfig {
-  return {
-    version: 1,
-    defaultProfile: "local",
-    profiles: { local: validProfile() },
-    ...overrides
-  };
-}
-
 // ---------------------------------------------------------------------------
 // Part A: @wats/internal-utils export surface
 // ---------------------------------------------------------------------------
@@ -73,7 +63,7 @@ describe("WATS-196 @wats/internal-utils containsUnsafePathSegment", () => {
     expect(typeof containsUnsafePathSegment).toBe("function");
   });
 
-  const rejected: Array<[label, unknown]> = [
+  const rejected: Array<[string, unknown]> = [
     ["double-dot segment ..", "safe/../wats"],
     ["single-dot segment .", "safe/./wats"],
     ["percent-encoded .. %2e%2e", "safe%2e%2ewats"],
@@ -105,7 +95,7 @@ describe("WATS-196 @wats/internal-utils containsUnsafePathSegment", () => {
     });
   }
 
-  const accepted: Array<[label, string]> = [
+  const accepted: Array<[string, string]> = [
     ["simple filename", "wats.sqlite"],
     ["hyphenated name", "wats-data.sqlite"],
     ["name with dots", "wats.data.sqlite"],
@@ -226,15 +216,31 @@ describe("WATS-196 @wats/config path validation (uniform matrix)", () => {
   for (const fragment of UNSAFE_PATH_FRAGMENTS) {
     const webhookPath = `/webhook/${fragment}`;
     test(`rejects webhook.path with unsafe fragment: ${JSON.stringify(fragment)}`, () => {
-      const config = validConfig();
-      (config.profiles!.local as WatsProfileConfig).webhook.path = webhookPath;
+      const config: unknown = {
+        version: 1,
+        defaultProfile: "local",
+        profiles: {
+          local: {
+            ...validProfile(),
+            webhook: { ...validProfile().webhook, path: webhookPath }
+          }
+        }
+      };
       expect(() => validateConfig(config)).toThrow(ConfigValidationError);
     });
 
     const apiPrefix = `/api/${fragment}`;
     test(`rejects service.apiPrefix with unsafe fragment: ${JSON.stringify(fragment)}`, () => {
-      const config = validConfig();
-      (config.profiles!.local as WatsProfileConfig).service.apiPrefix = apiPrefix;
+      const config: unknown = {
+        version: 1,
+        defaultProfile: "local",
+        profiles: {
+          local: {
+            ...validProfile(),
+            service: { ...validProfile().service, apiPrefix }
+          }
+        }
+      };
       expect(() => validateConfig(config)).toThrow(ConfigValidationError);
     });
   }
