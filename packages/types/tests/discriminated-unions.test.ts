@@ -224,9 +224,9 @@ describe("F-1 discriminated union contracts", () => {
     // rather than a type error. We verify closure via the type-level check
     // above and a runtime sanity on declared fields here.
     const contact: WhatsAppContact = {
-      name: { formatted: "Jane Q Public" }
+      name: { formattedName: "Jane Q Public" }
     };
-    expect(contact.name?.formatted).toBe("Jane Q Public");
+    expect(contact.name?.formattedName).toBe("Jane Q Public");
   });
 
   test("ImageMessage narrows MediaReference with id/mimeType", () => {
