@@ -3,7 +3,7 @@ title: WATS Public API Surface
 description: The public package surfaces that ship today versus planned parity work.
 ---
 
-<DocMeta status="active" appliesTo="0.3.x-alpha-tooling" lastReviewed="2026-05-02" />
+<DocMeta appliesTo="0.3.x-alpha-tooling" lastReviewed="2026-07-20" />
 
 For full signatures and behavior, see the [reference](/docs/reference).
 
@@ -60,6 +60,8 @@ Primary exports:
 - public endpoint subpaths: `@wats/graph/endpoints/messages`, `@wats/graph/endpoints/media`, `@wats/graph/endpoints/templates`, `@wats/graph/endpoints/flows`, `@wats/graph/endpoints/calling`, `@wats/graph/endpoints/business-management`, and `@wats/graph/endpoints/groups`. `bun run api:check` keeps package exports, fixture imports, docs, and changelog mentions aligned
 - Node/Bun-only filesystem media helpers: `@wats/graph/node-media` exports path-based `uploadAndSend*FromPath` helpers. This subpath is deliberately separate from the root entrypoint so browser/edge users never pull `node:fs` transitively.
 - `paginate` / `paginateAll`
+- reliable transport: `createReliableTransport` wraps a `Transport` with jittered backoff, `Retry-After` handling, and opt-in POST retry (`retryPosts`: `"never"` default, `"network-only"`, `"always"`; network-only requires an `Idempotency-Key` so a processed send is never duplicated)
+- rate limiter: `createTokenBucketRateLimiter` and a `rateLimiter` option on the reliable transport (token acquired before every attempt; client-side smoothing, shape-only)
 - Graph error classes and error registry helpers
 - media runtime: `uploadMedia`, `downloadMedia`, `downloadMediaBytes`, `deleteMedia`, `decryptEncryptedMedia`, upload-session helpers, `MediaValidationError`, `MediaCryptoError`, `MediaIntegrityError`, and finite media cap constants
 
@@ -168,21 +170,30 @@ Primary exports:
 - `WatsServiceOpenApiOptions`
 - `WatsServiceOpenApiDocument`
 - `WatsServiceError`
+- `MetricsRegistry` and `createMetricsRegistry` (Prometheus/OpenMetrics-compatible counters, histograms, and gauges with taxonomy-allowlisted names and enum-clamped label values)
+- `createOutboxMetricsReporter` (wires `outbox_depth` and `outbox_processed_total` from `OutboxWorkerTickReport` into a `MetricsRegistry`)
+- `OTEL_ATTR` (attribute-key constants for the OpenTelemetry-compatible sink seam)
+- `TelemetrySink` (interface), `CapturingTelemetrySink`, and `NOOP_TELEMETRY_SINK` (opt-in event sink; `@wats/service` does not depend on `@opentelemetry/*`)
+- `ErrorLedger` (bounded in-memory error-class ledger backing `/debug/diagnostics`)
 
 Current routes:
 
 - `GET /healthz`
 - `GET /readyz`
 - `GET /openapi.json`
+- `GET /status` (redacted operator status snapshot; existence-hiding 404 on missing/mismatched bearer token)
+- `GET /metrics` (Prometheus/OpenMetrics exposition; existence-hiding 404)
+- `GET /debug/diagnostics` (bounded support snapshot; existence-hiding 404)
 - `GET profile.webhook.path`
 - `POST profile.webhook.path`
 - `POST {profile.service.apiPrefix}/messages/text`
 - `POST {profile.service.apiPrefix}/messages`
 - `GET {profile.service.apiPrefix}/messages`
 - `GET {profile.service.apiPrefix}/messages/{messageId}`
+- `GET {profile.service.apiPrefix}/conversations/{phone}/window` (24-hour conversation-window state; 503 without persistence; `+` prefix normalized to Meta's bare-digit storage)
 - opt-in Groups routes when `enableGroupRoutes` is true
 
-Status: experimental service foundation. It composes config profile shape, explicit resolved secrets, Graph client, WebhookAdapter, WhatsApp facade, optional PersistenceStore injection, optional `enableGroupRoutes`, and a generated OpenAPI 3.1 document for the routes above. The CLI dry-run and local live wrappers can serve it locally; production hosting hardening and background outbox workers are later work.
+Status: experimental service foundation. It composes config profile shape, explicit resolved secrets, Graph client, WebhookAdapter, WhatsApp facade, optional PersistenceStore injection, optional `enableGroupRoutes`, optional `MetricsRegistry` / `telemetrySink` injection, and a generated OpenAPI 3.1 document for the routes above. The CLI dry-run and local live wrappers can serve it locally; production hosting hardening is later work.
 
 ### `@wats/persistence`
 
@@ -197,8 +208,11 @@ Primary exports:
 - `CURRENT_SCHEMA_VERSION`
 - outbox record APIs on `PersistenceStore`
 - `runOutboxWorkerOnce`
+- `startOutboxWorker` (timer-driven loop with injectable scheduling, overlap-skipping ticks, error-isolated callbacks, and a `stop()` that cancels the timer and awaits any in-flight run)
+- conversation-window helpers: `getConversationWindowState` and `canSendFreeForm` (24-hour free-form vs template gate from projected inbound messages; closed by default when no inbound history exists)
 - `createSqlitePersistence` from `@wats/persistence/sqlite`
 - `createPostgresPersistence` from `@wats/persistence/postgres` (shape-only, mock-client tested)
+- `createPostgresPersistenceWithClient` from `@wats/persistence/postgres` (inject a pre-built `pg` client; shape-only, mock-client tested)
 
 Status: experimental local persistence foundation. SQLite migrations, schema metadata, migration locks, webhook-event/request-idempotency/outbox tables, outbox record APIs, a one-tick at-least-once worker helper, redacted health diagnostics, and optional `@wats/service` injection exist. The Postgres adapter ships at `@wats/persistence/postgres` as shape-only, mock-client tested; it is not live-validated against a running Postgres service in default CI. Read-only local message projection is reachable through `wats messages list/show`; deeper conversation/thread navigation, status UI wiring, automatic service send enqueueing, and production hosting are later work.
 
