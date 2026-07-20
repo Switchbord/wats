@@ -8,3 +8,8 @@ description: "Internal shared helpers. Not a public API."
 `@wats/internal-utils` holds shared runtime-pure helpers for WATS workspace packages. It is published only so public packages like `@wats/config` install cleanly from the registry.
 
 It carries no stability guarantee. Do not depend on it from application code — anything useful gets re-exported through a public package's `exports` map instead.
+
+Exports:
+
+- **`isRecord(value: unknown): value is Record<string, unknown>`** — rigorous plain-object type guard. Returns `true` only for plain objects (prototype is `null` or `Object.prototype`). Rejects arrays, `Date`, class instances, `Map`, `Set`, `RegExp`, `Promise`, typed arrays, `ArrayBuffer`, and functions.
+- **`containsUnsafePathSegment(value: unknown): boolean`** — path-segment safety guard. Returns `true` when the input contains path-traversal (`..`, `.`), encoded traversal variants (`%2e%2e`, `%252e%252e`), separators (`\`, `?`, `#`, `:`), encoded slash/backslash variants (`%2f`, `%252f`, `%5c`, `%255c`), or control characters (CR, LF, NUL, `< 0x20`, `0x7F`). Returns `true` for non-string and empty-string inputs.

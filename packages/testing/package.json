@@ -6,9 +6,11 @@
   "type": "module",
   "dependencies": {
     "@wats/internal-utils": "workspace:*",
+    "@wats/config": "workspace:*",
     "@wats/crypto": "workspace:*",
     "@wats/http": "workspace:*",
     "@wats/graph": "workspace:*",
+    "@wats/persistence": "workspace:*",
     "@wats/service": "workspace:*"
   },
   "homepage": "https://wats.sh"

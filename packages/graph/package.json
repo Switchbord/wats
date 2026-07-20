@@ -86,6 +86,7 @@
     "wats"
   ],
   "dependencies": {
-    "@wats/crypto": "^0.3.30"
+    "@wats/crypto": "^0.3.30",
+    "@wats/internal-utils": "^0.3.30"
   }
 }

@@ -52,5 +52,8 @@
     "pg": {
       "optional": true
     }
+  },
+  "dependencies": {
+    "@wats/internal-utils": "^0.3.30"
   }
 }

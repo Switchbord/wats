@@ -60,6 +60,7 @@ import {
   NOOP_TELEMETRY_SINK,
   OTEL_ATTR
 } from "./telemetry.js";
+import { containsUnsafePathSegment } from "@wats/internal-utils";
 
 export interface WatsServiceSecrets {
   readonly accessToken: string;
@@ -187,27 +188,17 @@ const SERVER_START_MS = Date.now();
 const DEFAULT_OPENAPI_TITLE = "WATS Service API";
 const DEFAULT_OPENAPI_VERSION = "0.3.30";
 
+// Local isRecord intentionally diverges from @wats/internal-utils: the service
+// uses it to structurally validate class-instance inputs (PersistenceStore,
+// MetricsRegistry, transport, crypto provider, webhook facade). The rigorous
+// prototype-chain guard rejects class instances, which would break these
+// legitimate call sites. See WATS-196 escape-hatch decision.
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function hasControlChars(value: string): boolean {
   return /[\u0000-\u001f\u007f]/u.test(value);
-}
-
-function containsUnsafePathSegment(path: string): boolean {
-  const lower = path.toLowerCase();
-  return (
-    path.includes("\\") ||
-    path.includes("?") ||
-    path.includes("#") ||
-    hasControlChars(path) ||
-    path.split("/").some((segment) => segment === ".." || segment === ".") ||
-    lower.includes("%2e%2e") ||
-    lower.includes("%252e%252e") ||
-    lower.includes("%2f") ||
-    lower.includes("%5c")
-  );
 }
 
 function validateSafeAbsolutePath(value: unknown, field: string): string {
