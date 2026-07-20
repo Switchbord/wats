@@ -463,6 +463,14 @@ Config template starting points:
 Copy those files into ignored local paths before filling any real values. The
 checked-in files stay placeholders.
 
+## Available examples
+
+- `examples/minimal-bot/` — runnable 60-second offline bot using `@wats/service`, MockTransport, and `bun run demo`.
+- `examples/groups/` — runnable offline Groups flow using `@wats/graph`, `@wats/core`, MockTransport, and synthetic group webhooks (`bun run examples:groups`).
+- `examples/webhook-echo-bot/` — runnable offline echo bot using the `createWhatsApp` / `onMessage` / `sendText` loop with a mock transport and a synthetic webhook envelope (`bun run examples:webhook-echo-bot`).
+- `examples/offline-bot/README.md` — docs-only walkthrough of an offline MockTransport bot with synthetic webhook payloads/envelopes (no runnable package).
+- `examples/config/` — placeholder YAML and JSON config templates plus `.env.example` for local ignored copies.
+
 ## Quickstart flow with checked templates
 
 1. Read the example index in `examples/README.md`.
@@ -1479,8 +1487,8 @@ await sent.waitUntilRead({ timeoutMs: 5 * 60_000 });
 
 `status.sent()`, `status.delivered()`, `status.read()`, and `status.failed()`
 are the four statuses you usually branch on. Failed updates carry an
-`errors` array from Meta; inspect it before retrying, because Meta retries
-the webhook until you acknowledge it.
+`errors` array from Meta; inspect it before retrying. Meta retries the webhook
+until you acknowledge it.
 
 ## Related
 
@@ -2329,7 +2337,7 @@ The handle exposes `respond(spec)` to push into the queue mid-test and `reset()`
 
 ## Recipe 2 — Opt-in reliable transport
 
-Any `Transport` is just an object with a `request` method. WATS ships `createReliableTransport` as an opt-in decorator for ky-like retries, backoff, and per-attempt timeouts without adding a dependency or changing the default `GraphClient` behavior.
+Any `Transport` is just an object with a `request` method. WATS ships `createReliableTransport` as an opt-in decorator for retries with jittered backoff, `Retry-After` handling, and per-attempt timeouts without adding a dependency or changing the default `GraphClient` behavior.
 
 ```ts
 import {
@@ -2531,7 +2539,7 @@ WATS is a Bun-first TypeScript toolkit for WhatsApp operations. It is built as s
 @wats/cli     init, validate, doctor, serve, openapi commands
 ```
 
-App-layer packages may depend on `@wats/core`; lower-level packages must not. The dependency arrows only point down — `@wats/core` never imports `@wats/http`. (`@wats/http` is an application-edge package, NOT a peer of `@wats/graph`: it sits above `@wats/core` and uses `normalizeWebhookEnvelope` from it.)
+App-layer packages may depend on `@wats/core`; lower-level packages must not. The dependency arrows only point down — `@wats/core` never imports `@wats/http`. `@wats/http` is an application-edge package that sits above `@wats/core` (see the [package map](/docs/concepts/package-map) for the full dependency graph).
 
 ## Request flow
 
@@ -3046,6 +3054,12 @@ URL: https://wats.sh/docs/reference
 | [`reference/service.md`](/docs/reference/service) | `@wats/service` runtime-neutral standalone webhook/API service. |
 | [`reference/persistence.md`](/docs/reference/persistence) | Durable runtime state: SQLite + Postgres adapters, migrations, idempotency, outbox, message projection. |
 | [`reference/service.md`](/docs/reference/service#openapi-document) | Generated OpenAPI 3.1 document and `GET /openapi.json` service route. |
+
+## Internal packages
+
+| Doc | When to use it |
+| --- | --- |
+| [`reference/internal-utils.md`](/docs/reference/internal-utils) | `@wats/internal-utils` — internal helpers, not a public API. Published only so public packages install cleanly from the registry. |
 
 ## Guides
 
@@ -6801,9 +6815,9 @@ try {
 }
 ```
 
-The sibling-NOT language matters: an `instanceof UnsupportedMessageTypeError` on a 131051 response is NOT also an `instanceof InvalidParameterError` and NOT an `instanceof GraphAuthError` — the taxonomy is axis-exclusive. The sub-client test suites pin this for at least two error pairs each.
+The axis-exclusive language matters: an `instanceof UnsupportedMessageTypeError` on a 131051 response is not also an `instanceof InvalidParameterError` and not an `instanceof GraphAuthError` — the taxonomy is axis-exclusive. The sub-client test suites pin this for at least two error pairs each.
 
-## What the sub-clients deliberately do NOT do
+## What the sub-clients deliberately do not do
 
 - No separate `TemplateClient`, `MediaClient`, or `FlowClient`; WABA-scoped template and Flow operations live on `WABAClient` plus direct callables.
 - No OAuth token refresh or lifecycle management.
@@ -7551,7 +7565,7 @@ These are the low-level webhook primitives. Most applications should start with 
 
 ## mTLS CA transition boundary
 
-Meta's webhook delivery may sit behind an optional infrastructure-level mTLS client certificate check as Meta transitions outbound client certificate validation to the Meta-owned root `meta-outbound-api-ca-2025-12.pem`. That check is separate from WATS application behavior.
+Meta's webhook delivery may sit behind an optional infrastructure-level mTLS client certificate check. Meta is transitioning outbound client certificate validation to the Meta-owned root `meta-outbound-api-ca-2025-12.pem`. That check is separate from WATS application behavior.
 
 WATS always treats `X-Hub-Signature-256` as the app-level HMAC verification boundary: `validateWebhookSignature(...)` computes HMAC-SHA256 over the exact raw body bytes using your app secret after the request reaches WATS. Infrastructure-level mTLS client certificate validation, if you use it, belongs at the TLS terminator, load balancer, reverse proxy, CDN/edge product, or platform ingress before the WATS handler is invoked.
 
