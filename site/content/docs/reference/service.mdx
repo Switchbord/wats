@@ -78,7 +78,7 @@ If you inject your own `whatsapp` facade, these flags do nothing. The service pa
 | `${profile.service.apiPrefix}/messages` | POST | service bearer | Sends a supported generic text, media, location, reaction, contacts, or interactive message body through Graph; group text/pin bodies are accepted only when `enableGroupRoutes` is true. |
 | `${profile.service.apiPrefix}/messages` | GET | service bearer | Lists the projected outbound message send-attempt page (newest-first) when a `PersistenceStore` is injected. |
 | `${profile.service.apiPrefix}/messages/{messageId}` | GET | service bearer | Returns a single projected message record by WhatsApp message id (`wamid.*`) when a `PersistenceStore` is injected. |
-| `${profile.service.apiPrefix}/conversations/{phone}/window` | GET | service bearer | Returns the 24-hour customer-service window state for a phone number when a `PersistenceStore` is injected. Auth uses the existence-hiding posture (404 byte-identical to the catch-all on a missing or mismatched token), matching `/metrics` rather than the sibling `/api/messages` routes. Returns `503 persistence_not_configured` when no store is injected. |
+| `${profile.service.apiPrefix}/conversations/{phone}/window` | GET | service bearer | Returns the 24-hour customer-service window state for a phone number when a `PersistenceStore` is injected. A missing or invalid token returns `401` (uniform `/api/*` posture, matching `/api/messages`). Returns `503 persistence_not_configured` when no store is injected, or `503 persistence_unavailable` when the store throws. |
 | `${profile.service.apiPrefix}/groups` | GET, POST | service bearer | Opt-in (`enableGroupRoutes`) list/create Groups using the configured business phone-number id. |
 | `${profile.service.apiPrefix}/groups/{groupId}` | GET, POST, DELETE | service bearer | Opt-in get/update/delete a Group. |
 | `${profile.service.apiPrefix}/groups/{groupId}/invite-link` | GET, POST | service bearer | Opt-in get/reset a Group invite link. |
@@ -86,6 +86,12 @@ If you inject your own `whatsapp` facade, these flags do nothing. The service pa
 | `${profile.service.apiPrefix}/groups/{groupId}/join-requests` | GET, POST, DELETE | service bearer | Opt-in list/approve/reject Group join requests. |
 
 Unknown routes return `404`. Unsupported methods return `405` with an `Allow` header.
+
+#### Auth posture split
+
+`/api/*` operator routes (`/api/messages`, `/api/messages/{messageId}`, `/api/conversations/{phone}/window`) return `401 unauthorized` on a missing or invalid bearer token. This is dev-friendly: a caller can tell auth failure from a wrong path.
+
+Telemetry endpoints (`/metrics`, `/status`, `/debug/diagnostics`) keep the existence-hiding posture. A missing or invalid token returns `404`, byte-identical to the catch-all, so their existence is not disclosed to unauthenticated callers.
 
 ## OpenAPI document
 
@@ -370,8 +376,8 @@ HTTP errors use JSON bodies:
 ```
 
 - `400` malformed request/body
-- `401` missing or invalid service bearer token
-- `404` route not found
+- `401` missing or invalid service bearer token on `/api/*` operator routes
+- `404` route not found; telemetry endpoints (`/metrics`, `/status`, `/debug/diagnostics`) also return `404` on a missing or invalid token so their existence stays hidden
 - `405` method not allowed
 - `502` Graph request failure (auth-class and uncategorized Meta errors). When the underlying `GraphApiError` exposes sanitized Meta details, the body includes `metaCode`, `metaSubcode`, `metaType`, and `fbtraceId` alongside the stable `graph_request_failed` code. The service deliberately omits Meta's free-form error message because it may quote request/account identifiers; it never includes access tokens, app secrets, verify tokens, service bearer tokens, request bodies, or `Authorization` headers.
 - `503` persistence failure on a projection route. `persistence_not_configured` means no `PersistenceStore` was injected. `persistence_unavailable` means the injected store threw (outage, lock, corruption); it is never reported as `404 not_found`. `conversation_window_unavailable` covers a throw in the conversation-window lookup specifically.
