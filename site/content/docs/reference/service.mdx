@@ -3,7 +3,7 @@ title: "Service Reference (`@wats/service`)"
 description: "The @wats/service runtime-neutral standalone webhook/API service and its public API."
 ---
 
-<DocMeta status="experimental" lastReviewed="2026-06-21" />
+<DocMeta status="shape-only — webhook ingress and text send live-validated; other routes shape-only" lastReviewed="2026-06-21" />
 
 `@wats/service` exposes a runtime-neutral `Request -> Response` app composing the Graph client, webhook adapter, config profile shape, and WhatsApp facade. It is not a production server by itself: the CLI provides dry-run and credential-gated live `wats serve` wrappers, and a generated OpenAPI 3.1 document covers the routes below. Not implemented yet: Node/Docker packaging, production hosting.
 

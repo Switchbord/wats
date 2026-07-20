@@ -12,10 +12,6 @@
 //   - never token, phone number, WAMID, message text, raw webhook body,
 //     config path, or stack trace.
 //
-// outbox_depth (gauge) is explicitly deferred: PersistenceStore has no
-// non-mutating outbox-count query, and adding one is out of scope for this
-// endpoint slice. All other allowlisted families are implemented.
-
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";

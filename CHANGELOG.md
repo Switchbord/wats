@@ -12,7 +12,7 @@ Patch release: the ops runtime — POST retry safety, rate limiter seam, convers
 - Outbox worker loop: `startOutboxWorker` with injectable scheduling, overlap-skipping ticks, error-isolated callbacks, and a `stop()` that cancels the timer and awaits any in-flight run. New store method `countOutboxPending`. Single-process by design.
 - Inbound message projection in `@wats/service`: inbound webhook messages are recorded to persistence alongside outbound sends (failure-isolated; never breaks the webhook acknowledgement).
 - `GET /api/conversations/{phone}/window` operator endpoint (existence-hiding auth, 503 without persistence, `+` prefix normalized to Meta's bare-digit storage).
-- Metrics: gauge support in the service metrics registry, `wats_outbox_depth` gauge, `wats_outbox_processed_total` counter, and a `createOutboxMetricsReporter` wiring helper. Optional `metricsRegistry` config injection shares one registry between `/metrics` and the reporter.
+- Metrics: gauge support in the service metrics registry, `outbox_depth` gauge, `outbox_processed_total` counter, and a `createOutboxMetricsReporter` wiring helper. Optional `metricsRegistry` config injection shares one registry between `/metrics` and the reporter.
 - New guide: operate reliably (retry + idempotency + rate limiter, window gate, outbox worker + metrics, alerting).
 
 ### Changed

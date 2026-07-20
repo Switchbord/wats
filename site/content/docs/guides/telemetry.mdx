@@ -3,7 +3,7 @@ title: Telemetry for operators
 description: Operate WATS telemetry endpoints safely — Prometheus scraping, OpenTelemetry adapters, and the privacy threat model.
 ---
 
-<DocMeta status="active" appliesTo="@wats/service, Prometheus, OpenTelemetry" lastReviewed="2026-07-03" />
+<DocMeta status="shape-only — validated locally, not against live traffic" appliesTo="@wats/service, Prometheus, OpenTelemetry" lastReviewed="2026-07-03" />
 
 ## Threat model and default stance
 
@@ -44,6 +44,8 @@ The internal metrics registry exposes Prometheus names; the optional `TelemetryS
 | `send_outcomes_total` | `wats.graph.endpoint_family`, `wats.operation.outcome` | |
 | `webhook_normalization_total` | `wats.webhook.update_kind`, `wats.operation.outcome` | update kind enum-clamped |
 | `persistence_operations_total` | `wats.persistence.adapter`, `wats.operation.outcome` | absent when no `PersistenceStore` is injected |
+| `outbox_depth` | `adapter`, `state` | registry-only gauge (not forwarded to `TelemetrySink`); the shipped reporter sets only `state="pending"` from `OutboxWorkerTickReport.pending` |
+| `outbox_processed_total` | `wats.operation.outcome` | emitted only when an outbox metrics reporter is wired to `startOutboxWorker` |
 
 ## Prometheus scrape configuration
 
@@ -111,7 +113,7 @@ const app = createWatsServiceApp({
 });
 ```
 
-`recordSpan` and `recordEvent` are optional; WATS currently reserves them for future request-scoped instrumentation. The adapter runs synchronously inside the request hot path, so keep it fast. If your exporter throws, WATS isolates the failure and logs a JSON error line to `stderr`; telemetry cannot break a request.
+`recordSpan` and `recordEvent` are optional; WATS currently reserves them for future request-scoped instrumentation. The adapter runs synchronously inside the request hot path, so keep it fast. If your exporter throws, WATS isolates the failure and logs a JSON error line to `stderr`; telemetry cannot break a request (validated locally, not against live traffic).
 
 ## Diagnostics snapshot curl
 

@@ -603,10 +603,6 @@ function envRef(value: { env: string } | string): string {
 // endpoint_family) are enum-clamped to "unknown" per the taxonomy's
 // enum-clamping rule — this is enforced by the recording functions below,
 // not by the caller.
-//
-// outbox_depth (gauge) is intentionally NOT implemented: PersistenceStore
-// exposes no non-mutating outbox-count query, and adding one is out of scope
-// for a metrics-endpoint slice. Revisit when persistence gains that query.
 // ---------------------------------------------------------------------------
 
 const METRIC_STATUS_CLASSES = ["2xx", "3xx", "4xx", "5xx"] as const;

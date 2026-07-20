@@ -3,7 +3,7 @@ title: "Types Reference"
 description: "Shared TypeScript contracts: discriminated-union domain types for inbound WhatsApp objects."
 ---
 
-<DocMeta status="active" lastReviewed="2026-04-21" />
+<DocMeta status="shape-only — shared domain types; locally tested" lastReviewed="2026-04-21" />
 
 `@wats/types` ships discriminated-union shapes for every inbound WhatsApp domain object the types package exposes. Narrow via `switch` on the `type` discriminator; exhaustive switches with a `never` default branch catch any future variant added to the union.
 
@@ -165,67 +165,14 @@ if (message.type === "unsupported") {
 }
 ```
 
-## Parsed update event types
+## Normalized update event types
 
-:::note[Deprecated]
-The untyped `parseWebhookUpdate` parser and the `createUpdateRouter` /
-`UpdateRouter` / `ParsedUpdateEvent` / `UpdateFilter` legacy surfaces
-documented in this section are now marked `@deprecated` at the type
-level. They are superseded by `normalizeWebhookEnvelope` (which emits the
-discriminated `TypedUpdate` union — see
-[webhook-normalizer](/docs/reference/webhook-normalizer)) and the typed
-[`TypedRouter`](/docs/reference/router) /
-[`filtersTyped`](/docs/reference/filters) surfaces. The legacy exports
-remain in the `@wats/core` barrel for now but are scheduled for **removal
-in the next minor release**; new code should use the typed path.
-:::
+`@wats/core` normalizes raw Meta webhook envelopes into a flat array of `TypedUpdate` discriminated-union values via `normalizeWebhookEnvelope`. See [webhook-normalizer](/docs/reference/webhook-normalizer) for the full option surface (`maxEventsPerEnvelope`, safety limits, and the `skipped`/`limitError` taxonomy) and [router](/docs/reference/router) for `TypedRouter` dispatch. The typed update variants and their discriminators are part of `@wats/types`:
 
-`@wats/core` provides normalized parsed-event contracts for handler routing.
+- `TypedMessageUpdate`, `TypedStatusUpdate`, `TypedAccountUpdate`, `TypedUnknownUpdate`, `TypedUserPreferencesUpdate`, `TypedSystemUpdate`, `TypedChatOpenedUpdate`, and the calling/group variants
+- each carries stable `updateId`, `wabaId`, `phoneNumberId`, and `receivedAt` fields handlers and listeners consume downstream
 
-- `ParsedUpdateEvent`
-  - `object: string` (validated top-level webhook `object` value)
-  - `discriminator`
-    - `field: string`
-    - `subtype?: string` (from change `event` when present)
-    - `eventType: string` (`field` or `${field}.${subtype}`)
-  - `entry`
-    - `index: number`
-    - `id?: string`
-    - `time?: number`
-  - `change`
-    - `index: number`
-    - `value: Record<string, unknown>` (reference to raw `change.value`)
-  - `raw`
-    - `entry: Record<string, unknown>`
-    - `change: Record<string, unknown>`
-
-`parseWebhookUpdate(rawEnvelope, options?)` options:
-
-- `maxEntries?: number`
-- `maxChangesPerEntry?: number`
-- `maxTotalEvents?: number`
-- `supportedObjects?: readonly string[]` (default allows `whatsapp_business_account`)
-
-`parseWebhookUpdate` result union:
-
-- success: `{ ok: true, events: ParsedUpdateEvent[], skippedEntries: number, skippedChanges: number }`
-- failure: `{ ok: false, events: [], error: { code, message } }`
-
-Parser error codes:
-
-- `invalid_envelope`
-- `unsupported_object`
-- `entries_limit_exceeded`
-- `changes_limit_exceeded`
-- `events_limit_exceeded`
-
-`createUpdateRouter(options?)` dispatch summary includes:
-
-- base counters: `totalEvents`, `matchedHandlers`, `executedHandlers`, `failedHandlers`, `unmatchedEvents`, `errors`
-- safety metadata: `capped: boolean`, `aborted: boolean`, `limitError?: { code, message, eventIndex }`
-- limit error codes: `handlers_per_event_limit_exceeded`, `dispatches_limit_exceeded`
-
-This preserves best-effort nested malformed skipping while surfacing explicit degradation counters and hard-limit failures.
+The old untyped `parseWebhookUpdate` / `createUpdateRouter` / `UpdateRouter` / `ParsedUpdateEvent` / `UpdateFilter` legacy surfaces were removed; `normalizeWebhookEnvelope` + `TypedRouter` + `filtersTyped` are the typed replacements.
 
 ## API Surface
 

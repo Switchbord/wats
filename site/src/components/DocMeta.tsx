@@ -1,5 +1,11 @@
 interface DocMetaProps {
-  /** Lifecycle status of the documented surface. */
+  /**
+   * Capability honesty tag for the documented surface. Closed set:
+   * `live-validated` | `shape-only` | `planned`, each optionally suffixed
+   * ` — <short reason>`. Stability/maintenance meaning lives in the
+   * api-stability policy, not here. Pages with no capability claim omit it.
+   * Defined canonically in /docs/meta/api-stability.
+   */
   status?: string
   /** ISO date the page was last reviewed. */
   lastReviewed?: string

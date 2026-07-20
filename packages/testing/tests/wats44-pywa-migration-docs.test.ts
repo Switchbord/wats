@@ -34,8 +34,11 @@ describe("WATS-44 pywa migration docs", () => {
     const migration = read("site/content/docs/guides/migrating-from-pywa.mdx");
     expect(migration).not.toContain("TODO(A2)");
     // Voice-pass moved metadata into a JSX <DocMeta> tag and refreshed the
-    // review date to the June 2026 live campaign.
-    expect(migration).toContain('status="active"');
+    // review date to the June 2026 live campaign. The DocMeta status
+    // attribute carries the capability honesty tag (live-validated /
+    // shape-only / planned) per the closed set in api-stability; this
+    // migration guide makes no single capability claim, so status is
+    // omitted and only lastReviewed survives.
     expect(migration).toContain('lastReviewed="2026-06-10"');
 
     expectAll(migration, [

@@ -3,7 +3,7 @@ title: "Config Reference (`@wats/config`)"
 description: "The @wats/config application config shape: YAML/JSON validation, env-secret references, and redaction."
 ---
 
-<DocMeta status="experimental" lastReviewed="2026-04-28" />
+<DocMeta status="shape-only — local-only by design" lastReviewed="2026-04-28" />
 
 `@wats/config` validates YAML or JSON config into a frozen `WatsConfig` object and keeps secrets as environment-variable references — never raw credential values.
 
@@ -98,7 +98,7 @@ Unsupported extensions fail with `unsupported_format`; read failures fail with `
 
 ### `redactConfig(value)`
 
-Validates and returns a copy where every env name under a secret reference is replaced with `[REDACTED_ENV]`. Non-secret fields stay visible. Use it for logs, diagnostics, and `wats config print`-style output.
+Validates and returns a copy where every env name under a secret reference is replaced with `[REDACTED]`. Non-secret fields stay visible. Use it for logs, diagnostics, and `wats config print`-style output.
 
 ## Validation rules
 

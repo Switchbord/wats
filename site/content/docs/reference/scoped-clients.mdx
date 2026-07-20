@@ -3,7 +3,7 @@ title: "Scoped Clients Reference"
 description: "PhoneNumberClient and WABAClient: scoped sub-clients that bind a path param at construction."
 ---
 
-<DocMeta status="active" lastReviewed="2026-04-22" />
+<DocMeta status="live-validated" lastReviewed="2026-04-22" />
 
 `PhoneNumberClient` and `WABAClient` sit on top of the [endpoint registry](/docs/reference/endpoints) and bind a scope-defining path param (`phoneNumberId` / `wabaId`) at construction so call sites stop threading it through every request. They are thin ergonomic wrappers around the same `defineEndpoint` callables — they never re-implement path construction, sanitization, or error mapping.
 

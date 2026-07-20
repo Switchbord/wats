@@ -2222,6 +2222,8 @@ The internal metrics registry exposes Prometheus names; the optional `TelemetryS
 | `send_outcomes_total` | `wats.graph.endpoint_family`, `wats.operation.outcome` | |
 | `webhook_normalization_total` | `wats.webhook.update_kind`, `wats.operation.outcome` | update kind enum-clamped |
 | `persistence_operations_total` | `wats.persistence.adapter`, `wats.operation.outcome` | absent when no `PersistenceStore` is injected |
+| `outbox_depth` | `adapter`, `state` | registry-only gauge (not forwarded to `TelemetrySink`); the shipped reporter sets only `state="pending"` from `OutboxWorkerTickReport.pending` |
+| `outbox_processed_total` | `wats.operation.outcome` | emitted only when an outbox metrics reporter is wired to `startOutboxWorker` |
 
 ## Prometheus scrape configuration
 
@@ -2289,7 +2291,7 @@ const app = createWatsServiceApp({
 });
 ```
 
-`recordSpan` and `recordEvent` are optional; WATS currently reserves them for future request-scoped instrumentation. The adapter runs synchronously inside the request hot path, so keep it fast. If your exporter throws, WATS isolates the failure and logs a JSON error line to `stderr`; telemetry cannot break a request.
+`recordSpan` and `recordEvent` are optional; WATS currently reserves them for future request-scoped instrumentation. The adapter runs synchronously inside the request hot path, so keep it fast. If your exporter throws, WATS isolates the failure and logs a JSON error line to `stderr`; telemetry cannot break a request (validated locally, not against live traffic).
 
 ## Diagnostics snapshot curl
 
@@ -2890,6 +2892,8 @@ Primary exports:
 - public endpoint subpaths: `@wats/graph/endpoints/messages`, `@wats/graph/endpoints/media`, `@wats/graph/endpoints/templates`, `@wats/graph/endpoints/flows`, `@wats/graph/endpoints/calling`, `@wats/graph/endpoints/business-management`, and `@wats/graph/endpoints/groups`. `bun run api:check` keeps package exports, fixture imports, docs, and changelog mentions aligned
 - Node/Bun-only filesystem media helpers: `@wats/graph/node-media` exports path-based `uploadAndSend*FromPath` helpers. This subpath is deliberately separate from the root entrypoint so browser/edge users never pull `node:fs` transitively.
 - `paginate` / `paginateAll`
+- reliable transport: `createReliableTransport` wraps a `Transport` with jittered backoff, `Retry-After` handling, and opt-in POST retry (`retryPosts`: `"never"` default, `"network-only"`, `"always"`; network-only requires an `Idempotency-Key` so a processed send is never duplicated)
+- rate limiter: `createTokenBucketRateLimiter` and a `rateLimiter` option on the reliable transport (token acquired before every attempt; client-side smoothing, shape-only)
 - Graph error classes and error registry helpers
 - media runtime: `uploadMedia`, `downloadMedia`, `downloadMediaBytes`, `deleteMedia`, `decryptEncryptedMedia`, upload-session helpers, `MediaValidationError`, `MediaCryptoError`, `MediaIntegrityError`, and finite media cap constants
 
@@ -2998,21 +3002,30 @@ Primary exports:
 - `WatsServiceOpenApiOptions`
 - `WatsServiceOpenApiDocument`
 - `WatsServiceError`
+- `MetricsRegistry` and `createMetricsRegistry` (Prometheus/OpenMetrics-compatible counters, histograms, and gauges with taxonomy-allowlisted names and enum-clamped label values)
+- `createOutboxMetricsReporter` (wires `outbox_depth` and `outbox_processed_total` from `OutboxWorkerTickReport` into a `MetricsRegistry`)
+- `OTEL_ATTR` (attribute-key constants for the OpenTelemetry-compatible sink seam)
+- `TelemetrySink` (interface), `CapturingTelemetrySink`, and `NOOP_TELEMETRY_SINK` (opt-in event sink; `@wats/service` does not depend on `@opentelemetry/*`)
+- `ErrorLedger` (bounded in-memory error-class ledger backing `/debug/diagnostics`)
 
 Current routes:
 
 - `GET /healthz`
 - `GET /readyz`
 - `GET /openapi.json`
+- `GET /status` (redacted operator status snapshot; existence-hiding 404 on missing/mismatched bearer token)
+- `GET /metrics` (Prometheus/OpenMetrics exposition; existence-hiding 404)
+- `GET /debug/diagnostics` (bounded support snapshot; existence-hiding 404)
 - `GET profile.webhook.path`
 - `POST profile.webhook.path`
 - `POST {profile.service.apiPrefix}/messages/text`
 - `POST {profile.service.apiPrefix}/messages`
 - `GET {profile.service.apiPrefix}/messages`
 - `GET {profile.service.apiPrefix}/messages/{messageId}`
+- `GET {profile.service.apiPrefix}/conversations/{phone}/window` (24-hour conversation-window state; 503 without persistence; `+` prefix normalized to Meta's bare-digit storage)
 - opt-in Groups routes when `enableGroupRoutes` is true
 
-Status: experimental service foundation. It composes config profile shape, explicit resolved secrets, Graph client, WebhookAdapter, WhatsApp facade, optional PersistenceStore injection, optional `enableGroupRoutes`, and a generated OpenAPI 3.1 document for the routes above. The CLI dry-run and local live wrappers can serve it locally; production hosting hardening and background outbox workers are later work.
+Status: experimental service foundation. It composes config profile shape, explicit resolved secrets, Graph client, WebhookAdapter, WhatsApp facade, optional PersistenceStore injection, optional `enableGroupRoutes`, optional `MetricsRegistry` / `telemetrySink` injection, and a generated OpenAPI 3.1 document for the routes above. The CLI dry-run and local live wrappers can serve it locally; production hosting hardening is later work.
 
 ### `@wats/persistence`
 
@@ -3027,8 +3040,11 @@ Primary exports:
 - `CURRENT_SCHEMA_VERSION`
 - outbox record APIs on `PersistenceStore`
 - `runOutboxWorkerOnce`
+- `startOutboxWorker` (timer-driven loop with injectable scheduling, overlap-skipping ticks, error-isolated callbacks, and a `stop()` that cancels the timer and awaits any in-flight run)
+- conversation-window helpers: `getConversationWindowState` and `canSendFreeForm` (24-hour free-form vs template gate from projected inbound messages; closed by default when no inbound history exists)
 - `createSqlitePersistence` from `@wats/persistence/sqlite`
 - `createPostgresPersistence` from `@wats/persistence/postgres` (shape-only, mock-client tested)
+- `createPostgresPersistenceWithClient` from `@wats/persistence/postgres` (inject a pre-built `pg` client; shape-only, mock-client tested)
 
 Status: experimental local persistence foundation. SQLite migrations, schema metadata, migration locks, webhook-event/request-idempotency/outbox tables, outbox record APIs, a one-tick at-least-once worker helper, redacted health diagnostics, and optional `@wats/service` injection exist. The Postgres adapter ships at `@wats/persistence/postgres` as shape-only, mock-client tested; it is not live-validated against a running Postgres service in default CI. Read-only local message projection is reachable through `wats messages list/show`; deeper conversation/thread navigation, status UI wiring, automatic service send enqueueing, and production hosting are later work.
 
@@ -3928,7 +3944,7 @@ Unsupported extensions fail with `unsupported_format`; read failures fail with `
 
 ### `redactConfig(value)`
 
-Validates and returns a copy where every env name under a secret reference is replaced with `[REDACTED_ENV]`. Non-secret fields stay visible. Use it for logs, diagnostics, and `wats config print`-style output.
+Validates and returns a copy where every env name under a secret reference is replaced with `[REDACTED]`. Non-secret fields stay visible. Use it for logs, diagnostics, and `wats config print`-style output.
 
 ## Validation rules
 
@@ -7530,67 +7546,14 @@ if (message.type === "unsupported") {
 }
 ```
 
-## Parsed update event types
+## Normalized update event types
 
-:::note[Deprecated]
-The untyped `parseWebhookUpdate` parser and the `createUpdateRouter` /
-`UpdateRouter` / `ParsedUpdateEvent` / `UpdateFilter` legacy surfaces
-documented in this section are now marked `@deprecated` at the type
-level. They are superseded by `normalizeWebhookEnvelope` (which emits the
-discriminated `TypedUpdate` union — see
-[webhook-normalizer](/docs/reference/webhook-normalizer)) and the typed
-[`TypedRouter`](/docs/reference/router) /
-[`filtersTyped`](/docs/reference/filters) surfaces. The legacy exports
-remain in the `@wats/core` barrel for now but are scheduled for **removal
-in the next minor release**; new code should use the typed path.
-:::
+`@wats/core` normalizes raw Meta webhook envelopes into a flat array of `TypedUpdate` discriminated-union values via `normalizeWebhookEnvelope`. See [webhook-normalizer](/docs/reference/webhook-normalizer) for the full option surface (`maxEventsPerEnvelope`, safety limits, and the `skipped`/`limitError` taxonomy) and [router](/docs/reference/router) for `TypedRouter` dispatch. The typed update variants and their discriminators are part of `@wats/types`:
 
-`@wats/core` provides normalized parsed-event contracts for handler routing.
+- `TypedMessageUpdate`, `TypedStatusUpdate`, `TypedAccountUpdate`, `TypedUnknownUpdate`, `TypedUserPreferencesUpdate`, `TypedSystemUpdate`, `TypedChatOpenedUpdate`, and the calling/group variants
+- each carries stable `updateId`, `wabaId`, `phoneNumberId`, and `receivedAt` fields handlers and listeners consume downstream
 
-- `ParsedUpdateEvent`
-  - `object: string` (validated top-level webhook `object` value)
-  - `discriminator`
-    - `field: string`
-    - `subtype?: string` (from change `event` when present)
-    - `eventType: string` (`field` or `${field}.${subtype}`)
-  - `entry`
-    - `index: number`
-    - `id?: string`
-    - `time?: number`
-  - `change`
-    - `index: number`
-    - `value: Record<string, unknown>` (reference to raw `change.value`)
-  - `raw`
-    - `entry: Record<string, unknown>`
-    - `change: Record<string, unknown>`
-
-`parseWebhookUpdate(rawEnvelope, options?)` options:
-
-- `maxEntries?: number`
-- `maxChangesPerEntry?: number`
-- `maxTotalEvents?: number`
-- `supportedObjects?: readonly string[]` (default allows `whatsapp_business_account`)
-
-`parseWebhookUpdate` result union:
-
-- success: `{ ok: true, events: ParsedUpdateEvent[], skippedEntries: number, skippedChanges: number }`
-- failure: `{ ok: false, events: [], error: { code, message } }`
-
-Parser error codes:
-
-- `invalid_envelope`
-- `unsupported_object`
-- `entries_limit_exceeded`
-- `changes_limit_exceeded`
-- `events_limit_exceeded`
-
-`createUpdateRouter(options?)` dispatch summary includes:
-
-- base counters: `totalEvents`, `matchedHandlers`, `executedHandlers`, `failedHandlers`, `unmatchedEvents`, `errors`
-- safety metadata: `capped: boolean`, `aborted: boolean`, `limitError?: { code, message, eventIndex }`
-- limit error codes: `handlers_per_event_limit_exceeded`, `dispatches_limit_exceeded`
-
-This preserves best-effort nested malformed skipping while surfacing explicit degradation counters and hard-limit failures.
+The old untyped `parseWebhookUpdate` / `createUpdateRouter` / `UpdateRouter` / `ParsedUpdateEvent` / `UpdateFilter` legacy surfaces were removed; `normalizeWebhookEnvelope` + `TypedRouter` + `filtersTyped` are the typed replacements.
 
 ## API Surface
 
@@ -8338,7 +8301,7 @@ The normalizer does NOT:
 - Register handlers — that's the [router](/docs/reference/router).
 - Provide Graph API calls — no `@wats/graph` coupling.
 - Persist dedup state — caller's responsibility.
-- Modify the legacy `parseWebhookUpdate` — the normalizer is an independent producer above it.
+- Modify raw envelope shape — the normalizer is a read-only producer above the parsed body; it never mutates its input.
 - Verify webhook signatures — that is `@wats/http`'s job.
 - Talk to live Meta endpoints or require credentials.
 
@@ -8815,7 +8778,7 @@ webhooks; Meta has not seen it. **planned**: not built.
 | Message event-store projection (outbound) | n/a | `@wats/persistence` `wats_messages` + `wats_message_status_events` tables and `recordMessage` / `appendMessageStatus` / `getMessage` / `listMessages` APIs; read-only `GET /messages` and `GET /messages/{messageId}` service routes; `wats messages list/show` CLI inspection; Postgres adapter at `@wats/persistence/postgres` (shape-only, mock-client tested). | shape-only — local SQLite + MockTransport only; Postgres mock-client tested; no live Meta calls this slice. |
 | OpenAPI document | n/a | OpenAPI 3.1 for WATS service routes, served at `/openapi.json`. | shape-only. |
 | Internal utilities | n/a | `@wats/internal-utils` shared helpers. | shape-only — never leaves the process. |
-| OpenTelemetry observability | n/a | Not built; router/adapter observer hooks exist as seams. | planned. |
+| OpenTelemetry observability | n/a | `TelemetrySink` seam, `OTEL_ATTR`, `CapturingTelemetrySink`, `NOOP_TELEMETRY_SINK`, `MetricsRegistry`, `createOutboxMetricsReporter`, `/metrics`, `/status`, `/debug/diagnostics`, and a documented OTel adapter. Auto request-scoped span instrumentation is not wired. | shape-only — sink seam and `/metrics` exist; auto request-scoped span instrumentation remains planned. |
 
 Live-validation run log: [campaign log](/docs/parity/live-campaign).
 
@@ -9069,6 +9032,16 @@ evidence behind the live-validated tags in the [parity matrix](/docs/parity).
 URL: https://wats.sh/docs/meta/api-stability
 
 WATS public APIs carry one of three labels during the 0.x alpha line: stable-for-0.x, experimental, or internal. Pick your coupling accordingly.
+
+## Page honesty tags (DocMeta `status`)
+
+The `status` attribute on a page's `<DocMeta>` tag carries a **capability honesty tag**, not a stability or maintenance label. Stability lives in the stable-for-0.x / experimental / internal taxonomy below. The closed set for `status` is:
+
+- `live-validated` — the page's capability claims are exercised against live Meta Graph/webhook traffic (per the [parity matrix](/docs/parity)).
+- `shape-only` — implemented and validated locally (MockTransport, synthetic webhooks, consumer fixtures); Meta has not seen it. Optionally suffixed ` — <short reason>` to state what is or is not live-validated.
+- `planned` — not built yet.
+
+Each tag is optionally suffixed ` — <short reason>`. Pages that make no capability claim can omit `status`. Old values (`active`, `canonical`, `stable`, `experimental`, `internal`, `implemented credential-free; live validation pending`, `active — <reason>`) are retired: stability meaning moved into the taxonomy below, and capability meaning mapped to the honesty tag that fits the page's content.
 
 ## Stable-for-0.x surfaces
 

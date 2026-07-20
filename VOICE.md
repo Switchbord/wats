@@ -31,7 +31,8 @@ meal. One wry line per page is plenty. Zero is fine.
    sentences of nothing. Cut it.
 6. Every capability claim keeps its honesty tag where status matters:
    live-validated / shape-only / planned. Honesty is the brand. Dark humor
-   never blurs what actually works.
+   never blurs what actually works. The closed set for the `DocMeta` `status`
+   attribute is defined in [API stability](/docs/meta/api-stability).
 
 ## Style mechanics
 

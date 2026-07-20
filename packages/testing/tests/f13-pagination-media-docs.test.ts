@@ -159,12 +159,13 @@ describe("F-13 media.md reference guide", () => {
     expect(existsSync(docPath)).toBe(true);
   });
 
-  test("is marked experimental and documents the full media runtime", () => {
+  test("is marked shape-only and documents the full media runtime", () => {
     // Voice pass dropped the "runtime-complete" status word and WATS-37 ticket
-    // ref. The fact survives: experimental DocMeta status + a credential-free
-    // runtime covering upload/download/delete/decrypt/sessions.
+    // ref. The fact survives: a shape-only DocMeta honesty tag (the closed set
+    // is defined in api-stability) + a credential-free runtime covering
+    // upload/download/delete/decrypt/sessions.
     const doc = readFileSync(docPath, "utf8");
-    expect(doc).toMatch(/experimental/i);
+    expect(doc).toMatch(/shape-only/i);
     expect(doc).toMatch(/credential-free media runtime|media runtime/i);
   });
 
