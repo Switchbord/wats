@@ -135,11 +135,12 @@ describe("F-9 filters.md reference guide", () => {
     expect(doc).toContain("@wats/core/filtersTyped");
   });
 
-  test("documents the transitional two-surface scope and links related API surface", () => {
-    // E3: voice pass removed the "architecture notes" prose and the F-9 ticket
-    // ref (CI banned-phrases forbids re-adding ticket tokens). Assert on the
-    // surviving feature content that conveys the same scope intent.
-    expect(doc).toMatch(/Two filter surfaces coexist/i);
+  test("documents filtersTyped as the filter surface and links related API surface", () => {
+    // WATS-191 removed the legacy `@wats/core/filters` surface; the reference
+    // page now describes `filtersTyped` as THE filter surface (no transitional
+    // two-surface framing). Assert on the surviving scope intent.
+    expect(doc).toMatch(/@wats\/core\/filtersTyped/);
+    expect(doc).not.toMatch(/Two filter surfaces coexist/i);
     expect(doc).toContain("/docs/concepts/public-api-surface");
   });
 
