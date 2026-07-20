@@ -36,55 +36,48 @@ main = "src/index.ts"
 compatibility_date = "2024-10-01"
 
 [vars]
-VERIFY_TOKEN = "..."
+WATS_VERIFY_TOKEN = "..."
+WATS_PHONE_NUMBER_ID = "..."
+```
 
-[[secrets]]
-binding = "APP_SECRET"
+Secrets do not go in `wrangler.toml`. Set them through the Wrangler CLI so they never touch the repo:
 
-[[secrets]]
-binding = "META_ACCESS_TOKEN"
+```bash
+wrangler secret put WATS_APP_SECRET
+wrangler secret put WATS_ACCESS_TOKEN
 ```
 
 ## Worker entry
 
 ```ts
 // src/index.ts
-import {
-  createFetchWebhookHandler,
-  createWebhookAdapter
-} from "@wats/http";
-import { GraphClient, createFetchTransport } from "@wats/graph";
-import { WhatsApp, message } from "@wats/core";
+import { createFetchWebhookHandler, createWebhookAdapter } from "@wats/http";
+import { createWhatsApp } from "@wats/core";
 
 export interface Env {
-  VERIFY_TOKEN: string;
-  APP_SECRET: string;
-  META_ACCESS_TOKEN: string;
-  WA_PHONE_NUMBER_ID: string;
+  WATS_VERIFY_TOKEN: string;
+  WATS_PHONE_NUMBER_ID: string;
+  WATS_APP_SECRET: string;
+  WATS_ACCESS_TOKEN: string;
 }
 
 let handler: ((req: Request) => Promise<Response>) | undefined;
 
 function buildHandler(env: Env) {
-  const graphClient = new GraphClient({
-    accessToken: env.META_ACCESS_TOKEN,
+  const wa = createWhatsApp({
+    accessToken: env.WATS_ACCESS_TOKEN,
+    phoneNumberId: env.WATS_PHONE_NUMBER_ID,
     apiVersion: "v25.0",
-    transport: createFetchTransport()
   });
 
-  const wa = new WhatsApp({
-    graphClient,
-    phoneNumberId: env.WA_PHONE_NUMBER_ID
-  });
-
-  wa.on(message, async (update) => {
+  wa.onMessage(async (ctx) => {
     // handler body — fire-and-forget from the Worker's perspective.
-    console.log("received:", update.message.from);
+    console.log("received:", ctx.update.message.from);
   });
 
   const adapter = createWebhookAdapter({
-    verifyToken: env.VERIFY_TOKEN,
-    appSecret: env.APP_SECRET,
+    verifyToken: env.WATS_VERIFY_TOKEN,
+    appSecret: env.WATS_APP_SECRET,
     whatsapp: wa
   });
 
@@ -139,7 +132,7 @@ with a non-async logger callback.
 ## Verify it works
 
 ```bash
-curl -i "https://wats-webhook.<your-subdomain>.workers.dev/?hub.mode=subscribe&hub.verify_token=<token>&hub.challenge=ping"
+curl -i "https://wats-webhook.<your-subdomain>.workers.dev/?hub.mode=subscribe&hub.verify_token=<your WATS_VERIFY_TOKEN>&hub.challenge=ping"
 ```
 
 A correct deployment returns `200` with body `ping`; a wrong token returns

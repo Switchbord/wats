@@ -20,32 +20,24 @@ bun add @wats/http @wats/core @wats/graph @wats/crypto
 
 ```ts
 // server.ts
-import {
-  createBunWebhookServer,
-  createWebhookAdapter
-} from "@wats/http";
-import { GraphClient } from "@wats/graph";
-import { WhatsApp, message } from "@wats/core";
-import { createFetchTransport } from "@wats/graph";
+import { createBunWebhookServer, createWebhookAdapter } from "@wats/http";
+import { createWhatsApp } from "@wats/core";
 
-const graphClient = new GraphClient({
-  accessToken: process.env.META_ACCESS_TOKEN!,
+const wa = createWhatsApp({
+  accessToken: process.env.WATS_ACCESS_TOKEN!,
+  phoneNumberId: process.env.WATS_PHONE_NUMBER_ID!,
   apiVersion: "v25.0",
-  transport: createFetchTransport()
 });
 
-const wa = new WhatsApp({
-  graphClient,
-  phoneNumberId: process.env.WA_PHONE_NUMBER_ID!
-});
-
-wa.on(message, async (update) => {
-  console.log("received message:", update.message.from, update.message.type);
+wa.onMessage(async (ctx) => {
+  const message = ctx.update.message;
+  if (message.type !== "text") return;
+  await wa.sendText({ to: message.from, text: message.text.body });
 });
 
 const adapter = createWebhookAdapter({
-  verifyToken: process.env.VERIFY_TOKEN!,
-  appSecret: process.env.APP_SECRET!,
+  verifyToken: process.env.WATS_VERIFY_TOKEN!,
+  appSecret: process.env.WATS_APP_SECRET!,
   whatsapp: wa,
   logger: (event) => console.log("wats-http", event.type, event)
 });
@@ -115,7 +107,7 @@ logger: (event) => {
 Hit the GET verify endpoint the way Meta will:
 
 ```bash
-curl -i "http://127.0.0.1:8787/?hub.mode=subscribe&hub.verify_token=$VERIFY_TOKEN&hub.challenge=ping"
+curl -i "http://127.0.0.1:8787/?hub.mode=subscribe&hub.verify_token=$WATS_VERIFY_TOKEN&hub.challenge=ping"
 ```
 
 A correct setup returns `200` with body `ping`. A wrong token returns `401`.

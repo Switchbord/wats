@@ -21,31 +21,24 @@ npm install @wats/http @wats/core @wats/graph @wats/crypto
 ```ts
 // server.ts
 import { createServer } from "node:http";
-import {
-  createNodeWebhookHandler,
-  createWebhookAdapter
-} from "@wats/http";
-import { GraphClient, createFetchTransport } from "@wats/graph";
-import { WhatsApp, message } from "@wats/core";
+import { createNodeWebhookHandler, createWebhookAdapter } from "@wats/http";
+import { createWhatsApp } from "@wats/core";
 
-const graphClient = new GraphClient({
-  accessToken: process.env.META_ACCESS_TOKEN!,
+const wa = createWhatsApp({
+  accessToken: process.env.WATS_ACCESS_TOKEN!,
+  phoneNumberId: process.env.WATS_PHONE_NUMBER_ID!,
   apiVersion: "v25.0",
-  transport: createFetchTransport()
 });
 
-const wa = new WhatsApp({
-  graphClient,
-  phoneNumberId: process.env.WA_PHONE_NUMBER_ID!
-});
-
-wa.on(message, async (update) => {
-  console.log("received:", update.message.from, update.message.type);
+wa.onMessage(async (ctx) => {
+  const message = ctx.update.message;
+  if (message.type !== "text") return;
+  await wa.sendText({ to: message.from, text: message.text.body });
 });
 
 const adapter = createWebhookAdapter({
-  verifyToken: process.env.VERIFY_TOKEN!,
-  appSecret: process.env.APP_SECRET!,
+  verifyToken: process.env.WATS_VERIFY_TOKEN!,
+  appSecret: process.env.WATS_APP_SECRET!,
   whatsapp: wa
 });
 
@@ -111,7 +104,7 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
 ## Verify it works
 
 ```bash
-curl -i "http://127.0.0.1:3000/?hub.mode=subscribe&hub.verify_token=$VERIFY_TOKEN&hub.challenge=ping"
+curl -i "http://127.0.0.1:3000/?hub.mode=subscribe&hub.verify_token=$WATS_VERIFY_TOKEN&hub.challenge=ping"
 ```
 
 A correct setup returns `200` with body `ping`; a wrong token returns `401`.
