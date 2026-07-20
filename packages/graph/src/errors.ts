@@ -288,7 +288,7 @@ function isRateLimitClassification(
   return false;
 }
 
-const BEARER_TOKEN_REGEXP=/Beare...+/g;
+const BEARER_TOKEN_REGEXP=/Bearer\s+\S+/g;
 
 function redactString(value: string): string {
   return value.replace(BEARER_TOKEN_REGEXP, "Bearer ***");

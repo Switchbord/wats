@@ -1,9 +1,10 @@
 // WATS-175c PART 2 — GET /api/conversations/:phone/window.
 //
 // Authed route that returns the 24-hour customer-service-window state for a
-// phone number, computed from the injected persistence store. Mirrors the
-// existence-hiding posture of /metrics: a missing/mismatched bearer token
-// returns a 404 byte-identical to the catch-all. Requires persistence (503
+// phone number, computed from the injected persistence store. Uses the
+// uniform /api/* auth posture (WATS-189): a missing/mismatched bearer token
+// returns 401 unauthorized, matching the sibling /api/messages routes rather
+// than the existence-hiding /metrics posture. Requires persistence (503
 // persistence_not_configured when absent, matching /api/messages). The phone
 // path param is validated strictly (optional leading +, 1..15 digits).
 
@@ -226,15 +227,20 @@ describe("WATS-175c GET /api/conversations/:phone/window", () => {
     expect(body.error.code).toBe("malformed_path");
   });
 
-  test("wrong bearer token returns 404 byte-identical to the catch-all", async () => {
+  test("wrong bearer token returns 401 unauthorized (uniform /api/* posture)", async () => {
     const persistence = memoryStore();
     const app = createWatsServiceApp({ ...config(), persistence });
 
     const wrong = await app.fetch(new Request("https://service.test/api/conversations/15550001111/window", authedGet("wrong-token")));
-    expect(wrong.status).toBe(404);
+    expect(wrong.status).toBe(401);
+    const body = await wrong.json();
+    expect(body.error.code).toBe("unauthorized");
+  });
+
+  test("unknown route catch-all still returns 404 (existence-hiding for non-/api routes)", async () => {
+    const app = createWatsServiceApp(config());
     const catchAll = await app.fetch(new Request("https://service.test/no/such/route"));
     expect(catchAll.status).toBe(404);
-    expect(await wrong.text()).toBe(await catchAll.text());
   });
 
   test("non-GET method with valid token returns 405", async () => {

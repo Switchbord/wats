@@ -5,7 +5,7 @@ export const DEFAULT_WEBHOOK_MAX_BODY_BYTES = 1_048_576 as const;
 export const MAX_WEBHOOK_MAX_BODY_BYTES = 10_485_760 as const;
 export const MIN_SERVICE_PORT = 1 as const;
 export const MAX_SERVICE_PORT = 65_535 as const;
-export const REDACTED_ENV_NAME = "[REDACTED_ENV]" as const;
+export const REDACTED_ENV_NAME = "[REDACTED]" as const;
 
 export type ConfigErrorCode =
   | "invalid_config"

@@ -17,25 +17,6 @@ export type MediaOperation =
   | "upload_file_to_session"
   | "get_upload_session";
 
-export type MediaNotImplementedCode = "not_implemented";
-
-export class MediaNotImplementedError extends Error {
-  readonly code: MediaNotImplementedCode;
-  readonly operation: MediaOperation;
-  readonly linearIssue: string;
-
-  constructor(operation: MediaOperation, linearIssue: string) {
-    super(
-      `Media ${operation} is not implemented. ` +
-        `Track implementation via Linear issue ${linearIssue}.`
-    );
-    this.name = "MediaNotImplementedError";
-    this.code = "not_implemented";
-    this.operation = operation;
-    this.linearIssue = linearIssue;
-  }
-}
-
 export type MediaValidationErrorCode =
   | "invalid_client"
   | "invalid_params"
@@ -233,11 +214,6 @@ export interface GetUploadSessionResponse {
   readonly id: string;
   readonly fileOffset: number;
 }
-
-export const MEDIA_LINEAR_ISSUE_UPLOAD = "WATS-37";
-export const MEDIA_LINEAR_ISSUE_DOWNLOAD = "WATS-37";
-export const MEDIA_LINEAR_ISSUE_DELETE = "WATS-37";
-export const MEDIA_LINEAR_ISSUE_DECRYPT = "WATS-37";
 
 const MAX_PATH_DECODE_ROUNDS = 5;
 const SAFE_ID_REGEXP = /^[A-Za-z0-9_-]+$/;

@@ -1997,7 +1997,7 @@ export function createWatsServiceOpenApiDocument(
           "400": errorResponseSpec("Malformed limit or cursor query."),
           "401": errorResponseSpec("Missing or invalid service bearer token."),
           "405": errorResponseSpec("Method not allowed."),
-          "503": errorResponseSpec("No persistence store is configured.")
+          "503": errorResponseSpec("No persistence store configured (persistence_not_configured), or the configured store could not be reached (persistence_unavailable).")
         }
       }
     },
@@ -2013,9 +2013,9 @@ export function createWatsServiceOpenApiDocument(
           "200": okResponseSpec("Projected message record.", "MessageRecord"),
           "400": errorResponseSpec("Malformed message id."),
           "401": errorResponseSpec("Missing or invalid service bearer token."),
-          "404": errorResponseSpec("Message not found."),
+          "404": errorResponseSpec("Message not found (record === null)."),
           "405": errorResponseSpec("Method not allowed."),
-          "503": errorResponseSpec("No persistence store is configured.")
+          "503": errorResponseSpec("No persistence store configured (persistence_not_configured), or the configured store could not be reached (persistence_unavailable).")
         }
       }
     },
@@ -2023,7 +2023,7 @@ export function createWatsServiceOpenApiDocument(
       get: {
         tags: ["conversations"],
         summary: "Get the 24-hour customer-service-window state for a phone number",
-        description: "Returns the conversation-window state (open/closed, last inbound timestamp, expiry, remaining ms) computed from the injected persistence store via getConversationWindowState. Requires the service bearer token. On a missing or mismatched token the service returns 404 (not 401) so the endpoint's existence is not leaked, matching /metrics. Returns 503 persistence_not_configured when no persistence store is configured. The phone path param is validated strictly: an optional leading + followed by 1..15 digits.",
+        description: "Returns the conversation-window state (open/closed, last inbound timestamp, expiry, remaining ms) computed from the injected persistence store via getConversationWindowState. Requires the service bearer token. A missing or mismatched token returns 401 unauthorized, matching the sibling /api/* operator routes (telemetry endpoints /metrics, /status, /debug/diagnostics keep the existence-hiding 404). Returns 503 persistence_not_configured when no persistence store is configured, or 503 persistence_unavailable when the configured store throws. The phone path param is validated strictly: an optional leading + followed by 1..15 digits.",
         security: [{ serviceBearerAuth: [] }],
         parameters: [
           { name: "phone", in: "path", required: true, schema: { type: "string", pattern: "^\\+?\\d{1,15}$", minLength: 1, maxLength: 16 }, description: "Customer phone number (E.164-ish: optional leading +, 1..15 digits)." }
@@ -2031,9 +2031,10 @@ export function createWatsServiceOpenApiDocument(
         responses: {
           "200": okResponseSpec("Conversation window state.", "ConversationWindowState"),
           "400": errorResponseSpec("Malformed phone path param."),
-          "404": errorResponseSpec("Route not found, or bearer token missing/invalid (existence hidden)."),
+          "401": errorResponseSpec("Missing or invalid service bearer token."),
+          "404": errorResponseSpec("Route not found."),
           "405": errorResponseSpec("Method not allowed."),
-          "503": errorResponseSpec("No persistence store is configured.")
+          "503": errorResponseSpec("No persistence store configured (persistence_not_configured), or the configured store could not be reached (persistence_unavailable / conversation_window_unavailable).")
         }
       }
     },
@@ -2750,8 +2751,12 @@ async function handleListMessages(ctx: RuntimeConfig, request: Request, url: URL
     recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "success");
     return jsonResponse(200, { items: result.items, nextCursor: result.nextCursor });
   } catch {
+    // The store is configured but the call threw (DB outage, locked, etc.).
+    // Surface 503 persistence_unavailable so an outage is not misreported as
+    // "no store configured". 503 persistence_not_configured is reserved for
+    // ctx.persistence === undefined (guarded above).
     recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "error");
-    return errorResponse(503, "persistence_not_configured", "Message projections require a persistence store.");
+    return errorResponse(503, "persistence_unavailable", "Message projection store could not be reached.");
   }
 }
 
@@ -2776,8 +2781,12 @@ async function handleGetMessage(ctx: RuntimeConfig, request: Request, path: stri
     if (record === null) return errorResponse(404, "not_found", "Message not found.");
     return jsonResponse(200, record);
   } catch {
+    // The store is configured but the call threw. Returning 404 here would
+    // misreport a DB outage as a missing message. Reserve 404 not_found for
+    // record === null (guarded above) and surface 503 persistence_unavailable
+    // so operators can tell a store failure from an absent record.
     recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "error");
-    return errorResponse(404, "not_found", "Message not found.");
+    return errorResponse(503, "persistence_unavailable", "Message projection store could not be reached.");
   }
 }
 
@@ -2790,11 +2799,11 @@ const PHONE_PATH_RE = /^\+?\d{1,15}$/u;
 
 // WATS-175c: GET /api/conversations/:phone/window. Returns the 24-hour
 // customer-service-window state for a phone number, computed from the
-// injected persistence store via getConversationWindowState. Auth uses the
-// existence-hiding posture (404 byte-identical to the catch-all on a missing
-// or mismatched bearer token), matching /metrics rather than the sibling
-// /api/messages routes (401): the conversation-window endpoint is an operator
-// surface, not a public send surface, so its existence is hidden. Requires
+// injected persistence store via getConversationWindowState. WATS-189:
+// /api/* operator routes use the uniform 401 posture — a missing or
+// mismatched bearer token returns 401 unauthorized, matching the sibling
+// /api/messages routes. Telemetry endpoints (/metrics, /status,
+// /debug/diagnostics) keep the existence-hiding 404 catch-all. Requires
 // persistence (503 persistence_not_configured when absent, matching
 // /api/messages).
 async function handleConversationWindow(
@@ -2802,7 +2811,7 @@ async function handleConversationWindow(
   request: Request,
   path: string
 ): Promise<Response> {
-  if (!isAuthorized(request, ctx.secrets.serviceBearerToken)) return notFound();
+  if (!isAuthorized(request, ctx.secrets.serviceBearerToken)) return unauthorized();
   if (request.method.toUpperCase() !== "GET") return methodNotAllowed("GET");
   if (ctx.persistence === undefined) {
     return errorResponse(503, "persistence_not_configured", "Conversation window state requires a persistence store.");

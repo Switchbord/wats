@@ -60,7 +60,6 @@ export {
   createUploadSession,
   uploadFileToSession,
   getUploadSession,
-  MediaNotImplementedError,
   MediaValidationError,
   MediaCryptoError,
   MediaIntegrityError,
@@ -69,15 +68,10 @@ export {
   DEFAULT_MAX_MEDIA_DOWNLOAD_BYTES,
   MAX_MEDIA_DOWNLOAD_BYTES,
   DEFAULT_MAX_UPLOAD_SESSION_BYTES,
-  MAX_UPLOAD_SESSION_BYTES,
-  MEDIA_LINEAR_ISSUE_UPLOAD,
-  MEDIA_LINEAR_ISSUE_DOWNLOAD,
-  MEDIA_LINEAR_ISSUE_DELETE,
-  MEDIA_LINEAR_ISSUE_DECRYPT
+  MAX_UPLOAD_SESSION_BYTES
 } from "./endpoints/media.js";
 export type {
   MediaOperation,
-  MediaNotImplementedCode,
   MediaValidationErrorCode,
   MediaCryptoErrorCode,
   MediaIntegrityErrorCode,
