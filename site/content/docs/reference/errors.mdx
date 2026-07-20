@@ -223,7 +223,11 @@ WATS's registry is keyed by discrete `(code, subcode?)` pairs and does not suppo
 
 ## Retry-After header
 
-`GraphErrorFactoryContext` carries `headers: Headers`, so a factory could inspect `Retry-After`. The built-in subclasses do not: rate-limit classification is based purely on HTTP status + payload code, and no back-off hint is attached to `GraphRateLimitError` instances. Consumers that need `Retry-After` today must read it themselves from the response headers.
+`GraphApiError` (and therefore `GraphRateLimitError`) carries a `retryAfter?: string` field. `createGraphApiError` reads the `Retry-After` response header and populates it verbatim on every classified instance — seconds value or HTTP-date, as Meta sent it. The field is `undefined` when the response carried no such header.
+
+The `@wats/service` HTTP layer echoes that hint back to its own callers: on a rate-limit failure it returns HTTP 503 with a `retry-after` header copied from `error.retryAfter` when present.
+
+Rate-limit classification itself is based on HTTP status + payload code, not on the header — `retryAfter` is a back-off hint attached after classification, not a classification input.
 
 ## Template and Marketing Messages diagnostics
 
@@ -293,9 +297,11 @@ The request primitive inspects Graph JSON error envelopes only for non-2xx respo
 
 ## HTTP webhook verification errors
 
-`@wats/http` verification primitives return typed error objects (result unions) rather than throwing for expected failures.
+`@wats/http` verification primitives return typed error objects (result unions) rather than throwing for expected failures. Each result-union error carries a `status` field. The `WebhookAdapter` maps those onto the HTTP status it emits — the two are not always the same number.
 
-`verifyWebhookChallenge` error codes:
+### `verifyWebhookChallenge` result-union codes
+
+Each error carries `status: 400 | 403 | 500` on the `WebhookChallengeError` object:
 
 - `invalid_expected_verify_token` (`status: 500`) when the configured expected verify token is missing, non-string, empty, or whitespace-only.
 - `invalid_mode` (`status: 403`)
@@ -303,7 +309,19 @@ The request primitive inspects Graph JSON error envelopes only for non-2xx respo
 - `missing_challenge` (`status: 400`)
 - `crypto_provider_unavailable` (`status: 500`) when `input.crypto` is omitted AND the default `createCryptoProvider()` factory raises `UnsupportedCapabilityError`.
 
-`validateWebhookSignature` error codes:
+### HTTP status emitted by `WebhookAdapter`
+
+The adapter's `handleVerify` maps the result-union codes above onto the HTTP status returned to Meta. The mapping is not 1:1 with the result-union `status`:
+
+| Result-union code               | HTTP status |
+| ------------------------------- | ----------- |
+| `invalid_verify_token`          | 401         |
+| `invalid_mode`                  | 400         |
+| `missing_challenge`             | 400         |
+| `invalid_expected_verify_token` | 500         |
+| `crypto_provider_unavailable`   | 500         |
+
+### `validateWebhookSignature` error codes
 
 - `invalid_app_secret`
 - `invalid_raw_body` — `null`/`undefined`/plain objects/numbers/booleans/arrays/symbols/functions rejected; `SharedArrayBuffer`-backed views and detached buffers rejected too.
@@ -317,6 +335,7 @@ Both functions are `async` and route cryptographic primitives through the `@wats
 ## Usage
 
 ```ts
+import { createWhatsApp } from "@wats/core";
 import {
   GraphApiError,
   GraphAuthError,
@@ -327,8 +346,13 @@ import {
   scrubErrorCause
 } from "@wats/graph";
 
+const wa = createWhatsApp({
+  accessToken: process.env.WATS_ACCESS_TOKEN!,
+  phoneNumberId: process.env.WATS_PHONE_NUMBER_ID!,
+});
+
 try {
-  await client.messages.sendMessage({ phoneNumberId, to, text });
+  await wa.sendText({ to: "<recipient-e164>", text: "hello from wats" });
 } catch (error) {
   if (error instanceof InvalidParameterError) {
     // code 100 — caller fix needed.
@@ -337,7 +361,7 @@ try {
   } else if (error instanceof GraphAuthError) {
     // rotate access token.
   } else if (error instanceof GraphRateLimitError) {
-    // back off; consult Retry-After.
+    // back off; consult error.retryAfter when Meta supplied Retry-After.
   } else if (error instanceof GraphApiError) {
     logger.error("graph.unhandled", scrubErrorCause(error));
   } else {

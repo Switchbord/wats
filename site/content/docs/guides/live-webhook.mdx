@@ -27,14 +27,17 @@ Note the `https://<your-tunnel-host>` URL it prints.
 ## Run the live serve wrapper
 
 ```bash
-WATS_LIVE_ENABLE=1 WATS_YES_LIVE=1 \
-  wats serve --config wats.config.yaml --live --yes-live --env-file .env.local
+wats serve --config wats.config.yaml --live --yes-live --env-file .env.local
 ```
 
 - `--live` declares live intent.
 - `--yes-live` acknowledges that service routes can call Graph when you hit them.
 - `--env-file .env.local` is required; WATS does not read `.env.local`
   implicitly. Keep the env file local and gitignored.
+
+The `WATS_LIVE_ENABLE` and `WATS_YES_LIVE` env vars gate the `@wats/testing`
+live probe ledger, not `wats serve` — the serve wrapper uses the `--live` and
+`--yes-live` flags.
 
 This is for local live testing behind a secure HTTPS tunnel, not production
 hosting.

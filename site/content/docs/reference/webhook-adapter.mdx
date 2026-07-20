@@ -7,7 +7,12 @@ description: "The @wats/http runtime-neutral WebhookAdapter and its Bun, Node, a
 
 ## WebhookAdapter
 
-The **WebhookAdapter** is `@wats/http`'s runtime-neutral HTTP adapter layer. It takes incoming HTTP requests, verifies their `X-Hub-Signature-256` via the signature primitives, normalizes their body via `normalizeWebhookEnvelope`, dispatches the resulting `TypedUpdate` values through a facade-shaped `dispatch()` method, and returns a response with the correct status code.
+The **WebhookAdapter** is `@wats/http`'s runtime-neutral HTTP adapter layer. Each request passes through four stages:
+
+1. Verify `X-Hub-Signature-256` via the signature primitives.
+2. Normalize the body via `normalizeWebhookEnvelope`.
+3. Dispatch the resulting `TypedUpdate` values through a facade-shaped `dispatch()` method.
+4. Return a response with the correct status code.
 
 The adapter ships in **three shapes**, all backed by a single runtime-neutral core:
 
@@ -30,8 +35,8 @@ import {
 import { createWhatsApp } from "@wats/core";
 
 const wa = createWhatsApp({
-  accessToken: process.env.ACCESS_TOKEN!,
-  phoneNumberId: "12345"
+  accessToken: process.env.WATS_ACCESS_TOKEN!,
+  phoneNumberId: process.env.WATS_PHONE_NUMBER_ID!,
 });
 
 // Echo inbound text messages back to the sender.
@@ -42,8 +47,8 @@ wa.onMessage(async (ctx) => {
 });
 
 const adapter = createWebhookAdapter({
-  verifyToken: process.env.VERIFY_TOKEN!,
-  appSecret: process.env.APP_SECRET!,
+  verifyToken: process.env.WATS_VERIFY_TOKEN!,
+  appSecret: process.env.WATS_APP_SECRET!,
   whatsapp: wa,
   maxBodyBytes: 1_048_576,
   logger: (event) => console.log(event.type)
