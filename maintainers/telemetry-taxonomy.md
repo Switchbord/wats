@@ -1,10 +1,10 @@
 # Telemetry Privacy Model and Metric Taxonomy
 
-WATS-161 / TELEMETRY-0. Design contract for WATS service telemetry. No `/metrics`, `/status`, or diagnostics implementation exists in this slice. Future telemetry issues (WATS-162 through WATS-166) import and respect these decisions.
+Design contract for WATS service telemetry. No `/metrics`, `/status`, or diagnostics implementation exists in this slice. Future telemetry issues import and respect these decisions.
 
 ## Goal
 
-Define the telemetry privacy boundary and metric taxonomy before adding endpoints. Every telemetry issue in the WATS-162..166 epic points at this document as its contract.
+Define the telemetry privacy boundary and metric taxonomy before adding endpoints. Every telemetry issue in the telemetry epic points at this document as its contract.
 
 ## Non-goals
 
@@ -18,7 +18,7 @@ Telemetry is separate from liveness and readiness. `/healthz` and `/readyz` alre
 
 ## Allowed metric families
 
-The following metric families are the only ones WATS service telemetry may expose. Each family has a concrete metric name in Prometheus snake_case convention. Future implementations (WATS-162) must not invent metrics outside this list without amending this doc and its test.
+The following metric families are the only ones WATS service telemetry may expose. Each family has a concrete metric name in Prometheus snake_case convention. Future implementations must not invent metrics outside this list without amending this doc and its test.
 
 | Family | Metric name | Type | Description |
 |--------|-------------|------|-------------|
@@ -90,11 +90,11 @@ Options for future implementers:
 1. Bearer token — `/metrics`, `/status`, and `/debug/diagnostics` require an `Authorization: Bearer <serviceBearerToken>` header. Fail closed with 404 on a missing or mismatched token.
 2. Localhost/internal bind — for operators who want telemetry without a token: bind telemetry routes to a separate listener on `127.0.0.1` or a Unix socket. This is a deployment concern, not a WATS core concern.
 
-WATS-162 (`/metrics`), WATS-163 (`/status`), WATS-164 (OTel hook seams), WATS-165 (`/debug/diagnostics`), and WATS-166 (docs) must implement against this document. If an implementation needs a new metric family, label key, or diagnostic field, amend this doc and its test first.
+Future implementers of `/metrics`, `/status`, the OTel hook seams, `/debug/diagnostics`, and docs must implement against this document. If an implementation needs a new metric family, label key, or diagnostic field, amend this doc and its test first.
 
 ## Telemetry sink seam
 
-In addition to the Prometheus `/metrics` endpoint, WATS exposes an internal telemetry event stream through a `TelemetrySink` interface (WATS-164). A sink receives the same events that update the internal metrics registry. The interface is synchronous, PII-safe, and carries no hard `@opentelemetry/*` dependency. Implementers may bridge it to OpenTelemetry JS, Datadog, CloudWatch, or any other backend.
+In addition to the Prometheus `/metrics` endpoint, WATS exposes an internal telemetry event stream through a `TelemetrySink` interface. A sink receives the same events that update the internal metrics registry. The interface is synchronous, PII-safe, and carries no hard `@opentelemetry/*` dependency. Implementers may bridge it to OpenTelemetry JS, Datadog, CloudWatch, or any other backend.
 
 Attribute keys use OpenTelemetry conventions where they exist:
 
@@ -112,4 +112,4 @@ The same PII denylist and enum-clamping rules apply to sink attributes as to Pro
 
 ## No /metrics implementation in this slice
 
-This document is a contract. No `/metrics` route, Prometheus text endpoint, OpenMetrics endpoint, or metrics registry exists in `@wats/service` as of this slice. The test asserts that no file under `packages/service/src/` contains `/metrics`, `prometheus`, or `openmetrics`. WATS-162 implements the endpoint.
+This document is a contract. No `/metrics` route, Prometheus text endpoint, OpenMetrics endpoint, or metrics registry exists in `@wats/service` as of this slice. The test asserts that no file under `packages/service/src/` contains `/metrics`, `prometheus`, or `openmetrics`. The `/metrics` endpoint is not yet implemented.

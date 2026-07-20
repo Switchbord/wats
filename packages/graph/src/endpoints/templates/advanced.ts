@@ -6,7 +6,7 @@
 // F-6 path-param sanitizer (dot-segment / slash / control-char rejection)
 // and the F-4 MockTransport testability contract.
 //
-// Reference notes (see REFERENCE-153.md):
+// Reference notes (see maintainers/template-management-reference.md):
 //  - compare: pywa sends `template_ids` as a comma-joined string. Meta's
 //    curl docs show a bracketed list; the accepted form is UNVERIFIED.
 //    We follow pywa (comma-joined) and document the discrepancy.
@@ -600,7 +600,7 @@ export const migrateTemplates = Object.assign(
 // caller-supplied `authorization` headers — tokens never leak through the
 // body, URL, or error payload.
 //
-// Wire (see REFERENCE-153.md §5):
+// Wire (see maintainers/template-management-reference.md §5):
 //   POST https://api.facebook.com/{wabaId}/message_templates/archive
 //   POST https://api.facebook.com/{wabaId}/message_templates/unarchive
 //   Body: { hsm_ids: [id, ...] }  (JSON, content-type application/json)
@@ -611,9 +611,9 @@ export const migrateTemplates = Object.assign(
 // UNVERIFIED. We follow Meta's documented array shape because (a) it is the
 // documented contract and (b) a JSON array avoids ambiguity when a template
 // id legitimately contains a comma. pywa parity is intentionally NOT mimicked
-// here. See REFERENCE-153.md §5.
+// here. See maintainers/template-management-reference.md §5.
 //
-// Response (Meta, see REFERENCE-153.md §5):
+// Response (Meta, see maintainers/template-management-reference.md §5):
 //   archive   -> { archived_templates:  [id...], failed_templates: { id: reason } }
 //   unarchive -> { unarchived_templates:[id...], failed_templates: { id: reason } }
 // pywa may return `failed_templates` as a list `[{ id, reason }]`; both forms
@@ -978,7 +978,7 @@ async function invokeArchiveEndpoint(
  * {@link ARCHIVE_TEMPLATES_MAX_IDS} message templates on a WABA. Mirrors
  * pywa's `WhatsApp.archive_templates`. Uses `GraphClient.requestRaw` (not
  * `defineEndpoint`) because the endpoint lives on api.facebook.com, not
- * graph.facebook.com. See REFERENCE-153.md §5.
+ * graph.facebook.com. See maintainers/template-management-reference.md §5.
  */
 export async function archiveTemplates(
   client: GraphClient,
@@ -1003,7 +1003,7 @@ export async function archiveTemplates(
  * {@link ARCHIVE_TEMPLATES_MAX_IDS} message templates on a WABA. Mirrors
  * pywa's `WhatsApp.unarchive_templates`. Uses `GraphClient.requestRaw` (not
  * `defineEndpoint`) because the endpoint lives on api.facebook.com, not
- * graph.facebook.com. See REFERENCE-153.md §5.
+ * graph.facebook.com. See maintainers/template-management-reference.md §5.
  */
 export async function unarchiveTemplates(
   client: GraphClient,

@@ -557,7 +557,7 @@ export class WABAClient {
    * Graph `POST /{templateId}/unpause` (WATS-153). Template-id scoped edge
    * that unpauses a paused template. Delegates to the endpoint-registry
    * callable; the bound wabaId is not used (mirrors getMessageTemplate).
-   * The endpoint/response shape is UNVERIFIED — see REFERENCE-153.md.
+   * The endpoint/response shape is UNVERIFIED — see maintainers/template-management-reference.md.
    */
   async unpauseTemplate(
     params: UnpauseTemplateInput,
@@ -614,7 +614,7 @@ export class WABAClient {
    * `GraphClient.requestRaw` (not `defineEndpoint`) because the endpoint
    * lives on api.facebook.com, not graph.facebook.com. The bound wabaId is
    * used in the path and wins over any caller-supplied `wabaId` (mirrors
-   * `migrateTemplates`). See REFERENCE-153.md §5.
+   * `migrateTemplates`). See maintainers/template-management-reference.md §5.
    */
   async archiveTemplates(
     params: Omit<ArchiveTemplatesInput, "wabaId">,
@@ -637,7 +637,7 @@ export class WABAClient {
    * `GraphClient.requestRaw` (not `defineEndpoint`) because the endpoint
    * lives on api.facebook.com, not graph.facebook.com. The bound wabaId is
    * used in the path and wins over any caller-supplied `wabaId` (mirrors
-   * `migrateTemplates`). See REFERENCE-153.md §5.
+   * `migrateTemplates`). See maintainers/template-management-reference.md §5.
    */
   async unarchiveTemplates(
     params: Omit<UnarchiveTemplatesInput, "wabaId">,

@@ -1,4 +1,4 @@
-# WATS-153 reference — advanced template management helpers
+# Template management helpers — pywa/Meta comparison reference
 
 Sources: pywa master (client.py/api.py/types/templates.py) + Meta template comparison/migration/archival/auth docs. Base URL Graph v25.0 unless noted. Auth: Bearer token.
 
