@@ -1,35 +1,26 @@
 // @wats/types — contacts.ts
 //
-// Closed contact shape per architecture notes F-1. The wire payload uses snake_case
-// sub-fields (first_name / formatted_name) which are preserved here via
-// `raw` and reachable escape hatches so F-8's normalizer can promote
-// them to camelCase without breaking callers that touch `raw` today.
-//
-// TODO(F-8): replace raw-wire field mirroring in `WhatsAppContactName`
-// and related sub-shapes with the normalizer's camelCase output. The
-// duplicated snake_case surface stays until F-8 lands.
+// Closed contact shape per architecture notes F-1. The Meta wire payload
+// uses snake_case sub-fields (first_name / formatted_name / wa_id /
+// country_code / ...). These types describe the NORMALIZED camelCase
+// shape; the @wats/core webhook normalizer owns the snake→camel mapping
+// for inbound contacts. The original wire record is preserved on the
+// normalizer output via `raw` and is reachable on the raw envelope via
+// `rawChange`.
 
 export interface WhatsAppContactName {
-  formatted?: string;
-  first_name?: string;
-  last_name?: string;
-  middle_name?: string;
-  suffix?: string;
-  prefix?: string;
-  /**
-   * Legacy camelCase fields retained from B1. Either casing style may be
-   * populated depending on who authored the payload.
-   * TODO(F-8): collapse to camelCase-only once the normalizer lands.
-   */
   formattedName?: string;
   firstName?: string;
   lastName?: string;
+  middleName?: string;
+  suffix?: string;
+  prefix?: string;
 }
 
 export interface ContactPhone {
   phone?: string;
   type?: string;
-  wa_id?: string;
+  waId?: string;
 }
 
 export interface ContactEmail {
@@ -43,7 +34,7 @@ export interface ContactAddress {
   state?: string;
   zip?: string;
   country?: string;
-  country_code?: string;
+  countryCode?: string;
   type?: string;
 }
 
@@ -59,7 +50,7 @@ export interface ContactUrl {
 }
 
 export interface WhatsAppContact {
-  wa_id?: string;
+  waId?: string;
   profile?: { name?: string };
   name?: WhatsAppContactName;
   phones?: ContactPhone[];

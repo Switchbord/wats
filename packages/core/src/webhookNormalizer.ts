@@ -80,6 +80,13 @@ export interface TypedMessageUpdate {
   readonly wabaId: string;
   readonly receivedAt: number;
   readonly message: GroupMessage;
+  /**
+   * WATS-198: sender profile contacts[] from the field-value level,
+   * normalized from Meta wire ({ wa_id, profile: { name } }) to camelCase.
+   * Absent when the change carries no contacts[] or all entries are
+   * malformed. The original wire is preserved on `rawChange`.
+   */
+  readonly contacts?: readonly NormalizedContact[];
   readonly rawChange: WhatsAppWebhookChange;
 }
 
@@ -100,6 +107,18 @@ export interface NormalizedCallContact {
   readonly userId?: string;
   readonly parentUserId?: string;
   readonly raw: Record<string, unknown>;
+}
+
+/**
+ * WATS-198: normalized sender-profile contact from the field-value
+ * `contacts[]` array that accompanies inbound messages. Meta wire
+ * `{ wa_id, profile: { name } }` is mapped to camelCase; the original
+ * wire record is preserved on `raw`.
+ */
+export interface NormalizedContact {
+  readonly waId?: string;
+  readonly profile?: { readonly name?: string };
+  readonly raw?: unknown;
 }
 
 export interface NormalizedCallPayload {
@@ -667,6 +686,183 @@ function normalizeCallContactsArray(value: unknown): readonly NormalizedCallCont
   return out.length > 0 ? out : undefined;
 }
 
+// ---------- WATS-198 inbound contact normalization ----------
+
+/**
+ * Normalize a field-value `contacts[]` entry (sender profile data
+ * accompanying inbound messages) from Meta wire `{ wa_id, profile:
+ * { name } }` to camelCase `NormalizedContact`. Returns undefined
+ * when the entry is not a plain record so the caller can skip it
+ * without throwing.
+ */
+function normalizeFieldValueContact(value: unknown): NormalizedContact | undefined {
+  if (!isRecord(value)) return undefined;
+  const out: { waId?: string; profile?: { name?: string }; raw?: unknown } = {};
+  const waId = readSafeIdField(value, "wa_id");
+  if (waId !== undefined) out.waId = waId;
+  const profileRaw = readOwnDataField(value, "profile");
+  if (isRecord(profileRaw)) {
+    const name = readStringField(profileRaw, "name");
+    if (name !== undefined) out.profile = { name };
+  }
+  // Skip entries with no recognizable contact fields (no waId and no
+  // valid profile.name). This filters out garbage records like
+  // { profile: "not-a-record" } that are technically objects but
+  // carry no usable sender-profile data.
+  if (waId === undefined && out.profile === undefined) return undefined;
+  out.raw = safeCloneMessageJsonValue(value);
+  return out;
+}
+
+function normalizeFieldValueContactsArray(value: unknown): readonly NormalizedContact[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const out: NormalizedContact[] = [];
+  for (let i = 0; i < value.length; i += 1) {
+    const itemResult = readArrayDataItem(value, i);
+    if (!itemResult.ok) continue;
+    const contact = normalizeFieldValueContact(itemResult.value);
+    if (contact !== undefined) out.push(contact);
+  }
+  return out.length > 0 ? out : undefined;
+}
+
+/**
+ * Normalize a contacts-message `contacts[]` entry (a contact card sent
+ * by a user) from Meta wire sub-fields to camelCase. Maps
+ * `formatted_name`/`first_name`/`last_name`/`middle_name` → camelCase
+ * on `name`; `wa_id` → `waId` on phones; `country_code` → `countryCode`
+ * on addresses. Returns undefined when the entry is not a plain record
+ * (null / primitive / array) so the caller can skip it without throwing.
+ */
+function normalizeContactsMessageContact(value: unknown): Record<string, unknown> | undefined {
+  if (!isRecord(value)) return undefined;
+  const out: Record<string, unknown> = {};
+
+  const nameRaw = readOwnDataField(value, "name");
+  if (isRecord(nameRaw)) {
+    const name: Record<string, unknown> = {};
+    const formattedName = readStringField(nameRaw, "formatted_name");
+    if (formattedName !== undefined) name.formattedName = formattedName;
+    const firstName = readStringField(nameRaw, "first_name");
+    if (firstName !== undefined) name.firstName = firstName;
+    const lastName = readStringField(nameRaw, "last_name");
+    if (lastName !== undefined) name.lastName = lastName;
+    const middleName = readStringField(nameRaw, "middle_name");
+    if (middleName !== undefined) name.middleName = middleName;
+    const suffix = readStringField(nameRaw, "suffix");
+    if (suffix !== undefined) name.suffix = suffix;
+    const prefix = readStringField(nameRaw, "prefix");
+    if (prefix !== undefined) name.prefix = prefix;
+    if (Object.keys(name).length > 0) out.name = name;
+  }
+
+  const phonesRaw = readOwnDataField(value, "phones");
+  if (Array.isArray(phonesRaw)) {
+    const phones: Record<string, unknown>[] = [];
+    for (let i = 0; i < phonesRaw.length; i += 1) {
+      const itemResult = readArrayDataItem(phonesRaw, i);
+      if (!itemResult.ok || !isRecord(itemResult.value)) continue;
+      const phone: Record<string, unknown> = {};
+      const p = readStringField(itemResult.value, "phone");
+      if (p !== undefined) phone.phone = p;
+      const t = readStringField(itemResult.value, "type");
+      if (t !== undefined) phone.type = t;
+      const waId = readSafeIdField(itemResult.value, "wa_id");
+      if (waId !== undefined) phone.waId = waId;
+      if (Object.keys(phone).length > 0) phones.push(phone);
+    }
+    if (phones.length > 0) out.phones = phones;
+  }
+
+  const emailsRaw = readOwnDataField(value, "emails");
+  if (Array.isArray(emailsRaw)) {
+    const emails: Record<string, unknown>[] = [];
+    for (let i = 0; i < emailsRaw.length; i += 1) {
+      const itemResult = readArrayDataItem(emailsRaw, i);
+      if (!itemResult.ok || !isRecord(itemResult.value)) continue;
+      const email: Record<string, unknown> = {};
+      const e = readStringField(itemResult.value, "email");
+      if (e !== undefined) email.email = e;
+      const t = readStringField(itemResult.value, "type");
+      if (t !== undefined) email.type = t;
+      if (Object.keys(email).length > 0) emails.push(email);
+    }
+    if (emails.length > 0) out.emails = emails;
+  }
+
+  const addressesRaw = readOwnDataField(value, "addresses");
+  if (Array.isArray(addressesRaw)) {
+    const addresses: Record<string, unknown>[] = [];
+    for (let i = 0; i < addressesRaw.length; i += 1) {
+      const itemResult = readArrayDataItem(addressesRaw, i);
+      if (!itemResult.ok || !isRecord(itemResult.value)) continue;
+      const addr: Record<string, unknown> = {};
+      const street = readStringField(itemResult.value, "street");
+      if (street !== undefined) addr.street = street;
+      const city = readStringField(itemResult.value, "city");
+      if (city !== undefined) addr.city = city;
+      const state = readStringField(itemResult.value, "state");
+      if (state !== undefined) addr.state = state;
+      const zip = readStringField(itemResult.value, "zip");
+      if (zip !== undefined) addr.zip = zip;
+      const country = readStringField(itemResult.value, "country");
+      if (country !== undefined) addr.country = country;
+      const countryCode = readStringField(itemResult.value, "country_code");
+      if (countryCode !== undefined) addr.countryCode = countryCode;
+      const t = readStringField(itemResult.value, "type");
+      if (t !== undefined) addr.type = t;
+      if (Object.keys(addr).length > 0) addresses.push(addr);
+    }
+    if (addresses.length > 0) out.addresses = addresses;
+  }
+
+  const orgRaw = readOwnDataField(value, "org");
+  if (isRecord(orgRaw)) {
+    const org: Record<string, unknown> = {};
+    const company = readStringField(orgRaw, "company");
+    if (company !== undefined) org.company = company;
+    const department = readStringField(orgRaw, "department");
+    if (department !== undefined) org.department = department;
+    const title = readStringField(orgRaw, "title");
+    if (title !== undefined) org.title = title;
+    if (Object.keys(org).length > 0) out.org = org;
+  }
+
+  const urlsRaw = readOwnDataField(value, "urls");
+  if (Array.isArray(urlsRaw)) {
+    const urls: Record<string, unknown>[] = [];
+    for (let i = 0; i < urlsRaw.length; i += 1) {
+      const itemResult = readArrayDataItem(urlsRaw, i);
+      if (!itemResult.ok || !isRecord(itemResult.value)) continue;
+      const url: Record<string, unknown> = {};
+      const u = readStringField(itemResult.value, "url");
+      if (u !== undefined) url.url = u;
+      const t = readStringField(itemResult.value, "type");
+      if (t !== undefined) url.type = t;
+      if (Object.keys(url).length > 0) urls.push(url);
+    }
+    if (urls.length > 0) out.urls = urls;
+  }
+
+  const birthday = readStringField(value, "birthday");
+  if (birthday !== undefined) out.birthday = birthday;
+
+  out.raw = safeCloneMessageJsonValue(value);
+  return out;
+}
+
+function normalizeContactsMessageContactsArray(value: unknown): readonly Record<string, unknown>[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const out: Record<string, unknown>[] = [];
+  for (let i = 0; i < value.length; i += 1) {
+    const itemResult = readArrayDataItem(value, i);
+    if (!itemResult.ok) continue;
+    const contact = normalizeContactsMessageContact(itemResult.value);
+    if (contact !== undefined) out.push(contact);
+  }
+  return out.length > 0 ? out : undefined;
+}
+
 function isUnsafePrototypeKey(key: string): boolean {
   return key === "__proto__" || key === "constructor" || key === "prototype";
 }
@@ -950,6 +1146,14 @@ function normalizeMessagePayload(raw: Record<string, unknown>): GroupMessage | u
   if (type === "button") {
     const button = normalizeButtonPayload(readOwnDataField(raw, "button"));
     if (button !== undefined) base.button = button;
+    return base as unknown as WhatsAppMessage;
+  }
+  if (type === "contacts") {
+    const contactsWire = readOwnDataField(raw, "contacts");
+    if (Array.isArray(contactsWire)) {
+      const normalized = normalizeContactsMessageContactsArray(contactsWire);
+      base.contacts = normalized ?? [];
+    }
     return base as unknown as WhatsAppMessage;
   }
   if (type === "unsupported") {
@@ -1997,6 +2201,10 @@ function normalizeMessagesChange(
     return;
   }
 
+  // WATS-198: normalize field-value contacts[] (sender profiles) once per
+  // change; attach to each message update emitted from this change.
+  const fieldContacts = normalizeFieldValueContactsArray(readOwnDataField(value, "contacts"));
+
   const messages = readOwnDataField(value, "messages");
   if (Array.isArray(messages)) {
     for (let i = 0; i < messages.length; i += 1) {
@@ -2030,6 +2238,7 @@ function normalizeMessagesChange(
         wabaId,
         receivedAt,
         message: normalizedMessage,
+        ...(fieldContacts !== undefined ? { contacts: fieldContacts } : {}),
         rawChange
       };
       pushUpdate(acc, update, msgPath);
