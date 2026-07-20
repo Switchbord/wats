@@ -144,6 +144,6 @@ describe("WATS-110 npm scope governance and provenance hardening", () => {
     // add the entry in the next release PR, not under the already-tagged
     // heading. Verify the top heading stays the current release.
     const changelog = read("CHANGELOG.md");
-    expect(changelog.startsWith("# Changelog\n\n## [0.3.30]")).toBe(true);
+    expect(changelog.startsWith("# Changelog\n\n## [0.4.0-beta.0]")).toBe(true);
   });
 });

@@ -1,7 +1,7 @@
 {
   "name": "@wats/config",
   "description": "YAML/JSON config validation and env-secret references.",
-  "version": "0.3.30",
+  "version": "0.4.0-beta.0",
   "private": false,
   "license": "MIT",
   "type": "module",
@@ -38,6 +38,6 @@
     "wats"
   ],
   "dependencies": {
-    "@wats/internal-utils": "^0.3.30"
+    "@wats/internal-utils": "^0.4.0-beta.0"
   }
 }

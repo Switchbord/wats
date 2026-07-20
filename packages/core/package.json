@@ -1,7 +1,7 @@
 {
   "name": "@wats/core",
   "description": "Typed updates, filters, router, listeners, WhatsApp facade.",
-  "version": "0.3.30",
+  "version": "0.4.0-beta.0",
   "private": false,
   "license": "MIT",
   "type": "module",
@@ -58,6 +58,6 @@
     "wats"
   ],
   "dependencies": {
-    "@wats/graph": "^0.3.30"
+    "@wats/graph": "^0.4.0-beta.0"
   }
 }

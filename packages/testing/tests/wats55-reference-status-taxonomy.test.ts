@@ -36,6 +36,13 @@ function expectAll(source: string, needles: readonly string[], label: string): v
   }
 }
 
+function currentAlphaLine(): string {
+  const version = JSON.parse(read("package.json")).version as string;
+  const match = /^(\d+)\.(\d+)\./.exec(version);
+  if (!match) throw new Error(`Unexpected root package version ${version}`);
+  return `${match[1]}.${match[2]}.x-alpha`;
+}
+
 const graphEndpointSubpaths = [
   "@wats/graph/endpoints/media",
   "@wats/graph/endpoints/templates",
@@ -51,7 +58,7 @@ describe("WATS-55 reference status taxonomy and metadata", () => {
     // refs were deliberately dropped). The metadata still carries the alpha
     // tooling version tag — assert that survives.
     const appliesTo = metadataValue(packageMap, "appliesTo");
-    expect(appliesTo).toContain("0.3.x-alpha");
+    expect(appliesTo).toContain(currentAlphaLine());
 
     // Substance preserved: the api:check guard and what it verifies. The
     // old "WATS-54 checks package exports" phrasing was reworded to drop the
@@ -65,7 +72,7 @@ describe("WATS-55 reference status taxonomy and metadata", () => {
     // Voice-pass dropped the WATS-nn enumeration from appliesTo; the alpha
     // version tag survives.
     const appliesTo = metadataValue(referenceIndex, "appliesTo");
-    expect(appliesTo).toContain("0.3.x-alpha");
+    expect(appliesTo).toContain(currentAlphaLine());
     // The old line "WATS-54 keeps these aligned with `bun run api:check`" was
     // removed from the index during the voice pass (the api:check alignment
     // note now lives in package-map.mdx and endpoints.mdx). The index's

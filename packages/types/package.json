@@ -1,7 +1,7 @@
 {
   "name": "@wats/types",
   "description": "Shared WhatsApp domain types.",
-  "version": "0.3.30",
+  "version": "0.4.0-beta.0",
   "private": false,
   "license": "MIT",
   "type": "module",
