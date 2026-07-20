@@ -49,7 +49,7 @@
       "name": "@wats/config",
       "version": "0.3.30",
       "dependencies": {
-        "@wats/internal-utils": "^0.3.26",
+        "@wats/internal-utils": "^0.3.30",
       },
     },
     "packages/core": {
@@ -74,9 +74,9 @@
       "name": "@wats/http",
       "version": "0.3.30",
       "dependencies": {
-        "@wats/core": "^0.3.26",
-        "@wats/crypto": "^0.3.26",
-        "@wats/types": "^0.3.26",
+        "@wats/core": "^0.3.30",
+        "@wats/crypto": "^0.3.30",
+        "@wats/types": "^0.3.30",
       },
     },
     "packages/internal-utils": {
@@ -97,22 +97,24 @@
       "name": "@wats/service",
       "version": "0.3.30",
       "dependencies": {
-        "@wats/config": "^0.3.26",
-        "@wats/core": "^0.3.26",
-        "@wats/crypto": "^0.3.26",
-        "@wats/graph": "^0.3.26",
-        "@wats/http": "^0.3.26",
-        "@wats/persistence": "^0.3.26",
+        "@wats/config": "^0.3.30",
+        "@wats/core": "^0.3.30",
+        "@wats/crypto": "^0.3.30",
+        "@wats/graph": "^0.3.30",
+        "@wats/http": "^0.3.30",
+        "@wats/persistence": "^0.3.30",
       },
     },
     "packages/testing": {
       "name": "@wats/testing",
       "version": "0.3.30",
       "dependencies": {
+        "@wats/config": "workspace:*",
         "@wats/crypto": "workspace:*",
         "@wats/graph": "workspace:*",
         "@wats/http": "workspace:*",
         "@wats/internal-utils": "workspace:*",
+        "@wats/persistence": "workspace:*",
         "@wats/service": "workspace:*",
       },
     },
