@@ -72,10 +72,8 @@ Runtime orchestration and typed update handling.
 Primary exports:
 
 - `normalizeWebhookEnvelope` with message/status/account/unknown/calling update variants and deep camelCase normalization for common message body families
-- legacy raw parser/router helpers: `parseWebhookUpdate`, `createUpdateRouter` — **deprecated**, marked `@deprecated` at the type level; superseded by `normalizeWebhookEnvelope` + `TypedRouter` and scheduled for barrel removal next minor
-- typed filter namespace and `@wats/core/filtersTyped`, including `filtersTyped.call` and `message.*` helpers for media, location, reaction, interactive replies, and quick-reply buttons
-- legacy raw filter namespace and `@wats/core/filters` — **deprecated**, marked `@deprecated` at the type level; superseded by `filtersTyped` and scheduled for barrel removal next minor
 - `TypedRouter`
+- typed filter namespace and `@wats/core/filtersTyped`, including `filtersTyped.call` and `message.*` helpers for media, location, reaction, interactive replies, and quick-reply buttons
 - `createListenerRegistry`
 - `WhatsApp` facade and the `createWhatsApp(...)` factory, including `sendText(...)` (alias `startChat(...)`), `onMessage`/`onStatus`, and composer helpers when `phoneNumberId` is bound
 
@@ -147,9 +145,8 @@ Current commands:
 - `wats openapi --config <path> --server-url <url>`
 - `wats openapi --config <path> --out <path>`
 - `wats openapi --help`
-- `wats serve --config <path> --dry-run [--profile <name>] [--host <host>] [--port <port>] [--print-routes]`
-- `wats serve --config <path> --paas [--profile <name>] [--print-routes]`
-- `wats serve --config <path> --live --yes-live --env-file .env.local [--profile <name>] [--host <host>] [--port <port>]`
+- `wats serve --config <path> --dry-run [--profile <name>] [--host <host>] [--port <port>] [--paas] [--print-routes]`
+- `wats serve --config <path> --live --yes-live --env-file .env.local [--profile <name>] [--host <host>] [--port <port>] [--paas]`
 - `wats serve --help`
 - `wats webhook token`
 - `wats messages list [--config <path>] [--profile <name>] [--env-file <path>] [--limit N] [--cursor <rowId>] [--json]`

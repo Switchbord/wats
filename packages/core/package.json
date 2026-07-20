@@ -12,18 +12,6 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./updateParser": {
-      "types": "./dist/updateParser.d.ts",
-      "import": "./dist/updateParser.js"
-    },
-    "./router": {
-      "types": "./dist/router.d.ts",
-      "import": "./dist/router.js"
-    },
-    "./filters": {
-      "types": "./dist/filters/index.d.ts",
-      "import": "./dist/filters/index.js"
-    },
     "./filtersTyped": {
       "types": "./dist/filtersTyped/index.d.ts",
       "import": "./dist/filtersTyped/index.js"

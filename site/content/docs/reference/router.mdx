@@ -12,10 +12,10 @@ Dispatch synthetic updates through a router in the [playground](/playground?scen
 `TypedRouter` is the handler-dispatch engine above the `TypedUpdate` union and the branded `TypedFilter` surface. It owns three contracts the lower layers do not:
 
 1. **Handle-based registration.** Every call to `.on(filter, handler)` returns a `RegistrationHandle` the caller can use to `.unregister()` the handler. The handle carries the unique `Symbol()` id and a live `.registered` flag.
-2. **Registration-order dispatch.** Matching handlers fire in the exact order they were registered. The router does NOT implicitly group by kind, filter shape, or any other property.
+2. **Registration-order dispatch.** Matching handlers fire in the exact order they were registered. The router does not implicitly group by kind, filter shape, or any other property.
 3. **Observer seams.** Plug in `onBeforeDispatch` / `onAfterDispatch` / `onHandlerMatch` / `onHandlerError` hooks to log, trace, or count without a hard dependency on router internals.
 
-The router is the FINAL try/catch boundary for handler evaluation. Handler throws NEVER propagate out of `.dispatch()`.
+The router is the **final** try/catch boundary for handler evaluation. Handler throws NEVER propagate out of `.dispatch()`.
 
 ## Construction
 
@@ -34,12 +34,12 @@ const router = new TypedRouter({
 });
 ```
 
-All options are validated at CONSTRUCTION time with `TypedRouterOptionsError` and a stable `.code`:
+All options are validated at **construction** time with `TypedRouterOptionsError` and a stable `.code`:
 
 | Code | When it fires |
 | ---- | ------------- |
 | `invalid_options` | options is not a plain object |
-| `invalid_observer` | observer is not an object OR a hook is not a function |
+| `invalid_observer` | observer is not an object or a hook is not a function |
 | `invalid_max_handlers` | `maxHandlersPerDispatch` is not a positive integer |
 | `invalid_concurrency` | value is not `"sequential"` or `"parallel"` |
 | `invalid_dispatch_id_factory` | `dispatchIdFactory` is not a function |
@@ -96,9 +96,9 @@ When a handler throws (or an async handler rejects), the router:
 3. Invokes `observer.onHandlerError(dispatchId, handle, error, update)` if an observer is registered. The observer call is isolated — see "Observer-throw isolation" below.
 4. Continues with the next matching handler — subsequent handlers still fire.
 
-`.dispatch()` always resolves with a report. It NEVER rejects with a handler error, and it NEVER throws synchronously.
+`.dispatch()` always resolves with a report. It never rejects with a handler error, and it never throws synchronously.
 
-Filter-predicate throws (from consumer-supplied `custom()` predicates) are treated as **handler errors**: they originate from consumer-supplied code. The error is appended to `DispatchReport.errors` with the predicate-owning registration's `handleId` AND forwarded to `onHandlerError` (if an observer is registered). The matching handler is SKIPPED for that dispatch — the predicate never returned `true`, so the handler does not fire.
+Filter-predicate throws (from consumer-supplied `custom()` predicates) are treated as **handler errors**: they originate from consumer-supplied code. The error is appended to `DispatchReport.errors` with the predicate-owning registration's `handleId` and forwarded to `onHandlerError` (if an observer is registered). The matching handler is **skipped** for that dispatch — the predicate never returned `true`, so the handler does not fire.
 
 Observer-less callers therefore see a non-empty `errors` array when a `custom()` predicate explodes — the failure is never silently lost.
 
@@ -120,7 +120,7 @@ Invariants:
 - `onBeforeDispatch` fires exactly once, before any handler.
 - `onAfterDispatch` fires exactly once, after all handlers (or the first `"stop"`), with the final report.
 - Both hooks share the same `dispatchId` for their call pair — use it to correlate log/trace spans.
-- `onHandlerMatch` fires once per MATCHING handler (never for non-matching handlers).
+- `onHandlerMatch` fires once per matching handler (never for non-matching handlers).
 - `onHandlerError` fires synchronously with the collection into `report.errors` — so log-append and report-read are consistent.
 
 ### Observer-throw isolation
@@ -131,16 +131,16 @@ The rationale: the dispatch contract is "always resolves". Letting observer thro
 
 Implementation contract:
 
-- Do NOT rely on observer throws to signal exceptional flow. They are swallowed, and there is no `onObserverError` re-entry seam.
+- Do not rely on observer throws to signal exceptional flow. They are swallowed, and there is no `onObserverError` re-entry seam.
 - Observers are best-effort instrumentation (logging, metrics, tracing). If your observer must surface an error, route it via your own external mechanism — not by throwing.
 - All four hooks (`onBeforeDispatch`, `onHandlerMatch`, `onHandlerError`, `onAfterDispatch`) are isolated identically, in both `sequential` and `parallel` concurrency modes.
 
 ## Snapshot semantics during unregister
 
-The router takes a SNAPSHOT of the registered handlers at the start of `.dispatch()`. The dispatch then iterates the snapshot.
+The router takes a **snapshot** of the registered handlers at the start of `.dispatch()`. The dispatch then iterates the snapshot.
 
 - **Unregister during dispatch:** if handler `H1` calls `h2.unregister()` while H1 is running, `H2` still fires in the same dispatch (it was already in the snapshot). The next dispatch will not see `H2`.
-- **Register during dispatch:** a new `router.on(...)` call made by a running handler does NOT fire in the current dispatch. It becomes visible to the next dispatch.
+- **Register during dispatch:** a new `router.on(...)` call made by a running handler does not fire in the current dispatch. It becomes visible to the next dispatch.
 
 This picks determinism over "live" semantics. A frozen handler list for the duration of one dispatch is easier to reason about than racing-against-mutation.
 

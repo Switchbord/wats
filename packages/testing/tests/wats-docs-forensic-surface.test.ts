@@ -55,7 +55,9 @@ describe("forensic docs current-surface reconciliation", () => {
     expect(surface).toContain("GET {profile.service.apiPrefix}/messages");
     expect(surface).toContain("opt-in Groups routes");
     expect(surface).toContain("wats setup");
-    expect(surface).toContain("wats serve --config <path> --paas");
+    expect(surface).toContain("wats serve --config <path> --dry-run [--profile <name>] [--host <host>] [--port <port>] [--paas] [--print-routes]");
+    expect(surface).toContain("wats serve --config <path> --live --yes-live --env-file .env.local [--profile <name>] [--host <host>] [--port <port>] [--paas]");
+    expect(surface).not.toContain("wats serve --config <path> --paas [--profile <name>] [--print-routes]");
     expect(surface).not.toContain("observed status UI");
     expect(surface).not.toContain("supported Dockerfile, Compose file");
 

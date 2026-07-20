@@ -25,8 +25,8 @@ runtime. It is **not** part of the `site` build graph and adds no deps to
 `index.ts` re-exports (named + namespace) the surfaces the five v1 scenarios
 need: `GraphClient`, `PhoneNumberClient`, the `Graph*Error` classes, group/waba
 clients, `createMockTransport` (from `@wats/graph/testing`), and from
-`@wats/core`: `WhatsApp`, `normalizeWebhookEnvelope`, `TypedRouter`,
-`createUpdateRouter`, plus `filters` / `filtersTyped` namespaces.
+`@wats/core`: `WhatsApp`, `normalizeWebhookEnvelope`, `WebhookNormalizationError`,
+`TypedRouter`, plus the `filtersTyped` namespace.
 
 ## Pinned versions
 

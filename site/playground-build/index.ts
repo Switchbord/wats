@@ -12,7 +12,12 @@
 // ----------------------------------------------------------------------------
 // Namespaces (whole-package access for advanced scenarios / completeness)
 // ----------------------------------------------------------------------------
-export * as core from "@wats/core";
+// NOTE: `@wats/core` is intentionally NOT re-exported as a namespace. The
+// published 0.3.30 barrel still contains the legacy `createUpdateRouter`,
+// `parseWebhookUpdate`, and `@wats/core/filters` surface; re-exporting the
+// whole barrel would pull those deprecated symbols into the browser bundle.
+// Scenario code reaches `@wats/core` through the explicit named re-exports
+// below plus the `filtersTyped` subpath namespace.
 export * as graph from "@wats/graph";
 export * as types from "@wats/types";
 // crypto: routed through the browser-safe subpath barrel (see crypto-browser.ts).
@@ -61,9 +66,7 @@ export {
   normalizeWebhookEnvelope,
   WebhookNormalizationError,
   TypedRouter,
-  createUpdateRouter,
 } from "@wats/core";
 
-// Filters namespace (text/command/etc.) for the route-with-filters scenario.
-export * as filters from "@wats/core/filters";
+// Typed filters namespace for the route-with-filters scenario.
 export * as filtersTyped from "@wats/core/filtersTyped";
