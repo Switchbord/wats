@@ -9299,7 +9299,7 @@ What is planned, what is shipped, and what is explicitly out of scope. Issue-lev
 
 ## Shipped
 
-The `0.3.x-alpha-tooling` line ships the substrate:
+The `0.4.x-alpha-tooling` line ships the substrate:
 
 - Graph client, transport seam, endpoint registry, pagination, scoped clients
 - Graph error registry seeded with the known Meta error codes

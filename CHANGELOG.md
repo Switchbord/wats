@@ -1,5 +1,38 @@
 # Changelog
 
+## [0.4.0-beta.0] - 2026-07-20
+
+Beta launch: pre-beta review campaign — public-surface cleanup, docs truth pass, and two breaking-shape corrections.
+
+### Removed
+
+- `@wats/core`: the deprecated untyped router/parser/filter surface is gone (`createUpdateRouter`, `parseWebhookUpdate`, `UpdateFilter`, `hasMessageText`, `messageTextContains`, `messageFromWaId`, `hasMessageStatus`, `messageStatusIn`, and supporting types). Use `TypedRouter`, `normalizeWebhookEnvelope`, and `filtersTyped`.
+- `@wats/graph`: `MediaNotImplementedError` and the `MEDIA_LINEAR_ISSUE_*` constants removed; they were exported but never thrown.
+- `@wats/types`: contact shapes are camelCase-only. The `first_name`/`last_name`/`middle_name`/`formatted`, `wa_id`, and `country_code` fields are gone; use `firstName`/`lastName`/`middleName`/`formattedName`, `waId`, `countryCode`.
+
+### Added
+
+- Inbound contact normalization: `normalizeWebhookEnvelope` maps Meta's wire contacts to camelCase. Sender contacts surface as `contacts` on typed message updates (`NormalizedContact`: `waId`, `profile.name`, `raw`); contact-card messages normalize with the wire record preserved under `raw`. Malformed entries are skipped without throwing.
+
+### Changed
+
+- `@wats/service`: a persistence store that throws now returns `503 persistence_unavailable` (previously 404 "Message not found", or 503 with the misleading `persistence_not_configured`). `GET /api/conversations/{phone}/window` returns 401 on a missing or invalid bearer token, matching the sibling `/api/*` routes; telemetry endpoints keep the existence-hiding 404.
+- `@wats/config`: `redactConfig` marks redacted env-secret references `[REDACTED]` (was `[REDACTED_ENV]`; one marker everywhere).
+- `@wats/internal-utils` is the canonical home of `isRecord` and `containsUnsafePathSegment`; `@wats/config` and `@wats/service` inherit the stricter path rejection (encoded separators, double-encoded variants, colons).
+- Bearer-token redaction in `@wats/graph` errors tightened to the `Bearer <token>` shape.
+- Docs: deploy guides compile against the real exports (one `WATS_*` env-var convention, working `onMessage` form, real wrangler secret flow); the Docker guide documents the shipped Railway Dockerfile as active and keeps the generic Compose shape as planned; the errors reference matches the implementation (Retry-After on `GraphRateLimitError`, webhook verification HTTP statuses, facade-first examples); telemetry guide and parity page match the shipped 0.3.29/0.3.30 surface; docs status tags are a closed honesty set (live-validated / shape-only / planned).
+- Repo hygiene: internal ticket references purged from public files; the banned-phrase gate now scans tracked markdown; playground bundle freshness gate in CI; workflows pin Bun 1.3.13; every published package carries an npm `description`.
+
+### Release
+
+Breaking-shape upgrade. The removed `@wats/core` legacy surface and the contact-type field renames require import updates for anyone who adopted 0.3.x alpha. No new runtime dependencies.
+
+Install with Bun: `bun add @wats/core @wats/graph` (client) or `bun add @wats/config @wats/service` (standalone service). CLI: `bunx --bun @wats/cli --help`.
+
+Live-validation status is unchanged; the parity page carries the live-validated vs shape-only rows.
+
+Release metadata is aligned for 0.4.0-beta.0.
+
 ## [0.3.30] - 2026-07-05
 
 Patch release: the ops runtime — POST retry safety, rate limiter seam, conversation window, outbox worker, outbox metrics.

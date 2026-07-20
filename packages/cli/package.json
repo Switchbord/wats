@@ -1,7 +1,7 @@
 {
   "name": "@wats/cli",
   "description": "Local operator tooling for WATS.",
-  "version": "0.3.30",
+  "version": "0.4.0-beta.0",
   "private": false,
   "license": "MIT",
   "type": "module",
@@ -41,7 +41,7 @@
     "wats"
   ],
   "dependencies": {
-    "@wats/config": "^0.3.30",
-    "@wats/service": "^0.3.30"
+    "@wats/config": "^0.4.0-beta.0",
+    "@wats/service": "^0.4.0-beta.0"
   }
 }

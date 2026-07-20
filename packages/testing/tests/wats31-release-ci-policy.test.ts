@@ -16,7 +16,7 @@ const PUBLISHABLE_PACKAGE_NAMES = [
 ] as const;
 
 const PRIVATE_PACKAGE_NAMES = ["@wats/testing"] as const;
-const CURRENT_RELEASE_VERSION = "0.3.30" as const;
+const CURRENT_RELEASE_VERSION = "0.4.0-beta.0" as const;
 
 type JsonRecord = Record<string, unknown>;
 

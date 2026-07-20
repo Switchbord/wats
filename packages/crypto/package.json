@@ -1,7 +1,7 @@
 {
   "name": "@wats/crypto",
   "description": "Portable crypto provider seam.",
-  "version": "0.3.30",
+  "version": "0.4.0-beta.0",
   "private": false,
   "license": "MIT",
   "type": "module",

@@ -1,7 +1,7 @@
 {
   "name": "@wats/service",
   "description": "Runtime-neutral webhook/API service foundation.",
-  "version": "0.3.30",
+  "version": "0.4.0-beta.0",
   "private": false,
   "license": "MIT",
   "type": "module",
@@ -38,12 +38,12 @@
     "wats"
   ],
   "dependencies": {
-    "@wats/config": "^0.3.30",
-    "@wats/core": "^0.3.30",
-    "@wats/crypto": "^0.3.30",
-    "@wats/graph": "^0.3.30",
-    "@wats/http": "^0.3.30",
-    "@wats/internal-utils": "^0.3.30",
-    "@wats/persistence": "^0.3.30"
+    "@wats/config": "^0.4.0-beta.0",
+    "@wats/core": "^0.4.0-beta.0",
+    "@wats/crypto": "^0.4.0-beta.0",
+    "@wats/graph": "^0.4.0-beta.0",
+    "@wats/http": "^0.4.0-beta.0",
+    "@wats/internal-utils": "^0.4.0-beta.0",
+    "@wats/persistence": "^0.4.0-beta.0"
   }
 }
