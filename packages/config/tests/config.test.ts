@@ -350,10 +350,10 @@ describe("@wats/config redactConfig", () => {
     const validated = validateConfig(validConfig());
     const redacted = redactConfig(validated);
 
-    expect(redacted.profiles.local.auth.accessToken.env).toBe("[REDACTED_ENV]");
-    expect(redacted.profiles.local.webhook.verifyToken.env).toBe("[REDACTED_ENV]");
-    expect(redacted.profiles.local.webhook.appSecret.env).toBe("[REDACTED_ENV]");
-    expect(redacted.profiles.local.service.bearerToken.env).toBe("[REDACTED_ENV]");
+    expect(redacted.profiles.local.auth.accessToken.env).toBe("[REDACTED]");
+    expect(redacted.profiles.local.webhook.verifyToken.env).toBe("[REDACTED]");
+    expect(redacted.profiles.local.webhook.appSecret.env).toBe("[REDACTED]");
+    expect(redacted.profiles.local.service.bearerToken.env).toBe("[REDACTED]");
     expect(validated.profiles.local.auth.accessToken.env).toBe("WATS_ACCESS_TOKEN");
     expect(redacted.profiles.local.graph.apiVersion).toBe("v19.0");
   });

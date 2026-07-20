@@ -83,7 +83,7 @@ describe("WATS-51 config and env templates", () => {
     expect(parsedYaml.profiles.prod.webhook.path).toBe("/webhooks/whatsapp");
 
     const redacted = redactConfig(parsedYaml);
-    expect(JSON.stringify(redacted)).toContain("[REDACTED_ENV]");
+    expect(JSON.stringify(redacted)).toContain("[REDACTED]");
     expect(JSON.stringify(redacted)).not.toContain("WATS_ACCESS_TOKEN");
     expect(JSON.stringify(redacted)).not.toContain("WATS_APP_SECRET");
   });
