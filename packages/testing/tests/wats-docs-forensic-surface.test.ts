@@ -79,7 +79,7 @@ describe("forensic docs current-surface reconciliation", () => {
     const docker = read("site/content/docs/guides/deploy-docker.mdx");
     const service = read("site/content/docs/reference/service.mdx");
     const railway = read("deploy/railway/README.md");
-    expect(docker).toContain("repo ships a Railway-targeted Dockerfile");
+    expect(docker).toContain("repo ships a Railway-targeted root `Dockerfile`");
     expect(service).toContain("The repo ships a Railway-targeted root `Dockerfile`");
     expect(railway).toContain("does not auto-inject a persistence store");
     expect(railway).toContain("local message projection");
