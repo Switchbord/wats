@@ -1996,7 +1996,8 @@ export function createWatsServiceOpenApiDocument(
           "400": errorResponseSpec("Malformed webhook body."),
           "401": errorResponseSpec("Missing or invalid signature."),
           "405": errorResponseSpec("Method not allowed."),
-          "413": errorResponseSpec("Webhook body exceeds configured maxBodyBytes.")
+          "413": errorResponseSpec("Webhook body exceeds configured maxBodyBytes."),
+          "503": errorResponseSpec("Webhook deduplication store is unavailable; retry delivery.")
         }
       }
     },
