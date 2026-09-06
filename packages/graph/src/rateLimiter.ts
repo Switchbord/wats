@@ -77,6 +77,7 @@ export function createTokenBucketRateLimiter(
     throw new Error("CreateTokenBucketRateLimiterOptions: sleep must be a function.");
   }
   const now = options.now ?? (() => Date.now());
+  const usesDefaultSleep = options.sleep === undefined;
   const sleep = options.sleep ?? defaultSleep;
 
   let tokens = capacity;
@@ -126,6 +127,9 @@ export function createTokenBucketRateLimiter(
         }
       }
       for (;;) {
+        if (signal?.aborted) {
+          throw signal.reason instanceof Error ? signal.reason : new Error("RateLimiter acquire aborted by caller.");
+        }
         refill();
         if (tokens >= c) {
           tokens -= c;
@@ -143,6 +147,7 @@ export function createTokenBucketRateLimiter(
         // clock), the abort listener is removed in finally and the loop
         // rechecks admission; if abort wins, no token is consumed.
         let onAbort: (() => void) | undefined;
+        let timer: ReturnType<typeof setTimeout> | undefined;
         const aborted = new Promise<never>((_resolve, reject) => {
           onAbort = (): void => {
             reject(
@@ -154,8 +159,12 @@ export function createTokenBucketRateLimiter(
           signal.addEventListener("abort", onAbort, { once: true });
         });
         try {
-          await Promise.race([sleep(Math.max(0, waitMs)), aborted]);
+          const waiting = usesDefaultSleep
+            ? new Promise<void>((resolve) => { timer = setTimeout(resolve, Math.max(0, waitMs)); })
+            : sleep(Math.max(0, waitMs));
+          await Promise.race([waiting, aborted]);
         } finally {
+          if (timer !== undefined) clearTimeout(timer);
           if (onAbort !== undefined) signal.removeEventListener("abort", onAbort);
         }
       }
