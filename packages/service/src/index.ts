@@ -1996,7 +1996,8 @@ export function createWatsServiceOpenApiDocument(
           "400": errorResponseSpec("Malformed webhook body."),
           "401": errorResponseSpec("Missing or invalid signature."),
           "405": errorResponseSpec("Method not allowed."),
-          "413": errorResponseSpec("Webhook body exceeds configured maxBodyBytes.")
+          "413": errorResponseSpec("Webhook body exceeds configured maxBodyBytes."),
+          "503": errorResponseSpec("Webhook deduplication store is unavailable; retry delivery.")
         }
       }
     },
@@ -2507,6 +2508,7 @@ async function handleWebhook(ctx: RuntimeConfig, request: Request): Promise<Resp
   const now = receiptNowMs();
   const toDispatch: unknown[] = [];
   const deduped: unknown[] = [];
+  let dedupFailed = false;
   for (const update of dispatches) {
     const dedupKey = await extractDedupKey(update, sha256Hex);
     if (dedupKey === null) {
@@ -2521,9 +2523,12 @@ async function handleWebhook(ctx: RuntimeConfig, request: Request): Promise<Resp
         receivedAt: new Date(now).toISOString()
       });
       recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "success");
-    } catch (error) {
+    } catch {
       recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "error");
-      throw error;
+      // Finish updates already recorded by this request before reporting the
+      // outage. Otherwise a retry would suppress those undelivered updates.
+      dedupFailed = true;
+      break;
     }
     if (record === "duplicate") {
       deduped.push(update);
@@ -2560,6 +2565,9 @@ async function handleWebhook(ctx: RuntimeConfig, request: Request): Promise<Resp
     }
   }
   const skipped = deduped.length;
+  if (dedupFailed) {
+    return errorResponse(503, "persistence_unavailable", "Webhook deduplication store is unavailable.");
+  }
   return jsonResponse(200, { status: "ok", received: dispatches.length, dispatched, skipped });
 }
 
