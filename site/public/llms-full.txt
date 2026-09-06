@@ -1136,15 +1136,27 @@ service:
 
 Future Postgres deployment should use an env-secret reference such as
 `WATS_DATABASE_URL`; database URLs are secrets and must not be printed in
-logs.
+logs. `wats serve` now supports this via `--database-url-env WATS_DATABASE_URL`
+(see [CLI reference](/docs/reference/cli)).
 
 ## Volumes and persistence
 
-WATS has an experimental `@wats/persistence/sqlite` local adapter, but
-`@wats/service` does not consume it yet. Future container examples should
-mount a writable data directory such as `/var/lib/wats` for SQLite
-local/single-instance testing. Future multi-replica deployments should use
-Postgres once the adapter and service integration exist.
+`wats serve` has opt-in durable persistence:
+
+- `--database <sqlite-path>` opens and migrates a local SQLite file **before**
+  binding, injects it into the service config (metadata and message-history
+  only — no raw-message outbox or distributed queue), and closes it after
+  in-flight work drains on shutdown. Relative paths resolve under the config
+  directory. Without either flag the service is stateless (in-memory only).
+- `--database-url-env <env-name>` resolves a PostgreSQL DSN from the named env
+  var; the raw DSN never appears on the command line or in logs. Requires the
+  optional `pg` package in the runtime.
+
+For container SQLite, mount a writable data directory such as `/var/lib/wats`
+and pass `--database /var/lib/wats/wats.sqlite`. For multi-replica
+deployments, use `--database-url-env WATS_DATABASE_URL` with a managed
+Postgres. The Railway entrypoint surfaces these as the optional
+`WATS_DATABASE` and `WATS_DATABASE_URL_ENV` env vars (both off by default).
 
 ## Non-root runtime
 
@@ -1616,9 +1628,15 @@ app secrets, verify tokens, service bearer values, or Graph responses.
 Verify the service is up before pointing Meta at it:
 
 ```bash
-curl -fsS http://127.0.0.1:8787/healthz
-curl -fsS http://127.0.0.1:8787/readyz
+curl -fsS http://127.0.0.1:8787/healthz   # process alive — always 200
+curl -fsS http://127.0.0.1:8787/readyz    # dependencies ready — 200, or 503 if persistence is down/unmigrated
 ```
+
+`/healthz` reports process liveness (always 200). `/readyz` checks the
+optional persistence store's `health()` current schema and returns 503
+`persistence_unavailable` if the store is closed or unmigrated — so a load
+balancer can route traffic away from a node whose database is not ready
+without mistaking it for a dead process.
 
 ## Webhook onboarding checklist
 
@@ -1925,7 +1943,7 @@ const transport = createReliableTransport(
     retries: 3,
     baseDelayMs: 500,
     maxDelayMs: 8_000,
-    retryPosts: "network-only",
+    retryPosts: "never",
     rateLimiter: createTokenBucketRateLimiter({ capacity: 20, refillPerSecond: 5 })
   }
 );
@@ -1933,7 +1951,9 @@ const transport = createReliableTransport(
 const client = new GraphClient({ accessToken, apiVersion, baseUrl, transport });
 ```
 
-`retryPosts: "network-only"` retries a POST only when the request threw before any response arrived AND carries an `Idempotency-Key` header. A pre-response network failure is the one POST shape that cannot have been processed by the server, so an idempotency key makes the retry safe. POST 5xx is not retried — the server may have side-effected. `"always"` retries POST on 5xx too; use it only for endpoints you have verified are idempotent or dedupe by key.
+Keep `retryPosts: "never"` for sends unless you have verified the endpoint's server-side idempotency contract. A lost response does not mean the server did nothing: it may have accepted the message before the connection failed.
+
+`"network-only"` permits a retry after a network error when the request carries an `Idempotency-Key` header. The header alone does not make the operation idempotent. `"always"` also permits POST retries on 5xx. Both modes require verified server-side duplicate prevention; neither promises exactly-once delivery. The existing 429 backoff policy applies in every mode.
 
 The token bucket smooths your outbound rate so a burst does not trip Meta's 429. It is not Meta quota management — Meta has no published per-token send budget. Tune capacity and refill from your own telemetry; never assume a bucket rate equals Meta's limit.
 
@@ -1985,7 +2005,9 @@ const worker = startOutboxWorker(store, {
 });
 ```
 
-The worker is caller-owned and single-process. There is no distributed scheduling or multi-process coordination. Run one worker per process. The service send routes stay synchronous; enqueuing into the outbox is the caller's job — point a worker handler at your own send state. See the [Persistence Reference](/docs/reference/persistence) for the lease, `stop()`, and `onReport` shape.
+The worker is caller-owned. The service send routes stay synchronous; enqueuing into the outbox is the caller's job. Its handler reads application-owned send state; WATS stores only the payload hash, not message content. See the [Persistence Reference](/docs/reference/persistence) for the lease, `stop()`, and `onReport` shape.
+
+Plan failure recovery before running the worker unattended. The current loop retries failed items without a terminal attempt limit. You own dead-letter handling and retention of completed work. Do not enqueue an uncertain send for automatic retry: first reconcile whether the remote endpoint accepted it.
 
 ## What to alert on
 
@@ -2429,9 +2451,9 @@ const client = new GraphClient({
 });
 ```
 
-The decorator retries transient `GET`/`DELETE` failures (`GraphNetworkError`, HTTP `429`, and HTTP `5xx`) using exponential backoff with full jitter. It honors Meta's `Retry-After` header for `429` / `503` responses and caps every delay at `maxDelayMs`. Caller aborts are never retried; per-attempt timeouts compose with a caller-provided `AbortSignal` via native `AbortSignal.any` / `AbortSignal.timeout`.
+The decorator retries transient `GET`/`DELETE` failures (`GraphNetworkError`, HTTP `429`, and HTTP `5xx`) using exponential backoff with full jitter. It honors Meta's `Retry-After` header for `429` / `503` responses and caps every delay at `maxDelayMs`. Caller aborts are never retried and never reach the inner transport: a caller `AbortSignal` is forwarded into the rate limiter's wait, so an abort during admission rejects promptly without consuming a token or dispatching a request. Per-attempt timeouts compose with a caller-provided `AbortSignal` via native `AbortSignal.any` / `AbortSignal.timeout`, and each attempt gets the full `timeoutMs` budget (it is per-attempt, not a total deadline).
 
-WATS does **not** retry non-idempotent `POST` / `PUT` / `PATCH` request failures by default, with one narrow exception: HTTP `429` is treated as a rate-limit response across methods. Retrying `POST /messages` after an ambiguous network failure or `5xx` can double-send a WhatsApp message if Meta received the first request but the client lost the response. If you override `retryOn` to retry those POST failures, pair the request with an application idempotency strategy (for example the service-level `Idempotency-Key` flow). The default client applies no retries.
+WATS does **not** retry non-idempotent `POST` / `PUT` / `PATCH` request failures by default, with one narrow exception: HTTP `429` is treated as a rate-limit response across methods. A no-response POST failure (connection reset, socket closed mid-upload, read timeout) is ambiguous: the server may have received and applied the request before the response was lost. An `Idempotency-Key` header on its own proves nothing — the client sets it, and the server has no obligation to honor it unless the endpoint documents verified remote idempotency. The `retryPosts` modes (`"network-only"`, `"always"`) opt into retry only when you have independently verified the endpoint is idempotent or dedupes by `Idempotency-Key` server-side. The key is a necessary, not sufficient, condition; it never overrides the default `"never"`. The default client applies no retries.
 
 The same shape composes: `auth-refresh -> reliability -> tracing -> fetch`. Each layer is a function that takes `(inner: Transport) => Transport`. Because every layer sees the same `TransportRequest`/`TransportResponse` shape, the layers stay independently testable.
 
@@ -3527,6 +3549,25 @@ wats serve --config wats.config.yaml --live --yes-live --env-file .env.local --p
 - `--print-routes` under `--paas` validates and prints routes without binding, so it does not require `$PORT`.
 
 This removes the need for a container entrypoint shim mapping `$PORT`/`0.0.0.0` onto static flags. `wats serve --help` prints usage and exits 0.
+
+### `wats serve ... --database <sqlite-path>` / `--database-url-env <env-name>`
+
+Opt-in durable persistence for `wats serve`. Both modes are mutually exclusive and off by default: without either flag the service is stateless (in-memory only), byte-identical to prior behavior.
+
+```bash
+# Local SQLite file (opened + migrated before binding, closed on shutdown)
+wats serve --config wats.config.yaml --dry-run --database ./wats.sqlite
+
+# PostgreSQL via a named env var (the raw DSN never appears on the command line)
+WATS_DATABASE_URL=postgres://user:pass@host:5432/wats \
+  wats serve --config wats.config.yaml --dry-run --database-url-env WATS_DATABASE_URL
+```
+
+- `--database <sqlite-path>` opens and migrates a local SQLite file **before** binding the port, so an open/migration failure fails closed without ever touching the network. The path is a safe local filename (no traversal, control chars, or token-like names); relative paths resolve under the config directory. `:memory:` is allowed for tests.
+- `--database-url-env <env-name>` resolves a PostgreSQL connection string from the named environment variable on startup. The env name must be a safe identifier (`[A-Z][A-Z0-9_]*`); the raw DSN is never accepted on the command line and never printed. Requires the optional `pg` package in the runtime.
+- The store is injected into the service config (metadata and message-history only; no raw-message outbox or distributed queue is implied) and closed **after** active work drains on shutdown.
+- In live mode, env-secret values are resolved **before** the persistence store is opened, so an invalid or missing env file fails with `SecretResolutionError` without creating a SQLite file on disk. Static config/PaaS validation still runs before any write.
+- Shutdown is graceful and finite in two phases: `server.stop(false)` stops admitting new requests and lets in-flight work finish within a finite 10s server-drain window (polling the server's pending-request counters), then force-stops; the store is then closed within a **separate** finite 5s timeout so a hung pg query that never settles cannot block the bin exit forever. The bin awaits this async shutdown on `SIGINT`/`SIGTERM`. Repeated shutdown calls return the same in-flight drain promise (idempotent).
 
 ### `wats messages list` / `wats messages show`
 
@@ -6069,7 +6110,9 @@ The migration runner creates:
 - `wats_messages`
 - `wats_message_status_events`
 
-Migrations are forward-only for alpha. Already-applied migration checksums must match the package migration definitions; checksum drift fails closed with `PersistenceError`. `001_initial` keeps its originally shipped checksum; `002_outbox_lease_id` upgrades existing v1 databases with the `leaseId` outbox column; `003_message_projection` adds the message projection tables and indexes; `004_inbound_window_index` adds the composite index backing `getLatestInboundMessageAt`. A held migration lock fails closed with `PersistenceError` code `migration_lock_failed`.
+Migrations are forward-only for alpha. Already-applied migration checksums must match the package migration definitions; checksum drift fails closed with `PersistenceError`. `001_initial` keeps its originally shipped checksum; `002_outbox_lease_id` upgrades existing v1 databases with the `leaseId` outbox column; `003_message_projection` adds the message projection tables and indexes; `004_inbound_window_index` adds the composite index backing `getLatestInboundMessageAt`; `005_service_request_claims` adds the durable claim/completion columns to `wats_service_requests`; `006_message_uniqueness` deduplicates preexisting duplicate `(direction, wa_message_id)` message rows (keeping the best known state) and adds the unique indexes backing message and status-event dedup. A held migration lock fails closed with `PersistenceError` code `migration_lock_failed`.
+
+Backend faults are always typed as `PersistenceError` with a `code` from `PersistenceErrorCode` — a raw `bun:sqlite` or `pg` error never escapes the public API. `claim_failed` and `completion_failed` cover service-request claim/completion lease faults; `outbox_failed` covers outbox and message-projection transaction faults (including `recordMessage`/`appendMessageStatus` backend failures); `store_closed` covers operations on a closed store; `invalid_record`/`invalid_options`/`invalid_filename` cover input-validation failures (never backend faults); `migration_failed`/`migration_checksum_mismatch`/`migration_lock_failed` cover migration faults. The validation codes are distinct from the persistence-operation codes so a caller can tell a bad input from a backend fault.
 
 ## Runtime contract
 
@@ -6097,9 +6140,11 @@ Webhook event records store safe event keys and hashes, not raw webhook bodies. 
 
 Service request idempotency stores an idempotency key, request hash, and response JSON. A matching key/body hash replays the stored response; the same key with a different body hash conflicts.
 
+The built-in SQLite and Postgres adapters additionally implement two optional `PersistenceStore` methods — `claimServiceRequest({ idempotencyKey, requestHash, createdAt })` and `completeServiceRequest({ idempotencyKey, requestHash, responseJson, createdAt })` — for durable atomic service request claims. `claimServiceRequest` returns `"claimed"` (new reservation), `"pending"` (already claimed, not yet completed), `"conflict"` (same key, different hash), or `{ responseJson }` (already completed, replay). A claim reserves the request identity before the caller sends to Graph and persists across restart indefinitely (no timeout-based blind resend). `completeServiceRequest` stores the response only when it matches the reserved hash; the older `recordServiceRequest` never overwrites an existing reservation.
+
 ## Message projection
 
-The `wats_messages` table records outbound send attempts (and, in future slices, inbound messages). Each row is keyed by a caller-generated local `row_id`, carries the WhatsApp message id (`wa_message_id`), direction, optional phone fields, Graph type, current status, and created/updated timestamps. `wats_message_status_events` is an append-only log of status transitions per `wa_message_id`.
+The `wats_messages` table records outbound send attempts and authenticated inbound message metadata. Each row is keyed by a caller-generated local `row_id`, carries the WhatsApp message id (`wa_message_id`), direction, optional phone fields, Graph type, current status, and created/updated timestamps. `wats_message_status_events` is an append-only log of status transitions per `wa_message_id`.
 
 ```ts
 await store.recordMessage({
@@ -6120,7 +6165,9 @@ const record = await store.getMessage({ waMessageId: "wamid.HBgM..." });
 const page = await store.listMessages({ limit: 50 });
 ```
 
-`recordMessage` is idempotent on `row_id` (`INSERT OR IGNORE`): re-recording the same `rowId` is a no-op. `appendMessageStatus` inserts an event row and best-effort updates the matching message's `status` and `updated_at` (no-op if no matching message). `listMessages` returns rows newest-first (`created_at DESC, row_id DESC`), with `limit` (1..100) and an optional `beforeRowId` cursor for paging; `nextCursor` is the last item's `rowId` when more rows may exist, otherwise `null`.
+`recordMessage` is idempotent on `row_id` (`INSERT OR IGNORE`): re-recording the same `rowId` is a no-op. It also deduplicates by `(direction, wa_message_id)` via the unique index from schema migration `006_message_uniqueness` — a second insert with a different `rowId` but the same `(direction, wa_message_id)` is a no-op, preserving the first projection. `appendMessageStatus` inserts an event row and best-effort updates the matching message's `status` and `updated_at` (no-op if no matching message). `listMessages` returns rows newest-first (`created_at DESC, row_id DESC`), with `limit` (1..100) and an optional `beforeRowId` cursor for paging; `nextCursor` is the last item's `rowId` when more rows may exist, otherwise `null`.
+
+Status transitions are rank-based, not timestamp-only. The rank order is `sent(1) < delivered(2) < read(3)`; `pending(0)` is the lowest and unknown statuses rank `0`. `failed` may replace `pending` or `sent` but must never replace `delivered` or `read`. An event at the same second (e.g. a Meta callback timestamp truncated to whole seconds landing at an equal-or-earlier millisecond than the outbound send) may advance the rank; `updated_at` never rolls backward (it advances to the event timestamp only when the event is newer). This closes the timestamp-precision seam between millisecond outbound sends and whole-second Meta status callbacks. If a status event arrives before the message projection (an early webhook), `recordMessage` reconciles the stored events and advances the freshly-inserted row so it does not regress to the send-time status. Migration `006_message_uniqueness` deduplicates preexisting duplicate `(direction, wa_message_id)` rows by keeping the row with the best known state (highest status rank, then smallest `row_id` as a deterministic tiebreak), not the smallest `row_id` unconditionally.
 
 The service records outbound projections automatically after a successful Graph send and exposes them read-only through `GET /messages` and `GET /messages/{messageId}` (see the Service Reference). Projection failures are swallowed and never break the send response.
 
@@ -6157,7 +6204,7 @@ Clock skew: if the customer's last inbound lands after `now`, the window is trea
 
 `getLatestInboundMessageAt({ phone })` powers the helper: it returns the `createdAt` ISO of the most recent `wats_messages` row with `direction = 'inbound'` and `from_phone` matching, or `null`. Schema migration `004_inbound_window_index` adds the composite index `(direction, from_phone, created_at DESC)` so the lookup does not table-scan as the projection grows.
 
-Honesty caveats: the helper only sees inbound rows that have been projected into `wats_messages`. The service records outbound projections today; inbound projection wiring is landing separately, so until it ships the helper returns `closed` for every phone — which is the safe default (send a template). The Postgres adapter is shape-only and mock-client tested; the window helper works against any `PersistenceStore`, but live Postgres validation is not in default CI.
+The helper sees only locally projected inbound rows. The service projects authenticated inbound messages before handlers run and rejects invalid or future event timestamps rather than fabricating a window. Real PostgreSQL regression tests run in CI against an ephemeral database; this does not claim live Meta validation.
 
 ## Outbox
 
@@ -6928,7 +6975,7 @@ The axis-exclusive language matters: an `instanceof UnsupportedMessageTypeError`
 # Service Reference (`@wats/service`)
 URL: https://wats.sh/docs/reference/service
 
-`@wats/service` exposes a runtime-neutral `Request -> Response` app composing the Graph client, webhook adapter, config profile shape, and WhatsApp facade. It is not a production server by itself: the CLI provides dry-run and credential-gated live `wats serve` wrappers, and a generated OpenAPI 3.1 document covers the routes below. Not implemented yet: Node/Docker packaging, production hosting.
+`@wats/service` exposes a runtime-neutral `Request -> Response` app composing the Graph client, webhook adapter, config, and WhatsApp facade. The CLI provides dry-run and credential-gated live `wats serve` wrappers. A Railway-targeted Dockerfile ships in the repository; see [Docker deployment](/docs/guides/deploy-docker). Hosting, TLS, and storage volumes remain operator-owned.
 
 ## Public API
 
@@ -7026,7 +7073,9 @@ The document includes `serviceBearerAuth` only on the protected message routes, 
 
 `GET /status` returns a redacted operator snapshot: package `version`, `uptimeSeconds`, `graphApiVersion`, a coarse `serviceMode`, a templated `routes` inventory, `featureFlags`, and a `persistence` health summary (or `null` when no store is injected). Route entries use `:param` placeholders, so no WABA id, phone-number id, or message id appears in the inventory.
 
-`/status` differs from liveness and readiness. `/healthz` and `/readyz` answer "is this process alive?" and "is it ready to serve?" — they take no auth and return a fixed `{ ok, service }` body. `/status` answers "what is this instance doing?", requires the service bearer token, and returns structured operator data. A missing or invalid token returns `404` (not `401`) so the endpoint's existence is not disclosed to unauthenticated callers; the `404` body is identical to the catch-all. The snapshot never includes tokens, phone numbers, WABA ids, config file paths, raw webhook bodies, message text, or stack traces.
+`/healthz` reports process liveness. `/readyz` returns `200 { ok, service }` when no store is configured or the configured store is healthy and at the current schema version. A store failure or schema mismatch returns `503 persistence_unavailable`. Neither endpoint requires auth or calls Meta.
+
+`/status` requires the service bearer token and returns operator data. Missing or invalid auth returns the catch-all `404`. The snapshot omits tokens, phone numbers, WABA ids, paths, raw webhook bodies, message text, and stack traces. The public OpenAPI document lists route names; the telemetry `404` policy does not hide those names from the document.
 
 ## Metrics
 
@@ -7230,7 +7279,9 @@ The route preserves the bearer boundary: the service bearer token authorizes the
 
 ## Message projection routes
 
-When a `PersistenceStore` is injected, every successful outbound send (text and generic) records a local projection of the Graph send attempt: a `MessageRecord` keyed by the returned WhatsApp message id, plus an initial `sent` status event. Projection failures are swallowed and never break the send response — the caller still receives the Graph result.
+When a `PersistenceStore` is injected, successful sends record message metadata plus an initial `sent` event. Signed inbound messages are projected before handlers run, using the message's event time rather than receipt time. Delivery/read/failure callbacks update the projected state. Message content is not stored.
+
+Projection failures do not turn a successful Graph send into a failed send. Repeated signed updates retry projection without re-running handlers. Handler failures are still acknowledged; this is not a durable handler-replay queue.
 
 ### `GET /messages`
 
@@ -7347,8 +7398,20 @@ Missing any method fails construction with `WatsServiceError` code `invalid_pers
 When persistence is injected:
 
 - signed webhook POSTs are recorded by event key/hash and duplicate deliveries are acknowledged without redispatching the same update;
-- message send routes honor `Idempotency-Key`: a matching key/body hash replays the stored response; the same key with a different body returns `409 idempotency_conflict`;
+- built-in stores atomically reserve `Idempotency-Key` before Graph is called. Keys are scoped to phone number, WABA, and operation; hashes cover outgoing payloads. Completed sends replay their stored result; a changed payload returns `409 idempotency_conflict`; unresolved claims return `409 idempotency_pending` without sending again;
 - successful outbound sends record a local message projection and an initial `sent` status event, exposed read-only through `GET /messages` and `GET /messages/{messageId}`.
+
+Atomic `claimServiceRequest` / `completeServiceRequest` capabilities are additive: legacy custom stores can still be injected, but keyed sends return `503 persistence_not_atomic` when those methods are absent. Without persistence the service remains stateless, and an idempotency header supplies no deduplication guarantee.
+
+If Graph succeeds but durable completion fails, the service returns the genuine `200` result with `x-wats-persistence: degraded`. Do not resend it. Claims remain unresolved after ambiguous transport failures or crashes; WATS does not automatically release them. Reconcile the outcome before deciding whether a new send is needed.
+
+`POST /api/messages` also accepts templates:
+
+```json
+{"type":"template","to":"15550001111","name":"order_confirmation","languageCode":"en_US"}
+```
+
+Optional `components` use the SDK template component structure. Templates use the same keyed-send rules. Template approval and recipient eligibility remain Meta-enforced.
 
 The outbox APIs are part of the accepted contract even though current message routes still send synchronously. `claimOutboxItems(...)` returns `OutboxItem` records with `leaseId`; pass that same `leaseId` to `markOutboxItemFailed(...)` / `markOutboxItemSucceeded(...)` so stale workers cannot complete a newer reclaimed lease.
 
@@ -8024,6 +8087,51 @@ The adapter accepts `X-Hub-Signature-256` in the strict Meta format:
 Any deviation returns `400 invalid_signature_format` (malformed) or `401 missing_signature` (header absent) — the adapter never attempts a lenient re-parse. The regex used internally is `/^sha256=[a-f0-9]{64}$/`.
 
 Callers constructing the header themselves (proxies, test harnesses) MUST match the format exactly. This intentionally narrow surface keeps the attacker cost of signature-confusion attacks high and the validation logic short and auditable.
+
+## Service-layer ingestion
+
+When `@wats/service` is constructed with an injected `PersistenceStore`, the
+service wraps the adapter with a bounded, authenticated ingestion layer that
+adds guarantees the adapter core alone does not provide:
+
+1. **Per-update scoped dedup.** Each normalized `TypedUpdate` gets a stable
+   dedup key scoped by the receiving profile (`phoneNumberId` + `wabaId`) and
+   the update's own identity (`messageId` for messages; `statusId` + `status`
+   + `timestamp` for statuses). Fallback families (account, call, group,
+   system, unknown) hash the bounded canonical JSON of the STABLE fields
+   (receive-clock fields `receivedAt` and `rawChange` excluded) with the
+   entire scope tuple — not a raw phone/waba prefix — so retries dedup. The
+   key is an async SHA-256 of a JSON tuple via the existing crypto provider,
+   never a non-cryptographic hash. Dedup is recorded AFTER the adapter
+   authenticates the raw bytes, so an invalid request cannot poison dedup.
+
+2. **Finite depth gate.** After signature verification, the adapter rejects
+   `400 payload_depth_exceeded` when the parsed envelope's nesting depth
+   exceeds `MAX_NESTED_DEPTH` (128) — for ALL families, including a valid
+   message with a deeply-nested `extra` property. The gate runs BEFORE dedup
+   and dispatch; an over-limit payload is never silently dispatched.
+
+3. **Event-time projection BEFORE dispatch.** Inbound message projection uses
+   the valid Meta timestamp from the message's own `timestamp` field (not
+   receipt time). A future timestamp within the 1h clock-skew tolerance is
+   CLAMPED to receipt time (never extending the conversation window); beyond
+   the tolerance, and any malformed (non-numeric, empty, non-positive)
+   timestamp, cause the projection to be SKIPPED — it never fabricates a fresh
+   window. Status callbacks project via `appendMessageStatus`, which
+   atomically appends the event AND updates the stored message row's status
+   — exactly one row per message after `delivered`/`read`/`failed`. Projection
+   is idempotent and runs for both first-delivery and deduped updates, so a
+   transient projection failure is repaired by a retry without re-dispatch.
+
+4. **Readiness gate.** `/readyz` checks `store.health()` and rejects (503
+   `persistence_unavailable`) any store whose schema version is not
+   `CURRENT_SCHEMA_VERSION` (not just version 0), plus unhealthy/throw,
+   while `/healthz` stays 200 (process-alive vs dependencies-ready).
+
+The ACK-on-handler-failure contract is preserved: a handler throw is caught
+and the webhook still returns 200. The service does NOT add raw-content
+storage — the handler receives the normalized `TypedUpdate`, not the raw
+body bytes. `/api` routes return 401 on missing token; telemetry returns 404.
 
 ## See also
 

@@ -94,7 +94,7 @@ The built-in SQLite and Postgres adapters additionally implement two optional `P
 
 ## Message projection
 
-The `wats_messages` table records outbound send attempts (and, in future slices, inbound messages). Each row is keyed by a caller-generated local `row_id`, carries the WhatsApp message id (`wa_message_id`), direction, optional phone fields, Graph type, current status, and created/updated timestamps. `wats_message_status_events` is an append-only log of status transitions per `wa_message_id`.
+The `wats_messages` table records outbound send attempts and authenticated inbound message metadata. Each row is keyed by a caller-generated local `row_id`, carries the WhatsApp message id (`wa_message_id`), direction, optional phone fields, Graph type, current status, and created/updated timestamps. `wats_message_status_events` is an append-only log of status transitions per `wa_message_id`.
 
 ```ts
 await store.recordMessage({
@@ -154,7 +154,7 @@ Clock skew: if the customer's last inbound lands after `now`, the window is trea
 
 `getLatestInboundMessageAt({ phone })` powers the helper: it returns the `createdAt` ISO of the most recent `wats_messages` row with `direction = 'inbound'` and `from_phone` matching, or `null`. Schema migration `004_inbound_window_index` adds the composite index `(direction, from_phone, created_at DESC)` so the lookup does not table-scan as the projection grows.
 
-Honesty caveats: the helper only sees inbound rows that have been projected into `wats_messages`. The service records outbound projections today; inbound projection wiring is landing separately, so until it ships the helper returns `closed` for every phone — which is the safe default (send a template). The Postgres adapter is shape-only and mock-client tested; the window helper works against any `PersistenceStore`, but live Postgres validation is not in default CI.
+The helper sees only locally projected inbound rows. The service projects authenticated inbound messages before handlers run and rejects invalid or future event timestamps rather than fabricating a window. Real PostgreSQL regression tests run in CI against an ephemeral database; this does not claim live Meta validation.
 
 ## Outbox
 

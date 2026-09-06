@@ -9,7 +9,8 @@
   </defs>
   <rect x="0" y="0" width="880" height="544" fill="#0a0e12"/>
   <path d="M 752.75 444 C 752.75 388, 752.75 224, 752.75 175" fill="none" stroke="#3b4654" stroke-width="1.3" marker-end="url(#arrow)"/>
-  <path d="M 638.75 444 C 638.75 413.4, 582.25 406.6, 582.25 383" fill="none" stroke="#3b4654" stroke-width="1.3" marker-end="url(#arrow)"/>
+  <path d="M 638.75 444 C 638.75 388, 156 120, 156 71" fill="none" stroke="#3b4654" stroke-width="1.3" marker-end="url(#arrow)"/>
+  <path d="M 695.75 444 C 695.75 413.4, 582.25 406.6, 582.25 383" fill="none" stroke="#3b4654" stroke-width="1.3" marker-end="url(#arrow)"/>
   <path d="M 695.75 132 C 695.75 101.4, 838 94.6, 838 71" fill="none" stroke="#3b4654" stroke-width="1.3" marker-end="url(#arrow)"/>
   <path d="M 297.75 132 C 297.75 101.4, 269.5 94.6, 269.5 71" fill="none" stroke="#3b4654" stroke-width="1.3" marker-end="url(#arrow)"/>
   <path d="M 411.75 132 C 411.75 101.4, 383 94.6, 383 71" fill="none" stroke="#3b4654" stroke-width="1.3" marker-end="url(#arrow)"/>
@@ -25,7 +26,7 @@
   <path d="M 487.25 340 C 487.25 284, 326.5 120, 326.5 71" fill="none" stroke="#3b4654" stroke-width="1.3" marker-end="url(#arrow)"/>
   <path d="M 525.25 340 C 525.25 309.4, 497 302.6, 497 279" fill="none" stroke="#3b4654" stroke-width="1.3" marker-end="url(#arrow)"/>
   <path d="M 582.25 340 C 582.25 284, 809.5 120, 809.5 71" fill="none" stroke="#3b4654" stroke-width="1.3" marker-end="url(#arrow)"/>
-  <path d="M 468.25 340 C 468.25 284, 156 120, 156 71" fill="none" stroke="#3b4654" stroke-width="1.3" marker-end="url(#arrow)"/>
+  <path d="M 468.25 340 C 468.25 284, 99 120, 99 71" fill="none" stroke="#3b4654" stroke-width="1.3" marker-end="url(#arrow)"/>
   <path d="M 307.5 444 C 307.5 388, 638.75 224, 638.75 175" fill="none" stroke="#2a3340" stroke-width="1.3" marker-end="url(#arrow-dim)"/>
   <path d="M 288.5 444 C 288.5 388, 591.5 120, 591.5 71" fill="none" stroke="#2a3340" stroke-width="1.3" marker-end="url(#arrow-dim)"/>
   <path d="M 231.5 444 C 231.5 388, 212.5 120, 212.5 71" fill="none" stroke="#2a3340" stroke-width="1.3" marker-end="url(#arrow-dim)"/>
