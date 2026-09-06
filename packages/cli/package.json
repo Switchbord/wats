@@ -42,6 +42,7 @@
   ],
   "dependencies": {
     "@wats/config": "^0.4.0-beta.0",
-    "@wats/service": "^0.4.0-beta.0"
+    "@wats/service": "^0.4.0-beta.0",
+    "@wats/persistence": "^0.4.0-beta.0"
   }
 }
