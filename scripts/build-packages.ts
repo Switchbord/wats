@@ -2,6 +2,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, 
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { normalizeEsmSpecifiers } from "./normalize-esm-specifiers.ts";
 
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -90,6 +91,20 @@ function run(command: string, args: readonly string[], cwd: string): void {
   }
 }
 
+function collectDistJsFiles(dir: string): string[] {
+  const entries = readdirSync(dir, { withFileTypes: true });
+  const files: string[] = [];
+  for (const entry of entries) {
+    const fullPath = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...collectDistJsFiles(fullPath));
+    } else if (entry.isFile() && (entry.name.endsWith(".js") || entry.name.endsWith(".d.ts"))) {
+      files.push(fullPath);
+    }
+  }
+  return files.sort();
+}
+
 function buildPackage(pkg: PackageName): void {
   const packageDir = join(repoRoot, "packages", pkg);
   const distDir = join(packageDir, "dist");
@@ -110,6 +125,14 @@ function buildPackage(pkg: PackageName): void {
         writeFileSync(outFile, `${shebang}\n${builtText}`);
       }
     }
+  }
+
+  // Normalize extensionless relative specifiers in emitted .js files. This
+  // runs AFTER all dist .js files exist so resolution targets are reliable
+  // (e.g. index.js importing ./sqlite resolves to sqlite.js which was built
+  // in the same loop). See normalizeEsmSpecifiers for details.
+  for (const outFile of collectDistJsFiles(distDir)) {
+    if (outFile.endsWith(".js")) normalizeEsmSpecifiers(outFile);
   }
 
   const tempDir = mkdtempSync(join(repoRoot, ".tmp-wats83-tsconfig-"));
@@ -155,6 +178,14 @@ function buildPackage(pkg: PackageName): void {
     rmSync(join(distDir, "__types"), { recursive: true, force: true });
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
+  }
+
+  // Normalize extensionless relative specifiers in emitted .d.ts declaration
+  // files too, so type-only consumers importing via external specifiers under
+  // NodeNext module resolution resolve the .d.ts graph. Runs after the
+  // declaration copy so all .d.ts targets exist.
+  for (const outFile of collectDistJsFiles(distDir)) {
+    if (outFile.endsWith(".d.ts")) normalizeEsmSpecifiers(outFile);
   }
 }
 

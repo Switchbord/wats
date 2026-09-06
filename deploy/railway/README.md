@@ -53,11 +53,13 @@ Then point Meta App Dashboard > WhatsApp > Configuration at:
     docker run --rm -e PORT=9090 -p 9090:9090 wats-railway
     curl http://127.0.0.1:9090/healthz     # {"ok":true,"service":"wats"}
 
-## Known limitations (alpha)
+## Persistence and limits
 
-- The CLI `wats serve` wrapper does not auto-inject a persistence store. Webhook dedup,
-  idempotency, and local message projection are inactive unless an operator wires a
-  `PersistenceStore` through `createWatsServiceApp(...)` or equivalent service composition.
+- Persistence is opt-in. Set `WATS_DATABASE=/data/wats.sqlite` with a mounted
+  volume, or `WATS_DATABASE_URL_ENV=DATABASE_URL` and provide the PostgreSQL URL
+  in that environment variable. The entrypoint passes the selected option to
+  `wats serve`, which migrates the store before listening. With neither option,
+  webhook deduplication and local message history remain inactive.
 - Reliable-transport primitives (retry, bounded exponential full-jitter
   backoff, `Retry-After`, per-attempt timeout) ship opt-in via
   `createReliableTransport(inner, options?)` in `@wats/graph` (since 0.3.10) but
@@ -65,10 +67,11 @@ Then point Meta App Dashboard > WhatsApp > Configuration at:
   the bare fetch transport unless a caller passes the decorator. The decorator
   exposes an `onRetry(ctx)` hook as the redacted-telemetry primitive surface —
   the caller controls what (if anything) to record and is responsible for
-  redaction. WATS ships no built-in redacted telemetry sink and no per-endpoint
-  concurrency cap; both remain deferred pending live-campaign evidence and the
-  no-maintainer-owned-telemetry-by-default stance.
-- `@wats/persistence` now ships SQLite plus an optional Postgres adapter subpath, but `wats serve` still needs explicit operator wiring for durable/HA production persistence; no automatic HA topology is enabled by this Railway scaffold.
+  redaction. The service exposes local metrics and an opt-in telemetry adapter;
+  it does not send telemetry to a maintainer-owned endpoint.
+- Storage volumes, backups, database availability, and recovery of ambiguous
+  sends are operator-owned. No HA topology or payload outbox worker is enabled
+  by this container.
 
 ## Inbound webhook observability
 

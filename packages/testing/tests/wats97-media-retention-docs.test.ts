@@ -1,7 +1,8 @@
-import { describe, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import ts from "typescript";
 
 function findRepoRoot(startDir: string): string {
   let current = startDir;
@@ -142,8 +143,12 @@ function thirtyDayViolations(paths: readonly string[]): string[] {
 
 function extractComments(source: string): string[] {
   const comments: string[] = [];
-  for (const match of source.matchAll(/\/\*[\s\S]*?\*\//gu)) comments.push(match[0]);
-  for (const match of source.matchAll(/(^|[^:])\/\/[^\r\n]*/gmu)) comments.push(match[0]);
+  const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, ts.LanguageVariant.Standard, source);
+  for (let kind = scanner.scan(); kind !== ts.SyntaxKind.EndOfFileToken; kind = scanner.scan()) {
+    if (kind === ts.SyntaxKind.MultiLineCommentTrivia || kind === ts.SyntaxKind.SingleLineCommentTrivia) {
+      comments.push(scanner.getTokenText());
+    }
+  }
   return comments;
 }
 
@@ -164,6 +169,11 @@ function commentMentionsWebhookMediaRetention(comment: string): boolean {
 }
 
 describe("WATS-97 webhook media-id retention docs", () => {
+  test("comment scanner does not treat a route wildcard string as a block comment", () => {
+    const source = 'const route = "/api/*"; const value = "webhook media window"; /** template body */';
+    expect(extractComments(source)).toEqual(["/** template body */"]);
+  });
+
   test("required public docs lock current webhook media ID retention and persistence guidance", () => {
     // Site docs are voice-governed; assert the core retention fact there. The
     // full prompt-download + persistence prose is asserted on the changelog.

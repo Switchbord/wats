@@ -18,6 +18,9 @@ import {
   type OutboxSucceededInput,
   type PersistenceHealth,
   type PersistenceStore,
+  type ServiceRequestClaimInput,
+  type ServiceRequestClaimResult,
+  type ServiceRequestCompletionInput,
   type ServiceRequestLookupInput,
   type ServiceRequestLookupResult,
   type ServiceRequestRecordInput,
@@ -66,6 +69,32 @@ const SQLITE_MEMORY = ":memory:";
 const MAX_FILENAME_LENGTH = 4096;
 const MIGRATION_LOCK_ID = 1;
 const OUTBOX_PROCESSING_LEASE_MS = 5 * 60 * 1000;
+
+// WATS-200: explicit status rank transition semantics. Status events advance
+// deterministically by rank: sent(1) < delivered(2) < read(3). `failed` may
+// replace pending/sent (rank <= 1) but must NEVER replace delivered or read.
+// Unknown statuses get rank 0 so a known terminal state is never regressed by
+// an unrecognized value. Same-rank or higher-rank events may advance; an
+// equal-timestamp event may advance rank but never rolls updated_at backward.
+const STATUS_RANK: Readonly<Record<string, number>> = Object.freeze({
+  pending: 0,
+  sent: 1,
+  delivered: 2,
+  read: 3,
+  failed: 1
+});
+function statusRank(status: string): number {
+  return STATUS_RANK[status] ?? 0;
+}
+// `failed` is terminal-ish: it may replace pending/sent but never delivered/read.
+function failedMayReplace(currentStatus: string): boolean {
+  return statusRank(currentStatus) <= 1;
+}
+// Should `newStatus` replace `currentStatus`? Rank-based with a failed gate.
+function shouldAdvanceStatus(newStatus: string, currentStatus: string): boolean {
+  if (newStatus === "failed") return failedMayReplace(currentStatus);
+  return statusRank(newStatus) > statusRank(currentStatus);
+}
 const MIGRATIONS: readonly MigrationDefinition[] = Object.freeze([
   {
     id: "001_initial",
@@ -148,6 +177,77 @@ const MIGRATIONS: readonly MigrationDefinition[] = Object.freeze([
     statements: Object.freeze([
       `CREATE INDEX IF NOT EXISTS wats_messages_direction_from_phone_created_at_idx
         ON wats_messages (direction, from_phone, created_at DESC)`
+    ])
+  },
+  {
+    id: "005_service_request_claims",
+    version: 5,
+    checksum: "sha256:wats-persistence-005-service-request-claims-v1",
+    statements: Object.freeze([
+      // SQLite cannot drop a column constraint in place, so recreate the table
+      // with response_json nullable to allow 'claimed' rows that have no
+      // response yet. Existing rows keep their data; the status column
+      // defaults to 'completed' so old records replay via getServiceRequest.
+      `CREATE TABLE wats_service_requests_new (
+        idempotency_key TEXT PRIMARY KEY,
+        request_hash TEXT NOT NULL,
+        response_json TEXT,
+        created_at TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'completed',
+        claimed_at TEXT
+      )`,
+      `INSERT INTO wats_service_requests_new (idempotency_key, request_hash, response_json, created_at, status)
+         SELECT idempotency_key, request_hash, response_json, created_at, 'completed'
+         FROM wats_service_requests`,
+      `DROP TABLE wats_service_requests`,
+      `ALTER TABLE wats_service_requests_new RENAME TO wats_service_requests`
+    ])
+  },
+  {
+    id: "006_message_uniqueness",
+    version: 6,
+    checksum: "sha256:wats-persistence-006-message-uniqueness-v1",
+    statements: Object.freeze([
+      // Deterministic dedup of preexisting duplicate messages before creating
+      // the uniqueness index. Keep the row with the BEST KNOWN STATE per
+      // (direction, wa_message_id): highest status rank (read > delivered >
+      // sent > pending), then smallest row_id as a deterministic tiebreak when
+      // statuses are equal. Old logic kept the smallest row_id unconditionally
+      // and could discard a more-advanced status (e.g. 'read' lost to 'sent').
+      `DELETE FROM wats_message_status_events
+         WHERE id IN (
+           SELECT id FROM (
+             SELECT id,
+                    ROW_NUMBER() OVER (
+                      PARTITION BY wa_message_id, status, timestamp
+                      ORDER BY id ASC
+                    ) AS rn
+             FROM wats_message_status_events
+           ) WHERE rn > 1
+         )`,
+      `DELETE FROM wats_messages
+         WHERE row_id IN (
+           SELECT row_id FROM (
+             SELECT row_id,
+                    ROW_NUMBER() OVER (
+                      PARTITION BY direction, wa_message_id
+                      ORDER BY
+                        CASE status
+                          WHEN 'read' THEN 4
+                          WHEN 'delivered' THEN 3
+                          WHEN 'sent' THEN 2
+                          WHEN 'pending' THEN 1
+                          ELSE 0
+                        END DESC,
+                        row_id ASC
+                    ) AS rn
+             FROM wats_messages
+           ) WHERE rn > 1
+         )`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS wats_messages_direction_wa_message_id_uidx
+        ON wats_messages (direction, wa_message_id)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS wats_message_status_events_wa_message_id_status_timestamp_uidx
+        ON wats_message_status_events (wa_message_id, status, timestamp)`
     ])
   }
 ]);
@@ -245,7 +345,32 @@ function validateServiceRequestRecord(input: ServiceRequestRecordInput): Service
   try {
     JSON.parse(responseJson);
   } catch (cause) {
-    throw new PersistenceError("invalid_record", "responseJson must be valid JSON.", { cause });
+    throw new PersistenceError("invalid_record", "responseJson must be valid JSON.");
+  }
+  return Object.freeze({
+    idempotencyKey: validateRecordString(record.idempotencyKey, "idempotencyKey"),
+    requestHash: validateRecordString(record.requestHash, "requestHash"),
+    responseJson,
+    createdAt: validateTimestamp(record.createdAt, "createdAt")
+  });
+}
+
+function validateServiceRequestClaim(input: ServiceRequestClaimInput): ServiceRequestClaimInput {
+  const record = validateRecordInput(input, "service request claim");
+  return Object.freeze({
+    idempotencyKey: validateRecordString(record.idempotencyKey, "idempotencyKey"),
+    requestHash: validateRecordString(record.requestHash, "requestHash"),
+    createdAt: validateTimestamp(record.createdAt, "createdAt")
+  });
+}
+
+function validateServiceRequestCompletion(input: ServiceRequestCompletionInput): ServiceRequestCompletionInput {
+  const record = validateRecordInput(input, "service request completion");
+  const responseJson = validateRecordString(record.responseJson, "responseJson");
+  try {
+    JSON.parse(responseJson);
+  } catch (cause) {
+    throw new PersistenceError("invalid_record", "responseJson must be valid JSON.");
   }
   return Object.freeze({
     idempotencyKey: validateRecordString(record.idempotencyKey, "idempotencyKey"),
@@ -442,7 +567,7 @@ async function loadBunSqlite(): Promise<BunSqliteModule> {
     const specifier = "bun:sqlite";
     return (await import(specifier)) as unknown as BunSqliteModule;
   } catch (cause) {
-    throw new PersistenceError("migration_failed", "SQLite persistence requires Bun sqlite support.", { cause });
+    throw new PersistenceError("migration_failed", "SQLite persistence requires Bun sqlite support.");
   }
 }
 
@@ -498,7 +623,7 @@ class SqlitePersistenceStore implements PersistenceStore {
           applied.push(migration.id);
         } catch (cause) {
           this.#database.exec("ROLLBACK");
-          throw new PersistenceError("migration_failed", "SQLite migration failed.", { cause });
+          throw new PersistenceError("migration_failed", "SQLite migration failed.");
         }
       }
       return Object.freeze({
@@ -538,31 +663,128 @@ class SqlitePersistenceStore implements PersistenceStore {
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);
       if (/UNIQUE|constraint/i.test(message)) return "duplicate";
-      throw new PersistenceError("migration_failed", "SQLite webhook event record failed.", { cause });
+      throw new PersistenceError("migration_failed", "SQLite webhook event record failed.");
     }
   }
 
   async getServiceRequest(input: ServiceRequestLookupInput): Promise<ServiceRequestLookupResult> {
     this.#assertOpen();
     const lookup = validateServiceRequestLookup(input);
-    const row = this.#database.query<{ request_hash: string; response_json: string }>(
-      "SELECT request_hash, response_json FROM wats_service_requests WHERE idempotency_key = ?"
+    const row = this.#database.query<{ request_hash: string; response_json: string; status: string }>(
+      "SELECT request_hash, response_json, status FROM wats_service_requests WHERE idempotency_key = ?"
     ).get(lookup.idempotencyKey);
     if (row === null) return null;
     if (row.request_hash !== lookup.requestHash) return "conflict";
+    // WATS-200: a claimed-but-not-completed row has status='claimed' and a NULL
+    // response_json. The old getServiceRequest contract returns the response;
+    // a claimed row has none to replay, so return null rather than a stale
+    // placeholder.
+    if (row.status === "claimed" || row.response_json === null) return null;
     return Object.freeze({ responseJson: row.response_json });
   }
 
   async recordServiceRequest(input: ServiceRequestRecordInput): Promise<void> {
     this.#assertOpen();
     const record = validateServiceRequestRecord(input);
-    this.#database.run(
-      "INSERT OR IGNORE INTO wats_service_requests (idempotency_key, request_hash, response_json, created_at) VALUES (?, ?, ?, ?)",
-      record.idempotencyKey,
-      record.requestHash,
-      record.responseJson,
-      record.createdAt
-    );
+    // WATS-200: INSERT OR IGNORE preserves the old semantics — it never
+    // overwrites an existing row. If a claim already reserved the key, the
+    // IGNORE keeps the reservation intact (status='claimed'). A non-constraint
+    // backend fault (disk I/O, corruption, dropped table) must surface as a
+    // typed PersistenceError with a static message, never a raw bun:sqlite
+    // error, and must not echo the caller's input.
+    try {
+      this.#database.run(
+        "INSERT OR IGNORE INTO wats_service_requests (idempotency_key, request_hash, response_json, created_at, status) VALUES (?, ?, ?, ?, 'completed')",
+        record.idempotencyKey,
+        record.requestHash,
+        record.responseJson,
+        record.createdAt
+      );
+    } catch (cause) {
+      throw new PersistenceError("outbox_failed", "SQLite service request record failed.");
+    }
+  }
+
+  async claimServiceRequest(input: ServiceRequestClaimInput): Promise<ServiceRequestClaimResult> {
+    this.#assertOpen();
+    const claim = validateServiceRequestClaim(input);
+    // INSERT OR IGNORE atomically reserves the key. The status column
+    // distinguishes 'claimed' (reserved, response_json NULL) from 'completed'
+    // (response_json populated by completeServiceRequest). A duplicate insert
+    // is a no-op so the existing row is preserved — no blind resend. A backend
+    // fault (disk I/O, corruption, dropped table) must surface as a typed
+    // PersistenceError with a static message, never a raw bun:sqlite error,
+    // and must not echo the caller's input.
+    let insert: BunSqliteRunResult;
+    let row: { request_hash: string; response_json: string | null; status: string } | null;
+    try {
+      insert = this.#database.run(
+        "INSERT OR IGNORE INTO wats_service_requests (idempotency_key, request_hash, response_json, created_at, claimed_at, status) VALUES (?, ?, NULL, ?, ?, 'claimed')",
+        claim.idempotencyKey,
+        claim.requestHash,
+        claim.createdAt,
+        claim.createdAt
+      );
+      // changes === 1 means a new row was inserted: this is the first claim.
+      if (insert.changes === 1) return "claimed";
+      // The row already existed. Re-read to determine the outcome.
+      row = this.#database.query<{ request_hash: string; response_json: string | null; status: string }>(
+        "SELECT request_hash, response_json, status FROM wats_service_requests WHERE idempotency_key = ?"
+      ).get(claim.idempotencyKey);
+    } catch (cause) {
+      if (cause instanceof PersistenceError) throw cause;
+      throw new PersistenceError("claim_failed", "SQLite service request claim failed.");
+    }
+    if (row === null) {
+      throw new PersistenceError("claim_failed", "SQLite service request claim did not persist.");
+    }
+    if (row.request_hash !== claim.requestHash) return "conflict";
+    if (row.status === "completed" && row.response_json !== null) {
+      return Object.freeze({ responseJson: row.response_json });
+    }
+    return "pending";
+  }
+
+  async completeServiceRequest(input: ServiceRequestCompletionInput): Promise<void> {
+    this.#assertOpen();
+    const completion = validateServiceRequestCompletion(input);
+    // Completion must match the reserved hash. A mismatch is a typed error, not
+    // a silent overwrite. A completion without a prior claim is also a typed
+    // error — there is no reservation to complete. A backend fault (disk I/O,
+    // corruption, dropped table) on the data queries must surface as a typed
+    // PersistenceError with a static message, never a raw bun:sqlite error,
+    // and must not echo the caller's input.
+    let existing: { request_hash: string; status: string } | null;
+    try {
+      existing = this.#database.query<{ request_hash: string; status: string }>(
+        "SELECT request_hash, status FROM wats_service_requests WHERE idempotency_key = ?"
+      ).get(completion.idempotencyKey);
+    } catch (cause) {
+      throw new PersistenceError("completion_failed", "SQLite service request completion failed.");
+    }
+    if (existing === null) {
+      throw new PersistenceError("completion_failed", "SQLite service request completion requires a prior claim.");
+    }
+    if (existing.request_hash !== completion.requestHash) {
+      throw new PersistenceError("completion_failed", "SQLite service request completion hash mismatch.");
+    }
+    // Only 'claimed' rows are completable; a 'completed' row is already done.
+    if (existing.status === "completed") return;
+    let result: BunSqliteRunResult;
+    try {
+      result = this.#database.run(
+        "UPDATE wats_service_requests SET response_json = ?, status = 'completed', created_at = ? WHERE idempotency_key = ? AND request_hash = ? AND status = 'claimed'",
+        completion.responseJson,
+        completion.createdAt,
+        completion.idempotencyKey,
+        completion.requestHash
+      );
+    } catch (cause) {
+      throw new PersistenceError("completion_failed", "SQLite service request completion failed.");
+    }
+    if (result.changes !== 1) {
+      throw new PersistenceError("completion_failed", "SQLite service request completion lease is stale.");
+    }
   }
 
   async enqueueOutboxItem(input: OutboxEnqueueInput): Promise<OutboxEnqueueResult> {
@@ -583,7 +805,7 @@ class SqlitePersistenceStore implements PersistenceStore {
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);
       if (/UNIQUE|constraint/i.test(message)) return "duplicate";
-      throw new PersistenceError("outbox_failed", "SQLite outbox enqueue failed.", { cause });
+      throw new PersistenceError("outbox_failed", "SQLite outbox enqueue failed.");
     }
   }
 
@@ -627,22 +849,27 @@ class SqlitePersistenceStore implements PersistenceStore {
       return Object.freeze(rows.map((row) => outboxRowToItem({ ...row, status: "processing", attempts: row.attempts + 1, lease_id: row.lease_id + 1, next_attempt_at: null, updated_at: claim.now })));
     } catch (cause) {
       this.#database.exec("ROLLBACK");
-      throw new PersistenceError("outbox_failed", "SQLite outbox claim failed.", { cause });
+      throw new PersistenceError("outbox_failed", "SQLite outbox claim failed.");
     }
   }
 
   async markOutboxItemFailed(input: OutboxFailedInput): Promise<void> {
     this.#assertOpen();
     const failure = validateOutboxFailed(input);
-    const result = this.#database.run(
-      "UPDATE wats_outbox SET status = ?, next_attempt_at = ?, updated_at = ? WHERE id = ? AND status = ? AND lease_id = ?",
-      "pending",
-      failure.nextAttemptAt,
-      failure.updatedAt,
-      failure.id,
-      "processing",
-      failure.leaseId
-    );
+    let result: BunSqliteRunResult;
+    try {
+      result = this.#database.run(
+        "UPDATE wats_outbox SET status = ?, next_attempt_at = ?, updated_at = ? WHERE id = ? AND status = ? AND lease_id = ?",
+        "pending",
+        failure.nextAttemptAt,
+        failure.updatedAt,
+        failure.id,
+        "processing",
+        failure.leaseId
+      );
+    } catch (cause) {
+      throw new PersistenceError("outbox_failed", "SQLite outbox failure failed.");
+    }
     if (result.changes !== 1) {
       throw new PersistenceError("outbox_failed", "SQLite outbox failure lease is stale.");
     }
@@ -651,14 +878,19 @@ class SqlitePersistenceStore implements PersistenceStore {
   async markOutboxItemSucceeded(input: OutboxSucceededInput): Promise<void> {
     this.#assertOpen();
     const success = validateOutboxSucceeded(input);
-    const result = this.#database.run(
-      "UPDATE wats_outbox SET status = ?, next_attempt_at = NULL, updated_at = ? WHERE id = ? AND status = ? AND lease_id = ?",
-      "succeeded",
-      success.updatedAt,
-      success.id,
-      "processing",
-      success.leaseId
-    );
+    let result: BunSqliteRunResult;
+    try {
+      result = this.#database.run(
+        "UPDATE wats_outbox SET status = ?, next_attempt_at = NULL, updated_at = ? WHERE id = ? AND status = ? AND lease_id = ?",
+        "succeeded",
+        success.updatedAt,
+        success.id,
+        "processing",
+        success.leaseId
+      );
+    } catch (cause) {
+      throw new PersistenceError("outbox_failed", "SQLite outbox success failed.");
+    }
     if (result.changes !== 1) {
       throw new PersistenceError("outbox_failed", "SQLite outbox success lease is stale.");
     }
@@ -667,21 +899,65 @@ class SqlitePersistenceStore implements PersistenceStore {
   async recordMessage(input: MessageRecordInput): Promise<void> {
     this.#assertOpen();
     const record = validateMessageRecord(input);
-    this.#database.run(
-      `INSERT OR IGNORE INTO wats_messages
-        (row_id, wa_message_id, direction, from_phone, to_phone, type, status, graph_message_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      record.rowId,
-      record.waMessageId,
-      record.direction,
-      record.fromPhone,
-      record.toPhone,
-      record.type,
-      record.status,
-      record.graphMessageId,
-      record.createdAt,
-      record.updatedAt
-    );
+    // WATS-200: INSERT OR IGNORE deduplicates by row_id (PRIMARY KEY) and by
+    // (direction, wa_message_id) via the unique index from migration 006. A
+    // second insert with the same (direction, wa_message_id) but a different
+    // row_id is a no-op, preserving the first projection.
+    try {
+      this.#database.run(
+        `INSERT OR IGNORE INTO wats_messages
+          (row_id, wa_message_id, direction, from_phone, to_phone, type, status, graph_message_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        record.rowId,
+        record.waMessageId,
+        record.direction,
+        record.fromPhone,
+        record.toPhone,
+        record.type,
+        record.status,
+        record.graphMessageId,
+        record.createdAt,
+        record.updatedAt
+      );
+    } catch (cause) {
+      // A constraint violation is the expected dedup path (INSERT OR IGNORE
+      // already swallows those, but a non-constraint runtime fault — disk I/O,
+      // busy, corruption — must surface as a typed PersistenceError, never a
+      // raw bun:sqlite error, and must not echo the caller's input.
+      throw new PersistenceError("outbox_failed", "SQLite message record failed.");
+    }
+    // WATS-200: status-before-message reconciliation. A status event may have
+    // arrived (early webhook) before this outbound projection was recorded.
+    // If a more-advanced status already exists for this wa_message_id, advance
+    // the freshly-inserted row so it does not regress to the send-time status.
+    this.#reconcileStoredStatus(record.waMessageId, record.status, record.updatedAt);
+  }
+
+  // WATS-200: reconcile the message row's status with any status events that
+  // were stored before the message projection. Applies rank-transition
+  // semantics: a known more-advanced event advances the row; updated_at never
+  // rolls backward (it advances to the event timestamp only when newer).
+  #reconcileStoredStatus(waMessageId: string, recordedStatus: string, recordedUpdatedAt: string): void {
+    const events = this.#database.query<{ status: string; timestamp: string }>(
+      "SELECT status, timestamp FROM wats_message_status_events WHERE wa_message_id = ? ORDER BY timestamp ASC"
+    ).all(waMessageId);
+    if (events.length === 0) return;
+    let bestStatus = recordedStatus;
+    let bestUpdatedAt = recordedUpdatedAt;
+    for (const ev of events) {
+      if (shouldAdvanceStatus(ev.status, bestStatus)) {
+        bestStatus = ev.status;
+        if (ev.timestamp > bestUpdatedAt) bestUpdatedAt = ev.timestamp;
+      }
+    }
+    if (bestStatus !== recordedStatus || bestUpdatedAt !== recordedUpdatedAt) {
+      this.#database.run(
+        "UPDATE wats_messages SET status = ?, updated_at = ? WHERE wa_message_id = ?",
+        bestStatus,
+        bestUpdatedAt,
+        waMessageId
+      );
+    }
   }
 
   async appendMessageStatus(input: MessageStatusEventInput): Promise<void> {
@@ -689,22 +965,35 @@ class SqlitePersistenceStore implements PersistenceStore {
     const event = validateMessageStatusEvent(input);
     this.#database.exec("BEGIN IMMEDIATE");
     try {
+      // WATS-200: dedup by (wa_message_id, status, timestamp). The unique index
+      // created by migration 006 makes the INSERT a no-op for duplicates.
       this.#database.run(
-        "INSERT INTO wats_message_status_events (wa_message_id, status, timestamp) VALUES (?, ?, ?)",
+        "INSERT OR IGNORE INTO wats_message_status_events (wa_message_id, status, timestamp) VALUES (?, ?, ?)",
         event.waMessageId,
         event.status,
         event.timestamp
       );
-      this.#database.run(
-        "UPDATE wats_messages SET status = ?, updated_at = ? WHERE wa_message_id = ?",
-        event.status,
-        event.timestamp,
-        event.waMessageId
-      );
+      // WATS-200: rank-based monotonicity. Advance the message status only when
+      // the event represents a forward rank transition (sent < delivered < read;
+      // failed may replace pending/sent but not delivered/read). An event at
+      // the same second may advance rank; updated_at never rolls backward (it
+      // advances to the event timestamp only when the event is newer).
+      const current = this.#database.query<{ status: string; updated_at: string }>(
+        "SELECT status, updated_at FROM wats_messages WHERE wa_message_id = ?"
+      ).get(event.waMessageId);
+      if (current !== null && shouldAdvanceStatus(event.status, current.status)) {
+        const newUpdatedAt = event.timestamp > current.updated_at ? event.timestamp : current.updated_at;
+        this.#database.run(
+          "UPDATE wats_messages SET status = ?, updated_at = ? WHERE wa_message_id = ?",
+          event.status,
+          newUpdatedAt,
+          event.waMessageId
+        );
+      }
       this.#database.exec("COMMIT");
     } catch (cause) {
       this.#database.exec("ROLLBACK");
-      throw new PersistenceError("invalid_record", "SQLite message status append failed.", { cause });
+      throw new PersistenceError("outbox_failed", "SQLite message status append failed.");
     }
   }
 
@@ -799,7 +1088,7 @@ class SqlitePersistenceStore implements PersistenceStore {
         nowIso()
       );
     } catch (cause) {
-      throw new PersistenceError("migration_lock_failed", "SQLite migration lock is already held.", { cause });
+      throw new PersistenceError("migration_lock_failed", "SQLite migration lock is already held.");
     }
   }
 
@@ -837,6 +1126,6 @@ export async function createSqlitePersistence(options: SqlitePersistenceOptions)
     const database = new sqlite.Database(filename, { readonly, create: !readonly });
     return new SqlitePersistenceStore(database);
   } catch (cause) {
-    throw new PersistenceError("migration_failed", "SQLite database could not be opened.", { cause });
+    throw new PersistenceError("migration_failed", "SQLite database could not be opened.");
   }
 }

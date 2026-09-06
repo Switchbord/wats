@@ -100,8 +100,30 @@ function writeConsumerSmoke(pkg: string, installRoot: string): void {
     }).join("\n")
   );
 
+  // Bun runtime import probe.
   run("bun", [join(consumerDir, "subpath-smoke.ts")], consumerDir);
   run("bunx", ["tsc", "--noEmit", "--module", "NodeNext", "--target", "ES2022", "--moduleResolution", "NodeNext", "--strict", "--skipLibCheck", join(consumerDir, "types.ts")], consumerDir);
+
+  // Plain Node ESM runtime import probe: drive real `node` against the packed
+  // tarball install (no custom loader, no bundler) importing every export-map
+  // key via the external package specifiers and asserting each namespace has
+  // at least one concrete (non-undefined) runtime export. CLI bin stays Bun.
+  const nodeSmokeLines: string[] = [
+    `const specifiers = ${JSON.stringify(specifiers)};`,
+    `for (const specifier of specifiers) {`,
+    `  const mod = await import(specifier);`,
+    `  if (typeof mod !== "object" || mod === null) throw new Error("node import failed for " + specifier);`,
+    `  const keys = Object.keys(mod);`,
+    `  if (keys.length === 0) throw new Error("node import " + specifier + " has no runtime symbols");`,
+    `  let hasConcrete = false;`,
+    `  for (const k of keys) { const v = mod[k]; if (v !== undefined && v !== null && (typeof v === "function" || typeof v === "object" || typeof v === "string" || typeof v === "number" || typeof v === "boolean" || typeof v === "symbol" || typeof v === "bigint")) hasConcrete = true; }`,
+    `  if (!hasConcrete) throw new Error("node import " + specifier + " has no concrete runtime exports");`,
+    `}`,
+    `console.log(${JSON.stringify(packageName + ":node-export-map-import-ok")});`,
+    ""
+  ];
+  writeFileSync(join(consumerDir, "node-smoke.mjs"), nodeSmokeLines.join("\n"));
+  run("node", [join(consumerDir, "node-smoke.mjs")], consumerDir);
 }
 
 try {

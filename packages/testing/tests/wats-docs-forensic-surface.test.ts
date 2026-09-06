@@ -83,8 +83,9 @@ describe("forensic docs current-surface reconciliation", () => {
     const railway = read("deploy/railway/README.md");
     expect(docker).toContain("repo ships a Railway-targeted root `Dockerfile`");
     expect(service).toContain("The repo ships a Railway-targeted root `Dockerfile`");
-    expect(railway).toContain("does not auto-inject a persistence store");
-    expect(railway).toContain("local message projection");
+    expect(railway).toContain("Persistence is opt-in");
+    expect(railway).toContain("WATS_DATABASE=/data/wats.sqlite");
+    expect(railway).toContain("migrates the store before listening");
     expect(docker).not.toContain("no supported root Dockerfile");
     expect(service).not.toContain("There is no supported Dockerfile");
     expect(railway).not.toContain("no persistence is wired into `serve` yet");

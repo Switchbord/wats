@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.4.1-beta.0] - 2026-09-06
+
+Standalone hardening patch. Beta status is unchanged.
+
+### Fixed
+
+- Keyed service sends reserve durable request state before calling Graph. Concurrent requests cannot both send through the built-in stores; unresolved claims block repeat attempts. A successful Graph send followed by a completion-write failure stays successful, with `x-wats-persistence: degraded` rather than a misleading failure response.
+- Webhooks are byte-bounded before parsing, authenticated before normalization, and depth-bounded. Inbound projections use message event time before handlers run; duplicate updates and delivery-status projections retain stable identity and ordering.
+- PostgreSQL operations serialize access to a shared client, preventing cross-operation rollback. Message/status replay and same-second callback handling no longer regress projected state. Schema migrations preserve existing records while deduplicating projections.
+- Published runtime exports resolve under plain Node ESM as well as Bun. SQLite remains a Bun capability; PostgreSQL requires the optional `pg` driver.
+- Rate-limit admission honors cancellation and cleans up abandoned timers. Retry guidance now distinguishes an absent response from proof that a mutation was not applied.
+- Readiness checks configured persistence health and schema. OpenAPI 3.1 response schemas accept the null values the service emits.
+
+### Added
+
+- `wats serve --database` enables SQLite persistence; `--database-url-env` selects a PostgreSQL connection through an environment reference. Migrations precede listening. The default remains stateless. Shutdown drains requests and bounds store closure.
+- The generic message endpoint accepts camelCase template inputs through the existing SDK builder.
+- Real PostgreSQL regression checks in CI and packed-export checks under Node and Bun.
+
+### Upgrade
+
+`bun add @wats/core@0.4.1-beta.0 @wats/graph@0.4.1-beta.0`; CLI: `bunx --bun @wats/cli@0.4.1-beta.0 --help`.
+
+Back up persistent databases before migrating. Custom stores remain source-compatible, but keyed sends require the additive atomic claim/complete capabilities; otherwise they fail closed with `503 persistence_not_atomic`. Ambiguous claims require operator reconciliation, not automatic retry. There is no message-content inbox, payload outbox worker in `wats serve`, or new TanStack application in this patch. No live Meta validation is claimed.
+
 ## [0.4.0-beta.0] - 2026-07-20
 
 Beta launch: pre-beta review campaign — public-surface cleanup, docs truth pass, and two breaking-shape corrections.

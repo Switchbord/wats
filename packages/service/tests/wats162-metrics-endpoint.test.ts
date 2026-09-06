@@ -34,6 +34,9 @@ function findRepoRoot(startDir: string): string {
 const repoRoot = findRepoRoot(import.meta.dir);
 
 function memoryStore() {
+  // WATS-205: implement the atomic claim/complete contract so keyed sends
+  // proceed through the claim state machine instead of returning 503.
+  const requests = new Map<string, { requestHash: string; responseJson: string; status: string }>();
   return {
     backend: "sqlite" as const,
     async migrate() { return { currentVersion: 1, appliedMigrations: [], alreadyCurrent: true }; },
@@ -41,6 +44,19 @@ function memoryStore() {
     async recordWebhookEvent() { return "recorded" as const; },
     async getServiceRequest() { return null; },
     async recordServiceRequest() {},
+    async claimServiceRequest(input: { idempotencyKey: string; requestHash: string }) {
+      const existing = requests.get(input.idempotencyKey);
+      if (existing === undefined) {
+        requests.set(input.idempotencyKey, { requestHash: input.requestHash, responseJson: "", status: "claimed" });
+        return "claimed" as const;
+      }
+      if (existing.requestHash !== input.requestHash) return "conflict" as const;
+      if (existing.status === "completed" && existing.responseJson !== "") return Object.freeze({ responseJson: existing.responseJson });
+      return "pending" as const;
+    },
+    async completeServiceRequest(input: { idempotencyKey: string; requestHash: string; responseJson: string }) {
+      requests.set(input.idempotencyKey, { requestHash: input.requestHash, responseJson: input.responseJson, status: "completed" });
+    },
     async enqueueOutboxItem() { return "enqueued" as const; },
     async claimOutboxItems(): Promise<readonly OutboxItem[]> { return []; },
     async markOutboxItemFailed() {},

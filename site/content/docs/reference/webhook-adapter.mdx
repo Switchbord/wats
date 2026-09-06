@@ -248,6 +248,51 @@ Any deviation returns `400 invalid_signature_format` (malformed) or `401 missing
 
 Callers constructing the header themselves (proxies, test harnesses) MUST match the format exactly. This intentionally narrow surface keeps the attacker cost of signature-confusion attacks high and the validation logic short and auditable.
 
+## Service-layer ingestion
+
+When `@wats/service` is constructed with an injected `PersistenceStore`, the
+service wraps the adapter with a bounded, authenticated ingestion layer that
+adds guarantees the adapter core alone does not provide:
+
+1. **Per-update scoped dedup.** Each normalized `TypedUpdate` gets a stable
+   dedup key scoped by the receiving profile (`phoneNumberId` + `wabaId`) and
+   the update's own identity (`messageId` for messages; `statusId` + `status`
+   + `timestamp` for statuses). Fallback families (account, call, group,
+   system, unknown) hash the bounded canonical JSON of the STABLE fields
+   (receive-clock fields `receivedAt` and `rawChange` excluded) with the
+   entire scope tuple — not a raw phone/waba prefix — so retries dedup. The
+   key is an async SHA-256 of a JSON tuple via the existing crypto provider,
+   never a non-cryptographic hash. Dedup is recorded AFTER the adapter
+   authenticates the raw bytes, so an invalid request cannot poison dedup.
+
+2. **Finite depth gate.** After signature verification, the adapter rejects
+   `400 payload_depth_exceeded` when the parsed envelope's nesting depth
+   exceeds `MAX_NESTED_DEPTH` (128) — for ALL families, including a valid
+   message with a deeply-nested `extra` property. The gate runs BEFORE dedup
+   and dispatch; an over-limit payload is never silently dispatched.
+
+3. **Event-time projection BEFORE dispatch.** Inbound message projection uses
+   the valid Meta timestamp from the message's own `timestamp` field (not
+   receipt time). A future timestamp within the 1h clock-skew tolerance is
+   CLAMPED to receipt time (never extending the conversation window); beyond
+   the tolerance, and any malformed (non-numeric, empty, non-positive)
+   timestamp, cause the projection to be SKIPPED — it never fabricates a fresh
+   window. Status callbacks project via `appendMessageStatus`, which
+   atomically appends the event AND updates the stored message row's status
+   — exactly one row per message after `delivered`/`read`/`failed`. Projection
+   is idempotent and runs for both first-delivery and deduped updates, so a
+   transient projection failure is repaired by a retry without re-dispatch.
+
+4. **Readiness gate.** `/readyz` checks `store.health()` and rejects (503
+   `persistence_unavailable`) any store whose schema version is not
+   `CURRENT_SCHEMA_VERSION` (not just version 0), plus unhealthy/throw,
+   while `/healthz` stays 200 (process-alive vs dependencies-ready).
+
+The ACK-on-handler-failure contract is preserved: a handler throw is caught
+and the webhook still returns 200. The service does NOT add raw-content
+storage — the handler receives the normalized `TypedUpdate`, not the raw
+body bytes. `/api` routes return 401 on missing token; telemetry returns 404.
+
 ## See also
 
 - [Deploy on Bun](/docs/guides/deploy-bun)

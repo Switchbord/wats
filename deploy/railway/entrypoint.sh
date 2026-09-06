@@ -11,6 +11,14 @@
 #   PORT                 - injected by Railway (fallback 8080 for local runs)
 #   WATS_CONFIG          - path to wats.config.yaml inside the image (default below)
 #   WATS_SERVE_MODE      - "dry-run" (default, no creds) or "live"
+# Optional durable persistence (WATS-204, off by default = stateless):
+#   WATS_DATABASE         - path to a SQLite file (opened+migrated before bind).
+#                          Relative paths resolve under the config directory.
+#                          Mutually exclusive with WATS_DATABASE_URL_ENV.
+#   WATS_DATABASE_URL_ENV - name of an env var holding a PostgreSQL DSN. The
+#                          raw DSN never appears on the command line or in logs;
+#                          only the env-var NAME is passed to `wats serve`. The
+#                          DSN value itself must be set in the Railway variables.
 # Live mode additionally requires (Railway variables):
 #   WATS_ACCESS_TOKEN WATS_APP_SECRET WATS_VERIFY_TOKEN WATS_SERVICE_TOKEN
 #   WATS_WABA_ID WATS_PHONE_NUMBER_ID
@@ -20,6 +28,17 @@ HOST="${WATS_HOST:-0.0.0.0}"
 PORT="${PORT:-8080}"
 CONFIG="${WATS_CONFIG:-/app/deploy/railway/wats.config.yaml}"
 MODE="${WATS_SERVE_MODE:-dry-run}"
+
+# Optional persistence flags (both empty = stateless default).
+DATABASE_ARG=()
+if [ -n "${WATS_DATABASE:-}" ] && [ -n "${WATS_DATABASE_URL_ENV:-}" ]; then
+  echo "wats-railway: WATS_DATABASE and WATS_DATABASE_URL_ENV are mutually exclusive; exiting." >&2
+  exit 1
+elif [ -n "${WATS_DATABASE:-}" ]; then
+  DATABASE_ARG=(--database "${WATS_DATABASE}")
+elif [ -n "${WATS_DATABASE_URL_ENV:-}" ]; then
+  DATABASE_ARG=(--database-url-env "${WATS_DATABASE_URL_ENV}")
+fi
 
 echo "wats-railway: mode=${MODE} host=${HOST} port=${PORT} config=${CONFIG}"
 
@@ -59,8 +78,8 @@ if [ "${MODE}" = "live" ]; then
   )
   exec bun /app/packages/cli/dist/bin.js serve \
     --config "${CONFIG}" --host "${HOST}" --port "${PORT}" \
-    --live --yes-live --env-file .env.local
+    --live --yes-live --env-file .env.local "${DATABASE_ARG[@]}"
 fi
 
 exec bun /app/packages/cli/dist/bin.js serve \
-  --config "${CONFIG}" --host "${HOST}" --port "${PORT}" --dry-run
+  --config "${CONFIG}" --host "${HOST}" --port "${PORT}" --dry-run "${DATABASE_ARG[@]}"

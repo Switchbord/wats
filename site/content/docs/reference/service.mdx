@@ -5,7 +5,7 @@ description: "The @wats/service runtime-neutral standalone webhook/API service a
 
 <DocMeta status="shape-only — webhook ingress and text send live-validated; other routes shape-only" lastReviewed="2026-06-21" />
 
-`@wats/service` exposes a runtime-neutral `Request -> Response` app composing the Graph client, webhook adapter, config profile shape, and WhatsApp facade. It is not a production server by itself: the CLI provides dry-run and credential-gated live `wats serve` wrappers, and a generated OpenAPI 3.1 document covers the routes below. Not implemented yet: Node/Docker packaging, production hosting.
+`@wats/service` exposes a runtime-neutral `Request -> Response` app composing the Graph client, webhook adapter, config, and WhatsApp facade. The CLI provides dry-run and credential-gated live `wats serve` wrappers. A Railway-targeted Dockerfile ships in the repository; see [Docker deployment](/docs/guides/deploy-docker). Hosting, TLS, and storage volumes remain operator-owned.
 
 ## Public API
 
@@ -103,7 +103,9 @@ The document includes `serviceBearerAuth` only on the protected message routes, 
 
 `GET /status` returns a redacted operator snapshot: package `version`, `uptimeSeconds`, `graphApiVersion`, a coarse `serviceMode`, a templated `routes` inventory, `featureFlags`, and a `persistence` health summary (or `null` when no store is injected). Route entries use `:param` placeholders, so no WABA id, phone-number id, or message id appears in the inventory.
 
-`/status` differs from liveness and readiness. `/healthz` and `/readyz` answer "is this process alive?" and "is it ready to serve?" — they take no auth and return a fixed `{ ok, service }` body. `/status` answers "what is this instance doing?", requires the service bearer token, and returns structured operator data. A missing or invalid token returns `404` (not `401`) so the endpoint's existence is not disclosed to unauthenticated callers; the `404` body is identical to the catch-all. The snapshot never includes tokens, phone numbers, WABA ids, config file paths, raw webhook bodies, message text, or stack traces.
+`/healthz` reports process liveness. `/readyz` returns `200 { ok, service }` when no store is configured or the configured store is healthy and at the current schema version. A store failure or schema mismatch returns `503 persistence_unavailable`. Neither endpoint requires auth or calls Meta.
+
+`/status` requires the service bearer token and returns operator data. Missing or invalid auth returns the catch-all `404`. The snapshot omits tokens, phone numbers, WABA ids, paths, raw webhook bodies, message text, and stack traces. The public OpenAPI document lists route names; the telemetry `404` policy does not hide those names from the document.
 
 ## Metrics
 
@@ -307,7 +309,9 @@ The route preserves the bearer boundary: the service bearer token authorizes the
 
 ## Message projection routes
 
-When a `PersistenceStore` is injected, every successful outbound send (text and generic) records a local projection of the Graph send attempt: a `MessageRecord` keyed by the returned WhatsApp message id, plus an initial `sent` status event. Projection failures are swallowed and never break the send response — the caller still receives the Graph result.
+When a `PersistenceStore` is injected, successful sends record message metadata plus an initial `sent` event. Signed inbound messages are projected before handlers run, using the message's event time rather than receipt time. Delivery/read/failure callbacks update the projected state. Message content is not stored.
+
+Projection failures do not turn a successful Graph send into a failed send. Repeated signed updates retry projection without re-running handlers. Handler failures are still acknowledged; this is not a durable handler-replay queue.
 
 ### `GET /messages`
 
@@ -424,8 +428,20 @@ Missing any method fails construction with `WatsServiceError` code `invalid_pers
 When persistence is injected:
 
 - signed webhook POSTs are recorded by event key/hash and duplicate deliveries are acknowledged without redispatching the same update;
-- message send routes honor `Idempotency-Key`: a matching key/body hash replays the stored response; the same key with a different body returns `409 idempotency_conflict`;
+- built-in stores atomically reserve `Idempotency-Key` before Graph is called. Keys are scoped to phone number, WABA, and operation; hashes cover outgoing payloads. Completed sends replay their stored result; a changed payload returns `409 idempotency_conflict`; unresolved claims return `409 idempotency_pending` without sending again;
 - successful outbound sends record a local message projection and an initial `sent` status event, exposed read-only through `GET /messages` and `GET /messages/{messageId}`.
+
+Atomic `claimServiceRequest` / `completeServiceRequest` capabilities are additive: legacy custom stores can still be injected, but keyed sends return `503 persistence_not_atomic` when those methods are absent. Without persistence the service remains stateless, and an idempotency header supplies no deduplication guarantee.
+
+If Graph succeeds but durable completion fails, the service returns the genuine `200` result with `x-wats-persistence: degraded`. Do not resend it. Claims remain unresolved after ambiguous transport failures or crashes; WATS does not automatically release them. Reconcile the outcome before deciding whether a new send is needed.
+
+`POST /api/messages` also accepts templates:
+
+```json
+{"type":"template","to":"15550001111","name":"order_confirmation","languageCode":"en_US"}
+```
+
+Optional `components` use the SDK template component structure. Templates use the same keyed-send rules. Template approval and recipient eligibility remain Meta-enforced.
 
 The outbox APIs are part of the accepted contract even though current message routes still send synchronously. `claimOutboxItems(...)` returns `OutboxItem` records with `leaseId`; pass that same `leaseId` to `markOutboxItemFailed(...)` / `markOutboxItemSucceeded(...)` so stale workers cannot complete a newer reclaimed lease.
 

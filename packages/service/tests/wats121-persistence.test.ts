@@ -6,12 +6,14 @@ import { createWatsServiceApp, type WatsServiceConfig } from "../src/index";
 type MemoryStore = {
   readonly backend: "sqlite";
   events: Set<string>;
-  requests: Map<string, { requestHash: string; responseJson: string }>;
+  requests: Map<string, { requestHash: string; responseJson: string; status: string }>;
   migrate(): Promise<{ currentVersion: number; appliedMigrations: readonly string[]; alreadyCurrent: boolean }>;
   health(): Promise<{ ok: boolean; backend: "sqlite"; currentVersion: number; redactedLocation: string }>;
   recordWebhookEvent(input: { eventKey: string; eventHash: string; receivedAt: string }): Promise<"recorded" | "duplicate">;
   getServiceRequest(input: { idempotencyKey: string; requestHash: string }): Promise<null | "conflict" | { responseJson: string }>;
   recordServiceRequest(input: { idempotencyKey: string; requestHash: string; responseJson: string; createdAt: string }): Promise<void>;
+  claimServiceRequest(input: { idempotencyKey: string; requestHash: string; createdAt: string }): Promise<"claimed" | "pending" | "conflict" | { responseJson: string }>;
+  completeServiceRequest(input: { idempotencyKey: string; requestHash: string; responseJson: string; createdAt: string }): Promise<void>;
   enqueueOutboxItem(input: { id: string; payloadHash: string; createdAt: string; nextAttemptAt?: string | null }): Promise<"enqueued" | "duplicate">;
   claimOutboxItems(input: { now: string; limit: number }): Promise<readonly OutboxItem[]>;
   markOutboxItemFailed(input: { id: string; leaseId: number; nextAttemptAt: string; updatedAt: string }): Promise<void>;
@@ -29,7 +31,7 @@ function memoryStore(): MemoryStore {
   return {
     backend: "sqlite",
     events: new Set<string>(),
-    requests: new Map<string, { requestHash: string; responseJson: string }>(),
+    requests: new Map<string, { requestHash: string; responseJson: string; status: string }>(),
     async migrate() { return { currentVersion: 1, appliedMigrations: [], alreadyCurrent: true }; },
     async health() { return { ok: true, backend: "sqlite", currentVersion: 1, redactedLocation: "[REDACTED_SQLITE_DATABASE]" }; },
     async recordWebhookEvent(input) {
@@ -45,8 +47,21 @@ function memoryStore(): MemoryStore {
     },
     async recordServiceRequest(input) {
       if (!this.requests.has(input.idempotencyKey)) {
-        this.requests.set(input.idempotencyKey, { requestHash: input.requestHash, responseJson: input.responseJson });
+        this.requests.set(input.idempotencyKey, { requestHash: input.requestHash, responseJson: input.responseJson, status: "completed" });
       }
+    },
+    async claimServiceRequest(input) {
+      const existing = this.requests.get(input.idempotencyKey);
+      if (existing === undefined) {
+        this.requests.set(input.idempotencyKey, { requestHash: input.requestHash, responseJson: "", status: "claimed" });
+        return "claimed";
+      }
+      if (existing.requestHash !== input.requestHash) return "conflict";
+      if (existing.status === "completed" && existing.responseJson !== "") return { responseJson: existing.responseJson };
+      return "pending";
+    },
+    async completeServiceRequest(input) {
+      this.requests.set(input.idempotencyKey, { requestHash: input.requestHash, responseJson: input.responseJson, status: "completed" });
     },
     async enqueueOutboxItem() { return "enqueued"; },
     async claimOutboxItems() { return []; },

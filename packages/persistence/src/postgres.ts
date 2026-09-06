@@ -15,8 +15,12 @@ import {
   type OutboxFailedInput,
   type OutboxItem,
   type OutboxSucceededInput,
+  type PersistenceErrorCode,
   type PersistenceHealth,
   type PersistenceStore,
+  type ServiceRequestClaimInput,
+  type ServiceRequestClaimResult,
+  type ServiceRequestCompletionInput,
   type ServiceRequestLookupInput,
   type ServiceRequestLookupResult,
   type ServiceRequestRecordInput,
@@ -44,7 +48,16 @@ export interface PostgresClientLike {
 }
 
 interface PostgresClientConstructor {
-  new (config: { readonly connectionString: string }): PostgresClientLike;
+  new (config: { readonly connectionString: string; readonly connectionTimeoutMillis?: number }): PostgresClientLike;
+}
+
+// The real `pg.Client` exposes a `connect()` that opens the TCP socket. The
+// injected-fake `PostgresClientLike` interface (query/end only) does NOT, so
+// the factory narrows to a structural connect-capable type before awaiting it.
+// This keeps the fake/test interface connect-free while the factory path still
+// opens a real connection with a finite timeout.
+interface ConnectCapableClient extends PostgresClientLike {
+  connect(): Promise<void>;
 }
 
 interface MigrationDefinition {
@@ -62,6 +75,36 @@ interface MigrationRow extends Record<string, unknown> {
 
 const OUTBOX_PROCESSING_LEASE_MS = 5 * 60 * 1000;
 const MAX_CONNECTION_STRING_LENGTH = 4096;
+// WATS-200: the factory must open a real TCP connection with a FINITE timeout
+// so a dead host fails fast instead of hanging (then awaiting a queued close
+// forever). 10s is generous for a local/LAN Postgres and bounded for CLI use.
+const PG_CONNECT_TIMEOUT_MILLIS = 10_000;
+
+// WATS-200: explicit status rank transition semantics. Status events advance
+// deterministically by rank: sent(1) < delivered(2) < read(3). `failed` may
+// replace pending/sent (rank <= 1) but must NEVER replace delivered or read.
+// Unknown statuses get rank 0 so a known terminal state is never regressed by
+// an unrecognized value. Same-rank or higher-rank events may advance; an
+// equal-timestamp event may advance rank but never rolls updated_at backward.
+const STATUS_RANK: Readonly<Record<string, number>> = Object.freeze({
+  pending: 0,
+  sent: 1,
+  delivered: 2,
+  read: 3,
+  failed: 1
+});
+function statusRank(status: string): number {
+  return STATUS_RANK[status] ?? 0;
+}
+// `failed` is terminal-ish: it may replace pending/sent but never delivered/read.
+function failedMayReplace(currentStatus: string): boolean {
+  return statusRank(currentStatus) <= 1;
+}
+// Should `newStatus` replace `currentStatus`? Rank-based with a failed gate.
+function shouldAdvanceStatus(newStatus: string, currentStatus: string): boolean {
+  if (newStatus === "failed") return failedMayReplace(currentStatus);
+  return statusRank(newStatus) > statusRank(currentStatus);
+}
 
 const POSTGRES_MIGRATIONS: readonly MigrationDefinition[] = Object.freeze([
   {
@@ -146,6 +189,76 @@ const POSTGRES_MIGRATIONS: readonly MigrationDefinition[] = Object.freeze([
       `CREATE INDEX IF NOT EXISTS wats_messages_direction_from_phone_created_at_idx
         ON wats_messages (direction, from_phone, created_at DESC)`
     ])
+  },
+  {
+    id: "005_service_request_claims",
+    version: 5,
+    checksum: "sha256:wats-persistence-005-service-request-claims-v1",
+    statements: Object.freeze([
+      // Recreate wats_service_requests with nullable response_json and a
+      // status column. Existing rows (all had response_json) are backfilled
+      // to status='completed' so getServiceRequest keeps replaying them.
+      `CREATE TABLE IF NOT EXISTS wats_service_requests_new (
+        idempotency_key TEXT PRIMARY KEY,
+        request_hash TEXT NOT NULL,
+        response_json TEXT,
+        created_at TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'completed',
+        claimed_at TEXT
+      )`,
+      `INSERT INTO wats_service_requests_new (idempotency_key, request_hash, response_json, created_at, status)
+         SELECT idempotency_key, request_hash, response_json, created_at, 'completed'
+         FROM wats_service_requests`,
+      `DROP TABLE wats_service_requests`,
+      `ALTER TABLE wats_service_requests_new RENAME TO wats_service_requests`
+    ])
+  },
+  {
+    id: "006_message_uniqueness",
+    version: 6,
+    checksum: "sha256:wats-persistence-006-message-uniqueness-v1",
+    statements: Object.freeze([
+      // Deterministic dedup of preexisting duplicate messages. Keep the row
+      // with the BEST KNOWN STATE per (direction, wa_message_id): highest
+      // status rank (read > delivered > sent > pending), then smallest
+      // row_id as a deterministic tiebreak when statuses are equal. Old
+      // logic kept the smallest row_id unconditionally and could discard a
+      // more-advanced status (e.g. 'read' lost to 'sent').
+      `DELETE FROM wats_message_status_events
+         WHERE id IN (
+           SELECT id FROM (
+             SELECT id,
+                    ROW_NUMBER() OVER (
+                      PARTITION BY wa_message_id, status, timestamp
+                      ORDER BY id ASC
+                    ) AS rn
+             FROM wats_message_status_events
+           ) sub WHERE rn > 1
+         )`,
+      `DELETE FROM wats_messages
+         WHERE row_id IN (
+           SELECT row_id FROM (
+             SELECT row_id,
+                    ROW_NUMBER() OVER (
+                      PARTITION BY direction, wa_message_id
+                      ORDER BY
+                        CASE status
+                          WHEN 'read' THEN 4
+                          WHEN 'delivered' THEN 3
+                          WHEN 'sent' THEN 2
+                          WHEN 'pending' THEN 1
+                          ELSE 0
+                        END DESC,
+                        row_id ASC
+                    ) AS rn
+             FROM wats_messages
+           ) sub WHERE rn > 1
+         )`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS wats_messages_direction_wa_message_id_uidx
+        ON wats_messages (direction, wa_message_id)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS wats_message_status_events_wa_message_id_status_timestamp_uidx
+        ON wats_message_status_events (wa_message_id, status, timestamp)`
+    ])
   }
 ]);
 
@@ -160,6 +273,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
   const proto = Object.getPrototypeOf(value) as object | null;
   return proto === null || proto === Object.prototype;
+}
+
+// WATS-200: detect a PostgreSQL unique_violation (SQLSTATE 23505). The `pg`
+// driver exposes the code on `error.code`; the DatabaseError may also carry
+// `constraint`/`table` but the SQLSTATE is the reliable, stable signal. Used
+// by recordMessage to treat a (direction, wa_message_id) unique-index conflict
+// as the expected dedup no-op (ON CONFLICT (row_id) does not cover that index).
+function isUniqueViolation(cause: unknown): boolean {
+  if (cause === null || typeof cause !== "object") return false;
+  const code = (cause as { code?: unknown }).code;
+  return code === "23505";
 }
 
 function validateConnectionString(value: unknown): string {
@@ -235,7 +359,32 @@ function validateServiceRequestRecord(input: ServiceRequestRecordInput): Service
   try {
     JSON.parse(responseJson);
   } catch (cause) {
-    throw new PersistenceError("invalid_record", "responseJson must be valid JSON.", { cause });
+    throw new PersistenceError("invalid_record", "responseJson must be valid JSON.");
+  }
+  return Object.freeze({
+    idempotencyKey: validateRecordString(record.idempotencyKey, "idempotencyKey"),
+    requestHash: validateRecordString(record.requestHash, "requestHash"),
+    responseJson,
+    createdAt: validateTimestamp(record.createdAt, "createdAt")
+  });
+}
+
+function validateServiceRequestClaim(input: ServiceRequestClaimInput): ServiceRequestClaimInput {
+  const record = validateRecordInput(input, "service request claim");
+  return Object.freeze({
+    idempotencyKey: validateRecordString(record.idempotencyKey, "idempotencyKey"),
+    requestHash: validateRecordString(record.requestHash, "requestHash"),
+    createdAt: validateTimestamp(record.createdAt, "createdAt")
+  });
+}
+
+function validateServiceRequestCompletion(input: ServiceRequestCompletionInput): ServiceRequestCompletionInput {
+  const record = validateRecordInput(input, "service request completion");
+  const responseJson = validateRecordString(record.responseJson, "responseJson");
+  try {
+    JSON.parse(responseJson);
+  } catch (cause) {
+    throw new PersistenceError("invalid_record", "responseJson must be valid JSON.");
   }
   return Object.freeze({
     idempotencyKey: validateRecordString(record.idempotencyKey, "idempotencyKey"),
@@ -420,14 +569,63 @@ function messageRowToRecord(row: MessageRow): MessageRecord {
 class PostgresPersistenceStore implements PersistenceStore {
   readonly backend = "postgres" as const;
   #client: PostgresClientLike;
+  // WATS-200: `closing` is set SYNCHRONOUSLY by close() before close joins the
+  // queue. This closes the close race where a method's #assertOpen passed
+  // before close() but its work queued AFTER close drained the lock: after
+  // close() runs, every public method rejects with store_closed immediately
+  // without queuing any backend query. `closed` marks the client as fully
+  // ended (idempotent close). close() still drains in-flight work first via
+  // #withLock, so it cannot interrupt an active transaction.
+  #closing = false;
   #closed = false;
+  // WATS-200: serialize ALL operations on the shared Client so concurrent
+  // async method calls cannot interleave their BEGIN/COMMIT/ROLLBACK on the
+  // single backend connection. A second BEGIN while a transaction is open is
+  // a no-op (warning) on a shared pg.Client; a COMMIT/ROLLBACK from one caller
+  // closes the shared transaction for all interleaved callers. The mutex
+  // ensures each operation's transaction control is fully ordered.
+  #chain: Promise<unknown> = Promise.resolve();
 
   constructor(client: PostgresClientLike) {
     this.#client = client;
   }
 
+  // Acquire the serialization lock. Returns a release function. Every public
+  // method wraps its body in withLock(fn) so no two methods' queries can
+  // interleave on the shared connection.
+  //
+  // WATS-200 typed-error hardening (Q2): an optional errorCode lets each public
+  // method pin the taxonomy for an unwrapped driver fault. Any exception that
+  // is ALREADY a PersistenceError (validation, dedup, lease-stale, the inner
+  // try/catch in recordMessage/appendMessageStatus/claimOutboxItems) is
+  // re-thrown unchanged so the existing typed contract and error codes are
+  // preserved. Only a RAW driver exception (the `pg` client rejecting, e.g. a
+  // BEGIN/SELECT/INSERT/UPDATE/ROLLBACK whose message may echo the rejected
+  // query text / caller values) is mapped to a fresh PersistenceError with a
+  // STATIC message without the driver cause, which may contain private data. This closes the leak where a fault on the BEGIN
+  // query (outside the inner try in appendMessageStatus/claimOutboxItems) or
+  // any un-wrapped public query surfaces a raw driver Error that echoes
+  // caller-supplied secret-like input (requestHash, id, waMessageId).
+  #withLock<T>(fn: () => Promise<T>, errorCode: PersistenceErrorCode = "outbox_failed"): Promise<T> {
+    const run = this.#chain.then(fn, fn).then(
+      (value) => value,
+      (cause: unknown) => {
+        if (cause instanceof PersistenceError) throw cause;
+        throw new PersistenceError(errorCode, "Postgres operation failed.");
+      }
+    );
+    // Swallow rejection on the chain itself so one failure doesn't poison
+    // all subsequent operations; the caller still sees its own rejection.
+    this.#chain = run.then(() => undefined, () => undefined);
+    return run;
+  }
+
   async migrate(): Promise<MigrationReport> {
     this.#assertOpen();
+    return this.#withLock(() => this.#migrateLocked());
+  }
+
+  async #migrateLocked(): Promise<MigrationReport> {
     await this.#client.query(`CREATE TABLE IF NOT EXISTS wats_persistence_lock (
       id INTEGER PRIMARY KEY CHECK (id = 1),
       holder TEXT NOT NULL,
@@ -466,7 +664,7 @@ class PostgresPersistenceStore implements PersistenceStore {
           applied.push(migration.id);
         } catch (cause) {
           await this.#client.query("ROLLBACK");
-          throw new PersistenceError("migration_failed", "Postgres migration failed.", { cause });
+          throw new PersistenceError("migration_failed", "Postgres migration failed.");
         }
       }
       return Object.freeze({ currentVersion: CURRENT_SCHEMA_VERSION, appliedMigrations: Object.freeze(applied), alreadyCurrent: applied.length === 0 });
@@ -477,55 +675,129 @@ class PostgresPersistenceStore implements PersistenceStore {
 
   async health(): Promise<PersistenceHealth> {
     this.#assertOpen();
-    const result = await this.#client.query<{ version: number | string }>("SELECT COALESCE(MAX(version), 0) AS version FROM wats_schema_migrations");
-    const version = result.rows[0]?.version;
-    return Object.freeze({ ok: true, backend: "postgres", currentVersion: version === undefined ? 0 : numeric(version), redactedLocation: REDACTED_POSTGRES_LOCATION });
+    return this.#withLock(async () => {
+      const result = await this.#client.query<{ version: number | string }>("SELECT COALESCE(MAX(version), 0) AS version FROM wats_schema_migrations");
+      const version = result.rows[0]?.version;
+      return Object.freeze({ ok: true, backend: "postgres", currentVersion: version === undefined ? 0 : numeric(version), redactedLocation: REDACTED_POSTGRES_LOCATION });
+    });
   }
 
   async recordWebhookEvent(input: WebhookEventRecordInput): Promise<WebhookEventRecordResult> {
     this.#assertOpen();
-    const record = validateWebhookEventRecord(input);
-    const result = await this.#client.query(
-      "INSERT INTO wats_webhook_events (event_key, event_hash, received_at) VALUES ($1, $2, $3) ON CONFLICT (event_key) DO NOTHING",
-      [record.eventKey, record.eventHash, record.receivedAt]
-    );
-    return result.rowCount === 1 ? "recorded" : "duplicate";
+    return this.#withLock(async () => {
+      const record = validateWebhookEventRecord(input);
+      const result = await this.#client.query(
+        "INSERT INTO wats_webhook_events (event_key, event_hash, received_at) VALUES ($1, $2, $3) ON CONFLICT (event_key) DO NOTHING",
+        [record.eventKey, record.eventHash, record.receivedAt]
+      );
+      return result.rowCount === 1 ? "recorded" : "duplicate";
+    });
   }
 
   async getServiceRequest(input: ServiceRequestLookupInput): Promise<ServiceRequestLookupResult> {
     this.#assertOpen();
-    const lookup = validateServiceRequestLookup(input);
-    const result = await this.#client.query<{ request_hash: string; response_json: string }>(
-      "SELECT request_hash, response_json FROM wats_service_requests WHERE idempotency_key = $1",
-      [lookup.idempotencyKey]
-    );
-    const row = result.rows[0];
-    if (row === undefined) return null;
-    if (row.request_hash !== lookup.requestHash) return "conflict";
-    return Object.freeze({ responseJson: row.response_json });
+    return this.#withLock(async () => {
+      const lookup = validateServiceRequestLookup(input);
+      const result = await this.#client.query<{ request_hash: string; response_json: string; status: string }>(
+        "SELECT request_hash, response_json, status FROM wats_service_requests WHERE idempotency_key = $1",
+        [lookup.idempotencyKey]
+      );
+      const row = result.rows[0];
+      if (row === undefined) return null;
+      if (row.request_hash !== lookup.requestHash) return "conflict";
+      // WATS-200: a claimed-but-not-completed row has status='claimed' and a
+      // NULL response_json. Return null so callers don't replay a stale
+      // placeholder.
+      if (row.status === "claimed" || row.response_json === null) return null;
+      return Object.freeze({ responseJson: row.response_json });
+    });
   }
 
   async recordServiceRequest(input: ServiceRequestRecordInput): Promise<void> {
     this.#assertOpen();
-    const record = validateServiceRequestRecord(input);
-    await this.#client.query(
-      "INSERT INTO wats_service_requests (idempotency_key, request_hash, response_json, created_at) VALUES ($1, $2, $3, $4) ON CONFLICT (idempotency_key) DO NOTHING",
-      [record.idempotencyKey, record.requestHash, record.responseJson, record.createdAt]
-    );
+    return this.#withLock(async () => {
+      const record = validateServiceRequestRecord(input);
+      // WATS-200: ON CONFLICT DO NOTHING preserves the old semantics — never
+      // overwrites an existing row, including a 'claimed' reservation.
+      await this.#client.query(
+        "INSERT INTO wats_service_requests (idempotency_key, request_hash, response_json, created_at, status) VALUES ($1, $2, $3, $4, 'completed') ON CONFLICT (idempotency_key) DO NOTHING",
+        [record.idempotencyKey, record.requestHash, record.responseJson, record.createdAt]
+      );
+    });
+  }
+
+  async claimServiceRequest(input: ServiceRequestClaimInput): Promise<ServiceRequestClaimResult> {
+    this.#assertOpen();
+    return this.#withLock(async () => {
+      const claim = validateServiceRequestClaim(input);
+      // INSERT ... ON CONFLICT DO NOTHING atomically reserves the key.
+      const insert = await this.#client.query(
+        "INSERT INTO wats_service_requests (idempotency_key, request_hash, response_json, created_at, claimed_at, status) VALUES ($1, $2, NULL, $3, $3, 'claimed') ON CONFLICT (idempotency_key) DO NOTHING",
+        [claim.idempotencyKey, claim.requestHash, claim.createdAt]
+      );
+      // rowCount === 1 means a new row was inserted: this is the first claim.
+      if (insert.rowCount === 1) return "claimed";
+      // The row already existed. Re-read to determine the outcome.
+      const result = await this.#client.query<{ request_hash: string; response_json: string | null; status: string }>(
+        "SELECT request_hash, response_json, status FROM wats_service_requests WHERE idempotency_key = $1",
+        [claim.idempotencyKey]
+      );
+      const row = result.rows[0];
+      if (row === undefined) {
+        throw new PersistenceError("claim_failed", "Postgres service request claim did not persist.");
+      }
+      if (row.request_hash !== claim.requestHash) return "conflict";
+      if (row.status === "completed" && row.response_json !== null) {
+        return Object.freeze({ responseJson: row.response_json });
+      }
+      return "pending";
+    }, "claim_failed");
+  }
+
+  async completeServiceRequest(input: ServiceRequestCompletionInput): Promise<void> {
+    this.#assertOpen();
+    return this.#withLock(async () => {
+      const completion = validateServiceRequestCompletion(input);
+      const existing = await this.#client.query<{ request_hash: string; status: string }>(
+        "SELECT request_hash, status FROM wats_service_requests WHERE idempotency_key = $1",
+        [completion.idempotencyKey]
+      );
+      const row = existing.rows[0];
+      if (row === undefined) {
+        throw new PersistenceError("completion_failed", "Postgres service request completion requires a prior claim.");
+      }
+      if (row.request_hash !== completion.requestHash) {
+        throw new PersistenceError("completion_failed", "Postgres service request completion hash mismatch.");
+      }
+      if (row.status === "completed") return;
+      const result = await this.#client.query(
+        "UPDATE wats_service_requests SET response_json = $1, status = 'completed', created_at = $2 WHERE idempotency_key = $3 AND request_hash = $4 AND status = 'claimed'",
+        [completion.responseJson, completion.createdAt, completion.idempotencyKey, completion.requestHash]
+      );
+      if (result.rowCount !== 1) {
+        throw new PersistenceError("completion_failed", "Postgres service request completion lease is stale.");
+      }
+    }, "completion_failed");
   }
 
   async enqueueOutboxItem(input: OutboxEnqueueInput): Promise<OutboxEnqueueResult> {
     this.#assertOpen();
-    const item = validateOutboxEnqueue(input);
-    const result = await this.#client.query(
-      "INSERT INTO wats_outbox (id, status, attempts, next_attempt_at, payload_hash, created_at, updated_at) VALUES ($1, 'pending', 0, $2, $3, $4, $5) ON CONFLICT (id) DO NOTHING",
-      [item.id, item.nextAttemptAt, item.payloadHash, item.createdAt, item.createdAt]
-    );
-    return result.rowCount === 1 ? "enqueued" : "duplicate";
+    return this.#withLock(async () => {
+      const item = validateOutboxEnqueue(input);
+      const result = await this.#client.query(
+        "INSERT INTO wats_outbox (id, status, attempts, next_attempt_at, payload_hash, created_at, updated_at) VALUES ($1, 'pending', 0, $2, $3, $4, $5) ON CONFLICT (id) DO NOTHING",
+        [item.id, item.nextAttemptAt, item.payloadHash, item.createdAt, item.createdAt]
+      );
+      return result.rowCount === 1 ? "enqueued" : "duplicate";
+    });
   }
 
   async claimOutboxItems(input: OutboxClaimInput): Promise<readonly OutboxItem[]> {
     this.#assertOpen();
+    return this.#withLock(() => this.#claimOutboxItemsLocked(input));
+  }
+
+  async #claimOutboxItemsLocked(input: OutboxClaimInput): Promise<readonly OutboxItem[]> {
     const claim = validateOutboxClaim(input);
     const leaseExpiredAt = subtractMillisecondsIso(claim.now, OUTBOX_PROCESSING_LEASE_MS);
     await this.#client.query("BEGIN");
@@ -562,136 +834,225 @@ class PostgresPersistenceStore implements PersistenceStore {
     } catch (cause) {
       await this.#client.query("ROLLBACK");
       if (cause instanceof PersistenceError) throw cause;
-      throw new PersistenceError("outbox_failed", "Postgres outbox claim failed.", { cause });
+      throw new PersistenceError("outbox_failed", "Postgres outbox claim failed.");
     }
   }
 
   async markOutboxItemFailed(input: OutboxFailedInput): Promise<void> {
     this.#assertOpen();
-    const failure = validateOutboxFailed(input);
-    const result = await this.#client.query(
-      "UPDATE wats_outbox SET status = 'pending', next_attempt_at = $1, updated_at = $2 WHERE id = $3 AND status = 'processing' AND lease_id = $4",
-      [failure.nextAttemptAt, failure.updatedAt, failure.id, failure.leaseId]
-    );
-    if (result.rowCount !== 1) throw new PersistenceError("outbox_failed", "Postgres outbox failure lease is stale.");
+    return this.#withLock(async () => {
+      const failure = validateOutboxFailed(input);
+      const result = await this.#client.query(
+        "UPDATE wats_outbox SET status = 'pending', next_attempt_at = $1, updated_at = $2 WHERE id = $3 AND status = 'processing' AND lease_id = $4",
+        [failure.nextAttemptAt, failure.updatedAt, failure.id, failure.leaseId]
+      );
+      if (result.rowCount !== 1) throw new PersistenceError("outbox_failed", "Postgres outbox failure lease is stale.");
+    });
   }
 
   async markOutboxItemSucceeded(input: OutboxSucceededInput): Promise<void> {
     this.#assertOpen();
-    const success = validateOutboxSucceeded(input);
-    const result = await this.#client.query(
-      "UPDATE wats_outbox SET status = 'succeeded', next_attempt_at = NULL, updated_at = $1 WHERE id = $2 AND status = 'processing' AND lease_id = $3",
-      [success.updatedAt, success.id, success.leaseId]
-    );
-    if (result.rowCount !== 1) throw new PersistenceError("outbox_failed", "Postgres outbox success lease is stale.");
+    return this.#withLock(async () => {
+      const success = validateOutboxSucceeded(input);
+      const result = await this.#client.query(
+        "UPDATE wats_outbox SET status = 'succeeded', next_attempt_at = NULL, updated_at = $1 WHERE id = $2 AND status = 'processing' AND lease_id = $3",
+        [success.updatedAt, success.id, success.leaseId]
+      );
+      if (result.rowCount !== 1) throw new PersistenceError("outbox_failed", "Postgres outbox success lease is stale.");
+    });
   }
 
   async recordMessage(input: MessageRecordInput): Promise<void> {
     this.#assertOpen();
-    const record = validateMessageRecord(input);
-    await this.#client.query(
-      `INSERT INTO wats_messages
-        (row_id, wa_message_id, direction, from_phone, to_phone, type, status, graph_message_id, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-       ON CONFLICT (row_id) DO NOTHING`,
-      [record.rowId, record.waMessageId, record.direction, record.fromPhone, record.toPhone, record.type, record.status, record.graphMessageId, record.createdAt, record.updatedAt]
+    return this.#withLock(async () => {
+      const record = validateMessageRecord(input);
+      // WATS-200: dedup by both row_id (PRIMARY KEY) and the (direction,
+      // wa_message_id) unique index from migration 006. PostgreSQL does not
+      // allow two ON CONFLICT clauses in one statement, so we attempt the
+      // insert and treat a 23505 unique_violation on EITHER constraint as the
+      // expected dedup no-op. Any other backend fault is wrapped as a typed
+      // PersistenceError without echoing the caller's input.
+      try {
+        await this.#client.query(
+          `INSERT INTO wats_messages
+            (row_id, wa_message_id, direction, from_phone, to_phone, type, status, graph_message_id, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+           ON CONFLICT (row_id) DO NOTHING`,
+          [record.rowId, record.waMessageId, record.direction, record.fromPhone, record.toPhone, record.type, record.status, record.graphMessageId, record.createdAt, record.updatedAt]
+        );
+      } catch (cause) {
+        // 23505 unique_violation covers both the row_id PK and the
+        // (direction, wa_message_id) unique index — the expected dedup path.
+        if (isUniqueViolation(cause)) return;
+        throw new PersistenceError("outbox_failed", "Postgres message record failed.");
+      }
+      // WATS-200: status-before-message reconciliation. A status event may have
+      // arrived (early webhook) before this outbound projection was recorded.
+      // If a more-advanced status already exists for this wa_message_id,
+      // advance the freshly-inserted row so it does not regress to the
+      // send-time status.
+      await this.#reconcileStoredStatus(record.waMessageId, record.status, record.updatedAt);
+    });
+  }
+
+  // WATS-200: reconcile the message row's status with any status events that
+  // were stored before the message projection. Applies rank-transition
+  // semantics: a known more-advanced event advances the row; updated_at never
+  // rolls backward (it advances to the event timestamp only when newer).
+  async #reconcileStoredStatus(waMessageId: string, recordedStatus: string, recordedUpdatedAt: string): Promise<void> {
+    const events = await this.#client.query<{ status: string; timestamp: string }>(
+      "SELECT status, timestamp FROM wats_message_status_events WHERE wa_message_id = $1 ORDER BY timestamp ASC",
+      [waMessageId]
     );
+    if (events.rows.length === 0) return;
+    let bestStatus = recordedStatus;
+    let bestUpdatedAt = recordedUpdatedAt;
+    for (const ev of events.rows) {
+      if (shouldAdvanceStatus(ev.status, bestStatus)) {
+        bestStatus = ev.status;
+        if (ev.timestamp > bestUpdatedAt) bestUpdatedAt = ev.timestamp;
+      }
+    }
+    if (bestStatus !== recordedStatus || bestUpdatedAt !== recordedUpdatedAt) {
+      await this.#client.query(
+        "UPDATE wats_messages SET status = $1, updated_at = $2 WHERE wa_message_id = $3",
+        [bestStatus, bestUpdatedAt, waMessageId]
+      );
+    }
   }
 
   async appendMessageStatus(input: MessageStatusEventInput): Promise<void> {
     this.#assertOpen();
+    return this.#withLock(() => this.#appendMessageStatusLocked(input));
+  }
+
+  async #appendMessageStatusLocked(input: MessageStatusEventInput): Promise<void> {
     const event = validateMessageStatusEvent(input);
     await this.#client.query("BEGIN");
     try {
+      // WATS-200: dedup by (wa_message_id, status, timestamp). The unique
+      // index from migration 006 makes the INSERT a no-op for duplicates.
       await this.#client.query(
-        "INSERT INTO wats_message_status_events (wa_message_id, status, timestamp) VALUES ($1, $2, $3)",
+        "INSERT INTO wats_message_status_events (wa_message_id, status, timestamp) VALUES ($1, $2, $3) ON CONFLICT (wa_message_id, status, timestamp) DO NOTHING",
         [event.waMessageId, event.status, event.timestamp]
       );
-      await this.#client.query(
-        "UPDATE wats_messages SET status = $1, updated_at = $2 WHERE wa_message_id = $3",
-        [event.status, event.timestamp, event.waMessageId]
+      // WATS-200: rank-based monotonicity. Advance the message status only when
+      // the event represents a forward rank transition (sent < delivered < read;
+      // failed may replace pending/sent but not delivered/read). An event at
+      // the same second may advance rank; updated_at never rolls backward (it
+      // advances to the event timestamp only when the event is newer).
+      const current = await this.#client.query<{ status: string; updated_at: string }>(
+        "SELECT status, updated_at FROM wats_messages WHERE wa_message_id = $1",
+        [event.waMessageId]
       );
+      const row = current.rows[0];
+      if (row !== undefined && shouldAdvanceStatus(event.status, row.status)) {
+        const newUpdatedAt = event.timestamp > row.updated_at ? event.timestamp : row.updated_at;
+        await this.#client.query(
+          "UPDATE wats_messages SET status = $1, updated_at = $2 WHERE wa_message_id = $3",
+          [event.status, newUpdatedAt, event.waMessageId]
+        );
+      }
       await this.#client.query("COMMIT");
     } catch (cause) {
       await this.#client.query("ROLLBACK");
-      throw new PersistenceError("invalid_record", "Postgres message status append failed.", { cause });
+      if (cause instanceof PersistenceError) throw cause;
+      throw new PersistenceError("outbox_failed", "Postgres message status append failed.");
     }
   }
 
   async getMessage(input: { waMessageId: string }): Promise<MessageRecord | null> {
     this.#assertOpen();
-    const record = validateRecordInput(input, "message lookup");
-    const waMessageId = validateRecordString(record.waMessageId, "waMessageId");
-    const result = await this.#client.query<MessageRow>(
-      `SELECT row_id, wa_message_id, direction, from_phone, to_phone, type, status, graph_message_id, created_at, updated_at
-       FROM wats_messages WHERE wa_message_id = $1`,
-      [waMessageId]
-    );
-    const row = result.rows[0];
-    return row === undefined ? null : messageRowToRecord(row);
+    return this.#withLock(async () => {
+      const record = validateRecordInput(input, "message lookup");
+      const waMessageId = validateRecordString(record.waMessageId, "waMessageId");
+      const result = await this.#client.query<MessageRow>(
+        `SELECT row_id, wa_message_id, direction, from_phone, to_phone, type, status, graph_message_id, created_at, updated_at
+         FROM wats_messages WHERE wa_message_id = $1`,
+        [waMessageId]
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : messageRowToRecord(row);
+    });
   }
 
   async listMessages(input: ListMessagesInput): Promise<ListMessagesResult> {
     this.#assertOpen();
-    const query = validateListMessages(input);
-    const fetchLimit = query.limit + 1;
-    let rows: readonly MessageRow[];
-    if (query.beforeRowId === null) {
-      rows = (await this.#client.query<MessageRow>(
-        `SELECT row_id, wa_message_id, direction, from_phone, to_phone, type, status, graph_message_id, created_at, updated_at
-         FROM wats_messages
-         ORDER BY created_at DESC, row_id DESC
-         LIMIT $1`,
-        [fetchLimit]
-      )).rows;
-    } else {
-      const cursor = await this.#client.query<{ row_id: string; created_at: string }>(
-        "SELECT row_id, created_at FROM wats_messages WHERE row_id = $1",
-        [query.beforeRowId]
-      );
-      const cursorRow = cursor.rows[0];
-      if (cursorRow === undefined) return Object.freeze({ items: Object.freeze([]), nextCursor: null });
-      rows = (await this.#client.query<MessageRow>(
-        `SELECT row_id, wa_message_id, direction, from_phone, to_phone, type, status, graph_message_id, created_at, updated_at
-         FROM wats_messages
-         WHERE created_at < $1 OR (created_at = $2 AND row_id < $3)
-         ORDER BY created_at DESC, row_id DESC
-         LIMIT $4`,
-        [cursorRow.created_at, cursorRow.created_at, cursorRow.row_id, fetchLimit]
-      )).rows;
-    }
-    const pageRows = rows.slice(0, query.limit);
-    const items = Object.freeze(pageRows.map((row) => messageRowToRecord(row)));
-    const nextCursor = rows.length > query.limit ? items[items.length - 1]?.rowId ?? null : null;
-    return Object.freeze({ items, nextCursor });
+    return this.#withLock(async () => {
+      const query = validateListMessages(input);
+      const fetchLimit = query.limit + 1;
+      let rows: readonly MessageRow[];
+      if (query.beforeRowId === null) {
+        rows = (await this.#client.query<MessageRow>(
+          `SELECT row_id, wa_message_id, direction, from_phone, to_phone, type, status, graph_message_id, created_at, updated_at
+           FROM wats_messages
+           ORDER BY created_at DESC, row_id DESC
+           LIMIT $1`,
+          [fetchLimit]
+        )).rows;
+      } else {
+        const cursor = await this.#client.query<{ row_id: string; created_at: string }>(
+          "SELECT row_id, created_at FROM wats_messages WHERE row_id = $1",
+          [query.beforeRowId]
+        );
+        const cursorRow = cursor.rows[0];
+        if (cursorRow === undefined) return Object.freeze({ items: Object.freeze([]), nextCursor: null });
+        rows = (await this.#client.query<MessageRow>(
+          `SELECT row_id, wa_message_id, direction, from_phone, to_phone, type, status, graph_message_id, created_at, updated_at
+           FROM wats_messages
+           WHERE created_at < $1 OR (created_at = $2 AND row_id < $3)
+           ORDER BY created_at DESC, row_id DESC
+           LIMIT $4`,
+          [cursorRow.created_at, cursorRow.created_at, cursorRow.row_id, fetchLimit]
+        )).rows;
+      }
+      const pageRows = rows.slice(0, query.limit);
+      const items = Object.freeze(pageRows.map((row) => messageRowToRecord(row)));
+      const nextCursor = rows.length > query.limit ? items[items.length - 1]?.rowId ?? null : null;
+      return Object.freeze({ items, nextCursor });
+    });
   }
 
   async getLatestInboundMessageAt(input: LatestInboundMessageInput): Promise<string | null> {
     this.#assertOpen();
-    const record = validateRecordInput(input, "latest inbound lookup");
-    const phone = validateRecordString(record.phone, "phone");
-    const result = await this.#client.query<{ created_at: string }>(
-      `SELECT created_at FROM wats_messages
-       WHERE direction = 'inbound' AND from_phone = $1
-       ORDER BY created_at DESC
-       LIMIT 1`,
-      [phone]
-    );
-    const row = result.rows[0];
-    return row === undefined ? null : row.created_at;
+    return this.#withLock(async () => {
+      const record = validateRecordInput(input, "latest inbound lookup");
+      const phone = validateRecordString(record.phone, "phone");
+      const result = await this.#client.query<{ created_at: string }>(
+        `SELECT created_at FROM wats_messages
+         WHERE direction = 'inbound' AND from_phone = $1
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [phone]
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : row.created_at;
+    });
   }
 
   async countOutboxPending(): Promise<number> {
     this.#assertOpen();
-    const result = await this.#client.query<{ count: string | number }>(
-      "SELECT COUNT(*) AS count FROM wats_outbox WHERE status = $1",
-      ["pending"]
-    );
-    const row = result.rows[0];
-    return row === undefined ? 0 : numeric(row.count);
+    return this.#withLock(async () => {
+      const result = await this.#client.query<{ count: string | number }>(
+        "SELECT COUNT(*) AS count FROM wats_outbox WHERE status = $1",
+        ["pending"]
+      );
+      const row = result.rows[0];
+      return row === undefined ? 0 : numeric(row.count);
+    });
   }
 
   async close(): Promise<void> {
+    // WATS-200: Synchronously mark the store as closing so any public method
+    // invoked after this point (even on the same microtask, before close's
+    // queued work runs) rejects with store_closed WITHOUT queuing a backend
+    // query. Then drain any in-flight operation via #withLock before ending
+    // the client, so close cannot join or interrupt an active transaction.
+    this.#closing = true;
+    await this.#withLock(() => this.#closeLocked());
+  }
+
+  async #closeLocked(): Promise<void> {
     if (this.#closed) return;
     this.#closed = true;
     await this.#client.end();
@@ -716,7 +1077,11 @@ class PostgresPersistenceStore implements PersistenceStore {
   }
 
   #assertOpen(): void {
-    if (this.#closed) throw new PersistenceError("store_closed", "Persistence store is closed.");
+    // WATS-200: check both #closing and #closed synchronously. close() sets
+    // #closing=true before it joins the queue, so a method that runs after
+    // close() was called — even if it interleaves before close's queued work
+    // executes — is rejected here without queuing any backend query.
+    if (this.#closing || this.#closed) throw new PersistenceError("store_closed", "Persistence store is closed.");
   }
 }
 
@@ -729,12 +1094,30 @@ export async function createPostgresPersistence(options: PostgresPersistenceOpti
     const defaultExport = mod.default;
     Client = mod.Client ?? (typeof defaultExport === "function" ? defaultExport : defaultExport?.Client);
   } catch (cause) {
-    throw new PersistenceError("invalid_options", "Postgres persistence requires the optional 'pg' package.", { cause });
+    throw new PersistenceError("invalid_options", "Postgres persistence requires the optional 'pg' package.");
   }
   if (Client === undefined) {
     throw new PersistenceError("invalid_options", "Postgres persistence requires the optional 'pg' package.");
   }
-  return createPostgresPersistenceWithClient(new Client({ connectionString }));
+  // WATS-200: construct with a FINITE connection timeout so a dead host fails
+  // fast instead of hanging. The real `pg.Client` exposes connect(); the
+  // injected-fake interface does not, so narrow structurally before awaiting.
+  // On connect failure, close the client bounded and surface a STATIC typed
+  // error — never echo the raw DSN (it may carry a secret password).
+  const client = new Client({ connectionString, connectionTimeoutMillis: PG_CONNECT_TIMEOUT_MILLIS }) as unknown as ConnectCapableClient;
+  if (typeof client.connect !== "function") {
+    // A client without connect() cannot open a real connection; this is a
+    // configuration/contract error, not a host fault.
+    try { await client.end(); } catch { /* best-effort */ }
+    throw new PersistenceError("invalid_options", "Postgres client must expose a connect function for the factory path.");
+  }
+  try {
+    await client.connect();
+  } catch (cause) {
+    try { await client.end(); } catch { /* best-effort: do not mask the connect failure */ }
+    throw new PersistenceError("invalid_options", "Postgres connection could not be established.");
+  }
+  return createPostgresPersistenceWithClient(client);
 }
 
 export function createPostgresPersistenceWithClient(client: PostgresClientLike): PersistenceStore {

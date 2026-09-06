@@ -84,7 +84,7 @@ describe("WATS-35 OpenAPI document generator", () => {
 
     expect(doc.openapi).toBe("3.1.0");
     expect(doc.info.title).toBe("WATS Service API");
-    expect(doc.info.version).toBe("0.4.0-beta.0");
+    expect(doc.info.version).toBe("0.4.1-beta.0");
     expect(doc.servers).toEqual([{ url: "https://service.test" }]);
 
     expect(Object.keys(doc.paths).sort()).toEqual([
@@ -128,6 +128,7 @@ describe("WATS-35 OpenAPI document generator", () => {
     expect(json.schema).toEqual({ "$ref": "#/components/schemas/SupportedMessageBody" });
     expect(doc.components.schemas.SupportedMessageBody.oneOf).toEqual([
       { "$ref": "#/components/schemas/GenericTextMessageBody" },
+      { "$ref": "#/components/schemas/TemplateMessageBody" },
       { "$ref": "#/components/schemas/MediaMessageBody" },
       { "$ref": "#/components/schemas/LocationMessageBody" },
       { "$ref": "#/components/schemas/ContactsMessageBody" },

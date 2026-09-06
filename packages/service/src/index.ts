@@ -20,6 +20,7 @@ import {
   createGroup,
   buildSendReactionPayload,
   buildSendStickerPayload,
+  buildSendTemplatePayload,
   buildSendVideoPayload,
   deleteGroup,
   getGroup,
@@ -41,6 +42,7 @@ import type { CryptoProvider } from "@wats/crypto";
 import type { PersistenceStore } from "@wats/persistence";
 import {
   getConversationWindowState,
+  CURRENT_SCHEMA_VERSION,
   type ConversationWindowState
 } from "@wats/persistence";
 import {
@@ -61,6 +63,22 @@ import {
   OTEL_ATTR
 } from "./telemetry.js";
 import { containsUnsafePathSegment } from "@wats/internal-utils";
+import {
+  metaTimestampToIso,
+  receiptNowMs,
+  messageDedupKey,
+  statusDedupKey,
+  fallbackDedupKey,
+  isWithinDepthLimit
+} from "./webhookIngress.js";
+import {
+  claimKeyedSend,
+  completeKeyedSend,
+  namespacedIdempotencyKey,
+  canonicalJsonString,
+  sha256HexPrefixed,
+  CanonicalDepthError
+} from "./serviceRequests.js";
 
 export interface WatsServiceSecrets {
   readonly accessToken: string;
@@ -186,7 +204,7 @@ const METRICS_PATH = "/metrics";
 const DEBUG_DIAGNOSTICS_PATH = "/debug/diagnostics";
 const SERVER_START_MS = Date.now();
 const DEFAULT_OPENAPI_TITLE = "WATS Service API";
-const DEFAULT_OPENAPI_VERSION = "0.4.0-beta.0";
+const DEFAULT_OPENAPI_VERSION = "0.4.1-beta.0";
 
 // Local isRecord intentionally diverges from @wats/internal-utils: the service
 // uses it to structurally validate class-instance inputs (PersistenceStore,
@@ -1251,8 +1269,10 @@ function cryptoRandomId(): string {
   return `wats-msg-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-function jsonTextResponse(status: number, payloadText: string): Response {
-  return new Response(payloadText, { status, headers: { "content-type": JSON_CONTENT_TYPE } });
+function jsonTextResponse(status: number, payloadText: string, headers?: Record<string, string>): Response {
+  const hdrs: Record<string, string> = { "content-type": JSON_CONTENT_TYPE };
+  if (headers !== undefined) Object.assign(hdrs, headers);
+  return new Response(payloadText, { status, headers: hdrs });
 }
 
 function isNonEmptyString(value: unknown): value is string {
@@ -1400,6 +1420,7 @@ function groupOperation(summary: string, schemaName?: string): Record<string, un
 function createOpenApiSchemas(enableGroupRoutes = false): Record<string, Record<string, unknown>> {
   const supportedMessageBodyOneOf = [
     schemaRef("GenericTextMessageBody"),
+    schemaRef("TemplateMessageBody"),
     schemaRef("MediaMessageBody"),
     schemaRef("LocationMessageBody"),
     schemaRef("ContactsMessageBody"),
@@ -1581,6 +1602,24 @@ function createOpenApiSchemas(enableGroupRoutes = false): Record<string, Record<
             body: { type: "string", minLength: 1 },
             preview_url: { type: "boolean" }
           }
+        }
+      }
+    },
+    TemplateMessageBody: {
+      type: "object",
+      additionalProperties: false,
+      required: ["type", "to", "name", "languageCode"],
+      properties: {
+        type: { type: "string", const: "template" },
+        to: { type: "string", minLength: 1, description: "WhatsApp recipient phone number or wa_id." },
+        name: { type: "string", minLength: 1, description: "Template name as registered in the WhatsApp Business Manager." },
+        languageCode: { type: "string", minLength: 1, description: "Template language code (e.g. en_US)." },
+        components: {
+          type: "array",
+          minItems: 0,
+          maxItems: 100,
+          items: { type: "object", additionalProperties: true },
+          description: "Optional template components (header, body, button parameters)."
         }
       }
     },
@@ -1790,11 +1829,11 @@ function createOpenApiSchemas(enableGroupRoutes = false): Record<string, Record<
         rowId: { type: "string", minLength: 1, description: "Caller-generated local row id." },
         waMessageId: { type: "string", minLength: 1, description: "WhatsApp message id (wamid.*) from the Graph response." },
         direction: { type: "string", enum: ["inbound", "outbound"] },
-        fromPhone: { type: "string", nullable: true, description: "Sender phone or wa_id when known; null when absent." },
-        toPhone: { type: "string", nullable: true, description: "Recipient phone or wa_id when known; null when absent." },
+        fromPhone: { type: ["string", "null"], description: "Sender phone or wa_id when known; null when absent." },
+        toPhone: { type: ["string", "null"], description: "Recipient phone or wa_id when known; null when absent." },
         type: { type: "string", description: "Graph message type (text, image, ...)." },
         status: { type: "string", description: "Last known status (sent, delivered, read, failed, ...)." },
-        graphMessageId: { type: "string", nullable: true, description: "Same as waMessageId for outbound; null when absent." },
+        graphMessageId: { type: ["string", "null"], description: "Same as waMessageId for outbound; null when absent." },
         createdAt: { type: "string", description: "ISO 8601 timestamp (ms precision)." },
         updatedAt: { type: "string", description: "ISO 8601 timestamp (ms precision)." }
       }
@@ -1805,7 +1844,7 @@ function createOpenApiSchemas(enableGroupRoutes = false): Record<string, Record<
       required: ["items", "nextCursor"],
       properties: {
         items: { type: "array", items: schemaRef("MessageRecord") },
-        nextCursor: { type: "string", nullable: true, description: "rowId of the last returned item when more rows may exist; null otherwise." }
+        nextCursor: { type: ["string", "null"], description: "rowId of the last returned item when more rows may exist; null otherwise." }
       }
     },
     ConversationWindowState: {
@@ -1814,8 +1853,8 @@ function createOpenApiSchemas(enableGroupRoutes = false): Record<string, Record<
       required: ["open", "lastInboundAt", "expiresAt", "remainingMs"],
       properties: {
         open: { type: "boolean", description: "True when the 24-hour customer-service window is open (a recent inbound message exists within windowMs)." },
-        lastInboundAt: { type: "string", nullable: true, description: "ISO 8601 timestamp (ms precision) of the most recent inbound message from this phone; null when none." },
-        expiresAt: { type: "string", nullable: true, description: "ISO 8601 timestamp (ms precision) when the window closes or closed (lastInboundAt + windowMs); null when no inbound message exists." },
+        lastInboundAt: { type: ["string", "null"], description: "ISO 8601 timestamp (ms precision) of the most recent inbound message from this phone; null when none." },
+        expiresAt: { type: ["string", "null"], description: "ISO 8601 timestamp (ms precision) when the window closes or closed (lastInboundAt + windowMs); null when no inbound message exists." },
         remainingMs: { type: "integer", minimum: 0, description: "Milliseconds remaining before the window closes; 0 when closed or unknown." }
       }
     },
@@ -2397,33 +2436,45 @@ function buildServiceCommerceInteractivePayload(input: ServiceCommerceInteractiv
   }
 }
 
-function deepSortJson(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map((item) => deepSortJson(item));
-  if (isRecord(value)) {
-    const out: Record<string, unknown> = {};
-    for (const key of Object.keys(value).sort()) out[key] = deepSortJson(value[key]);
-    return out;
+// WATS-201: per-update dedup key extraction from a normalized update.
+// Message: receiving profile (phoneNumberId + wabaId) + messageId.
+// Status: receiving profile + statusId + status + timestamp.
+// Other families: bounded canonical hash of stable fields (excludes
+// receive-clock fields) with depth rejection; entire scope tuple hashed.
+async function extractDedupKey(update: unknown, sha256HexFn: (input: string) => Promise<string>): Promise<string | null> {
+  if (!isRecord(update)) return null;
+  const kind = typeof update.kind === "string" ? update.kind : null;
+  const phoneNumberId = typeof update.phoneNumberId === "string" && update.phoneNumberId.length > 0 ? update.phoneNumberId : "_unknown";
+  const wabaId = typeof update.wabaId === "string" && update.wabaId.length > 0 ? update.wabaId : "_unknown";
+  if (kind === "message") {
+    const message = (update as { message?: unknown }).message;
+    if (!isRecord(message)) return null;
+    const messageId = typeof message.id === "string" ? message.id : null;
+    if (messageId === null || messageId.length === 0) return null;
+    return messageDedupKey(sha256HexFn, phoneNumberId, wabaId, messageId);
   }
-  return value;
-}
-
-async function persistedWebhookKey(ctx: RuntimeConfig, request: Request): Promise<{ eventKey: string; eventHash: string } | null> {
-  if (ctx.persistence === undefined || request.method.toUpperCase() !== "POST") return null;
-  const clone = request.clone();
-  let envelope: unknown;
-  try {
-    envelope = JSON.parse(await clone.text()) as unknown;
-  } catch {
-    return null;
+  if (kind === "status") {
+    const status = (update as { status?: unknown }).status;
+    if (!isRecord(status)) return null;
+    const statusId = typeof status.id === "string" ? status.id : null;
+    if (statusId === null || statusId.length === 0) return null;
+    const statusValue = typeof status.status === "string" ? status.status : "_unknown";
+    const timestamp = typeof status.timestamp === "string" ? status.timestamp : "_unknown";
+    return statusDedupKey(sha256HexFn, phoneNumberId, wabaId, statusId, statusValue, timestamp);
   }
-  const eventKey = `webhook:${await sha256Hex(JSON.stringify(deepSortJson(envelope)))}`;
-  return { eventKey, eventHash: eventKey.replace(/^webhook:/u, "sha256:") };
+  return fallbackDedupKey(sha256HexFn, phoneNumberId, wabaId, update);
 }
 
 async function handleWebhook(ctx: RuntimeConfig, request: Request): Promise<Response> {
-  const event = await persistedWebhookKey(ctx, request);
-  if (event === null || ctx.persistence === undefined) return ctx.webhookHandler(request);
+  // No persistence: delegate to the adapter verbatim (raw-body auth policy
+  // preserved — the adapter reads bounded bytes and authenticates before
+  // normalization, and dispatches internally).
+  if (ctx.persistence === undefined) return ctx.webhookHandler(request);
 
+  // Persistence path: the adapter reads bounded bytes, authenticates the raw
+  // bytes BEFORE canonicalization, and normalizes into dispatches. We supply
+  // a staging facade that collects updates, then apply the finite depth gate,
+  // per-update scoped dedup, event-time projection, and real dispatch.
   const dispatches: unknown[] = [];
   const facade: WebhookFacadeLike = {
     dispatch: (update: unknown) => {
@@ -2439,57 +2490,85 @@ async function handleWebhook(ctx: RuntimeConfig, request: Request): Promise<Resp
     ...(ctx.cryptoProvider !== undefined ? { cryptoProvider: ctx.cryptoProvider } : {})
   });
   const response = await createFetchWebhookHandler(webhookAdapter)(request);
+  // Non-200 (auth failure, malformed, too-large) or no dispatches: return the
+  // adapter's response directly. Invalid requests do not poison dedup.
   if (response.status !== 200 || dispatches.length === 0) return response;
 
-  let record: "recorded" | "duplicate";
-  try {
-    record = await ctx.persistence.recordWebhookEvent({
-      eventKey: event.eventKey,
-      eventHash: event.eventHash,
-      receivedAt: new Date().toISOString()
-    });
-    recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "success");
-  } catch (error) {
-    // Record the metric, then preserve the pre-instrumentation behavior
-    // exactly: this call was never wrapped in a try/catch before, so a
-    // thrown error propagated uncaught. Re-throw rather than failing open.
-    recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "error");
-    throw error;
-  }
-  if (record === "duplicate") {
-    // WATS-162: normalization already happened (the adapter parsed and
-    // normalized every update into `dispatches`), but the update is not
-    // re-dispatched. Record "deduped" per update so webhook_normalization_total
-    // reflects that normalization occurred even though dispatch was skipped.
-    for (const update of dispatches) {
-      const kind = isRecord(update) && typeof update.kind === "string" ? update.kind : "unknown";
-      recordWebhookNormalization(ctx.telemetrySink, kind, "deduped");
+  // WATS-201: finite depth gate on the authenticated parsed envelope for ALL
+  // families, BEFORE dedup/dispatch. An over-limit payload (deeply nested
+  // extra property on a valid message, status, or account update) is rejected
+  // with a controlled 400 and never silently dispatched.
+  for (const update of dispatches) {
+    if (!isWithinDepthLimit(update)) {
+      return errorResponse(400, "payload_depth_exceeded", "Webhook payload nesting depth exceeds the limit.");
     }
-    return jsonResponse(200, { status: "ok", received: dispatches.length, dispatched: 0, skipped: dispatches.length });
   }
 
-  let dispatched = 0;
+  const now = receiptNowMs();
+  const toDispatch: unknown[] = [];
+  const deduped: unknown[] = [];
   for (const update of dispatches) {
+    const dedupKey = await extractDedupKey(update, sha256Hex);
+    if (dedupKey === null) {
+      toDispatch.push(update);
+      continue;
+    }
+    let record: "recorded" | "duplicate";
+    try {
+      record = await ctx.persistence.recordWebhookEvent({
+        eventKey: dedupKey,
+        eventHash: `sha256:${dedupKey}`,
+        receivedAt: new Date(now).toISOString()
+      });
+      recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "success");
+    } catch (error) {
+      recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "error");
+      throw error;
+    }
+    if (record === "duplicate") {
+      deduped.push(update);
+    } else {
+      toDispatch.push(update);
+    }
+  }
+
+  for (const update of deduped) {
+    const kind = isRecord(update) && typeof update.kind === "string" ? update.kind : "unknown";
+    recordWebhookNormalization(ctx.telemetrySink, kind, "deduped");
+  }
+
+  // Event-time projection BEFORE dispatch for ALL updates (to-dispatch and
+  // deduped). Projection is idempotent, so re-projecting a deduped update
+  // repairs a transient failure from the first delivery without re-dispatch.
+  for (const update of toDispatch) {
+    await recordInboundProjection(ctx, update, now);
+    await recordStatusProjection(ctx, update, now);
+  }
+  for (const update of deduped) {
+    await recordInboundProjection(ctx, update, now);
+    await recordStatusProjection(ctx, update, now);
+  }
+
+  // Dispatch the non-deduped updates. Preserve ACK-on-handler-failure.
+  let dispatched = 0;
+  for (const update of toDispatch) {
     try {
       await ctx.whatsapp.dispatch(update);
       dispatched += 1;
     } catch {
-      // Preserve WebhookAdapter's acknowledge-on-handler-failure contract.
+      // ACK-on-handler-failure contract preserved.
     }
-    // WATS-175c: record an inbound projection for message-kind updates.
-    // Isolated from dispatch — projection failures are swallowed inside
-    // recordInboundProjection so they never break the ACK. Run after the
-    // dispatch attempt so the projection reflects every normalized message
-    // regardless of handler outcome.
-    await recordInboundProjection(ctx, update);
   }
-  return jsonResponse(200, { status: "ok", received: dispatches.length, dispatched, skipped: 0 });
+  const skipped = deduped.length;
+  return jsonResponse(200, { status: "ok", received: dispatches.length, dispatched, skipped });
 }
 
 function buildSupportedMessageBody(body: unknown, enableGroupRoutes = false): GraphMessagesSendBody | null {
   if (isRecord(body) && !enableGroupRoutes && (body.recipient_type === "group" || body.recipientType === "group" || body.type === "pin")) {
     return null;
   }
+  const template = validateServiceTemplateMessageBody(body);
+  if (template !== null) return template;
   const text = validateGenericTextMessageBody(body);
   if (text !== null) return text;
   const media = validateServiceMediaMessageBody(body);
@@ -2506,6 +2585,45 @@ function buildSupportedMessageBody(body: unknown, enableGroupRoutes = false): Gr
     if (groupPin !== null) return buildServiceGroupPinPayload(groupPin);
     if (interactive !== null) return buildServiceBasicInteractivePayload(interactive);
     return buildServiceCommerceInteractivePayload(commerceInteractive as ServiceCommerceInteractiveMessageInput);
+  } catch (error) {
+    if (error instanceof GraphRequestValidationError) return null;
+    throw error;
+  }
+}
+
+/**
+ * WATS-205 G03: Validate a camelCase template composer body
+ * ({ type: "template", to, name, languageCode, components? }) and build the
+ * Graph-native template payload via the existing SDK builder
+ * (buildSendTemplatePayload). Returns null on any validation failure so
+ * buildSupportedMessageBody can fall through to the next body type.
+ *
+ * Safe validation: rejects non-objects, missing required fields, wrong types,
+ * and delegates the remaining structural validation to the SDK builder which
+ * throws GraphRequestValidationError on invalid input (caught and mapped to
+ * null here).
+ */
+function validateServiceTemplateMessageBody(body: unknown): GraphMessagesSendBody | null {
+  if (!isRecord(body)) return null;
+  if (body.type !== "template") return null;
+  const to = typeof body.to === "string" ? body.to : undefined;
+  const name = typeof body.name === "string" ? body.name : undefined;
+  const languageCode = typeof body.languageCode === "string" ? body.languageCode : undefined;
+  // Required fields: name and languageCode must be non-empty strings.
+  if (name === undefined || name.trim().length === 0) return null;
+  if (languageCode === undefined || languageCode.trim().length === 0) return null;
+  // At least one of to or recipient is required by the SDK builder; for the
+  // service composer, `to` is the expected field. If it's missing, let the
+  // builder throw (caught below -> null).
+  const components = body.components;
+  try {
+    const payload = buildSendTemplatePayload({
+      ...(to !== undefined ? { to } : {}),
+      name,
+      languageCode,
+      ...(components !== undefined ? { components: components as never } : {})
+    });
+    return payload as unknown as GraphMessagesSendBody;
   } catch (error) {
     if (error instanceof GraphRequestValidationError) return null;
     throw error;
@@ -2549,14 +2667,12 @@ async function recordOutboundProjection(
   }
 }
 
-// WATS-175c: inbound message projection. Mirrors recordOutboundProjection but
-// records the inbound half of a conversation. Called from the webhook
-// dispatch loop only for `message`-kind normalized updates; status/account/
-// other kinds are skipped. Persistence failure is isolated exactly like the
-// outbound path: it records a persistence-operation error and returns — a
-// projection failure must NEVER break the webhook ACK (the 200 is returned to
-// Meta regardless).
-async function recordInboundProjection(ctx: RuntimeConfig, update: unknown): Promise<void> {
+// WATS-175c / WATS-201: inbound message projection. Records the inbound half
+// of a conversation using the VALID Meta timestamp (clamped, never future);
+// malformed/too-future timestamps skip projection. Idempotent — a retry
+// re-projection does not duplicate the row. Persistence failure is isolated:
+// it never breaks the webhook ACK.
+async function recordInboundProjection(ctx: RuntimeConfig, update: unknown, receiptNowMs: number): Promise<void> {
   if (ctx.persistence === undefined) return;
   if (!isRecord(update)) return;
   const kind = typeof update.kind === "string" ? update.kind : null;
@@ -2568,22 +2684,53 @@ async function recordInboundProjection(ctx: RuntimeConfig, update: unknown): Pro
   const fromPhone = typeof message.from === "string" ? message.from : null;
   const messageType = typeof message.type === "string" ? message.type : null;
   if (messageType === null) return;
-  const now = new Date().toISOString();
-  const rowId = cryptoRandomId();
+  // Use the message's own timestamp (clamped, never future). Malformed or
+  // too-future timestamps skip projection rather than fabricate a window.
+  const rawTimestamp = typeof message.timestamp === "string" ? message.timestamp : null;
+  const createdAt = rawTimestamp !== null ? metaTimestampToIso(rawTimestamp, receiptNowMs) : null;
+  if (createdAt === null) return;
   try {
-    await ctx.persistence.recordMessage({
-      rowId,
-      waMessageId,
-      direction: "inbound",
-      ...(fromPhone !== null ? { fromPhone } : {}),
-      type: messageType,
-      status: "received",
-      createdAt: now,
-      updatedAt: now
-    });
+    const existing = await ctx.persistence.getMessage({ waMessageId });
+    if (existing === null) {
+      await ctx.persistence.recordMessage({
+        rowId: cryptoRandomId(),
+        waMessageId,
+        direction: "inbound",
+        ...(fromPhone !== null ? { fromPhone } : {}),
+        type: messageType,
+        status: "received",
+        createdAt,
+        updatedAt: createdAt
+      });
+    }
     recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "success");
   } catch {
-    // Projection failure must not break the webhook ACK.
+    recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "error");
+  }
+}
+
+// WATS-201: status callback projection. appendMessageStatus atomically
+// appends the status event AND updates the stored message row's status in
+// one transaction — no second row insert. Exactly one row per message after
+// delivered/read. Failure isolation mirrors the inbound path.
+async function recordStatusProjection(ctx: RuntimeConfig, update: unknown, receiptNowMs: number): Promise<void> {
+  if (ctx.persistence === undefined) return;
+  if (!isRecord(update)) return;
+  const kind = typeof update.kind === "string" ? update.kind : null;
+  if (kind !== "status") return;
+  const status = (update as { status?: unknown }).status;
+  if (!isRecord(status)) return;
+  const waMessageId = typeof status.id === "string" ? status.id : null;
+  if (waMessageId === null) return;
+  const statusValue = typeof status.status === "string" ? status.status : null;
+  if (statusValue === null) return;
+  const rawTimestamp = typeof status.timestamp === "string" ? status.timestamp : null;
+  const eventTimestamp = rawTimestamp !== null ? metaTimestampToIso(rawTimestamp, receiptNowMs) : null;
+  const timestamp = eventTimestamp ?? new Date(receiptNowMs).toISOString();
+  try {
+    await ctx.persistence.appendMessageStatus({ waMessageId, status: statusValue, timestamp });
+    recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "success");
+  } catch {
     recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "error");
   }
 }
@@ -2598,20 +2745,15 @@ async function handleTextMessage(ctx: RuntimeConfig, request: Request): Promise<
 
   const idempotencyKey = safeIdempotencyKey(request);
   if (idempotencyKey === "invalid") return errorResponse(400, "invalid_idempotency_key", "Idempotency-Key is invalid.");
-  const requestHash = idempotencyKey !== null && ctx.persistence !== undefined ? `sha256:${await sha256Hex(rawBody)}` : null;
-  if (idempotencyKey !== null && requestHash !== null && ctx.persistence !== undefined) {
-    let existing: Awaited<ReturnType<PersistenceStore["getServiceRequest"]>>;
-    try {
-      existing = await ctx.persistence.getServiceRequest({ idempotencyKey, requestHash });
-      recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "success");
-    } catch (error) {
-      recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "error");
-      throw error;
-    }
-    if (existing === "conflict") return errorResponse(409, "idempotency_conflict", "Idempotency-Key conflicts with a different request body.");
-    if (existing !== null) return jsonTextResponse(200, existing.responseJson);
-  }
 
+  // WATS-205: atomic durable keyed send via claim/complete state machine.
+  // When an idempotency key is present and a persistence store is configured,
+  // use the atomic claimServiceRequest/completeServiceRequest protocol instead
+  // of the non-atomic getServiceRequest/recordServiceRequest read-then-write.
+  // Key is namespaced by phoneNumberId + WABA + operation to avoid cross-profile
+  // collisions. Hash is the canonical OUTGOING payload hash (not the parsed
+  // request) so irrelevant/unknown request fields cannot affect the hash or
+  // cause a RangeError in deep canonicalization.
   const payload: GraphMessagesSendBody = {
     messaging_product: "whatsapp",
     to: input.to,
@@ -2619,6 +2761,38 @@ async function handleTextMessage(ctx: RuntimeConfig, request: Request): Promise<
     text: { body: input.text }
   };
   if (input.previewUrl !== undefined) payload.text.preview_url = input.previewUrl;
+
+  let namespacedKey = "";
+  let requestHash = "";
+  let keyed = false;
+  if (idempotencyKey !== null && ctx.persistence !== undefined) {
+    try {
+      requestHash = await sha256HexPrefixed(canonicalJsonString(payload));
+    } catch (error) {
+      if (error instanceof CanonicalDepthError) return errorResponse(400, "payload_depth_exceeded", "Outgoing payload exceeds canonical depth limit.");
+      throw error;
+    }
+    namespacedKey = await namespacedIdempotencyKey(
+      ctx.profile.whatsapp.phoneNumberId,
+      ctx.profile.whatsapp.wabaId,
+      "messages_text",
+      idempotencyKey
+    );
+    keyed = true;
+    let outcome;
+    try {
+      outcome = await claimKeyedSend(ctx.persistence, namespacedKey, requestHash, new Date().toISOString());
+      recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "success");
+    } catch {
+      recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "error");
+      return errorResponse(503, "persistence_unavailable", "Persistence claim failed.");
+    }
+    if (outcome.kind === "not_atomic") return errorResponse(503, "persistence_not_atomic", "Persistence store does not support atomic claim/complete; keyed sends are rejected.");
+    if (outcome.kind === "pending") return errorResponse(409, "idempotency_pending", "Idempotency-Key is pending a prior claim.");
+    if (outcome.kind === "conflict") return errorResponse(409, "idempotency_conflict", "Idempotency-Key conflicts with a different request body.");
+    if (outcome.kind === "replay") return jsonTextResponse(200, outcome.responseJson);
+  }
+
   try {
     const result = await ctx.graphClient.messages.sendMessage({
       phoneNumberId: ctx.profile.whatsapp.phoneNumberId,
@@ -2628,18 +2802,23 @@ async function handleTextMessage(ctx: RuntimeConfig, request: Request): Promise<
     });
     recordGraphOperation(ctx.telemetrySink, "messages", 200, "success");
     recordSendOutcome(ctx.telemetrySink, "messages", "success");
-    if (idempotencyKey !== null && requestHash !== null && ctx.persistence !== undefined) {
+    // WATS-205: complete the claim after a successful Graph send. If
+    // completion fails, return the genuine 200 result with a static
+    // x-wats-persistence:degraded header so the caller knows the response
+    // was not durably recorded. The claim remains 'claimed' (not
+    // 'completed') so a retry sees 'pending' and cannot blindly resend.
+    let degraded = false;
+    if (keyed && ctx.persistence !== undefined) {
       const responseJson = responseToJsonText(result);
       if (responseJson !== null) {
-        // Note: a persistence failure here is caught by the outer catch below
-        // and reported as a Graph-operation error too — a pre-existing
-        // conflation in the original control flow, not introduced here.
-        await ctx.persistence.recordServiceRequest({ idempotencyKey, requestHash, responseJson, createdAt: new Date().toISOString() });
-        recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "success");
+        const completed = await completeKeyedSend(ctx.persistence, namespacedKey, requestHash, responseJson, new Date().toISOString());
+        recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, completed ? "success" : "error");
+        degraded = !completed;
       }
     }
     await recordOutboundProjection(ctx, result, input.to, "text");
-    return jsonResponse(200, result);
+    const headers = degraded ? { "x-wats-persistence": "degraded" } : undefined;
+    return jsonResponse(200, result, headers);
   } catch (error) {
     recordGraphOperation(ctx.telemetrySink, "messages", graphErrorStatus(error), "error");
     recordSendOutcome(ctx.telemetrySink, "messages", "error");
@@ -2657,18 +2836,40 @@ async function handleGenericMessage(ctx: RuntimeConfig, request: Request): Promi
 
   const idempotencyKey = safeIdempotencyKey(request);
   if (idempotencyKey === "invalid") return errorResponse(400, "invalid_idempotency_key", "Idempotency-Key is invalid.");
-  const requestHash = idempotencyKey !== null && ctx.persistence !== undefined ? `sha256:${await sha256Hex(rawBody)}` : null;
-  if (idempotencyKey !== null && requestHash !== null && ctx.persistence !== undefined) {
-    let existing: Awaited<ReturnType<PersistenceStore["getServiceRequest"]>>;
+
+  // WATS-205: atomic durable keyed send via claim/complete state machine.
+  // Hash is the canonical OUTGOING payload (the built `body`), not the parsed
+  // request, so irrelevant/unknown request fields cannot affect the hash or
+  // trigger a RangeError in deep canonicalization.
+  let namespacedKey = "";
+  let requestHash = "";
+  let keyed = false;
+  if (idempotencyKey !== null && ctx.persistence !== undefined) {
     try {
-      existing = await ctx.persistence.getServiceRequest({ idempotencyKey, requestHash });
-      recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "success");
+      requestHash = await sha256HexPrefixed(canonicalJsonString(body));
     } catch (error) {
-      recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "error");
+      if (error instanceof CanonicalDepthError) return errorResponse(400, "payload_depth_exceeded", "Outgoing payload exceeds canonical depth limit.");
       throw error;
     }
-    if (existing === "conflict") return errorResponse(409, "idempotency_conflict", "Idempotency-Key conflicts with a different request body.");
-    if (existing !== null) return jsonTextResponse(200, existing.responseJson);
+    namespacedKey = await namespacedIdempotencyKey(
+      ctx.profile.whatsapp.phoneNumberId,
+      ctx.profile.whatsapp.wabaId,
+      "messages",
+      idempotencyKey
+    );
+    keyed = true;
+    let outcome;
+    try {
+      outcome = await claimKeyedSend(ctx.persistence, namespacedKey, requestHash, new Date().toISOString());
+      recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "success");
+    } catch {
+      recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "error");
+      return errorResponse(503, "persistence_unavailable", "Persistence claim failed.");
+    }
+    if (outcome.kind === "not_atomic") return errorResponse(503, "persistence_not_atomic", "Persistence store does not support atomic claim/complete; keyed sends are rejected.");
+    if (outcome.kind === "pending") return errorResponse(409, "idempotency_pending", "Idempotency-Key is pending a prior claim.");
+    if (outcome.kind === "conflict") return errorResponse(409, "idempotency_conflict", "Idempotency-Key conflicts with a different request body.");
+    if (outcome.kind === "replay") return jsonTextResponse(200, outcome.responseJson);
   }
 
   try {
@@ -2680,20 +2881,21 @@ async function handleGenericMessage(ctx: RuntimeConfig, request: Request): Promi
     });
     recordGraphOperation(ctx.telemetrySink, "messages", 200, "success");
     recordSendOutcome(ctx.telemetrySink, "messages", "success");
-    if (idempotencyKey !== null && requestHash !== null && ctx.persistence !== undefined) {
+    // WATS-205: complete the claim after a successful Graph send.
+    let degraded = false;
+    if (keyed && ctx.persistence !== undefined) {
       const responseJson = responseToJsonText(result);
       if (responseJson !== null) {
-        // Note: a persistence failure here is caught by the outer catch below
-        // and reported as a Graph-operation error too — a pre-existing
-        // conflation in the original control flow, not introduced here.
-        await ctx.persistence.recordServiceRequest({ idempotencyKey, requestHash, responseJson, createdAt: new Date().toISOString() });
-        recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "success");
+        const completed = await completeKeyedSend(ctx.persistence, namespacedKey, requestHash, responseJson, new Date().toISOString());
+        recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, completed ? "success" : "error");
+        degraded = !completed;
       }
     }
     const genericTo = typeof (body as { to?: unknown }).to === "string" ? (body as { to: string }).to : undefined;
     const genericType = typeof (body as { type?: unknown }).type === "string" ? (body as { type: string }).type : "unknown";
     await recordOutboundProjection(ctx, result, genericTo, genericType);
-    return jsonResponse(200, result);
+    const headers = degraded ? { "x-wats-persistence": "degraded" } : undefined;
+    return jsonResponse(200, result, headers);
   } catch (error) {
     recordGraphOperation(ctx.telemetrySink, "messages", graphErrorStatus(error), "error");
     recordSendOutcome(ctx.telemetrySink, "messages", "error");
@@ -3177,6 +3379,19 @@ export function createWatsServiceApp(config: WatsServiceConfig): WatsServiceApp 
 
     if (path === "/readyz") {
       if (method !== "GET") return methodNotAllowed("GET");
+      // WATS-201: /readyz rejects any store whose schema version is not
+      // CURRENT_SCHEMA_VERSION (not just version 0), plus unhealthy/throw.
+      // /healthz stays 200 (process-alive vs dependencies-ready).
+      if (ctx.persistence !== undefined) {
+        try {
+          const health = await ctx.persistence.health();
+          if (!health.ok || health.currentVersion !== CURRENT_SCHEMA_VERSION) {
+            return errorResponse(503, "persistence_unavailable", "Persistence store is not ready.");
+          }
+        } catch {
+          return errorResponse(503, "persistence_unavailable", "Persistence store health check failed.");
+        }
+      }
       return jsonResponse(200, { ok: true, service: SERVICE_NAME });
     }
 
