@@ -7,7 +7,7 @@ Standalone hardening patch. Beta status is unchanged.
 ### Fixed
 
 - Keyed service sends reserve durable request state before calling Graph. Concurrent requests cannot both send through the built-in stores; unresolved claims block repeat attempts. A successful Graph send followed by a completion-write failure stays successful, with `x-wats-persistence: degraded` rather than a misleading failure response.
-- Webhooks are byte-bounded before parsing, authenticated before normalization, and depth-bounded. Inbound projections use message event time before handlers run; duplicate updates and delivery-status projections retain stable identity and ordering.
+- Webhooks are byte-bounded before parsing, authenticated before normalization, and depth-bounded. Inbound projections use message event time before handlers run; duplicate updates and delivery-status projections retain stable identity and ordering. Dedup-store failures return a redacted `503`, while updates already recorded earlier in a batch finish processing so they are not stranded on retry.
 - PostgreSQL operations serialize access to a shared client, preventing cross-operation rollback. Message/status replay and same-second callback handling no longer regress projected state. Schema migrations preserve existing records while deduplicating projections.
 - Published runtime exports resolve under plain Node ESM as well as Bun. SQLite remains a Bun capability; PostgreSQL requires the optional `pg` driver.
 - Rate-limit admission honors cancellation and cleans up abandoned timers. Retry guidance now distinguishes an absent response from proof that a mutation was not applied.

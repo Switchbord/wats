@@ -264,6 +264,10 @@ adds guarantees the adapter core alone does not provide:
    key is an async SHA-256 of a JSON tuple via the existing crypto provider,
    never a non-cryptographic hash. Dedup is recorded AFTER the adapter
    authenticates the raw bytes, so an invalid request cannot poison dedup.
+   If the dedup store fails, the service returns `503 persistence_unavailable`
+   without exposing the backend error. Updates already recorded earlier in
+   that request finish processing; the failed update and remaining batch are
+   left for retry. Retrying the envelope suppresses completed updates.
 
 2. **Finite depth gate.** After signature verification, the adapter rejects
    `400 payload_depth_exceeded` when the parsed envelope's nesting depth
