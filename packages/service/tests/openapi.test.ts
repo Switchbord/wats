@@ -128,6 +128,7 @@ describe("WATS-35 OpenAPI document generator", () => {
     expect(json.schema).toEqual({ "$ref": "#/components/schemas/SupportedMessageBody" });
     expect(doc.components.schemas.SupportedMessageBody.oneOf).toEqual([
       { "$ref": "#/components/schemas/GenericTextMessageBody" },
+      { "$ref": "#/components/schemas/TemplateMessageBody" },
       { "$ref": "#/components/schemas/MediaMessageBody" },
       { "$ref": "#/components/schemas/LocationMessageBody" },
       { "$ref": "#/components/schemas/ContactsMessageBody" },

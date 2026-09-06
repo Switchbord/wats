@@ -45,6 +45,13 @@ import Ajv2020 from "ajv/dist/2020.js";
 // Test helpers
 // ---------------------------------------------------------------------------
 
+// Build a deeply nested object N levels deep (for depth-bound canonicalization).
+function nestedObject(depth: number): unknown {
+  let v: unknown = "leaf";
+  for (let i = 0; i < depth; i++) v = { child: v };
+  return v;
+}
+
 function profile(overrides: Partial<WatsProfileConfig> = {}): WatsProfileConfig {
   return {
     graph: { apiVersion: "v25.0", baseUrl: "https://graph.test/root/" },
@@ -204,10 +211,14 @@ describe("WATS-205 R01/R02 atomic durable keyed sends", () => {
     // but records the count. Under the atomic claim state machine, only
     // the claim winner reaches Graph; the concurrent loser gets 409 pending
     // before the transport is ever called.
+    // The transport yields to the event loop (setTimeout 0) to simulate
+    // real network I/O timing so the second concurrent request's claim
+    // runs while the first is still in-flight (awaiting the transport).
     let graphCalls = 0;
     const transport: Transport = {
       async request(_req: TransportRequest): Promise<TransportResponse> {
         graphCalls += 1;
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
         return mockResponse(200, { messaging_product: "whatsapp", messages: [{ id: "wamid.ATOMICTEST" }] });
       }
     };
@@ -309,7 +320,7 @@ describe("WATS-205 R01/R02 atomic durable keyed sends", () => {
     // To test the completion-failure path we need the store open for the
     // claim but failing for completion. We use a wrapper that delegates
     // claim normally but throws on completeServiceRequest.
-    const realClaim = store.claimServiceRequest.bind(store);
+    const realClaim = store.claimServiceRequest!.bind(store);
     const failingStore: PersistenceStore = new Proxy(store, {
       get(target, prop) {
         if (prop === "completeServiceRequest") {
@@ -452,6 +463,162 @@ describe("WATS-205 R01/R02 atomic durable keyed sends", () => {
     expect(requestCount()).toBe(1);
     await store.close();
   });
+
+  test("claim that throws (store exception) returns 503 persistence_unavailable, not a crash", async () => {
+    // The claim call must not escape app.fetch as an unhandled rejection.
+    // A store that throws during claimServiceRequest maps to a controlled
+    // 503 persistence_unavailable with a metrics error tick — never a
+    // TypeError crash or a blind send.
+    const mock = createMockTransport({
+      defaultResponse: { status: 200, body: { messages: [{ id: "wamid.THROWCLAIM" }] } }
+    });
+    const store = await createSqlitePersistence({ filename: ":memory:" });
+    await store.migrate();
+    // Close the store so claimServiceRequest throws store_closed.
+    await store.close();
+    const app = createWatsServiceApp({
+      profile: profile(),
+      secrets: SECRETS,
+      transport: mock.transport,
+      persistence: store
+    });
+    const res = await app.fetch(textRequest({ to: "15550001111", text: "throw-claim" }, "throw-claim-key"));
+    expect(res.status).toBe(503);
+    const body = await json(res) as { error: { code: string } };
+    expect(body.error.code).toBe("persistence_unavailable");
+    // No Graph call was made — the claim failed before the send.
+    expect(mock.requests.length).toBe(0);
+  });
+
+  test("null/malformed claim result returns 503, not 200 empty or TypeError", async () => {
+    // A store returning null or a malformed object from claimServiceRequest
+    // must NOT be treated as a replay (which would access .responseJson and
+    // crash or return an empty 200). It maps to 503 persistence_unavailable.
+    const mock = createMockTransport({
+      defaultResponse: { status: 200, body: { messages: [{ id: "wamid.NULLCLAIM" }] } }
+    });
+    const malformedStore: PersistenceStore = {
+      backend: "sqlite" as const,
+      async migrate() { return { currentVersion: 1, appliedMigrations: [], alreadyCurrent: true }; },
+      async health() { return { ok: true, backend: "sqlite" as const, currentVersion: 1, redactedLocation: "[R]" }; },
+      async recordWebhookEvent() { return "recorded" as const; },
+      async getServiceRequest() { return null; },
+      async recordServiceRequest() {},
+      // Returns null — malformed (not a valid claim result).
+      async claimServiceRequest() { return null as never; },
+      async completeServiceRequest() {},
+      async enqueueOutboxItem() { return "enqueued" as const; },
+      async claimOutboxItems() { return []; },
+      async markOutboxItemFailed() {},
+      async markOutboxItemSucceeded() {},
+      async recordMessage() {},
+      async appendMessageStatus() {},
+      async getMessage() { return null; },
+      async listMessages() { return { items: [], nextCursor: null }; },
+      async getLatestInboundMessageAt() { return null; },
+      async countOutboxPending() { return 0; },
+      async close() {}
+    } as unknown as PersistenceStore;
+    const app = createWatsServiceApp({
+      profile: profile(),
+      secrets: SECRETS,
+      transport: mock.transport,
+      persistence: malformedStore
+    });
+    const res = await app.fetch(textRequest({ to: "15550001111", text: "null-claim" }, "null-claim-key"));
+    expect(res.status).toBe(503);
+    const body = await json(res) as { error: { code: string } };
+    expect(body.error.code).toBe("persistence_unavailable");
+    expect(mock.requests.length).toBe(0);
+  });
+
+  test("extra ignored parsed deep field does not affect hash (outgoing payload hashed)", async () => {
+    // The hash is computed over the canonical OUTGOING payload, not the parsed
+    // request. An extra deeply-nested field in the request body that does not
+    // affect the outgoing Graph payload must not change the idempotency hash
+    // — two sends with the same logical payload but different irrelevant
+    // request fields must conflict/replay, not be treated as different.
+    // This also proves deepSortJson does not RangeError on deep untrusted input
+    // (the outgoing payload is flat; only the parsed request is deep).
+    const mock = createMockTransport({
+      defaultResponse: { status: 200, body: { messages: [{ id: "wamid.EXTRA" }] } }
+    });
+    const store = await createSqlitePersistence({ filename: ":memory:" });
+    await store.migrate();
+    const app = createWatsServiceApp({
+      profile: profile(),
+      secrets: SECRETS,
+      transport: mock.transport,
+      persistence: store
+    });
+    const key = "extra-field-key";
+    // First send: plain body.
+    const first = await app.fetch(textRequest({ to: "15550001111", text: "same" }, key));
+    expect(first.status).toBe(200);
+    expect(mock.requests.length).toBe(1);
+
+    // Second send: same key, same text, but with a deeply-nested extra field
+    // that the text handler ignores. The outgoing payload is identical
+    // (messaging_product/to/type/text), so the hash matches → replay 200,
+    // not conflict 409, and no second Graph call.
+    const deepExtra = { to: "15550001111", text: "same", junk: nestedObject(200) };
+    const second = await app.fetch(textRequest(deepExtra, key));
+    expect(second.status).toBe(200);
+    expect(await json(second)).toEqual({ messages: [{ id: "wamid.EXTRA" }] });
+    expect(mock.requests.length).toBe(1);
+    await store.close();
+  });
+
+  test("completion on a non-atomic store returns 200 with x-wats-persistence:degraded", async () => {
+    // A store that implements claim but NOT complete is not atomic. The claim
+    // returns 'not_atomic' → 503. But if a store claims to support claim yet
+    // complete is missing at completion time, the completion returns false
+    // (degraded), not true. Here we verify the degraded path: a store whose
+    // completeServiceRequest throws after a successful send still returns
+    // 200 with the degraded header (the existing completion-failure test
+    // covers this via Proxy; this test confirms the helper's contract:
+    // missing capability => false/degraded).
+    const mock = createMockTransport({
+      defaultResponse: { status: 200, body: { messages: [{ id: "wamid.NONATOMICCOMPLETE" }] } }
+    });
+    const store = await createSqlitePersistence({ filename: ":memory:" });
+    await store.migrate();
+    // Proxy that removes completeServiceRequest so isAtomicClaimStore is false
+    // at completion time — but claim already succeeded. This simulates a
+    // store that had claim at claim time but lost complete by completion.
+    // Since isAtomicClaimStore is checked fresh each call, removing the method
+    // makes completeKeyedSend return false => degraded.
+    const realClaim = store.claimServiceRequest!.bind(store);
+    const realComplete = store.completeServiceRequest!.bind(store);
+    let claimDone = false;
+    const partialStore: PersistenceStore = new Proxy(store, {
+      get(target, prop) {
+        if (prop === "claimServiceRequest") {
+          return async (input: { idempotencyKey: string; requestHash: string; createdAt: string }) => {
+            claimDone = true;
+            return realClaim(input);
+          };
+        }
+        if (prop === "completeServiceRequest") {
+          // After claim, delete so isAtomicClaimStore is false at completion.
+          return claimDone ? undefined : realComplete;
+        }
+        const val = (target as unknown as Record<string | symbol, unknown>)[prop];
+        return typeof val === "function" ? val.bind(target) : val;
+      }
+    }) as unknown as PersistenceStore;
+    const app = createWatsServiceApp({
+      profile: profile(),
+      secrets: SECRETS,
+      transport: mock.transport,
+      persistence: partialStore
+    });
+    const res = await app.fetch(textRequest({ to: "15550001111", text: "nonatomic" }, "nonatomic-complete-key"));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("x-wats-persistence")).toBe("degraded");
+    expect(await json(res)).toEqual({ messages: [{ id: "wamid.NONATOMICCOMPLETE" }] });
+    await store.close();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -581,8 +748,13 @@ describe("WATS-205 R09 OpenAPI 3.1 nullable cleanup and AJV 2020 validation", ()
     // Every named schema under components.schemas must compile under AJV 2020.
     const ajv = new Ajv2020({ strict: false, allErrors: true });
     const schemas = doc.components!.schemas as Record<string, Record<string, unknown>>;
+    // Register all schemas first so cross-schema $ref resolves (correct AJV usage).
     for (const [name, schema] of Object.entries(schemas)) {
-      expect(() => ajv.compile(schema as never), `schema ${name} should compile`).not.toThrow();
+      ajv.addSchema(schema, `#/components/schemas/${name}`);
+    }
+    for (const [name] of Object.entries(schemas)) {
+      const validator = ajv.getSchema(`#/components/schemas/${name}`);
+      expect(validator, `schema ${name} should compile`).toBeDefined();
     }
   });
 
@@ -604,25 +776,30 @@ describe("WATS-205 R09 OpenAPI 3.1 nullable cleanup and AJV 2020 validation", ()
     });
     const doc = createWatsServiceOpenApiDocument(profile(), { serverUrl: "https://service.test" });
     const ajv = new Ajv2020({ strict: false, allErrors: true });
+    // Register all schemas so cross-schema $ref resolves during compile.
+    const allSchemas = doc.components!.schemas as Record<string, Record<string, unknown>>;
+    for (const [name, schema] of Object.entries(allSchemas)) {
+      ajv.addSchema(schema, `#/components/schemas/${name}`);
+    }
 
     // /healthz → HealthResponse
     const healthz = await app.fetch(new Request("https://service.test/healthz"));
     expect(healthz.status).toBe(200);
     const healthzBody = await healthz.json();
-    const healthzValidator = ajv.compile(doc.components!.schemas!.HealthResponse as never);
+    const healthzValidator = ajv.getSchema("#/components/schemas/HealthResponse")!;
     expect(healthzValidator(healthzBody), "healthz body validates against HealthResponse").toBe(true);
 
     // /readyz → ReadyResponse
     const readyz = await app.fetch(new Request("https://service.test/readyz"));
     const readyzBody = await readyz.json();
-    const readyzValidator = ajv.compile(doc.components!.schemas!.ReadyResponse as never);
+    const readyzValidator = ajv.getSchema("#/components/schemas/ReadyResponse")!;
     expect(readyzValidator(readyzBody), "readyz body validates against ReadyResponse").toBe(true);
 
     // POST /api/messages/text → GraphResponsePassthrough
     const sendRes = await app.fetch(textRequest({ to: "15550001111", text: "ajv validate" }));
     expect(sendRes.status).toBe(200);
     const sendBody = await sendRes.json();
-    const passthroughValidator = ajv.compile(doc.components!.schemas!.GraphResponsePassthrough as never);
+    const passthroughValidator = ajv.getSchema("#/components/schemas/GraphResponsePassthrough")!;
     expect(passthroughValidator(sendBody), "send body validates against GraphResponsePassthrough").toBe(true);
 
     // GET /api/messages (list) → MessageListResponse. The nextCursor field
@@ -633,7 +810,7 @@ describe("WATS-205 R09 OpenAPI 3.1 nullable cleanup and AJV 2020 validation", ()
     }));
     expect(listRes.status).toBe(200);
     const listBody = await listRes.json();
-    const listValidator = ajv.compile(doc.components!.schemas!.MessageListResponse as never);
+    const listValidator = ajv.getSchema("#/components/schemas/MessageListResponse")!;
     expect(listValidator(listBody), "list body validates against MessageListResponse (nextCursor null OK)").toBe(true);
     await store.close();
   });
