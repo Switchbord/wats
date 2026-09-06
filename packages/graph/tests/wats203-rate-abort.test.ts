@@ -505,7 +505,7 @@ describe("WATS-203 acquire cancellation signal", () => {
       expect(innerCalls).toBe(2);
       expect(response.status).toBe(200);
     } finally {
-      await new Promise<void>((resolve) => server.close(resolve));
+      await new Promise<void>((resolve, reject) => server.close((error?: Error) => error ? reject(error) : resolve()));
     }
   });
 });

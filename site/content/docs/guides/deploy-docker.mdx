@@ -258,7 +258,7 @@ logs. `wats serve` now supports this via `--database-url-env WATS_DATABASE_URL`
 
 ## Volumes and persistence
 
-`wats serve` has opt-in durable persistence (WATS-204):
+`wats serve` has opt-in durable persistence:
 
 - `--database <sqlite-path>` opens and migrates a local SQLite file **before**
   binding, injects it into the service config (metadata and message-history

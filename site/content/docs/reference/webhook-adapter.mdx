@@ -248,7 +248,7 @@ Any deviation returns `400 invalid_signature_format` (malformed) or `401 missing
 
 Callers constructing the header themselves (proxies, test harnesses) MUST match the format exactly. This intentionally narrow surface keeps the attacker cost of signature-confusion attacks high and the validation logic short and auditable.
 
-## Service-layer ingestion (WATS-201)
+## Service-layer ingestion
 
 When `@wats/service` is constructed with an injected `PersistenceStore`, the
 service wraps the adapter with a bounded, authenticated ingestion layer that

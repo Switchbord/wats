@@ -12,7 +12,7 @@ import { createSqlitePersistence } from "@wats/persistence/sqlite";
 import { createPostgresPersistence } from "@wats/persistence/postgres";
 
 const checks = {
-  currentSchemaVersion: CURRENT_SCHEMA_VERSION === 4,
+  currentSchemaVersion: Number.isInteger(CURRENT_SCHEMA_VERSION) && CURRENT_SCHEMA_VERSION >= 6,
   errorClass: new PersistenceError("invalid_options") instanceof Error,
   sqliteFactory: typeof createSqlitePersistence === "function",
   postgresFactory: typeof createPostgresPersistence === "function",
