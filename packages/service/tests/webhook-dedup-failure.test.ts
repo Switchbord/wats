@@ -7,6 +7,7 @@ import { createCryptoProvider } from "@wats/crypto";
 import { createSqlitePersistence, type PersistenceStore } from "@wats/persistence";
 import { createMockTransport } from "@wats/graph/testing";
 import { createWatsServiceApp } from "../src/index";
+import Ajv2020 from "ajv/dist/2020.js";
 
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close(); });
@@ -76,6 +77,22 @@ async function expectUnavailable(app: ReturnType<typeof createWatsServiceApp>, i
 }
 
 describe("signed webhook dedup storage failures", () => {
+  test("OpenAPI declares the retryable dedup failure and validates its actual response", async () => {
+    const f = await fixture();
+    const document = await (await f.app.fetch(new Request("https://service.test/openapi.json"))).json() as {
+      paths: Record<string, { post: { responses: Record<string, { content: Record<string, { schema: object }> }> } }>;
+      components: { schemas: Record<string, object> };
+    };
+    const responseSchema = document.paths["/webhooks/whatsapp"]!.post.responses["503"];
+    expect(responseSchema).toBeDefined();
+    const ajv = new Ajv2020({ strict: false });
+    for (const [name, schema] of Object.entries(document.components.schemas)) ajv.addSchema(schema, `#/components/schemas/${name}`);
+    const validate = ajv.compile(responseSchema!.content["application/json"]!.schema);
+    failInserts(f.database);
+    const response = await f.app.fetch(await request(["wamid.schema"]));
+    expect(response.status).toBe(503);
+    expect(validate(await response.json())).toBe(true);
+  });
   test("real SQLite insert fault returns a redacted retryable response and recovers", async () => {
     const f = await fixture();
     failInserts(f.database);
