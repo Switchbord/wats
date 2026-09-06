@@ -345,7 +345,7 @@ function validateServiceRequestRecord(input: ServiceRequestRecordInput): Service
   try {
     JSON.parse(responseJson);
   } catch (cause) {
-    throw new PersistenceError("invalid_record", "responseJson must be valid JSON.", { cause });
+    throw new PersistenceError("invalid_record", "responseJson must be valid JSON.");
   }
   return Object.freeze({
     idempotencyKey: validateRecordString(record.idempotencyKey, "idempotencyKey"),
@@ -370,7 +370,7 @@ function validateServiceRequestCompletion(input: ServiceRequestCompletionInput):
   try {
     JSON.parse(responseJson);
   } catch (cause) {
-    throw new PersistenceError("invalid_record", "responseJson must be valid JSON.", { cause });
+    throw new PersistenceError("invalid_record", "responseJson must be valid JSON.");
   }
   return Object.freeze({
     idempotencyKey: validateRecordString(record.idempotencyKey, "idempotencyKey"),
@@ -567,7 +567,7 @@ async function loadBunSqlite(): Promise<BunSqliteModule> {
     const specifier = "bun:sqlite";
     return (await import(specifier)) as unknown as BunSqliteModule;
   } catch (cause) {
-    throw new PersistenceError("migration_failed", "SQLite persistence requires Bun sqlite support.", { cause });
+    throw new PersistenceError("migration_failed", "SQLite persistence requires Bun sqlite support.");
   }
 }
 
@@ -623,7 +623,7 @@ class SqlitePersistenceStore implements PersistenceStore {
           applied.push(migration.id);
         } catch (cause) {
           this.#database.exec("ROLLBACK");
-          throw new PersistenceError("migration_failed", "SQLite migration failed.", { cause });
+          throw new PersistenceError("migration_failed", "SQLite migration failed.");
         }
       }
       return Object.freeze({
@@ -663,7 +663,7 @@ class SqlitePersistenceStore implements PersistenceStore {
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);
       if (/UNIQUE|constraint/i.test(message)) return "duplicate";
-      throw new PersistenceError("migration_failed", "SQLite webhook event record failed.", { cause });
+      throw new PersistenceError("migration_failed", "SQLite webhook event record failed.");
     }
   }
 
@@ -701,7 +701,7 @@ class SqlitePersistenceStore implements PersistenceStore {
         record.createdAt
       );
     } catch (cause) {
-      throw new PersistenceError("outbox_failed", "SQLite service request record failed.", { cause });
+      throw new PersistenceError("outbox_failed", "SQLite service request record failed.");
     }
   }
 
@@ -733,7 +733,7 @@ class SqlitePersistenceStore implements PersistenceStore {
       ).get(claim.idempotencyKey);
     } catch (cause) {
       if (cause instanceof PersistenceError) throw cause;
-      throw new PersistenceError("claim_failed", "SQLite service request claim failed.", { cause });
+      throw new PersistenceError("claim_failed", "SQLite service request claim failed.");
     }
     if (row === null) {
       throw new PersistenceError("claim_failed", "SQLite service request claim did not persist.");
@@ -760,7 +760,7 @@ class SqlitePersistenceStore implements PersistenceStore {
         "SELECT request_hash, status FROM wats_service_requests WHERE idempotency_key = ?"
       ).get(completion.idempotencyKey);
     } catch (cause) {
-      throw new PersistenceError("completion_failed", "SQLite service request completion failed.", { cause });
+      throw new PersistenceError("completion_failed", "SQLite service request completion failed.");
     }
     if (existing === null) {
       throw new PersistenceError("completion_failed", "SQLite service request completion requires a prior claim.");
@@ -780,7 +780,7 @@ class SqlitePersistenceStore implements PersistenceStore {
         completion.requestHash
       );
     } catch (cause) {
-      throw new PersistenceError("completion_failed", "SQLite service request completion failed.", { cause });
+      throw new PersistenceError("completion_failed", "SQLite service request completion failed.");
     }
     if (result.changes !== 1) {
       throw new PersistenceError("completion_failed", "SQLite service request completion lease is stale.");
@@ -805,7 +805,7 @@ class SqlitePersistenceStore implements PersistenceStore {
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);
       if (/UNIQUE|constraint/i.test(message)) return "duplicate";
-      throw new PersistenceError("outbox_failed", "SQLite outbox enqueue failed.", { cause });
+      throw new PersistenceError("outbox_failed", "SQLite outbox enqueue failed.");
     }
   }
 
@@ -849,7 +849,7 @@ class SqlitePersistenceStore implements PersistenceStore {
       return Object.freeze(rows.map((row) => outboxRowToItem({ ...row, status: "processing", attempts: row.attempts + 1, lease_id: row.lease_id + 1, next_attempt_at: null, updated_at: claim.now })));
     } catch (cause) {
       this.#database.exec("ROLLBACK");
-      throw new PersistenceError("outbox_failed", "SQLite outbox claim failed.", { cause });
+      throw new PersistenceError("outbox_failed", "SQLite outbox claim failed.");
     }
   }
 
@@ -868,7 +868,7 @@ class SqlitePersistenceStore implements PersistenceStore {
         failure.leaseId
       );
     } catch (cause) {
-      throw new PersistenceError("outbox_failed", "SQLite outbox failure failed.", { cause });
+      throw new PersistenceError("outbox_failed", "SQLite outbox failure failed.");
     }
     if (result.changes !== 1) {
       throw new PersistenceError("outbox_failed", "SQLite outbox failure lease is stale.");
@@ -889,7 +889,7 @@ class SqlitePersistenceStore implements PersistenceStore {
         success.leaseId
       );
     } catch (cause) {
-      throw new PersistenceError("outbox_failed", "SQLite outbox success failed.", { cause });
+      throw new PersistenceError("outbox_failed", "SQLite outbox success failed.");
     }
     if (result.changes !== 1) {
       throw new PersistenceError("outbox_failed", "SQLite outbox success lease is stale.");
@@ -924,7 +924,7 @@ class SqlitePersistenceStore implements PersistenceStore {
       // already swallows those, but a non-constraint runtime fault — disk I/O,
       // busy, corruption — must surface as a typed PersistenceError, never a
       // raw bun:sqlite error, and must not echo the caller's input.
-      throw new PersistenceError("outbox_failed", "SQLite message record failed.", { cause });
+      throw new PersistenceError("outbox_failed", "SQLite message record failed.");
     }
     // WATS-200: status-before-message reconciliation. A status event may have
     // arrived (early webhook) before this outbound projection was recorded.
@@ -993,7 +993,7 @@ class SqlitePersistenceStore implements PersistenceStore {
       this.#database.exec("COMMIT");
     } catch (cause) {
       this.#database.exec("ROLLBACK");
-      throw new PersistenceError("outbox_failed", "SQLite message status append failed.", { cause });
+      throw new PersistenceError("outbox_failed", "SQLite message status append failed.");
     }
   }
 
@@ -1088,7 +1088,7 @@ class SqlitePersistenceStore implements PersistenceStore {
         nowIso()
       );
     } catch (cause) {
-      throw new PersistenceError("migration_lock_failed", "SQLite migration lock is already held.", { cause });
+      throw new PersistenceError("migration_lock_failed", "SQLite migration lock is already held.");
     }
   }
 
@@ -1126,6 +1126,6 @@ export async function createSqlitePersistence(options: SqlitePersistenceOptions)
     const database = new sqlite.Database(filename, { readonly, create: !readonly });
     return new SqlitePersistenceStore(database);
   } catch (cause) {
-    throw new PersistenceError("migration_failed", "SQLite database could not be opened.", { cause });
+    throw new PersistenceError("migration_failed", "SQLite database could not be opened.");
   }
 }

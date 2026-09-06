@@ -359,7 +359,7 @@ function validateServiceRequestRecord(input: ServiceRequestRecordInput): Service
   try {
     JSON.parse(responseJson);
   } catch (cause) {
-    throw new PersistenceError("invalid_record", "responseJson must be valid JSON.", { cause });
+    throw new PersistenceError("invalid_record", "responseJson must be valid JSON.");
   }
   return Object.freeze({
     idempotencyKey: validateRecordString(record.idempotencyKey, "idempotencyKey"),
@@ -384,7 +384,7 @@ function validateServiceRequestCompletion(input: ServiceRequestCompletionInput):
   try {
     JSON.parse(responseJson);
   } catch (cause) {
-    throw new PersistenceError("invalid_record", "responseJson must be valid JSON.", { cause });
+    throw new PersistenceError("invalid_record", "responseJson must be valid JSON.");
   }
   return Object.freeze({
     idempotencyKey: validateRecordString(record.idempotencyKey, "idempotencyKey"),
@@ -602,8 +602,7 @@ class PostgresPersistenceStore implements PersistenceStore {
   // preserved. Only a RAW driver exception (the `pg` client rejecting, e.g. a
   // BEGIN/SELECT/INSERT/UPDATE/ROLLBACK whose message may echo the rejected
   // query text / caller values) is mapped to a fresh PersistenceError with a
-  // STATIC message and the caller's original error attached as `cause` — never
-  // echoed in the message. This closes the leak where a fault on the BEGIN
+  // STATIC message without the driver cause, which may contain private data. This closes the leak where a fault on the BEGIN
   // query (outside the inner try in appendMessageStatus/claimOutboxItems) or
   // any un-wrapped public query surfaces a raw driver Error that echoes
   // caller-supplied secret-like input (requestHash, id, waMessageId).
@@ -612,7 +611,7 @@ class PostgresPersistenceStore implements PersistenceStore {
       (value) => value,
       (cause: unknown) => {
         if (cause instanceof PersistenceError) throw cause;
-        throw new PersistenceError(errorCode, "Postgres operation failed.", { cause });
+        throw new PersistenceError(errorCode, "Postgres operation failed.");
       }
     );
     // Swallow rejection on the chain itself so one failure doesn't poison
@@ -665,7 +664,7 @@ class PostgresPersistenceStore implements PersistenceStore {
           applied.push(migration.id);
         } catch (cause) {
           await this.#client.query("ROLLBACK");
-          throw new PersistenceError("migration_failed", "Postgres migration failed.", { cause });
+          throw new PersistenceError("migration_failed", "Postgres migration failed.");
         }
       }
       return Object.freeze({ currentVersion: CURRENT_SCHEMA_VERSION, appliedMigrations: Object.freeze(applied), alreadyCurrent: applied.length === 0 });
@@ -835,7 +834,7 @@ class PostgresPersistenceStore implements PersistenceStore {
     } catch (cause) {
       await this.#client.query("ROLLBACK");
       if (cause instanceof PersistenceError) throw cause;
-      throw new PersistenceError("outbox_failed", "Postgres outbox claim failed.", { cause });
+      throw new PersistenceError("outbox_failed", "Postgres outbox claim failed.");
     }
   }
 
@@ -885,7 +884,7 @@ class PostgresPersistenceStore implements PersistenceStore {
         // 23505 unique_violation covers both the row_id PK and the
         // (direction, wa_message_id) unique index — the expected dedup path.
         if (isUniqueViolation(cause)) return;
-        throw new PersistenceError("outbox_failed", "Postgres message record failed.", { cause });
+        throw new PersistenceError("outbox_failed", "Postgres message record failed.");
       }
       // WATS-200: status-before-message reconciliation. A status event may have
       // arrived (early webhook) before this outbound projection was recorded.
@@ -958,7 +957,7 @@ class PostgresPersistenceStore implements PersistenceStore {
     } catch (cause) {
       await this.#client.query("ROLLBACK");
       if (cause instanceof PersistenceError) throw cause;
-      throw new PersistenceError("outbox_failed", "Postgres message status append failed.", { cause });
+      throw new PersistenceError("outbox_failed", "Postgres message status append failed.");
     }
   }
 
@@ -1095,7 +1094,7 @@ export async function createPostgresPersistence(options: PostgresPersistenceOpti
     const defaultExport = mod.default;
     Client = mod.Client ?? (typeof defaultExport === "function" ? defaultExport : defaultExport?.Client);
   } catch (cause) {
-    throw new PersistenceError("invalid_options", "Postgres persistence requires the optional 'pg' package.", { cause });
+    throw new PersistenceError("invalid_options", "Postgres persistence requires the optional 'pg' package.");
   }
   if (Client === undefined) {
     throw new PersistenceError("invalid_options", "Postgres persistence requires the optional 'pg' package.");
@@ -1116,7 +1115,7 @@ export async function createPostgresPersistence(options: PostgresPersistenceOpti
     await client.connect();
   } catch (cause) {
     try { await client.end(); } catch { /* best-effort: do not mask the connect failure */ }
-    throw new PersistenceError("invalid_options", "Postgres connection could not be established.", { cause });
+    throw new PersistenceError("invalid_options", "Postgres connection could not be established.");
   }
   return createPostgresPersistenceWithClient(client);
 }
