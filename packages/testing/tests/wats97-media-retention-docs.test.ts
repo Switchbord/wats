@@ -1,4 +1,4 @@
-import { describe, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -164,6 +164,11 @@ function commentMentionsWebhookMediaRetention(comment: string): boolean {
 }
 
 describe("WATS-97 webhook media-id retention docs", () => {
+  test("comment scanner does not treat a route wildcard string as a block comment", () => {
+    const source = 'const route = "/api/*"; const value = "webhook media window"; /** template body */';
+    expect(extractComments(source)).toEqual(["/** template body */"]);
+  });
+
   test("required public docs lock current webhook media ID retention and persistence guidance", () => {
     // Site docs are voice-governed; assert the core retention fact there. The
     // full prompt-download + persistence prose is asserted on the changelog.
