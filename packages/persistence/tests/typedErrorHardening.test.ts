@@ -17,6 +17,7 @@ import { rmSync } from "node:fs";
 import {
   PersistenceError,
   createSqlitePersistence,
+  type PersistenceErrorCode,
   type PersistenceStore
 } from "../src/index";
 import {
@@ -35,7 +36,7 @@ const SECRET_ID = "SECRET_ID_wamid_value";
 // no secret-like substring leaks through ANY common serialization surface.
 function assertTypedNoLeak(
   thrown: unknown,
-  expectedCode: string,
+  expectedCode: PersistenceErrorCode,
   ...secrets: readonly string[]
 ): void {
   expect(thrown).toBeInstanceOf(PersistenceError);
@@ -252,7 +253,7 @@ describe("WATS-200 Postgres typed-error wrapping on driver fault (Q2)", () => {
   test("every public serialized Postgres operation surfaces typed PersistenceError with a static message and no caller-input echo", async () => {
     const cases: ReadonlyArray<{
       name: string;
-      expectedCode: string;
+      expectedCode: PersistenceErrorCode;
       faultWith: string;
       op: (store: PersistenceStore) => Promise<unknown>;
     }> = [
@@ -300,7 +301,7 @@ describe("WATS-200 Postgres typed-error wrapping on driver fault (Q2)", () => {
   });
 
   test("recordMessage/appendMessageStatus/claimOutboxItems continue to wrap driver faults as typed PersistenceError (control group)", async () => {
-    const cases: ReadonlyArray<{ expectedCode: string; faultWith: string; op: (store: PersistenceStore) => Promise<unknown> }> = [
+    const cases: ReadonlyArray<{ expectedCode: PersistenceErrorCode; faultWith: string; op: (store: PersistenceStore) => Promise<unknown> }> = [
       { expectedCode: "outbox_failed", faultWith: `pg: insert ${SECRET_HASH} failed`, op: (s) =>
         s.recordMessage({ rowId: "r1", waMessageId: SECRET_ID, direction: "outbound", toPhone: "+1", type: "text", status: "sent", createdAt: ISO, updatedAt: ISO }) },
       { expectedCode: "outbox_failed", faultWith: `pg: BEGIN ${SECRET_ID} failed`, op: (s) =>
@@ -349,5 +350,46 @@ describe("WATS-200 Postgres typed-error wrapping on driver fault (Q2)", () => {
       thrown = error;
     }
     assertTypedNoLeak(thrown, "store_closed", SECRET_HASH, SECRET_ID);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Factory connect() path: createPostgresPersistence must connect the real
+// pg.Client (with a finite connectionTimeoutMillis) before constructing the
+// store. A bad host must fail with a typed PersistenceError (no raw DSN echo)
+// and close the client bounded. The success path against a real Postgres is
+// env-gated (WATS_TEST_POSTGRES_URL), matching the real-PG concurrency suite.
+// ---------------------------------------------------------------------------
+
+const PG_URL = process.env.WATS_TEST_POSTGRES_URL ?? "";
+const maybeFactoryTest = PG_URL ? test : test.skip;
+
+describe("WATS-200 createPostgresPersistence factory connect() path", () => {
+  maybeFactoryTest("real external createPostgresPersistence({ connectionString }) -> migrate -> health succeeds against the QA Postgres", async () => {
+    const { createPostgresPersistence } = await import("../src/postgres");
+    const store = await createPostgresPersistence({ connectionString: PG_URL });
+    try {
+      const report = await store.migrate();
+      expect(report.currentVersion).toBeGreaterThanOrEqual(1);
+      const health = await store.health();
+      expect(health.backend).toBe("postgres");
+      expect(health.ok).toBe(true);
+    } finally {
+      await store.close();
+    }
+  });
+
+  test("a bad host fails with a typed PersistenceError and does not echo the raw DSN (no hang, bounded)", async () => {
+    const { createPostgresPersistence } = await import("../src/postgres");
+    // A connection string with a secret-like password to a host that will
+    // refuse/timeout. The password MUST NOT appear in the surfaced error.
+    const badDsn = "postgresql://user:SHOULD_NOT_LEAK_PASSWORD@127.0.0.1:1/wats_test";
+    let thrown: unknown;
+    try {
+      await createPostgresPersistence({ connectionString: badDsn });
+    } catch (error) {
+      thrown = error;
+    }
+    assertTypedNoLeak(thrown, "invalid_options", "SHOULD_NOT_LEAK_PASSWORD", badDsn);
   });
 });

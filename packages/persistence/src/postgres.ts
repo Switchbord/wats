@@ -15,6 +15,7 @@ import {
   type OutboxFailedInput,
   type OutboxItem,
   type OutboxSucceededInput,
+  type PersistenceErrorCode,
   type PersistenceHealth,
   type PersistenceStore,
   type ServiceRequestClaimInput,
@@ -47,7 +48,16 @@ export interface PostgresClientLike {
 }
 
 interface PostgresClientConstructor {
-  new (config: { readonly connectionString: string }): PostgresClientLike;
+  new (config: { readonly connectionString: string; readonly connectionTimeoutMillis?: number }): PostgresClientLike;
+}
+
+// The real `pg.Client` exposes a `connect()` that opens the TCP socket. The
+// injected-fake `PostgresClientLike` interface (query/end only) does NOT, so
+// the factory narrows to a structural connect-capable type before awaiting it.
+// This keeps the fake/test interface connect-free while the factory path still
+// opens a real connection with a finite timeout.
+interface ConnectCapableClient extends PostgresClientLike {
+  connect(): Promise<void>;
 }
 
 interface MigrationDefinition {
@@ -65,6 +75,10 @@ interface MigrationRow extends Record<string, unknown> {
 
 const OUTBOX_PROCESSING_LEASE_MS = 5 * 60 * 1000;
 const MAX_CONNECTION_STRING_LENGTH = 4096;
+// WATS-200: the factory must open a real TCP connection with a FINITE timeout
+// so a dead host fails fast instead of hanging (then awaiting a queued close
+// forever). 10s is generous for a local/LAN Postgres and bounded for CLI use.
+const PG_CONNECT_TIMEOUT_MILLIS = 10_000;
 
 // WATS-200: explicit status rank transition semantics. Status events advance
 // deterministically by rank: sent(1) < delivered(2) < read(3). `failed` may
@@ -579,8 +593,28 @@ class PostgresPersistenceStore implements PersistenceStore {
   // Acquire the serialization lock. Returns a release function. Every public
   // method wraps its body in withLock(fn) so no two methods' queries can
   // interleave on the shared connection.
-  #withLock<T>(fn: () => Promise<T>): Promise<T> {
-    const run = this.#chain.then(fn, fn);
+  //
+  // WATS-200 typed-error hardening (Q2): an optional errorCode lets each public
+  // method pin the taxonomy for an unwrapped driver fault. Any exception that
+  // is ALREADY a PersistenceError (validation, dedup, lease-stale, the inner
+  // try/catch in recordMessage/appendMessageStatus/claimOutboxItems) is
+  // re-thrown unchanged so the existing typed contract and error codes are
+  // preserved. Only a RAW driver exception (the `pg` client rejecting, e.g. a
+  // BEGIN/SELECT/INSERT/UPDATE/ROLLBACK whose message may echo the rejected
+  // query text / caller values) is mapped to a fresh PersistenceError with a
+  // STATIC message and the caller's original error attached as `cause` — never
+  // echoed in the message. This closes the leak where a fault on the BEGIN
+  // query (outside the inner try in appendMessageStatus/claimOutboxItems) or
+  // any un-wrapped public query surfaces a raw driver Error that echoes
+  // caller-supplied secret-like input (requestHash, id, waMessageId).
+  #withLock<T>(fn: () => Promise<T>, errorCode: PersistenceErrorCode = "outbox_failed"): Promise<T> {
+    const run = this.#chain.then(fn, fn).then(
+      (value) => value,
+      (cause: unknown) => {
+        if (cause instanceof PersistenceError) throw cause;
+        throw new PersistenceError(errorCode, "Postgres operation failed.", { cause });
+      }
+    );
     // Swallow rejection on the chain itself so one failure doesn't poison
     // all subsequent operations; the caller still sees its own rejection.
     this.#chain = run.then(() => undefined, () => undefined);
@@ -718,7 +752,7 @@ class PostgresPersistenceStore implements PersistenceStore {
         return Object.freeze({ responseJson: row.response_json });
       }
       return "pending";
-    });
+    }, "claim_failed");
   }
 
   async completeServiceRequest(input: ServiceRequestCompletionInput): Promise<void> {
@@ -744,7 +778,7 @@ class PostgresPersistenceStore implements PersistenceStore {
       if (result.rowCount !== 1) {
         throw new PersistenceError("completion_failed", "Postgres service request completion lease is stale.");
       }
-    });
+    }, "completion_failed");
   }
 
   async enqueueOutboxItem(input: OutboxEnqueueInput): Promise<OutboxEnqueueResult> {
@@ -1066,7 +1100,25 @@ export async function createPostgresPersistence(options: PostgresPersistenceOpti
   if (Client === undefined) {
     throw new PersistenceError("invalid_options", "Postgres persistence requires the optional 'pg' package.");
   }
-  return createPostgresPersistenceWithClient(new Client({ connectionString }));
+  // WATS-200: construct with a FINITE connection timeout so a dead host fails
+  // fast instead of hanging. The real `pg.Client` exposes connect(); the
+  // injected-fake interface does not, so narrow structurally before awaiting.
+  // On connect failure, close the client bounded and surface a STATIC typed
+  // error — never echo the raw DSN (it may carry a secret password).
+  const client = new Client({ connectionString, connectionTimeoutMillis: PG_CONNECT_TIMEOUT_MILLIS }) as unknown as ConnectCapableClient;
+  if (typeof client.connect !== "function") {
+    // A client without connect() cannot open a real connection; this is a
+    // configuration/contract error, not a host fault.
+    try { await client.end(); } catch { /* best-effort */ }
+    throw new PersistenceError("invalid_options", "Postgres client must expose a connect function for the factory path.");
+  }
+  try {
+    await client.connect();
+  } catch (cause) {
+    try { await client.end(); } catch { /* best-effort: do not mask the connect failure */ }
+    throw new PersistenceError("invalid_options", "Postgres connection could not be established.", { cause });
+  }
+  return createPostgresPersistenceWithClient(client);
 }
 
 export function createPostgresPersistenceWithClient(client: PostgresClientLike): PersistenceStore {

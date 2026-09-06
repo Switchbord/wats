@@ -688,14 +688,21 @@ class SqlitePersistenceStore implements PersistenceStore {
     const record = validateServiceRequestRecord(input);
     // WATS-200: INSERT OR IGNORE preserves the old semantics — it never
     // overwrites an existing row. If a claim already reserved the key, the
-    // IGNORE keeps the reservation intact (status='claimed').
-    this.#database.run(
-      "INSERT OR IGNORE INTO wats_service_requests (idempotency_key, request_hash, response_json, created_at, status) VALUES (?, ?, ?, ?, 'completed')",
-      record.idempotencyKey,
-      record.requestHash,
-      record.responseJson,
-      record.createdAt
-    );
+    // IGNORE keeps the reservation intact (status='claimed'). A non-constraint
+    // backend fault (disk I/O, corruption, dropped table) must surface as a
+    // typed PersistenceError with a static message, never a raw bun:sqlite
+    // error, and must not echo the caller's input.
+    try {
+      this.#database.run(
+        "INSERT OR IGNORE INTO wats_service_requests (idempotency_key, request_hash, response_json, created_at, status) VALUES (?, ?, ?, ?, 'completed')",
+        record.idempotencyKey,
+        record.requestHash,
+        record.responseJson,
+        record.createdAt
+      );
+    } catch (cause) {
+      throw new PersistenceError("outbox_failed", "SQLite service request record failed.", { cause });
+    }
   }
 
   async claimServiceRequest(input: ServiceRequestClaimInput): Promise<ServiceRequestClaimResult> {
@@ -704,20 +711,30 @@ class SqlitePersistenceStore implements PersistenceStore {
     // INSERT OR IGNORE atomically reserves the key. The status column
     // distinguishes 'claimed' (reserved, response_json NULL) from 'completed'
     // (response_json populated by completeServiceRequest). A duplicate insert
-    // is a no-op so the existing row is preserved — no blind resend.
-    const insert = this.#database.run(
-      "INSERT OR IGNORE INTO wats_service_requests (idempotency_key, request_hash, response_json, created_at, claimed_at, status) VALUES (?, ?, NULL, ?, ?, 'claimed')",
-      claim.idempotencyKey,
-      claim.requestHash,
-      claim.createdAt,
-      claim.createdAt
-    );
-    // changes === 1 means a new row was inserted: this is the first claim.
-    if (insert.changes === 1) return "claimed";
-    // The row already existed. Re-read to determine the outcome.
-    const row = this.#database.query<{ request_hash: string; response_json: string | null; status: string }>(
-      "SELECT request_hash, response_json, status FROM wats_service_requests WHERE idempotency_key = ?"
-    ).get(claim.idempotencyKey);
+    // is a no-op so the existing row is preserved — no blind resend. A backend
+    // fault (disk I/O, corruption, dropped table) must surface as a typed
+    // PersistenceError with a static message, never a raw bun:sqlite error,
+    // and must not echo the caller's input.
+    let insert: BunSqliteRunResult;
+    let row: { request_hash: string; response_json: string | null; status: string } | null;
+    try {
+      insert = this.#database.run(
+        "INSERT OR IGNORE INTO wats_service_requests (idempotency_key, request_hash, response_json, created_at, claimed_at, status) VALUES (?, ?, NULL, ?, ?, 'claimed')",
+        claim.idempotencyKey,
+        claim.requestHash,
+        claim.createdAt,
+        claim.createdAt
+      );
+      // changes === 1 means a new row was inserted: this is the first claim.
+      if (insert.changes === 1) return "claimed";
+      // The row already existed. Re-read to determine the outcome.
+      row = this.#database.query<{ request_hash: string; response_json: string | null; status: string }>(
+        "SELECT request_hash, response_json, status FROM wats_service_requests WHERE idempotency_key = ?"
+      ).get(claim.idempotencyKey);
+    } catch (cause) {
+      if (cause instanceof PersistenceError) throw cause;
+      throw new PersistenceError("claim_failed", "SQLite service request claim failed.", { cause });
+    }
     if (row === null) {
       throw new PersistenceError("claim_failed", "SQLite service request claim did not persist.");
     }
@@ -733,10 +750,18 @@ class SqlitePersistenceStore implements PersistenceStore {
     const completion = validateServiceRequestCompletion(input);
     // Completion must match the reserved hash. A mismatch is a typed error, not
     // a silent overwrite. A completion without a prior claim is also a typed
-    // error — there is no reservation to complete.
-    const existing = this.#database.query<{ request_hash: string; status: string }>(
-      "SELECT request_hash, status FROM wats_service_requests WHERE idempotency_key = ?"
-    ).get(completion.idempotencyKey);
+    // error — there is no reservation to complete. A backend fault (disk I/O,
+    // corruption, dropped table) on the data queries must surface as a typed
+    // PersistenceError with a static message, never a raw bun:sqlite error,
+    // and must not echo the caller's input.
+    let existing: { request_hash: string; status: string } | null;
+    try {
+      existing = this.#database.query<{ request_hash: string; status: string }>(
+        "SELECT request_hash, status FROM wats_service_requests WHERE idempotency_key = ?"
+      ).get(completion.idempotencyKey);
+    } catch (cause) {
+      throw new PersistenceError("completion_failed", "SQLite service request completion failed.", { cause });
+    }
     if (existing === null) {
       throw new PersistenceError("completion_failed", "SQLite service request completion requires a prior claim.");
     }
@@ -745,13 +770,18 @@ class SqlitePersistenceStore implements PersistenceStore {
     }
     // Only 'claimed' rows are completable; a 'completed' row is already done.
     if (existing.status === "completed") return;
-    const result = this.#database.run(
-      "UPDATE wats_service_requests SET response_json = ?, status = 'completed', created_at = ? WHERE idempotency_key = ? AND request_hash = ? AND status = 'claimed'",
-      completion.responseJson,
-      completion.createdAt,
-      completion.idempotencyKey,
-      completion.requestHash
-    );
+    let result: BunSqliteRunResult;
+    try {
+      result = this.#database.run(
+        "UPDATE wats_service_requests SET response_json = ?, status = 'completed', created_at = ? WHERE idempotency_key = ? AND request_hash = ? AND status = 'claimed'",
+        completion.responseJson,
+        completion.createdAt,
+        completion.idempotencyKey,
+        completion.requestHash
+      );
+    } catch (cause) {
+      throw new PersistenceError("completion_failed", "SQLite service request completion failed.", { cause });
+    }
     if (result.changes !== 1) {
       throw new PersistenceError("completion_failed", "SQLite service request completion lease is stale.");
     }
@@ -826,15 +856,20 @@ class SqlitePersistenceStore implements PersistenceStore {
   async markOutboxItemFailed(input: OutboxFailedInput): Promise<void> {
     this.#assertOpen();
     const failure = validateOutboxFailed(input);
-    const result = this.#database.run(
-      "UPDATE wats_outbox SET status = ?, next_attempt_at = ?, updated_at = ? WHERE id = ? AND status = ? AND lease_id = ?",
-      "pending",
-      failure.nextAttemptAt,
-      failure.updatedAt,
-      failure.id,
-      "processing",
-      failure.leaseId
-    );
+    let result: BunSqliteRunResult;
+    try {
+      result = this.#database.run(
+        "UPDATE wats_outbox SET status = ?, next_attempt_at = ?, updated_at = ? WHERE id = ? AND status = ? AND lease_id = ?",
+        "pending",
+        failure.nextAttemptAt,
+        failure.updatedAt,
+        failure.id,
+        "processing",
+        failure.leaseId
+      );
+    } catch (cause) {
+      throw new PersistenceError("outbox_failed", "SQLite outbox failure failed.", { cause });
+    }
     if (result.changes !== 1) {
       throw new PersistenceError("outbox_failed", "SQLite outbox failure lease is stale.");
     }
@@ -843,14 +878,19 @@ class SqlitePersistenceStore implements PersistenceStore {
   async markOutboxItemSucceeded(input: OutboxSucceededInput): Promise<void> {
     this.#assertOpen();
     const success = validateOutboxSucceeded(input);
-    const result = this.#database.run(
-      "UPDATE wats_outbox SET status = ?, next_attempt_at = NULL, updated_at = ? WHERE id = ? AND status = ? AND lease_id = ?",
-      "succeeded",
-      success.updatedAt,
-      success.id,
-      "processing",
-      success.leaseId
-    );
+    let result: BunSqliteRunResult;
+    try {
+      result = this.#database.run(
+        "UPDATE wats_outbox SET status = ?, next_attempt_at = NULL, updated_at = ? WHERE id = ? AND status = ? AND lease_id = ?",
+        "succeeded",
+        success.updatedAt,
+        success.id,
+        "processing",
+        success.leaseId
+      );
+    } catch (cause) {
+      throw new PersistenceError("outbox_failed", "SQLite outbox success failed.", { cause });
+    }
     if (result.changes !== 1) {
       throw new PersistenceError("outbox_failed", "SQLite outbox success lease is stale.");
     }
