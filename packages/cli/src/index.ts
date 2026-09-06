@@ -104,10 +104,19 @@ type BunServer = Readonly<{
   pendingWebSockets?: number;
 }>;
 
+// WATS-204 adversarial (F1): the minimal store contract the shutdown helper
+// needs. Extracted so tests can inject a never-resolving / rejecting close
+// without standing up a real persistence backend. The full PersistenceStore
+// satisfies this structurally.
+export type ServeShutdownStore = Pick<PersistenceStore, "close">;
+
 // WATS-204: graceful drain timeout. server.stop(false) stops admission and
 // lets active requests finish; after this many ms we force-stop.
 const SERVE_DRAIN_TIMEOUT_MS = 10_000;
 const SERVE_DRAIN_POLL_MS = 25;
+
+// Store closure is bounded separately after the request-drain window.
+const SERVE_STORE_CLOSE_TIMEOUT_MS = 5_000;
 
 type BunLike = Readonly<{
   serve(options: { hostname: string; port: number; fetch(request: Request): Response | Promise<Response> }): BunServer;
@@ -364,7 +373,7 @@ Live mode requires --live, --yes-live, and --env-file together. The CLI does not
 
 With --paas, the port comes from $PORT unless --port is given, and the host defaults to 0.0.0.0 unless --host is given; serve fails closed if --paas needs $PORT but it is missing or not 1..65535. This removes the external container entrypoint shim for PaaS deploys.
 
-Shutdown is graceful: in-flight requests are allowed to finish within a finite timeout (default 10s), then the store is closed. Repeated shutdown signals are idempotent.
+Shutdown is graceful: in-flight requests are allowed to finish within a finite server-drain timeout (default 10s), then the store is closed within a separate finite timeout (default 5s) so a hung query never blocks the process. Repeated shutdown signals await the same in-flight drain (idempotent).
 `;
 
 const WEBHOOK_TOKEN_HELP = `Usage: wats webhook token [--help]
@@ -1690,44 +1699,75 @@ function getBunRuntime(): BunLike | null {
   return maybeBun as BunLike;
 }
 
-function createServeShutdown(server: BunServer, store?: PersistenceStore): () => Promise<void> {
-  let stopped = false;
-  return async () => {
-    if (stopped) return;
-    stopped = true;
-    // Stop admitting new requests but let active work finish.
-    server.stop(false);
+// WATS-204 adversarial (F1): graceful shutdown helper. Exported for test
+// injection of a bounded store-close deadline and a never-resolving store.
+// The real serveCommand call uses the default finite deadlines.
+//
+// Contract:
+//   - Stop admission (server.stop(false)), drain active work within a finite
+//     drain window, then force-stop (server.stop(true)).
+//   - Race store.close() against a finite store-close timeout. A hung pg
+//     query that never settles must NOT hang the process after the server is
+//     already force-stopped. On timeout we proceed; the abandoned close
+//     promise is attached a .catch so it never surfaces as an unhandled
+//     rejection.
+//   - Repeated calls return the SAME in-flight promise so every caller
+//     awaits the actual outcome (not a fresh resolved promise).
+//   - Returns Promise<void> (resolves on completion/timeout, never rejects).
+export function createServeShutdown(
+  server: BunServer,
+  store: ServeShutdownStore | undefined,
+  options: Readonly<{ drainTimeoutMs?: number; storeCloseTimeoutMs?: number; drainPollMs?: number }> = {}
+): () => Promise<void> {
+  const drainTimeoutMs = options.drainTimeoutMs ?? SERVE_DRAIN_TIMEOUT_MS;
+  const storeCloseTimeoutMs = options.storeCloseTimeoutMs ?? SERVE_STORE_CLOSE_TIMEOUT_MS;
+  const drainPollMs = options.drainPollMs ?? SERVE_DRAIN_POLL_MS;
+  let inflight: Promise<void> | undefined = undefined;
+  return () => {
+    if (inflight !== undefined) return inflight;
+    inflight = (async (): Promise<void> => {
+      // Stop admitting new requests but let active work finish.
+      server.stop(false);
 
-    // Drain: poll the server's pendingRequests counter until it reaches
-    // zero (or a property is absent, in which case fall through to the
-    // finite timeout). The forced timeout guarantees we never wait forever.
-    const drainDeadline = Date.now() + SERVE_DRAIN_TIMEOUT_MS;
-    const hasPendingProp = typeof server.pendingRequests === "number" || typeof server.pendingWebSockets === "number";
-    if (hasPendingProp) {
-      while (Date.now() < drainDeadline) {
-        const pending =
-          (typeof server.pendingRequests === "number" ? server.pendingRequests : 0) +
-          (typeof server.pendingWebSockets === "number" ? server.pendingWebSockets : 0);
-        if (pending <= 0) break;
-        await new Promise<void>((resolvePoll) => setTimeout(resolvePoll, SERVE_DRAIN_POLL_MS));
+      // Drain: poll the server's pendingRequests counter until it reaches
+      // zero (or a property is absent, in which case fall through to the
+      // finite timeout). The forced timeout guarantees we never wait forever.
+      const drainDeadline = Date.now() + drainTimeoutMs;
+      const hasPendingProp = typeof server.pendingRequests === "number" || typeof server.pendingWebSockets === "number";
+      if (hasPendingProp) {
+        while (Date.now() < drainDeadline) {
+          const pending =
+            (typeof server.pendingRequests === "number" ? server.pendingRequests : 0) +
+            (typeof server.pendingWebSockets === "number" ? server.pendingWebSockets : 0);
+          if (pending <= 0) break;
+          await new Promise<void>((resolvePoll) => setTimeout(resolvePoll, drainPollMs));
+        }
+      } else {
+        // Fallback for runtimes that don't expose pendingRequests: wait the
+        // full finite timeout, then force-stop. This is still bounded.
+        await new Promise<void>((resolveTimeout) => setTimeout(resolveTimeout, drainTimeoutMs));
       }
-    } else {
-      // Fallback for runtimes that don't expose pendingRequests: wait the
-      // full finite timeout, then force-stop. This is still bounded.
-      await new Promise<void>((resolveTimeout) => setTimeout(resolveTimeout, SERVE_DRAIN_TIMEOUT_MS));
-    }
 
-    // Force-stop any remaining work after the drain window.
-    server.stop(true);
+      // Force-stop any remaining work after the drain window.
+      server.stop(true);
 
-    // Close the store AFTER active work has drained.
-    if (store !== undefined) {
-      try {
-        await store.close();
-      } catch {
-        // Best-effort close; the server is already stopping.
+      // Close the store AFTER active work has drained. Race against a finite
+      // store-close timeout: a never-settling close must not block the bin
+      // exit forever. The abandoned close promise gets a .catch so it never
+      // surfaces as an unhandled rejection if it settles later (reject) or
+      // never (no-op).
+      if (store !== undefined) {
+        const closePromise = store.close();
+        const timer = new Promise<void>((resolveTimeout) => setTimeout(resolveTimeout, storeCloseTimeoutMs));
+        try {
+          await Promise.race([closePromise, timer]);
+        } catch {
+          // Best-effort close; the server is already stopped.
+        }
+        closePromise.catch(() => undefined);
       }
-    }
+    })();
+    return inflight;
   };
 }
 
@@ -1811,6 +1851,19 @@ async function serveCommand(args: readonly string[]): Promise<CliCommandResult> 
     const boundProfile = resolvePaasServeProfile(profile, parsed, processEnv());
     if (boundProfile === null) return fail("Invalid serve arguments. Run `wats serve --help` for usage.\n");
 
+    // WATS-204 adversarial (F2): in live mode, resolve env-secret values BEFORE
+    // opening/migrating the persistence store. Secret resolution only reads the
+    // env file + process env (no writes), so invalid/missing live secrets fail
+    // with SecretResolutionError WITHOUT first creating a SQLite file on disk.
+    // Static config/PaaS validation above already runs before any write.
+    let liveSecrets: ResolvedServiceSecrets | null | undefined = undefined;
+    if (parsed.mode === "live") {
+      liveSecrets = await resolveLiveServiceSecrets(boundProfile, parsed as ServeArgs & { ok: true; mode: "live" });
+      if (liveSecrets === null) {
+        return fail("SecretResolutionError\nMissing or invalid live env values. Run `wats serve --help` for usage.\n");
+      }
+    }
+
     // WATS-204: open+migrate the persistence store BEFORE binding, so a
     // migration/open failure fails closed without ever touching the port.
     // Returns undefined when no persistence flags were passed (stateless default).
@@ -1828,11 +1881,7 @@ async function serveCommand(args: readonly string[]): Promise<CliCommandResult> 
 
     const serviceConfig = parsed.mode === "dry-run"
       ? syntheticServiceConfig(boundProfile, store)
-      : await resolveLiveServiceSecrets(boundProfile, parsed as ServeArgs & { ok: true; mode: "live" }).then((secrets) => secrets === null ? null : liveServiceConfig(boundProfile, secrets, store));
-    if (serviceConfig === null) {
-      if (store !== undefined) await store.close().catch(() => undefined);
-      return fail("SecretResolutionError\nMissing or invalid live env values. Run `wats serve --help` for usage.\n");
-    }
+      : liveServiceConfig(boundProfile, liveSecrets as ResolvedServiceSecrets, store);
 
     let server: BunServer;
     try {
