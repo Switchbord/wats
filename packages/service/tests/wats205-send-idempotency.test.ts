@@ -40,6 +40,9 @@ import {
 import type { PersistenceStore } from "@wats/persistence";
 import type { Transport, TransportRequest, TransportResponse } from "@wats/graph";
 import Ajv2020 from "ajv/dist/2020.js";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -624,6 +627,29 @@ describe("WATS-205 R01/R02 atomic durable keyed sends", () => {
 // ---------------------------------------------------------------------------
 // G03: Template operation
 // ---------------------------------------------------------------------------
+
+describe("WATS-205 persisted namespace evidence", () => {
+  test("same raw key is isolated by account and operation and survives reopening", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "wats-key-scope-"));
+    const filename = join(dir, "state.sqlite");
+    let store = await createSqlitePersistence({ filename });
+    await store.migrate();
+    const mock = createMockTransport({defaultResponse:{status:200,body:{messages:[{id:"wamid.scope"}]}}});
+    const make = (p = profile()) => createWatsServiceApp({profile:p,secrets:SECRETS,transport:mock.transport,persistence:store});
+    try {
+      expect((await make().fetch(textRequest({to:"15550001111",text:"one"}, "shared-key"))).status).toBe(200);
+      const other = profile({whatsapp:{wabaId:"223456789012345",phoneNumberId:"25551234567"}});
+      expect((await make(other).fetch(textRequest({to:"15550001111",text:"two"}, "shared-key"))).status).toBe(200);
+      expect((await make().fetch(messageRequest({type:"template",to:"15550001111",name:"hello_world",languageCode:"en_US"}, "shared-key"))).status).toBe(200);
+      expect(mock.requests.length).toBe(3);
+      await store.close();
+      store = await createSqlitePersistence({ filename });
+      await store.migrate();
+      expect((await make().fetch(textRequest({to:"15550001111",text:"one"}, "shared-key"))).status).toBe(200);
+      expect(mock.requests.length).toBe(3);
+    } finally {await store.close();rmSync(dir,{recursive:true,force:true});}
+  });
+});
 
 describe("WATS-205 G03 template operation", () => {
   test("POST /messages with type:template sends a template via the SDK builder", async () => {
