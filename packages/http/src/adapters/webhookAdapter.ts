@@ -450,6 +450,23 @@ async function handleVerify(ctx: HandleContext): Promise<WebhookResponse> {
   }
 }
 
+const MAX_ENVELOPE_DEPTH = 128;
+
+// The byte cap bounds width; this iterative walk bounds nesting without using
+// the JS call stack. Only JSON.parse-created data reaches this function.
+function isBoundedEnvelope(root: unknown): boolean {
+  const stack: Array<{ value: unknown; depth: number }> = [{ value: root, depth: 0 }];
+  while (stack.length > 0) {
+    const { value, depth } = stack.pop()!;
+    if (value === null || typeof value !== "object") continue;
+    if (depth > MAX_ENVELOPE_DEPTH) return false;
+    for (const child of Object.values(value)) {
+      if (child !== null && typeof child === "object") stack.push({ value: child, depth: depth + 1 });
+    }
+  }
+  return true;
+}
+
 async function handleDispatch(ctx: HandleContext): Promise<WebhookResponse> {
   const { request, appSecret, whatsapp, cryptoProvider, maxBodyBytes, logger } =
     ctx;
@@ -525,6 +542,11 @@ async function handleDispatch(ctx: HandleContext): Promise<WebhookResponse> {
     envelope = JSON.parse(decodeBody(bytes));
   } catch {
     return errorResponse(400, "invalid_json", "Request body is not valid JSON.");
+  }
+
+  // Authenticate before inspecting complexity; normalize only bounded data.
+  if (!isBoundedEnvelope(envelope)) {
+    return errorResponse(400, "payload_depth_exceeded", "Webhook payload nesting depth exceeds the limit.");
   }
 
   // Normalize.

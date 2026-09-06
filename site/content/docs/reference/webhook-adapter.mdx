@@ -265,8 +265,8 @@ adds guarantees the adapter core alone does not provide:
    never a non-cryptographic hash. Dedup is recorded AFTER the adapter
    authenticates the raw bytes, so an invalid request cannot poison dedup.
 
-2. **Finite depth gate.** The authenticated parsed envelope is rejected with
-   `400 payload_depth_exceeded` when any normalized update's nesting depth
+2. **Finite depth gate.** After signature verification, the adapter rejects
+   `400 payload_depth_exceeded` when the parsed envelope's nesting depth
    exceeds `MAX_NESTED_DEPTH` (128) — for ALL families, including a valid
    message with a deeply-nested `extra` property. The gate runs BEFORE dedup
    and dispatch; an over-limit payload is never silently dispatched.
