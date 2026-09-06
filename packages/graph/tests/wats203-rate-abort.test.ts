@@ -110,23 +110,35 @@ describe("WATS-203 acquire cancellation signal", () => {
     });
 
     test("a followup normal waiter after an aborted acquire succeeds once tokens refill", async () => {
+      // Limiter A: real pending sleep so the abort (queued as a microtask)
+      // wins the race; proves the aborted wait consumes no token.
+      const rlA = createTokenBucketRateLimiter({
+        capacity: 1,
+        refillPerSecond: 1,
+        sleep: pendingSleep
+      });
+      expect(rlA.tryAcquire(1)).toBe(true); // drained
+      const controller = new AbortController();
+      const abortedTask = rlA.acquire(1, controller.signal);
+      queueMicrotask(() => controller.abort(new Error("cancelled")));
+      await expect(abortedTask).rejects.toThrow("cancelled");
+      // No token leaked: the bucket is still empty.
+      expect(rlA.tryAcquire(1)).toBe(false);
+
+      // Limiter B: a fresh limiter with a virtual-clock sleep proves a
+      // normal (no-signal) waiter after an abort succeeds once tokens
+      // refill — the abort of one waiter does not poison the limiter.
       let t = 0;
-      const rl = createTokenBucketRateLimiter({
+      const rlB = createTokenBucketRateLimiter({
         capacity: 1,
         refillPerSecond: 1,
         now: () => t,
         sleep: async (ms: number) => { t += ms; }
       });
-      expect(rl.tryAcquire(1)).toBe(true); // drained
-      const controller = new AbortController();
-      // Signal-bearing acquire parks on a virtual-clock sleep; abort it.
-      const abortedTask = rl.acquire(1, controller.signal);
-      queueMicrotask(() => controller.abort(new Error("cancelled")));
-      await expect(abortedTask).rejects.toThrow("cancelled");
-      // A subsequent waiter without a signal waits 1000ms (1 token / 1 per s)
-      // and then admits.
-      await rl.acquire(1);
-      expect(rl.tryAcquire(1)).toBe(false); // the refilled token was consumed
+      expect(rlB.tryAcquire(1)).toBe(true); // drained
+      // A no-signal acquire waits 1000ms (virtual clock advances) and admits.
+      await rlB.acquire(1);
+      expect(rlB.tryAcquire(1)).toBe(false); // the refilled token was consumed
     });
 
     test("pre-abort: an already-aborted signal rejects before any sleep", async () => {
@@ -411,5 +423,89 @@ describe("WATS-203 acquire cancellation signal", () => {
       await expect(transport.request(req)).rejects.toThrow("connection reset");
       expect(innerCalls).toBe(1);
     });
+  });
+
+  // A real localhost HTTP server that applies a POST then destroys the
+  // socket (response loss). The retry, if enabled, uses the identical
+  // Idempotency-Key and observes TWO server-side applications — proving the
+  // no-response path is ambiguous, not exactly-once. This documents the
+  // hazard the corrected claim warns about; it does NOT assert any
+  // exactly-once guarantee, because the local server (standing in for Meta)
+  // does not dedupe by the key.
+  test("localhost response-loss documents POST ambiguity (server may have applied the request)", async () => {
+    const { createServer } = await import("node:http");
+    let applied = 0;
+    const server: ReturnType<typeof createServer> = createServer((req, res) => {
+      req.resume();
+      req.on("end", () => {
+        applied += 1;
+        if (applied === 1) {
+          // Apply the POST, then drop the response (connection reset).
+          req.socket.destroy();
+          return;
+        }
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ messages: [{ id: `wamid.local-${applied}` }] }));
+      });
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as { port: number };
+    let innerCalls = 0;
+    try {
+      // A transport whose inner request uses real fetch against localhost,
+      // wrapping fetch-level throws as GraphNetworkError (mirroring
+      // createFetchTransport) so the reliable transport's retryOn sees a
+      // network error, not a raw fetch rejection.
+      const inner: Transport = {
+        async request(req): Promise<TransportResponse> {
+          innerCalls += 1;
+          let raw: Response;
+          try {
+            raw = await globalThis.fetch(req.url.replace(
+              "https://graph.facebook.com/v25.0/123/messages",
+              `http://127.0.0.1:${port}/123/messages`
+            ), {
+              method: req.method,
+              headers: req.headers,
+              body: req.body
+            });
+          } catch (error) {
+            throw new GraphNetworkError("socket reset before response", error);
+          }
+          return {
+            status: raw.status,
+            headers: raw.headers,
+            body: raw.body,
+            arrayBuffer: () => raw.arrayBuffer(),
+            json: <T = unknown>() => raw.json() as Promise<T>,
+            text: () => raw.text()
+          };
+        }
+      };
+      const headers = new Headers({ "idempotency-key": "same-local-key" });
+      const req: TransportRequest = {
+        method: "POST",
+        url: "https://graph.facebook.com/v25.0/123/messages",
+        headers,
+        body: JSON.stringify({ to: "15550001111", type: "text", text: { body: "local-only" } })
+      };
+      const transport = createReliableTransport(inner, {
+        retryPosts: "network-only",
+        retries: 1,
+        baseDelayMs: 1,
+        maxDelayMs: 1,
+        random: () => 0,
+        sleep: async () => undefined
+      });
+      const response = await transport.request(req);
+      // The server applied the POST twice: once before the response was
+      // lost, once on the retry. This is the ambiguity — the key did not
+      // prevent a duplicate because the local server does not dedupe.
+      expect(applied).toBe(2);
+      expect(innerCalls).toBe(2);
+      expect(response.status).toBe(200);
+    } finally {
+      await new Promise<void>((resolve) => server.close(resolve));
+    }
   });
 });

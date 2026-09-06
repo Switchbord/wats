@@ -13,9 +13,16 @@
 export interface RateLimiter {
   /**
    * Wait until `cost` tokens are available, then deduct them. Resolves once
-   * the request is admitted; never rejects unless the injected sleep does.
+   * the request is admitted; never rejects unless the injected sleep does,
+   * or an `AbortSignal` is provided and aborts before admission.
+   *
+   * The optional `signal` is backwards compatible: callers using the legacy
+   * `acquire(cost?)` signature are unaffected. A real `AbortSignal` racing
+   * the wait rejects promptly with the signal's reason and consumes no
+   * token. Non-AbortSignal inputs fail closed with a TypeError rather than
+   * silently dropping cancellation.
    */
-  acquire(cost?: number): Promise<void>;
+  acquire(cost?: number, signal?: AbortSignal): Promise<void>;
   /**
    * Non-blocking admission check. Refills the bucket to the current virtual
    * time, then if `cost` tokens are available deducts them and returns true;
@@ -101,8 +108,23 @@ export function createTokenBucketRateLimiter(
   }
 
   return {
-    async acquire(cost?: number): Promise<void> {
+    async acquire(cost?: number, signal?: AbortSignal): Promise<void> {
       const c = assertCost(cost);
+      if (signal !== undefined) {
+        // Fail closed on non-AbortSignal inputs: a duck-typed object is not a
+        // real signal, and silently treating it as "no signal" would drop the
+        // caller's cancellation intent. Require a genuine AbortSignal.
+        if (signal === null || !(signal instanceof AbortSignal)) {
+          throw new TypeError(
+            "RateLimiter.acquire: signal must be an AbortSignal or undefined."
+          );
+        }
+        if (signal.aborted) {
+          throw signal.reason instanceof Error
+            ? signal.reason
+            : new Error("RateLimiter acquire aborted by caller.");
+        }
+      }
       for (;;) {
         refill();
         if (tokens >= c) {
@@ -111,7 +133,31 @@ export function createTokenBucketRateLimiter(
         }
         const deficit = c - tokens;
         const waitMs = (deficit / refillPerSecond) * 1_000;
-        await sleep(Math.max(0, waitMs));
+        if (signal === undefined) {
+          await sleep(Math.max(0, waitMs));
+          continue;
+        }
+        // Race the wait against the signal. The injected sleep may not be
+        // cancellable, so we compose a promise that rejects on abort and
+        // settle the race. If the sleep wins (tokens refilled under a virtual
+        // clock), the abort listener is removed in finally and the loop
+        // rechecks admission; if abort wins, no token is consumed.
+        let onAbort: (() => void) | undefined;
+        const aborted = new Promise<never>((_resolve, reject) => {
+          onAbort = (): void => {
+            reject(
+              signal.reason instanceof Error
+                ? signal.reason
+                : new Error("RateLimiter acquire aborted by caller.")
+            );
+          };
+          signal.addEventListener("abort", onAbort, { once: true });
+        });
+        try {
+          await Promise.race([sleep(Math.max(0, waitMs)), aborted]);
+        } finally {
+          if (onAbort !== undefined) signal.removeEventListener("abort", onAbort);
+        }
       }
     },
     tryAcquire(cost?: number): boolean {

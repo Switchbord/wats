@@ -30,16 +30,27 @@ export interface ReliableTransportOptions extends Partial<TransportRetryPolicy> 
    * the historical behavior: POST is retried only on 429 (the rate-limit
    * exception), never on 5xx or network errors.
    *
+   * A no-response POST failure (connection reset, socket closed mid-upload,
+   * read timeout) is ambiguous: the server may have received and applied the
+   * request before the response was lost. An Idempotency-Key header on its
+   * own proves nothing — the client sets it, the server has no obligation to
+   * honor it unless the endpoint documents verified remote idempotency. The
+   * retry modes below opt into retry only when you have independently verified
+   * the endpoint is idempotent or dedupes by Idempotency-Key server-side. The
+   * key is a necessary, not sufficient, condition; it never overrides the
+   * default "never".
+   *
    * - "network-only": additionally retry a POST whose request threw a
    *   GraphNetworkError BEFORE any response arrived, but only when the request
-   *   carries an Idempotency-Key header (case-insensitive). A pre-response
-   *   network failure is the one POST failure shape that cannot have been
-   *   processed by the server, so an idempotency key makes the retry safe.
-   *   POST 5xx is still not retried — the server may have side-effected.
+   *   carries an Idempotency-Key header (case-insensitive). This is the least
+   *   ambiguous POST failure shape, but still not exactly-once: the server may
+   *   have applied the first send and lost the response. The retry is safe only
+   *   if the endpoint dedupes by the key you supplied. POST 5xx is not retried —
+   *   the server began processing and may have side-effected.
    * - "always": additionally retry POST on 5xx. Requires server-side
    *   idempotency for the endpoint; a 5xx after the server began processing
-   *   can otherwise duplicate a send. Use only for endpoints you have
-   *   verified are idempotent or dedupe by Idempotency-Key.
+   *   can otherwise duplicate a send. Use only for endpoints you have verified
+   *   are idempotent or dedupe by Idempotency-Key.
    */
   readonly retryPosts?: RetryPostMode;
   readonly rateLimiter?: RateLimiter;
@@ -94,7 +105,7 @@ function resolvePolicy(options?: ReliableTransportOptions): ResolvedReliableTran
   if (options?.rateLimiter !== undefined) {
     const rl = options.rateLimiter;
     if (rl === null || typeof rl !== "object" || typeof rl.acquire !== "function") {
-      throw new Error("ReliableTransportOptions: rateLimiter must be an object with an acquire(cost?) => Promise<void> method.");
+      throw new Error("ReliableTransportOptions: rateLimiter must be an object with an acquire(cost?, signal?) => Promise<void> method.");
     }
     if (typeof rl.tryAcquire !== "function") {
       throw new Error("ReliableTransportOptions: rateLimiter must also implement tryAcquire(cost?) => boolean.");
@@ -245,6 +256,36 @@ async function sleepWithAbort(
   }
 }
 
+async function acquireWithAbort(
+  limiter: RateLimiter,
+  signal: AbortSignal
+): Promise<void> {
+  // Forward the caller signal to a signal-aware limiter; for a custom
+  // limiter that does not accept a signal, race the acquire against the
+  // abort. The abort listener is always removed in finally so no listener
+  // leaks when the acquire wins.
+  let onAbort: (() => void) | undefined;
+  const aborted = new Promise<never>((_resolve, reject) => {
+    onAbort = (): void => {
+      reject(
+        signal.reason instanceof Error
+          ? signal.reason
+          : new GraphNetworkError("Transport request aborted by caller.")
+      );
+    };
+    if (signal.aborted) {
+      onAbort();
+    } else {
+      signal.addEventListener("abort", onAbort, { once: true });
+    }
+  });
+  try {
+    await Promise.race([limiter.acquire(undefined, signal), aborted]);
+  } finally {
+    if (onAbort !== undefined) signal.removeEventListener("abort", onAbort);
+  }
+}
+
 export function createReliableTransport(inner: Transport, options?: ReliableTransportOptions): Transport {
   if (inner === null || typeof inner !== "object" || typeof inner.request !== "function") {
     throw new Error("ReliableTransportOptions: inner transport must implement request().");
@@ -259,9 +300,20 @@ export function createReliableTransport(inner: Transport, options?: ReliableTran
         throwIfAborted(opts?.signal);
         // Admit through the rate limiter (if any) before every attempt,
         // including retries, so a burst of retries cannot overrun the bucket.
+        // The caller signal is forwarded so an abort during the wait rejects
+        // promptly and consumes no token; a custom limiter that does not
+        // accept a signal is raced against the caller abort as a fallback.
         if (policy.rateLimiter !== undefined) {
-          await policy.rateLimiter.acquire();
+          if (opts?.signal !== undefined) {
+            await acquireWithAbort(policy.rateLimiter, opts.signal);
+          } else {
+            await policy.rateLimiter.acquire();
+          }
         }
+        // Recheck the caller signal after the rate-limiter wait resolved and
+        // before dispatching the inner transport: an abort that raced the
+        // admission must not start a request.
+        throwIfAborted(opts?.signal);
         attempt += 1;
         const composedSignal = composeSignal(opts?.signal, policy.timeoutMs);
         const attemptOpts: TransportOptions | undefined = composedSignal !== undefined
