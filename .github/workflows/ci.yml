@@ -13,6 +13,22 @@ jobs:
   test:
     name: Bun tests and release hygiene
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: wats_test
+          POSTGRES_PASSWORD: local-ci-only
+          POSTGRES_DB: wats_test
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U wats_test -d wats_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      WATS_TEST_POSTGRES_URL: postgresql://wats_test:local-ci-only@127.0.0.1:${{ job.services.postgres.ports[5432] }}/wats_test
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -32,6 +48,9 @@ jobs:
 
       - name: Run tests
         run: bun test
+
+      - name: Confirm real Postgres regression executes
+        run: bun test packages/persistence/tests/postgresRealConcurrency.test.ts
 
       - name: Run minimal bot example smoke
         run: bun run examples:minimal-bot
