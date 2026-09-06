@@ -161,11 +161,13 @@ describe("WATS-125 Postgres persistence adapter", () => {
 
   test("message projection methods use parameterized queries and composite cursor pagination", async () => {
     const client = new ScriptedPgClient([
-      { rows: [], rowCount: 1 }, // recordMessage
-      { rows: [], rowCount: 1 }, // append begin
-      { rows: [], rowCount: 1 }, // insert status
-      { rows: [], rowCount: 1 }, // update status
-      { rows: [], rowCount: 1 }, // append commit
+      { rows: [], rowCount: 1 }, // recordMessage INSERT
+      { rows: [], rowCount: 0 }, // recordMessage reconcile SELECT (no prior status events)
+      { rows: [], rowCount: 0 }, // append BEGIN
+      { rows: [], rowCount: 1 }, // insert status event
+      { rows: [{ status: "sent", updated_at: "2026-06-21T00:00:00.000Z" }], rowCount: 1 }, // append SELECT current message status
+      { rows: [], rowCount: 1 }, // update status (delivered advances sent)
+      { rows: [], rowCount: 0 }, // append COMMIT
       { rows: [{ row_id: "row-1", wa_message_id: "wamid.1", direction: "outbound", from_phone: null, to_phone: "1555", type: "text", status: "delivered", graph_message_id: "wamid.1", created_at: "2026-06-21T00:00:00.000Z", updated_at: "2026-06-21T00:00:01.000Z" }], rowCount: 1 }, // getMessage
       { rows: [{ row_id: "cursor", created_at: "2026-06-21T00:00:01.000Z" }], rowCount: 1 }, // cursor lookup
       { rows: [

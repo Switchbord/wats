@@ -66,6 +66,32 @@ interface MigrationRow extends Record<string, unknown> {
 const OUTBOX_PROCESSING_LEASE_MS = 5 * 60 * 1000;
 const MAX_CONNECTION_STRING_LENGTH = 4096;
 
+// WATS-200: explicit status rank transition semantics. Status events advance
+// deterministically by rank: sent(1) < delivered(2) < read(3). `failed` may
+// replace pending/sent (rank <= 1) but must NEVER replace delivered or read.
+// Unknown statuses get rank 0 so a known terminal state is never regressed by
+// an unrecognized value. Same-rank or higher-rank events may advance; an
+// equal-timestamp event may advance rank but never rolls updated_at backward.
+const STATUS_RANK: Readonly<Record<string, number>> = Object.freeze({
+  pending: 0,
+  sent: 1,
+  delivered: 2,
+  read: 3,
+  failed: 1
+});
+function statusRank(status: string): number {
+  return STATUS_RANK[status] ?? 0;
+}
+// `failed` is terminal-ish: it may replace pending/sent but never delivered/read.
+function failedMayReplace(currentStatus: string): boolean {
+  return statusRank(currentStatus) <= 1;
+}
+// Should `newStatus` replace `currentStatus`? Rank-based with a failed gate.
+function shouldAdvanceStatus(newStatus: string, currentStatus: string): boolean {
+  if (newStatus === "failed") return failedMayReplace(currentStatus);
+  return statusRank(newStatus) > statusRank(currentStatus);
+}
+
 const POSTGRES_MIGRATIONS: readonly MigrationDefinition[] = Object.freeze([
   {
     id: "001_initial",
@@ -179,7 +205,11 @@ const POSTGRES_MIGRATIONS: readonly MigrationDefinition[] = Object.freeze([
     checksum: "sha256:wats-persistence-006-message-uniqueness-v1",
     statements: Object.freeze([
       // Deterministic dedup of preexisting duplicate messages. Keep the row
-      // with the smallest row_id per (direction, wa_message_id).
+      // with the BEST KNOWN STATE per (direction, wa_message_id): highest
+      // status rank (read > delivered > sent > pending), then smallest
+      // row_id as a deterministic tiebreak when statuses are equal. Old
+      // logic kept the smallest row_id unconditionally and could discard a
+      // more-advanced status (e.g. 'read' lost to 'sent').
       `DELETE FROM wats_message_status_events
          WHERE id IN (
            SELECT id FROM (
@@ -197,7 +227,15 @@ const POSTGRES_MIGRATIONS: readonly MigrationDefinition[] = Object.freeze([
              SELECT row_id,
                     ROW_NUMBER() OVER (
                       PARTITION BY direction, wa_message_id
-                      ORDER BY row_id ASC
+                      ORDER BY
+                        CASE status
+                          WHEN 'read' THEN 4
+                          WHEN 'delivered' THEN 3
+                          WHEN 'sent' THEN 2
+                          WHEN 'pending' THEN 1
+                          ELSE 0
+                        END DESC,
+                        row_id ASC
                     ) AS rn
              FROM wats_messages
            ) sub WHERE rn > 1
@@ -221,6 +259,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
   const proto = Object.getPrototypeOf(value) as object | null;
   return proto === null || proto === Object.prototype;
+}
+
+// WATS-200: detect a PostgreSQL unique_violation (SQLSTATE 23505). The `pg`
+// driver exposes the code on `error.code`; the DatabaseError may also carry
+// `constraint`/`table` but the SQLSTATE is the reliable, stable signal. Used
+// by recordMessage to treat a (direction, wa_message_id) unique-index conflict
+// as the expected dedup no-op (ON CONFLICT (row_id) does not cover that index).
+function isUniqueViolation(cause: unknown): boolean {
+  if (cause === null || typeof cause !== "object") return false;
+  const code = (cause as { code?: unknown }).code;
+  return code === "23505";
 }
 
 function validateConnectionString(value: unknown): string {
@@ -784,17 +833,59 @@ class PostgresPersistenceStore implements PersistenceStore {
     this.#assertOpen();
     return this.#withLock(async () => {
       const record = validateMessageRecord(input);
-      // WATS-200: ON CONFLICT (row_id) DO NOTHING preserves the old semantics.
-      // The unique index on (direction, wa_message_id) from migration 006
-      // prevents duplicate projections; a conflict there is also a no-op.
-      await this.#client.query(
-        `INSERT INTO wats_messages
-          (row_id, wa_message_id, direction, from_phone, to_phone, type, status, graph_message_id, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-         ON CONFLICT (row_id) DO NOTHING`,
-        [record.rowId, record.waMessageId, record.direction, record.fromPhone, record.toPhone, record.type, record.status, record.graphMessageId, record.createdAt, record.updatedAt]
-      );
+      // WATS-200: dedup by both row_id (PRIMARY KEY) and the (direction,
+      // wa_message_id) unique index from migration 006. PostgreSQL does not
+      // allow two ON CONFLICT clauses in one statement, so we attempt the
+      // insert and treat a 23505 unique_violation on EITHER constraint as the
+      // expected dedup no-op. Any other backend fault is wrapped as a typed
+      // PersistenceError without echoing the caller's input.
+      try {
+        await this.#client.query(
+          `INSERT INTO wats_messages
+            (row_id, wa_message_id, direction, from_phone, to_phone, type, status, graph_message_id, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+           ON CONFLICT (row_id) DO NOTHING`,
+          [record.rowId, record.waMessageId, record.direction, record.fromPhone, record.toPhone, record.type, record.status, record.graphMessageId, record.createdAt, record.updatedAt]
+        );
+      } catch (cause) {
+        // 23505 unique_violation covers both the row_id PK and the
+        // (direction, wa_message_id) unique index — the expected dedup path.
+        if (isUniqueViolation(cause)) return;
+        throw new PersistenceError("outbox_failed", "Postgres message record failed.", { cause });
+      }
+      // WATS-200: status-before-message reconciliation. A status event may have
+      // arrived (early webhook) before this outbound projection was recorded.
+      // If a more-advanced status already exists for this wa_message_id,
+      // advance the freshly-inserted row so it does not regress to the
+      // send-time status.
+      await this.#reconcileStoredStatus(record.waMessageId, record.status, record.updatedAt);
     });
+  }
+
+  // WATS-200: reconcile the message row's status with any status events that
+  // were stored before the message projection. Applies rank-transition
+  // semantics: a known more-advanced event advances the row; updated_at never
+  // rolls backward (it advances to the event timestamp only when newer).
+  async #reconcileStoredStatus(waMessageId: string, recordedStatus: string, recordedUpdatedAt: string): Promise<void> {
+    const events = await this.#client.query<{ status: string; timestamp: string }>(
+      "SELECT status, timestamp FROM wats_message_status_events WHERE wa_message_id = $1 ORDER BY timestamp ASC",
+      [waMessageId]
+    );
+    if (events.rows.length === 0) return;
+    let bestStatus = recordedStatus;
+    let bestUpdatedAt = recordedUpdatedAt;
+    for (const ev of events.rows) {
+      if (shouldAdvanceStatus(ev.status, bestStatus)) {
+        bestStatus = ev.status;
+        if (ev.timestamp > bestUpdatedAt) bestUpdatedAt = ev.timestamp;
+      }
+    }
+    if (bestStatus !== recordedStatus || bestUpdatedAt !== recordedUpdatedAt) {
+      await this.#client.query(
+        "UPDATE wats_messages SET status = $1, updated_at = $2 WHERE wa_message_id = $3",
+        [bestStatus, bestUpdatedAt, waMessageId]
+      );
+    }
   }
 
   async appendMessageStatus(input: MessageStatusEventInput): Promise<void> {
@@ -812,16 +903,28 @@ class PostgresPersistenceStore implements PersistenceStore {
         "INSERT INTO wats_message_status_events (wa_message_id, status, timestamp) VALUES ($1, $2, $3) ON CONFLICT (wa_message_id, status, timestamp) DO NOTHING",
         [event.waMessageId, event.status, event.timestamp]
       );
-      // WATS-200: monotonicity. Only advance the message status if the event
-      // timestamp is newer than the current updated_at.
-      await this.#client.query(
-        "UPDATE wats_messages SET status = $1, updated_at = $2 WHERE wa_message_id = $3 AND $2 > updated_at",
-        [event.status, event.timestamp, event.waMessageId]
+      // WATS-200: rank-based monotonicity. Advance the message status only when
+      // the event represents a forward rank transition (sent < delivered < read;
+      // failed may replace pending/sent but not delivered/read). An event at
+      // the same second may advance rank; updated_at never rolls backward (it
+      // advances to the event timestamp only when the event is newer).
+      const current = await this.#client.query<{ status: string; updated_at: string }>(
+        "SELECT status, updated_at FROM wats_messages WHERE wa_message_id = $1",
+        [event.waMessageId]
       );
+      const row = current.rows[0];
+      if (row !== undefined && shouldAdvanceStatus(event.status, row.status)) {
+        const newUpdatedAt = event.timestamp > row.updated_at ? event.timestamp : row.updated_at;
+        await this.#client.query(
+          "UPDATE wats_messages SET status = $1, updated_at = $2 WHERE wa_message_id = $3",
+          [event.status, newUpdatedAt, event.waMessageId]
+        );
+      }
       await this.#client.query("COMMIT");
     } catch (cause) {
       await this.#client.query("ROLLBACK");
-      throw new PersistenceError("invalid_record", "Postgres message status append failed.", { cause });
+      if (cause instanceof PersistenceError) throw cause;
+      throw new PersistenceError("outbox_failed", "Postgres message status append failed.", { cause });
     }
   }
 

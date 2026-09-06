@@ -69,6 +69,32 @@ const SQLITE_MEMORY = ":memory:";
 const MAX_FILENAME_LENGTH = 4096;
 const MIGRATION_LOCK_ID = 1;
 const OUTBOX_PROCESSING_LEASE_MS = 5 * 60 * 1000;
+
+// WATS-200: explicit status rank transition semantics. Status events advance
+// deterministically by rank: sent(1) < delivered(2) < read(3). `failed` may
+// replace pending/sent (rank <= 1) but must NEVER replace delivered or read.
+// Unknown statuses get rank 0 so a known terminal state is never regressed by
+// an unrecognized value. Same-rank or higher-rank events may advance; an
+// equal-timestamp event may advance rank but never rolls updated_at backward.
+const STATUS_RANK: Readonly<Record<string, number>> = Object.freeze({
+  pending: 0,
+  sent: 1,
+  delivered: 2,
+  read: 3,
+  failed: 1
+});
+function statusRank(status: string): number {
+  return STATUS_RANK[status] ?? 0;
+}
+// `failed` is terminal-ish: it may replace pending/sent but never delivered/read.
+function failedMayReplace(currentStatus: string): boolean {
+  return statusRank(currentStatus) <= 1;
+}
+// Should `newStatus` replace `currentStatus`? Rank-based with a failed gate.
+function shouldAdvanceStatus(newStatus: string, currentStatus: string): boolean {
+  if (newStatus === "failed") return failedMayReplace(currentStatus);
+  return statusRank(newStatus) > statusRank(currentStatus);
+}
 const MIGRATIONS: readonly MigrationDefinition[] = Object.freeze([
   {
     id: "001_initial",
@@ -183,8 +209,11 @@ const MIGRATIONS: readonly MigrationDefinition[] = Object.freeze([
     checksum: "sha256:wats-persistence-006-message-uniqueness-v1",
     statements: Object.freeze([
       // Deterministic dedup of preexisting duplicate messages before creating
-      // the uniqueness index. Keep the row with the smallest row_id (stable
-      // lexicographic order) per (direction, wa_message_id); delete the rest.
+      // the uniqueness index. Keep the row with the BEST KNOWN STATE per
+      // (direction, wa_message_id): highest status rank (read > delivered >
+      // sent > pending), then smallest row_id as a deterministic tiebreak when
+      // statuses are equal. Old logic kept the smallest row_id unconditionally
+      // and could discard a more-advanced status (e.g. 'read' lost to 'sent').
       `DELETE FROM wats_message_status_events
          WHERE id IN (
            SELECT id FROM (
@@ -202,7 +231,15 @@ const MIGRATIONS: readonly MigrationDefinition[] = Object.freeze([
              SELECT row_id,
                     ROW_NUMBER() OVER (
                       PARTITION BY direction, wa_message_id
-                      ORDER BY row_id ASC
+                      ORDER BY
+                        CASE status
+                          WHEN 'read' THEN 4
+                          WHEN 'delivered' THEN 3
+                          WHEN 'sent' THEN 2
+                          WHEN 'pending' THEN 1
+                          ELSE 0
+                        END DESC,
+                        row_id ASC
                     ) AS rn
              FROM wats_messages
            ) WHERE rn > 1
@@ -826,21 +863,61 @@ class SqlitePersistenceStore implements PersistenceStore {
     // (direction, wa_message_id) via the unique index from migration 006. A
     // second insert with the same (direction, wa_message_id) but a different
     // row_id is a no-op, preserving the first projection.
-    this.#database.run(
-      `INSERT OR IGNORE INTO wats_messages
-        (row_id, wa_message_id, direction, from_phone, to_phone, type, status, graph_message_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      record.rowId,
-      record.waMessageId,
-      record.direction,
-      record.fromPhone,
-      record.toPhone,
-      record.type,
-      record.status,
-      record.graphMessageId,
-      record.createdAt,
-      record.updatedAt
-    );
+    try {
+      this.#database.run(
+        `INSERT OR IGNORE INTO wats_messages
+          (row_id, wa_message_id, direction, from_phone, to_phone, type, status, graph_message_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        record.rowId,
+        record.waMessageId,
+        record.direction,
+        record.fromPhone,
+        record.toPhone,
+        record.type,
+        record.status,
+        record.graphMessageId,
+        record.createdAt,
+        record.updatedAt
+      );
+    } catch (cause) {
+      // A constraint violation is the expected dedup path (INSERT OR IGNORE
+      // already swallows those, but a non-constraint runtime fault — disk I/O,
+      // busy, corruption — must surface as a typed PersistenceError, never a
+      // raw bun:sqlite error, and must not echo the caller's input.
+      throw new PersistenceError("outbox_failed", "SQLite message record failed.", { cause });
+    }
+    // WATS-200: status-before-message reconciliation. A status event may have
+    // arrived (early webhook) before this outbound projection was recorded.
+    // If a more-advanced status already exists for this wa_message_id, advance
+    // the freshly-inserted row so it does not regress to the send-time status.
+    this.#reconcileStoredStatus(record.waMessageId, record.status, record.updatedAt);
+  }
+
+  // WATS-200: reconcile the message row's status with any status events that
+  // were stored before the message projection. Applies rank-transition
+  // semantics: a known more-advanced event advances the row; updated_at never
+  // rolls backward (it advances to the event timestamp only when newer).
+  #reconcileStoredStatus(waMessageId: string, recordedStatus: string, recordedUpdatedAt: string): void {
+    const events = this.#database.query<{ status: string; timestamp: string }>(
+      "SELECT status, timestamp FROM wats_message_status_events WHERE wa_message_id = ? ORDER BY timestamp ASC"
+    ).all(waMessageId);
+    if (events.length === 0) return;
+    let bestStatus = recordedStatus;
+    let bestUpdatedAt = recordedUpdatedAt;
+    for (const ev of events) {
+      if (shouldAdvanceStatus(ev.status, bestStatus)) {
+        bestStatus = ev.status;
+        if (ev.timestamp > bestUpdatedAt) bestUpdatedAt = ev.timestamp;
+      }
+    }
+    if (bestStatus !== recordedStatus || bestUpdatedAt !== recordedUpdatedAt) {
+      this.#database.run(
+        "UPDATE wats_messages SET status = ?, updated_at = ? WHERE wa_message_id = ?",
+        bestStatus,
+        bestUpdatedAt,
+        waMessageId
+      );
+    }
   }
 
   async appendMessageStatus(input: MessageStatusEventInput): Promise<void> {
@@ -856,20 +933,27 @@ class SqlitePersistenceStore implements PersistenceStore {
         event.status,
         event.timestamp
       );
-      // WATS-200: monotonicity. Only advance the message status if the event
-      // timestamp is newer than the current updated_at, so a stale webhook
-      // retry (earlier timestamp) cannot regress a later status.
-      this.#database.run(
-        "UPDATE wats_messages SET status = ?, updated_at = ? WHERE wa_message_id = ? AND ? > updated_at",
-        event.status,
-        event.timestamp,
-        event.waMessageId,
-        event.timestamp
-      );
+      // WATS-200: rank-based monotonicity. Advance the message status only when
+      // the event represents a forward rank transition (sent < delivered < read;
+      // failed may replace pending/sent but not delivered/read). An event at
+      // the same second may advance rank; updated_at never rolls backward (it
+      // advances to the event timestamp only when the event is newer).
+      const current = this.#database.query<{ status: string; updated_at: string }>(
+        "SELECT status, updated_at FROM wats_messages WHERE wa_message_id = ?"
+      ).get(event.waMessageId);
+      if (current !== null && shouldAdvanceStatus(event.status, current.status)) {
+        const newUpdatedAt = event.timestamp > current.updated_at ? event.timestamp : current.updated_at;
+        this.#database.run(
+          "UPDATE wats_messages SET status = ?, updated_at = ? WHERE wa_message_id = ?",
+          event.status,
+          newUpdatedAt,
+          event.waMessageId
+        );
+      }
       this.#database.exec("COMMIT");
     } catch (cause) {
       this.#database.exec("ROLLBACK");
-      throw new PersistenceError("invalid_record", "SQLite message status append failed.", { cause });
+      throw new PersistenceError("outbox_failed", "SQLite message status append failed.", { cause });
     }
   }
 

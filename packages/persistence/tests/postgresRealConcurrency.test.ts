@@ -151,4 +151,119 @@ describe("WATS-200 real Postgres concurrency (env-gated)", () => {
       await store.close();
     }
   });
+
+  // WATS-200 storage correction: recordMessage must dedup by the
+  // (direction, wa_message_id) unique index, not only row_id. ON CONFLICT
+  // (row_id) DO NOTHING does NOT cover that index, so a second insert with a
+  // different rowId but the same (direction, wa_message_id) threw a raw 23505
+  // unique_violation. The fix treats 23505 as the expected dedup no-op.
+  maybeTest("recordMessage dedups by (direction, wa_message_id) without throwing on a different rowId", async () => {
+    const pg = (await import(PG_SPECIFIER)) as unknown as PgClientConstructor;
+    const { createPostgresPersistenceWithClient } = await import("../src/postgres");
+    const client = new pg.Client({ connectionString: PG_URL });
+    await client.connect();
+    for (const t of ["wats_message_status_events", "wats_messages", "wats_outbox", "wats_webhook_events", "wats_service_requests", "wats_schema_migrations", "wats_persistence_lock"]) {
+      await client.query(`DROP TABLE IF EXISTS ${t} CASCADE`);
+    }
+    const store = createPostgresPersistenceWithClient(client);
+    await store.migrate();
+    try {
+      const NOW = "2026-09-06T00:00:00.000Z";
+      await store.recordMessage({ rowId: "pg-row-1", waMessageId: "wamid.PG_DUP", direction: "outbound", type: "text", status: "sent", createdAt: NOW, updatedAt: NOW });
+      // different rowId, same (direction, wa_message_id) -> no-op, NOT a throw
+      await store.recordMessage({ rowId: "pg-row-2", waMessageId: "wamid.PG_DUP", direction: "outbound", type: "text", status: "sent", createdAt: NOW, updatedAt: NOW });
+      const rec = await store.getMessage({ waMessageId: "wamid.PG_DUP" });
+      expect(rec?.rowId).toBe("pg-row-1");
+    } finally {
+      await store.close();
+      await client.end();
+    }
+  });
+
+  // WATS-200 storage correction: rank-based status transitions on real PG.
+  // delivered at the same second (truncated ms) must advance sent; a later
+  // sent must not regress read; failed must not replace delivered/read.
+  maybeTest("appendMessageStatus rank transitions: same-second advance, no regress, failed gate", async () => {
+    const pg = (await import(PG_SPECIFIER)) as unknown as PgClientConstructor;
+    const { createPostgresPersistenceWithClient } = await import("../src/postgres");
+    const client = new pg.Client({ connectionString: PG_URL });
+    await client.connect();
+    for (const t of ["wats_message_status_events", "wats_messages", "wats_outbox", "wats_webhook_events", "wats_service_requests", "wats_schema_migrations", "wats_persistence_lock"]) {
+      await client.query(`DROP TABLE IF EXISTS ${t} CASCADE`);
+    }
+    const store = createPostgresPersistenceWithClient(client);
+    await store.migrate();
+    try {
+      // send at 123ms; delivered callback truncated to 000ms (same second).
+      await store.recordMessage({ rowId: "pg-rA", waMessageId: "wamid.pgA", direction: "outbound", type: "text", status: "sent", createdAt: "2026-09-06T00:00:00.000Z", updatedAt: "2026-09-06T00:00:00.123Z" });
+      await store.appendMessageStatus({ waMessageId: "wamid.pgA", status: "delivered", timestamp: "2026-09-06T00:00:00.000Z" });
+      expect((await store.getMessage({ waMessageId: "wamid.pgA" }))?.status).toBe("delivered");
+
+      // a later-timestamp sent must NOT regress read.
+      await store.recordMessage({ rowId: "pg-rB", waMessageId: "wamid.pgB", direction: "outbound", type: "text", status: "read", createdAt: "2026-09-06T00:00:00.000Z", updatedAt: "2026-09-06T00:00:01.000Z" });
+      await store.appendMessageStatus({ waMessageId: "wamid.pgB", status: "sent", timestamp: "2026-09-06T00:00:02.000Z" });
+      expect((await store.getMessage({ waMessageId: "wamid.pgB" }))?.status).toBe("read");
+
+      // failed must NOT replace read even with a later timestamp.
+      await store.appendMessageStatus({ waMessageId: "wamid.pgB", status: "failed", timestamp: "2026-09-06T00:00:05.000Z" });
+      expect((await store.getMessage({ waMessageId: "wamid.pgB" }))?.status).toBe("read");
+    } finally {
+      await store.close();
+      await client.end();
+    }
+  });
+
+  // WATS-200 storage correction: status-before-message reconciliation on real PG.
+  maybeTest("status event before message projection is reconciled on recordMessage", async () => {
+    const pg = (await import(PG_SPECIFIER)) as unknown as PgClientConstructor;
+    const { createPostgresPersistenceWithClient } = await import("../src/postgres");
+    const client = new pg.Client({ connectionString: PG_URL });
+    await client.connect();
+    for (const t of ["wats_message_status_events", "wats_messages", "wats_outbox", "wats_webhook_events", "wats_service_requests", "wats_schema_migrations", "wats_persistence_lock"]) {
+      await client.query(`DROP TABLE IF EXISTS ${t} CASCADE`);
+    }
+    const store = createPostgresPersistenceWithClient(client);
+    await store.migrate();
+    try {
+      await store.appendMessageStatus({ waMessageId: "wamid.pgG", status: "delivered", timestamp: "2026-09-06T00:00:03.000Z" });
+      await store.recordMessage({ rowId: "pg-rG", waMessageId: "wamid.pgG", direction: "outbound", type: "text", status: "sent", createdAt: "2026-09-06T00:00:00.000Z", updatedAt: "2026-09-06T00:00:00.000Z" });
+      expect((await store.getMessage({ waMessageId: "wamid.pgG" }))?.status).toBe("delivered");
+    } finally {
+      await store.close();
+      await client.end();
+    }
+  });
+
+  // WATS-200 storage correction: migration 006 dedup keeps the most-advanced
+  // status, not the smallest row_id, on real PG.
+  maybeTest("migration dedup keeps most-advanced status on real Postgres", async () => {
+    const pg = (await import(PG_SPECIFIER)) as unknown as PgClientConstructor;
+    const { createPostgresPersistenceWithClient } = await import("../src/postgres");
+    const client = new pg.Client({ connectionString: PG_URL });
+    await client.connect();
+    for (const t of ["wats_message_status_events", "wats_messages", "wats_outbox", "wats_webhook_events", "wats_service_requests", "wats_schema_migrations", "wats_persistence_lock"]) {
+      await client.query(`DROP TABLE IF EXISTS ${t} CASCADE`);
+    }
+    const store = createPostgresPersistenceWithClient(client);
+    await store.migrate();
+    // Do NOT call store.close() here — it would end() the shared client before
+    // the direct re-seed queries below. The store is discarded after seeding.
+
+    // Pre-seed duplicate (direction, wa_message_id) rows with differing status.
+    await client.query("DROP INDEX IF EXISTS wats_messages_direction_wa_message_id_uidx");
+    await client.query("DROP INDEX IF EXISTS wats_message_status_events_wa_message_id_status_timestamp_uidx");
+    await client.query("DELETE FROM wats_schema_migrations WHERE id = '006_message_uniqueness'");
+    await client.query("INSERT INTO wats_messages (row_id, wa_message_id, direction, from_phone, to_phone, type, status, graph_message_id, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)", ["aaa-1", "wamid.pgDEDUP", "outbound", null, null, "text", "sent", null, "2026-09-06T00:00:00.000Z", "2026-09-06T00:00:00.000Z"]);
+    await client.query("INSERT INTO wats_messages (row_id, wa_message_id, direction, from_phone, to_phone, type, status, graph_message_id, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)", ["zzz-9", "wamid.pgDEDUP", "outbound", null, null, "text", "read", null, "2026-09-06T00:00:00.000Z", "2026-09-06T00:00:04.000Z"]);
+
+    const store2 = createPostgresPersistenceWithClient(client);
+    await store2.migrate();
+    try {
+      const rec = await store2.getMessage({ waMessageId: "wamid.pgDEDUP" });
+      expect(rec?.status).toBe("read");
+    } finally {
+      await store2.close();
+      await client.end();
+    }
+  });
 });
