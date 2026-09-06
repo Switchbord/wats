@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import ts from "typescript";
 
 function findRepoRoot(startDir: string): string {
   let current = startDir;
@@ -142,8 +143,12 @@ function thirtyDayViolations(paths: readonly string[]): string[] {
 
 function extractComments(source: string): string[] {
   const comments: string[] = [];
-  for (const match of source.matchAll(/\/\*[\s\S]*?\*\//gu)) comments.push(match[0]);
-  for (const match of source.matchAll(/(^|[^:])\/\/[^\r\n]*/gmu)) comments.push(match[0]);
+  const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, ts.LanguageVariant.Standard, source);
+  for (let kind = scanner.scan(); kind !== ts.SyntaxKind.EndOfFileToken; kind = scanner.scan()) {
+    if (kind === ts.SyntaxKind.MultiLineCommentTrivia || kind === ts.SyntaxKind.SingleLineCommentTrivia) {
+      comments.push(scanner.getTokenText());
+    }
+  }
   return comments;
 }
 
