@@ -506,6 +506,14 @@ function messageRowToRecord(row: MessageRow): MessageRecord {
 class PostgresPersistenceStore implements PersistenceStore {
   readonly backend = "postgres" as const;
   #client: PostgresClientLike;
+  // WATS-200: `closing` is set SYNCHRONOUSLY by close() before close joins the
+  // queue. This closes the close race where a method's #assertOpen passed
+  // before close() but its work queued AFTER close drained the lock: after
+  // close() runs, every public method rejects with store_closed immediately
+  // without queuing any backend query. `closed` marks the client as fully
+  // ended (idempotent close). close() still drains in-flight work first via
+  // #withLock, so it cannot interrupt an active transaction.
+  #closing = false;
   #closed = false;
   // WATS-200: serialize ALL operations on the shared Client so concurrent
   // async method calls cannot interleave their BEGIN/COMMIT/ROLLBACK on the
@@ -899,8 +907,12 @@ class PostgresPersistenceStore implements PersistenceStore {
   }
 
   async close(): Promise<void> {
-    // WATS-200: wait for any in-flight operation to finish before closing the
-    // client, so close cannot join or interrupt an active transaction.
+    // WATS-200: Synchronously mark the store as closing so any public method
+    // invoked after this point (even on the same microtask, before close's
+    // queued work runs) rejects with store_closed WITHOUT queuing a backend
+    // query. Then drain any in-flight operation via #withLock before ending
+    // the client, so close cannot join or interrupt an active transaction.
+    this.#closing = true;
     await this.#withLock(() => this.#closeLocked());
   }
 
@@ -929,7 +941,11 @@ class PostgresPersistenceStore implements PersistenceStore {
   }
 
   #assertOpen(): void {
-    if (this.#closed) throw new PersistenceError("store_closed", "Persistence store is closed.");
+    // WATS-200: check both #closing and #closed synchronously. close() sets
+    // #closing=true before it joins the queue, so a method that runs after
+    // close() was called — even if it interleaves before close's queued work
+    // executes — is rejected here without queuing any backend query.
+    if (this.#closing || this.#closed) throw new PersistenceError("store_closed", "Persistence store is closed.");
   }
 }
 

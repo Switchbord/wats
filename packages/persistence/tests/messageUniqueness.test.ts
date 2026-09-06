@@ -106,19 +106,19 @@ describe("WATS-200 migration dedup of preexisting duplicates", () => {
     raw.exec("DELETE FROM wats_schema_migrations WHERE id = '006_message_uniqueness'");
     raw.run(
       "INSERT INTO wats_messages (row_id, wa_message_id, direction, from_phone, to_phone, type, status, graph_message_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-      "dup-1", "wamid.PRE", "outbound", null, null, "text", "sent", null, ISO_A, ISO_A
+      ["dup-1", "wamid.PRE", "outbound", null, null, "text", "sent", null, ISO_A, ISO_A]
     );
     raw.run(
       "INSERT INTO wats_messages (row_id, wa_message_id, direction, from_phone, to_phone, type, status, graph_message_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-      "dup-2", "wamid.PRE", "outbound", null, null, "text", "sent", null, ISO_B, ISO_B
+      ["dup-2", "wamid.PRE", "outbound", null, null, "text", "sent", null, ISO_B, ISO_B]
     );
     raw.run(
       "INSERT INTO wats_message_status_events (wa_message_id, status, timestamp) VALUES (?, ?, ?)",
-      "wamid.PRE", "sent", ISO_A
+      ["wamid.PRE", "sent", ISO_A]
     );
     raw.run(
       "INSERT INTO wats_message_status_events (wa_message_id, status, timestamp) VALUES (?, ?, ?)",
-      "wamid.PRE", "sent", ISO_A
+      ["wamid.PRE", "sent", ISO_A]
     );
     raw.close();
 

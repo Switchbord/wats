@@ -88,6 +88,8 @@ Webhook event records store safe event keys and hashes, not raw webhook bodies. 
 
 Service request idempotency stores an idempotency key, request hash, and response JSON. A matching key/body hash replays the stored response; the same key with a different body hash conflicts.
 
+The built-in SQLite and Postgres adapters additionally implement two optional `PersistenceStore` methods — `claimServiceRequest({ idempotencyKey, requestHash, createdAt })` and `completeServiceRequest({ idempotencyKey, requestHash, responseJson, createdAt })` — for durable atomic service request claims. `claimServiceRequest` returns `"claimed"` (new reservation), `"pending"` (already claimed, not yet completed), `"conflict"` (same key, different hash), or `{ responseJson }` (already completed, replay). A claim reserves the request identity before the caller sends to Graph and persists across restart indefinitely (no timeout-based blind resend). `completeServiceRequest` stores the response only when it matches the reserved hash; the older `recordServiceRequest` never overwrites an existing reservation.
+
 ## Message projection
 
 The `wats_messages` table records outbound send attempts (and, in future slices, inbound messages). Each row is keyed by a caller-generated local `row_id`, carries the WhatsApp message id (`wa_message_id`), direction, optional phone fields, Graph type, current status, and created/updated timestamps. `wats_message_status_events` is an append-only log of status transitions per `wa_message_id`.

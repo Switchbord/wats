@@ -108,7 +108,16 @@ describe("WATS-125 Postgres persistence adapter", () => {
   // "missing package" code path is exercised in environments without the
   // driver. The runtime optional peer dependency is unchanged.
   test("createPostgresPersistence reports missing optional pg package without echoing the URL", async () => {
-    const pgAvailable = await import("pg").then(() => true).catch(() => false);
+    // Detect the optional `pg` peer dependency without a statically-typed
+    // import (the worktree may not have @types/pg). A string specifier keeps
+    // tsc from resolving the module, mirroring the adapter's own lazy import.
+    const pgSpecifier = "pg";
+    let pgAvailable = true;
+    try {
+      await import(pgSpecifier);
+    } catch {
+      pgAvailable = false;
+    }
     if (pgAvailable) return; // skip: driver is installed, missing-package path not reachable
 
     const secretUrl = "postgres://user:***@example.test/db";
@@ -200,5 +209,54 @@ describe("WATS-125 Postgres persistence adapter", () => {
     await store.markOutboxItemSucceeded({ id: "item-1", leaseId: 1, updatedAt: "2026-06-21T00:00:03.000Z" });
     await store.close();
     expect(client.closed).toBe(true);
+  });
+
+  // WATS-200 close race: close() sets #closing synchronously before joining
+  // the queue, so a public method invoked on the same tick after close()
+  // rejects with the typed store_closed error WITHOUT queuing a backend
+  // query (the old code only asserted #closed inside the queued callback,
+  // so the method passed the early assert then queued work after close).
+  test("queued close then a same-tick operation fails typed store_closed with zero backend queries", async () => {
+    const client = new ScriptedPgClient([{ rows: [{ version: 3 }], rowCount: 1 }]); // health response that must NEVER be consumed
+    const store = createPostgresPersistenceWithClient(client);
+
+    const closePromise = store.close();
+    // health() is called on the SAME tick, before close's queued work runs.
+    let thrown: unknown;
+    try {
+      await store.health();
+    } catch (error) {
+      thrown = error;
+    }
+    const err = thrown as PersistenceError;
+    expect(err).toBeInstanceOf(PersistenceError);
+    expect(err.code).toBe("store_closed");
+
+    await closePromise;
+    expect(client.closed).toBe(true);
+    // No backend query was issued for the rejected health(): the only query
+    // observed is whatever close/end produced, never a SELECT version.
+    const allSql = client.queries.map((q) => q.sql).join("\n");
+    expect(allSql).not.toContain("wats_schema_migrations");
+  });
+
+  test("close is idempotent and further operations fail typed store_closed", async () => {
+    const client = new ScriptedPgClient();
+    const store = createPostgresPersistenceWithClient(client);
+
+    await store.close();
+    expect(client.closed).toBe(true);
+    // Second close is a no-op (idempotent), end() not called again.
+    const endCountBefore = client.closed;
+    await store.close();
+    expect(client.closed).toBe(endCountBefore);
+
+    let thrown: unknown;
+    try {
+      await store.health();
+    } catch (error) {
+      thrown = error;
+    }
+    expect((thrown as PersistenceError).code).toBe("store_closed");
   });
 });

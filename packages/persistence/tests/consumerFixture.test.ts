@@ -11,15 +11,30 @@ import {
 // @wats/persistence specifier (resolves to dist/) and verifies the new
 // claim/complete public API has the correct runtime shape and behavior, so
 // downstream consumers can reach it without a relative-path self-import.
+//
+// claim/complete are OPTIONAL on PersistenceStore (additive contract), so this
+// fixture narrows to a store that exposes them before calling — mirroring how
+// a real consumer guards an optional capability.
+
+interface ClaimingStore extends PersistenceStore {
+  claimServiceRequest(input: ServiceRequestClaimInput): Promise<ServiceRequestClaimResult>;
+  completeServiceRequest(input: ServiceRequestCompletionInput): Promise<void>;
+}
+
+function hasClaiming(store: PersistenceStore): store is ClaimingStore {
+  return typeof store.claimServiceRequest === "function" && typeof store.completeServiceRequest === "function";
+}
 
 describe("WATS-200 persistence consumer fixture (package specifier)", () => {
   test("claimServiceRequest and completeServiceRequest are callable via the package specifier", async () => {
-    const store: PersistenceStore = await createSqlitePersistence({ filename: ":memory:" });
-    await store.migrate();
+    const base: PersistenceStore = await createSqlitePersistence({ filename: ":memory:" });
+    await base.migrate();
     try {
-      // Assert the new methods exist with correct runtime type.
-      expect(typeof store.claimServiceRequest).toBe("function");
-      expect(typeof store.completeServiceRequest).toBe("function");
+      // Narrow: claim/complete are optional on the interface; assert presence
+      // before calling, exactly as a downstream consumer must.
+      expect(hasClaiming(base)).toBe(true);
+      if (!hasClaiming(base)) return; // type narrows store to ClaimingStore
+      const store = base;
 
       // First claim reserves the request and returns 'claimed'.
       const claimInput: ServiceRequestClaimInput = {
@@ -47,7 +62,7 @@ describe("WATS-200 persistence consumer fixture (package specifier)", () => {
       const replayClaim: ServiceRequestClaimResult = await store.claimServiceRequest(claimInput);
       expect(replayClaim).toEqual({ responseJson: completionInput.responseJson });
     } finally {
-      await store.close();
+      await base.close();
     }
   });
 });

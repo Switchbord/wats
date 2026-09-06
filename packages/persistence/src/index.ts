@@ -183,8 +183,13 @@ export interface PersistenceStore {
   recordWebhookEvent(input: WebhookEventRecordInput): Promise<WebhookEventRecordResult>;
   getServiceRequest(input: ServiceRequestLookupInput): Promise<ServiceRequestLookupResult>;
   recordServiceRequest(input: ServiceRequestRecordInput): Promise<void>;
-  claimServiceRequest(input: ServiceRequestClaimInput): Promise<ServiceRequestClaimResult>;
-  completeServiceRequest(input: ServiceRequestCompletionInput): Promise<void>;
+  // WATS-200: claim/complete are OPTIONAL on the store interface so this stays
+  // a purely additive, backwards-compatible contract — existing in-process
+  // mock/fake stores that do not implement durable claims still satisfy the
+  // interface. Built-in persistence adapters (SQLite, Postgres) implement
+  // them; consumers narrow to a store that has them before calling.
+  claimServiceRequest?(input: ServiceRequestClaimInput): Promise<ServiceRequestClaimResult>;
+  completeServiceRequest?(input: ServiceRequestCompletionInput): Promise<void>;
   enqueueOutboxItem(input: OutboxEnqueueInput): Promise<OutboxEnqueueResult>;
   claimOutboxItems(input: OutboxClaimInput): Promise<readonly OutboxItem[]>;
   markOutboxItemFailed(input: OutboxFailedInput): Promise<void>;

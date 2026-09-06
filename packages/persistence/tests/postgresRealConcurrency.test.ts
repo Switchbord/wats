@@ -1,17 +1,41 @@
 import { describe, expect, test } from "bun:test";
+import type { OutboxItem } from "../src/index";
 
 // WATS-200 real-Postgres concurrency test. The parent orchestrator provides
 // an isolated Postgres instance via WATS_TEST_POSTGRES_URL. When the env var
 // is absent, the test is SKIPPED (not a no-op pass) so CI clearly signals it
-// needs a live backend. Uses dynamic import('pg') so the test file loads
-// without the driver installed.
+// needs a live backend. The `pg` driver is an OPTIONAL peer dependency and the
+// worktree may not carry @types/pg, so the module is imported via a string
+// specifier (so tsc does not try to resolve it) and narrowed to a local
+// structural interface — no ambient `pg` shim, no fake types that could hide
+// real driver defects. Runtime uses the real `pg` package when present.
 const PG_URL = process.env.WATS_TEST_POSTGRES_URL ?? "";
+
+// A non-literal specifier so tsc does not attempt to resolve the optional `pg`
+// module (the worktree may lack @types/pg). Runtime resolves the real package.
+const PG_SPECIFIER = "pg";
+
+interface PgClient {
+  connect(): Promise<void>;
+  query<Row extends Record<string, unknown> = Record<string, unknown>>(
+    sql: string,
+    params?: readonly unknown[]
+  ): Promise<{ readonly rows: readonly Row[]; readonly rowCount: number | null }>;
+  end(): Promise<void>;
+}
+interface PgModule {
+  new (config: { readonly connectionString?: string }): PgClient;
+}
+interface PgClientConstructor {
+  readonly Client: PgModule;
+}
 
 describe("WATS-200 real Postgres concurrency (env-gated)", () => {
   const maybeTest = PG_URL ? test : test.skip;
 
   maybeTest("concurrent claim + append serialize: no rollback crosstalk", async () => {
-    const pg = await import("pg");
+    // String specifier keeps this free of a static `pg` type dependency.
+    const pg = (await import(PG_SPECIFIER)) as unknown as PgClientConstructor;
     const { createPostgresPersistenceWithClient } = await import("../src/postgres");
 
     // Use a real pg.Client connected to the live backend.
@@ -65,7 +89,7 @@ describe("WATS-200 real Postgres concurrency (env-gated)", () => {
 
       // The claim must succeed.
       expect(results[0]!.status).toBe("fulfilled");
-      const claimResult = (results[0] as PromiseFulfilledResult<{ id: string; status: string }[]>).value;
+      const claimResult = (results[0] as PromiseFulfilledResult<readonly OutboxItem[]>).value;
       const claimed = claimResult.find((c) => c.id === "real-claim-item");
       expect(claimed).toBeDefined();
       expect(claimed!.status).toBe("processing");
@@ -92,13 +116,17 @@ describe("WATS-200 real Postgres concurrency (env-gated)", () => {
   });
 
   maybeTest("claim/complete works against real Postgres", async () => {
-    const pg = await import("pg");
+    const pg = (await import(PG_SPECIFIER)) as unknown as PgClientConstructor;
     const { createPostgresPersistenceWithClient } = await import("../src/postgres");
+    type ClaimingStore = ReturnType<typeof createPostgresPersistenceWithClient> & {
+      claimServiceRequest(input: { idempotencyKey: string; requestHash: string; createdAt: string }): Promise<"claimed" | "pending" | "conflict" | { responseJson: string }>;
+      completeServiceRequest(input: { idempotencyKey: string; requestHash: string; responseJson: string; createdAt: string }): Promise<void>;
+    };
 
     const client = new pg.Client({ connectionString: PG_URL });
     await client.connect();
 
-    const store = createPostgresPersistenceWithClient(client);
+    const store = createPostgresPersistenceWithClient(client) as ClaimingStore;
     try {
       const NOW = "2026-09-06T00:00:00.000Z";
       const RESP = JSON.stringify({ messages: [{ id: "wamid.real" }] });
