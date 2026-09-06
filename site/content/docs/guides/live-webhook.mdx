@@ -59,9 +59,15 @@ app secrets, verify tokens, service bearer values, or Graph responses.
 Verify the service is up before pointing Meta at it:
 
 ```bash
-curl -fsS http://127.0.0.1:8787/healthz
-curl -fsS http://127.0.0.1:8787/readyz
+curl -fsS http://127.0.0.1:8787/healthz   # process alive — always 200
+curl -fsS http://127.0.0.1:8787/readyz    # dependencies ready — 200, or 503 if persistence is down/unmigrated
 ```
+
+`/healthz` reports process liveness (always 200). `/readyz` checks the
+optional persistence store's `health()` current schema and returns 503
+`persistence_unavailable` if the store is closed or unmigrated — so a load
+balancer can route traffic away from a node whose database is not ready
+without mistaking it for a dead process.
 
 ## Webhook onboarding checklist
 

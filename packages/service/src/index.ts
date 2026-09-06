@@ -41,6 +41,7 @@ import type { CryptoProvider } from "@wats/crypto";
 import type { PersistenceStore } from "@wats/persistence";
 import {
   getConversationWindowState,
+  CURRENT_SCHEMA_VERSION,
   type ConversationWindowState
 } from "@wats/persistence";
 import {
@@ -61,6 +62,14 @@ import {
   OTEL_ATTR
 } from "./telemetry.js";
 import { containsUnsafePathSegment } from "@wats/internal-utils";
+import {
+  metaTimestampToIso,
+  receiptNowMs,
+  messageDedupKey,
+  statusDedupKey,
+  fallbackDedupKey,
+  isWithinDepthLimit
+} from "./webhookIngress.js";
 
 export interface WatsServiceSecrets {
   readonly accessToken: string;
@@ -2397,33 +2406,45 @@ function buildServiceCommerceInteractivePayload(input: ServiceCommerceInteractiv
   }
 }
 
-function deepSortJson(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map((item) => deepSortJson(item));
-  if (isRecord(value)) {
-    const out: Record<string, unknown> = {};
-    for (const key of Object.keys(value).sort()) out[key] = deepSortJson(value[key]);
-    return out;
+// WATS-201: per-update dedup key extraction from a normalized update.
+// Message: receiving profile (phoneNumberId + wabaId) + messageId.
+// Status: receiving profile + statusId + status + timestamp.
+// Other families: bounded canonical hash of stable fields (excludes
+// receive-clock fields) with depth rejection; entire scope tuple hashed.
+async function extractDedupKey(update: unknown, sha256HexFn: (input: string) => Promise<string>): Promise<string | null> {
+  if (!isRecord(update)) return null;
+  const kind = typeof update.kind === "string" ? update.kind : null;
+  const phoneNumberId = typeof update.phoneNumberId === "string" && update.phoneNumberId.length > 0 ? update.phoneNumberId : "_unknown";
+  const wabaId = typeof update.wabaId === "string" && update.wabaId.length > 0 ? update.wabaId : "_unknown";
+  if (kind === "message") {
+    const message = (update as { message?: unknown }).message;
+    if (!isRecord(message)) return null;
+    const messageId = typeof message.id === "string" ? message.id : null;
+    if (messageId === null || messageId.length === 0) return null;
+    return messageDedupKey(sha256HexFn, phoneNumberId, wabaId, messageId);
   }
-  return value;
-}
-
-async function persistedWebhookKey(ctx: RuntimeConfig, request: Request): Promise<{ eventKey: string; eventHash: string } | null> {
-  if (ctx.persistence === undefined || request.method.toUpperCase() !== "POST") return null;
-  const clone = request.clone();
-  let envelope: unknown;
-  try {
-    envelope = JSON.parse(await clone.text()) as unknown;
-  } catch {
-    return null;
+  if (kind === "status") {
+    const status = (update as { status?: unknown }).status;
+    if (!isRecord(status)) return null;
+    const statusId = typeof status.id === "string" ? status.id : null;
+    if (statusId === null || statusId.length === 0) return null;
+    const statusValue = typeof status.status === "string" ? status.status : "_unknown";
+    const timestamp = typeof status.timestamp === "string" ? status.timestamp : "_unknown";
+    return statusDedupKey(sha256HexFn, phoneNumberId, wabaId, statusId, statusValue, timestamp);
   }
-  const eventKey = `webhook:${await sha256Hex(JSON.stringify(deepSortJson(envelope)))}`;
-  return { eventKey, eventHash: eventKey.replace(/^webhook:/u, "sha256:") };
+  return fallbackDedupKey(sha256HexFn, phoneNumberId, wabaId, update);
 }
 
 async function handleWebhook(ctx: RuntimeConfig, request: Request): Promise<Response> {
-  const event = await persistedWebhookKey(ctx, request);
-  if (event === null || ctx.persistence === undefined) return ctx.webhookHandler(request);
+  // No persistence: delegate to the adapter verbatim (raw-body auth policy
+  // preserved — the adapter reads bounded bytes and authenticates before
+  // normalization, and dispatches internally).
+  if (ctx.persistence === undefined) return ctx.webhookHandler(request);
 
+  // Persistence path: the adapter reads bounded bytes, authenticates the raw
+  // bytes BEFORE canonicalization, and normalizes into dispatches. We supply
+  // a staging facade that collects updates, then apply the finite depth gate,
+  // per-update scoped dedup, event-time projection, and real dispatch.
   const dispatches: unknown[] = [];
   const facade: WebhookFacadeLike = {
     dispatch: (update: unknown) => {
@@ -2439,51 +2460,77 @@ async function handleWebhook(ctx: RuntimeConfig, request: Request): Promise<Resp
     ...(ctx.cryptoProvider !== undefined ? { cryptoProvider: ctx.cryptoProvider } : {})
   });
   const response = await createFetchWebhookHandler(webhookAdapter)(request);
+  // Non-200 (auth failure, malformed, too-large) or no dispatches: return the
+  // adapter's response directly. Invalid requests do not poison dedup.
   if (response.status !== 200 || dispatches.length === 0) return response;
 
-  let record: "recorded" | "duplicate";
-  try {
-    record = await ctx.persistence.recordWebhookEvent({
-      eventKey: event.eventKey,
-      eventHash: event.eventHash,
-      receivedAt: new Date().toISOString()
-    });
-    recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "success");
-  } catch (error) {
-    // Record the metric, then preserve the pre-instrumentation behavior
-    // exactly: this call was never wrapped in a try/catch before, so a
-    // thrown error propagated uncaught. Re-throw rather than failing open.
-    recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "error");
-    throw error;
-  }
-  if (record === "duplicate") {
-    // WATS-162: normalization already happened (the adapter parsed and
-    // normalized every update into `dispatches`), but the update is not
-    // re-dispatched. Record "deduped" per update so webhook_normalization_total
-    // reflects that normalization occurred even though dispatch was skipped.
-    for (const update of dispatches) {
-      const kind = isRecord(update) && typeof update.kind === "string" ? update.kind : "unknown";
-      recordWebhookNormalization(ctx.telemetrySink, kind, "deduped");
+  // WATS-201: finite depth gate on the authenticated parsed envelope for ALL
+  // families, BEFORE dedup/dispatch. An over-limit payload (deeply nested
+  // extra property on a valid message, status, or account update) is rejected
+  // with a controlled 400 and never silently dispatched.
+  for (const update of dispatches) {
+    if (!isWithinDepthLimit(update)) {
+      return errorResponse(400, "payload_depth_exceeded", "Webhook payload nesting depth exceeds the limit.");
     }
-    return jsonResponse(200, { status: "ok", received: dispatches.length, dispatched: 0, skipped: dispatches.length });
   }
 
-  let dispatched = 0;
+  const now = receiptNowMs();
+  const toDispatch: unknown[] = [];
+  const deduped: unknown[] = [];
   for (const update of dispatches) {
+    const dedupKey = await extractDedupKey(update, sha256Hex);
+    if (dedupKey === null) {
+      toDispatch.push(update);
+      continue;
+    }
+    let record: "recorded" | "duplicate";
+    try {
+      record = await ctx.persistence.recordWebhookEvent({
+        eventKey: dedupKey,
+        eventHash: `sha256:${dedupKey}`,
+        receivedAt: new Date(now).toISOString()
+      });
+      recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "success");
+    } catch (error) {
+      recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "error");
+      throw error;
+    }
+    if (record === "duplicate") {
+      deduped.push(update);
+    } else {
+      toDispatch.push(update);
+    }
+  }
+
+  for (const update of deduped) {
+    const kind = isRecord(update) && typeof update.kind === "string" ? update.kind : "unknown";
+    recordWebhookNormalization(ctx.telemetrySink, kind, "deduped");
+  }
+
+  // Event-time projection BEFORE dispatch for ALL updates (to-dispatch and
+  // deduped). Projection is idempotent, so re-projecting a deduped update
+  // repairs a transient failure from the first delivery without re-dispatch.
+  for (const update of toDispatch) {
+    await recordInboundProjection(ctx, update, now);
+    await recordStatusProjection(ctx, update, now);
+  }
+  for (const update of deduped) {
+    await recordInboundProjection(ctx, update, now);
+    await recordStatusProjection(ctx, update, now);
+  }
+
+  // Dispatch the non-deduped updates. Preserve ACK-on-handler-failure.
+  let dispatched = 0;
+  for (const update of toDispatch) {
     try {
       await ctx.whatsapp.dispatch(update);
       dispatched += 1;
     } catch {
-      // Preserve WebhookAdapter's acknowledge-on-handler-failure contract.
+      // ACK-on-handler-failure contract preserved.
     }
-    // WATS-175c: record an inbound projection for message-kind updates.
-    // Isolated from dispatch — projection failures are swallowed inside
-    // recordInboundProjection so they never break the ACK. Run after the
-    // dispatch attempt so the projection reflects every normalized message
-    // regardless of handler outcome.
-    await recordInboundProjection(ctx, update);
   }
-  return jsonResponse(200, { status: "ok", received: dispatches.length, dispatched, skipped: 0 });
+  const skipped = deduped.length;
+  return jsonResponse(200, { status: "ok", received: dispatches.length, dispatched, skipped });
 }
 
 function buildSupportedMessageBody(body: unknown, enableGroupRoutes = false): GraphMessagesSendBody | null {
@@ -2549,14 +2596,12 @@ async function recordOutboundProjection(
   }
 }
 
-// WATS-175c: inbound message projection. Mirrors recordOutboundProjection but
-// records the inbound half of a conversation. Called from the webhook
-// dispatch loop only for `message`-kind normalized updates; status/account/
-// other kinds are skipped. Persistence failure is isolated exactly like the
-// outbound path: it records a persistence-operation error and returns — a
-// projection failure must NEVER break the webhook ACK (the 200 is returned to
-// Meta regardless).
-async function recordInboundProjection(ctx: RuntimeConfig, update: unknown): Promise<void> {
+// WATS-175c / WATS-201: inbound message projection. Records the inbound half
+// of a conversation using the VALID Meta timestamp (clamped, never future);
+// malformed/too-future timestamps skip projection. Idempotent — a retry
+// re-projection does not duplicate the row. Persistence failure is isolated:
+// it never breaks the webhook ACK.
+async function recordInboundProjection(ctx: RuntimeConfig, update: unknown, receiptNowMs: number): Promise<void> {
   if (ctx.persistence === undefined) return;
   if (!isRecord(update)) return;
   const kind = typeof update.kind === "string" ? update.kind : null;
@@ -2568,22 +2613,53 @@ async function recordInboundProjection(ctx: RuntimeConfig, update: unknown): Pro
   const fromPhone = typeof message.from === "string" ? message.from : null;
   const messageType = typeof message.type === "string" ? message.type : null;
   if (messageType === null) return;
-  const now = new Date().toISOString();
-  const rowId = cryptoRandomId();
+  // Use the message's own timestamp (clamped, never future). Malformed or
+  // too-future timestamps skip projection rather than fabricate a window.
+  const rawTimestamp = typeof message.timestamp === "string" ? message.timestamp : null;
+  const createdAt = rawTimestamp !== null ? metaTimestampToIso(rawTimestamp, receiptNowMs) : null;
+  if (createdAt === null) return;
   try {
-    await ctx.persistence.recordMessage({
-      rowId,
-      waMessageId,
-      direction: "inbound",
-      ...(fromPhone !== null ? { fromPhone } : {}),
-      type: messageType,
-      status: "received",
-      createdAt: now,
-      updatedAt: now
-    });
+    const existing = await ctx.persistence.getMessage({ waMessageId });
+    if (existing === null) {
+      await ctx.persistence.recordMessage({
+        rowId: cryptoRandomId(),
+        waMessageId,
+        direction: "inbound",
+        ...(fromPhone !== null ? { fromPhone } : {}),
+        type: messageType,
+        status: "received",
+        createdAt,
+        updatedAt: createdAt
+      });
+    }
     recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "success");
   } catch {
-    // Projection failure must not break the webhook ACK.
+    recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "error");
+  }
+}
+
+// WATS-201: status callback projection. appendMessageStatus atomically
+// appends the status event AND updates the stored message row's status in
+// one transaction — no second row insert. Exactly one row per message after
+// delivered/read. Failure isolation mirrors the inbound path.
+async function recordStatusProjection(ctx: RuntimeConfig, update: unknown, receiptNowMs: number): Promise<void> {
+  if (ctx.persistence === undefined) return;
+  if (!isRecord(update)) return;
+  const kind = typeof update.kind === "string" ? update.kind : null;
+  if (kind !== "status") return;
+  const status = (update as { status?: unknown }).status;
+  if (!isRecord(status)) return;
+  const waMessageId = typeof status.id === "string" ? status.id : null;
+  if (waMessageId === null) return;
+  const statusValue = typeof status.status === "string" ? status.status : null;
+  if (statusValue === null) return;
+  const rawTimestamp = typeof status.timestamp === "string" ? status.timestamp : null;
+  const eventTimestamp = rawTimestamp !== null ? metaTimestampToIso(rawTimestamp, receiptNowMs) : null;
+  const timestamp = eventTimestamp ?? new Date(receiptNowMs).toISOString();
+  try {
+    await ctx.persistence.appendMessageStatus({ waMessageId, status: statusValue, timestamp });
+    recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "success");
+  } catch {
     recordPersistenceOperation(ctx.telemetrySink, ctx.persistence.backend, "error");
   }
 }
@@ -3177,6 +3253,19 @@ export function createWatsServiceApp(config: WatsServiceConfig): WatsServiceApp 
 
     if (path === "/readyz") {
       if (method !== "GET") return methodNotAllowed("GET");
+      // WATS-201: /readyz rejects any store whose schema version is not
+      // CURRENT_SCHEMA_VERSION (not just version 0), plus unhealthy/throw.
+      // /healthz stays 200 (process-alive vs dependencies-ready).
+      if (ctx.persistence !== undefined) {
+        try {
+          const health = await ctx.persistence.health();
+          if (!health.ok || health.currentVersion !== CURRENT_SCHEMA_VERSION) {
+            return errorResponse(503, "persistence_unavailable", "Persistence store is not ready.");
+          }
+        } catch {
+          return errorResponse(503, "persistence_unavailable", "Persistence store health check failed.");
+        }
+      }
       return jsonResponse(200, { ok: true, service: SERVICE_NAME });
     }
 

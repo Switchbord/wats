@@ -172,6 +172,25 @@ async function postWebhook(
   }));
 }
 
+// Dig into the envelope's first message text object (for depth-gate fixtures).
+function envelopeMessageText(env: Record<string, unknown>): Record<string, unknown> {
+  const entry = (env.entry as unknown[])[0] as Record<string, unknown>;
+  const change = (entry.changes as unknown[])[0] as Record<string, unknown>;
+  const value = change.value as Record<string, unknown>;
+  const messages = value.messages as unknown[];
+  const message = messages[0] as Record<string, unknown>;
+  return message.text as Record<string, unknown>;
+}
+
+// Dig into the envelope's first status object (for depth-gate fixtures).
+function envelopeStatus(env: Record<string, unknown>): Record<string, unknown> {
+  const entry = (env.entry as unknown[])[0] as Record<string, unknown>;
+  const change = (entry.changes as unknown[])[0] as Record<string, unknown>;
+  const value = change.value as Record<string, unknown>;
+  const statuses = value.statuses as unknown[];
+  return statuses[0] as Record<string, unknown>;
+}
+
 // Build a deeply nested object N levels deep.
 function nestedObject(depth: number): unknown {
   let v: unknown = "leaf";
@@ -182,7 +201,7 @@ function nestedObject(depth: number): unknown {
 // Count message rows for a waMessageId directly via SQLite.
 function countMessageRows(dbPath: string, waMessageId: string): number {
   const db = new Database(dbPath, { readonly: true });
-  const row = db.query<{ c: number }>("SELECT COUNT(*) AS c FROM wats_messages WHERE wa_message_id = ?").get(waMessageId);
+  const row = db.query<{ c: number }, [string]>("SELECT COUNT(*) AS c FROM wats_messages WHERE wa_message_id = ?").get(waMessageId);
   db.close();
   return row?.c ?? 0;
 }
@@ -691,7 +710,7 @@ describe("WATS-201 finite depth gate", () => {
     // message text. Authenticated, parseable, normalizable — but over the
     // depth gate. Must be rejected with 400 BEFORE dedup/dispatch.
     const env = messageEnvelope({ from: "15550001111", id: "wamid.DEEPMSG", timestamp: String(nowSeconds()) });
-    ((env.entry[0]!.changes[0]!.value.messages[0] as Record<string, unknown>).text as Record<string, unknown>).extra = nestedObject(200);
+    envelopeMessageText(env).extra = nestedObject(200);
 
     const res = await postWebhook(app, env);
     expect(res.status).toBe(400);
@@ -711,7 +730,7 @@ describe("WATS-201 finite depth gate", () => {
     });
 
     const env = statusEnvelope({ id: "wamid.DEEPSTATUS", status: "delivered", timestamp: String(nowSeconds()) });
-    ((env.entry[0]!.changes[0]!.value.statuses[0] as Record<string, unknown>).extra = nestedObject(200));
+    envelopeStatus(env).extra = nestedObject(200);
 
     const res = await postWebhook(app, env);
     expect(res.status).toBe(400);
@@ -748,7 +767,7 @@ describe("WATS-201 finite depth gate", () => {
     await store.close();
   });
 
-  test("within-limit depth (128) is accepted and dispatched", async () => {
+  test("within-limit depth is accepted and dispatched", async () => {
     const store = await createSqlitePersistence({ filename: tempDb() });
     await store.migrate();
     const dispatches: unknown[] = [];
@@ -757,9 +776,10 @@ describe("WATS-201 finite depth gate", () => {
       whatsapp: { dispatch: (u: unknown) => { dispatches.push(u); return Promise.resolve(); } } as never
     });
 
-    // 128 levels deep — exactly at the limit, accepted.
-    const env = messageEnvelope({ from: "15550001111", id: "wamid.AT128", timestamp: String(nowSeconds()) });
-    ((env.entry[0]!.changes[0]!.value.messages[0] as Record<string, unknown>).text as Record<string, unknown>).extra = nestedObject(128);
+    // 100 levels deep — substantively deep but within the 128 total-depth
+    // limit (the envelope + rawChange nesting adds ~6 levels, total ~106).
+    const env = messageEnvelope({ from: "15550001111", id: "wamid.WITHIN", timestamp: String(nowSeconds()) });
+    envelopeMessageText(env).extra = nestedObject(100);
 
     const res = await postWebhook(app, env);
     expect(res.status).toBe(200);
@@ -917,7 +937,10 @@ describe("WATS-201 /readyz persistence readiness", () => {
     // Force a stale schema version (lower than current).
     const db = new Database(dbPath);
     db.run("DELETE FROM wats_schema_migrations");
-    db.run("INSERT INTO wats_schema_migrations (id, version, checksum, applied_at) VALUES (?, ?, ?, ?)", "0001_init", 1, "stale", new Date().toISOString());
+    db.run(
+      "INSERT INTO wats_schema_migrations (id, version, checksum, applied_at) VALUES (?, ?, ?, ?)",
+      ["0001_init", 1, "stale", new Date().toISOString()]
+    );
     db.close();
 
     const health = await store.health();

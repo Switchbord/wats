@@ -151,7 +151,7 @@ async function postInboundWebhook(app: ReturnType<typeof createWatsServiceApp>, 
         value: {
           messaging_product: "whatsapp",
           metadata: { phone_number_id: "15551234567" },
-          messages: [{ from, id, timestamp: "1", type: "text", text: { body: "hi" } }]
+          messages: [{ from, id, timestamp: String(Math.floor(Date.now() / 1000)), type: "text", text: { body: "hi" } }]
         }
       }]
     }]
