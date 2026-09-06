@@ -18,6 +18,9 @@ import {
   type OutboxSucceededInput,
   type PersistenceHealth,
   type PersistenceStore,
+  type ServiceRequestClaimInput,
+  type ServiceRequestClaimResult,
+  type ServiceRequestCompletionInput,
   type ServiceRequestLookupInput,
   type ServiceRequestLookupResult,
   type ServiceRequestRecordInput,
@@ -149,6 +152,66 @@ const MIGRATIONS: readonly MigrationDefinition[] = Object.freeze([
       `CREATE INDEX IF NOT EXISTS wats_messages_direction_from_phone_created_at_idx
         ON wats_messages (direction, from_phone, created_at DESC)`
     ])
+  },
+  {
+    id: "005_service_request_claims",
+    version: 5,
+    checksum: "sha256:wats-persistence-005-service-request-claims-v1",
+    statements: Object.freeze([
+      // SQLite cannot drop a column constraint in place, so recreate the table
+      // with response_json nullable to allow 'claimed' rows that have no
+      // response yet. Existing rows keep their data; the status column
+      // defaults to 'completed' so old records replay via getServiceRequest.
+      `CREATE TABLE wats_service_requests_new (
+        idempotency_key TEXT PRIMARY KEY,
+        request_hash TEXT NOT NULL,
+        response_json TEXT,
+        created_at TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'completed',
+        claimed_at TEXT
+      )`,
+      `INSERT INTO wats_service_requests_new (idempotency_key, request_hash, response_json, created_at, status)
+         SELECT idempotency_key, request_hash, response_json, created_at, 'completed'
+         FROM wats_service_requests`,
+      `DROP TABLE wats_service_requests`,
+      `ALTER TABLE wats_service_requests_new RENAME TO wats_service_requests`
+    ])
+  },
+  {
+    id: "006_message_uniqueness",
+    version: 6,
+    checksum: "sha256:wats-persistence-006-message-uniqueness-v1",
+    statements: Object.freeze([
+      // Deterministic dedup of preexisting duplicate messages before creating
+      // the uniqueness index. Keep the row with the smallest row_id (stable
+      // lexicographic order) per (direction, wa_message_id); delete the rest.
+      `DELETE FROM wats_message_status_events
+         WHERE id IN (
+           SELECT id FROM (
+             SELECT id,
+                    ROW_NUMBER() OVER (
+                      PARTITION BY wa_message_id, status, timestamp
+                      ORDER BY id ASC
+                    ) AS rn
+             FROM wats_message_status_events
+           ) WHERE rn > 1
+         )`,
+      `DELETE FROM wats_messages
+         WHERE row_id IN (
+           SELECT row_id FROM (
+             SELECT row_id,
+                    ROW_NUMBER() OVER (
+                      PARTITION BY direction, wa_message_id
+                      ORDER BY row_id ASC
+                    ) AS rn
+             FROM wats_messages
+           ) WHERE rn > 1
+         )`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS wats_messages_direction_wa_message_id_uidx
+        ON wats_messages (direction, wa_message_id)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS wats_message_status_events_wa_message_id_status_timestamp_uidx
+        ON wats_message_status_events (wa_message_id, status, timestamp)`
+    ])
   }
 ]);
 
@@ -241,6 +304,31 @@ function validateServiceRequestLookup(input: ServiceRequestLookupInput): Service
 
 function validateServiceRequestRecord(input: ServiceRequestRecordInput): ServiceRequestRecordInput {
   const record = validateRecordInput(input, "service request record");
+  const responseJson = validateRecordString(record.responseJson, "responseJson");
+  try {
+    JSON.parse(responseJson);
+  } catch (cause) {
+    throw new PersistenceError("invalid_record", "responseJson must be valid JSON.", { cause });
+  }
+  return Object.freeze({
+    idempotencyKey: validateRecordString(record.idempotencyKey, "idempotencyKey"),
+    requestHash: validateRecordString(record.requestHash, "requestHash"),
+    responseJson,
+    createdAt: validateTimestamp(record.createdAt, "createdAt")
+  });
+}
+
+function validateServiceRequestClaim(input: ServiceRequestClaimInput): ServiceRequestClaimInput {
+  const record = validateRecordInput(input, "service request claim");
+  return Object.freeze({
+    idempotencyKey: validateRecordString(record.idempotencyKey, "idempotencyKey"),
+    requestHash: validateRecordString(record.requestHash, "requestHash"),
+    createdAt: validateTimestamp(record.createdAt, "createdAt")
+  });
+}
+
+function validateServiceRequestCompletion(input: ServiceRequestCompletionInput): ServiceRequestCompletionInput {
+  const record = validateRecordInput(input, "service request completion");
   const responseJson = validateRecordString(record.responseJson, "responseJson");
   try {
     JSON.parse(responseJson);
@@ -545,24 +633,91 @@ class SqlitePersistenceStore implements PersistenceStore {
   async getServiceRequest(input: ServiceRequestLookupInput): Promise<ServiceRequestLookupResult> {
     this.#assertOpen();
     const lookup = validateServiceRequestLookup(input);
-    const row = this.#database.query<{ request_hash: string; response_json: string }>(
-      "SELECT request_hash, response_json FROM wats_service_requests WHERE idempotency_key = ?"
+    const row = this.#database.query<{ request_hash: string; response_json: string; status: string }>(
+      "SELECT request_hash, response_json, status FROM wats_service_requests WHERE idempotency_key = ?"
     ).get(lookup.idempotencyKey);
     if (row === null) return null;
     if (row.request_hash !== lookup.requestHash) return "conflict";
+    // WATS-200: a claimed-but-not-completed row has status='claimed' and a NULL
+    // response_json. The old getServiceRequest contract returns the response;
+    // a claimed row has none to replay, so return null rather than a stale
+    // placeholder.
+    if (row.status === "claimed" || row.response_json === null) return null;
     return Object.freeze({ responseJson: row.response_json });
   }
 
   async recordServiceRequest(input: ServiceRequestRecordInput): Promise<void> {
     this.#assertOpen();
     const record = validateServiceRequestRecord(input);
+    // WATS-200: INSERT OR IGNORE preserves the old semantics — it never
+    // overwrites an existing row. If a claim already reserved the key, the
+    // IGNORE keeps the reservation intact (status='claimed').
     this.#database.run(
-      "INSERT OR IGNORE INTO wats_service_requests (idempotency_key, request_hash, response_json, created_at) VALUES (?, ?, ?, ?)",
+      "INSERT OR IGNORE INTO wats_service_requests (idempotency_key, request_hash, response_json, created_at, status) VALUES (?, ?, ?, ?, 'completed')",
       record.idempotencyKey,
       record.requestHash,
       record.responseJson,
       record.createdAt
     );
+  }
+
+  async claimServiceRequest(input: ServiceRequestClaimInput): Promise<ServiceRequestClaimResult> {
+    this.#assertOpen();
+    const claim = validateServiceRequestClaim(input);
+    // INSERT OR IGNORE atomically reserves the key. The status column
+    // distinguishes 'claimed' (reserved, response_json NULL) from 'completed'
+    // (response_json populated by completeServiceRequest). A duplicate insert
+    // is a no-op so the existing row is preserved — no blind resend.
+    const insert = this.#database.run(
+      "INSERT OR IGNORE INTO wats_service_requests (idempotency_key, request_hash, response_json, created_at, claimed_at, status) VALUES (?, ?, NULL, ?, ?, 'claimed')",
+      claim.idempotencyKey,
+      claim.requestHash,
+      claim.createdAt,
+      claim.createdAt
+    );
+    // changes === 1 means a new row was inserted: this is the first claim.
+    if (insert.changes === 1) return "claimed";
+    // The row already existed. Re-read to determine the outcome.
+    const row = this.#database.query<{ request_hash: string; response_json: string | null; status: string }>(
+      "SELECT request_hash, response_json, status FROM wats_service_requests WHERE idempotency_key = ?"
+    ).get(claim.idempotencyKey);
+    if (row === null) {
+      throw new PersistenceError("claim_failed", "SQLite service request claim did not persist.");
+    }
+    if (row.request_hash !== claim.requestHash) return "conflict";
+    if (row.status === "completed" && row.response_json !== null) {
+      return Object.freeze({ responseJson: row.response_json });
+    }
+    return "pending";
+  }
+
+  async completeServiceRequest(input: ServiceRequestCompletionInput): Promise<void> {
+    this.#assertOpen();
+    const completion = validateServiceRequestCompletion(input);
+    // Completion must match the reserved hash. A mismatch is a typed error, not
+    // a silent overwrite. A completion without a prior claim is also a typed
+    // error — there is no reservation to complete.
+    const existing = this.#database.query<{ request_hash: string; status: string }>(
+      "SELECT request_hash, status FROM wats_service_requests WHERE idempotency_key = ?"
+    ).get(completion.idempotencyKey);
+    if (existing === null) {
+      throw new PersistenceError("completion_failed", "SQLite service request completion requires a prior claim.");
+    }
+    if (existing.request_hash !== completion.requestHash) {
+      throw new PersistenceError("completion_failed", "SQLite service request completion hash mismatch.");
+    }
+    // Only 'claimed' rows are completable; a 'completed' row is already done.
+    if (existing.status === "completed") return;
+    const result = this.#database.run(
+      "UPDATE wats_service_requests SET response_json = ?, status = 'completed', created_at = ? WHERE idempotency_key = ? AND request_hash = ? AND status = 'claimed'",
+      completion.responseJson,
+      completion.createdAt,
+      completion.idempotencyKey,
+      completion.requestHash
+    );
+    if (result.changes !== 1) {
+      throw new PersistenceError("completion_failed", "SQLite service request completion lease is stale.");
+    }
   }
 
   async enqueueOutboxItem(input: OutboxEnqueueInput): Promise<OutboxEnqueueResult> {
@@ -667,6 +822,10 @@ class SqlitePersistenceStore implements PersistenceStore {
   async recordMessage(input: MessageRecordInput): Promise<void> {
     this.#assertOpen();
     const record = validateMessageRecord(input);
+    // WATS-200: INSERT OR IGNORE deduplicates by row_id (PRIMARY KEY) and by
+    // (direction, wa_message_id) via the unique index from migration 006. A
+    // second insert with the same (direction, wa_message_id) but a different
+    // row_id is a no-op, preserving the first projection.
     this.#database.run(
       `INSERT OR IGNORE INTO wats_messages
         (row_id, wa_message_id, direction, from_phone, to_phone, type, status, graph_message_id, created_at, updated_at)
@@ -689,17 +848,23 @@ class SqlitePersistenceStore implements PersistenceStore {
     const event = validateMessageStatusEvent(input);
     this.#database.exec("BEGIN IMMEDIATE");
     try {
+      // WATS-200: dedup by (wa_message_id, status, timestamp). The unique index
+      // created by migration 006 makes the INSERT a no-op for duplicates.
       this.#database.run(
-        "INSERT INTO wats_message_status_events (wa_message_id, status, timestamp) VALUES (?, ?, ?)",
+        "INSERT OR IGNORE INTO wats_message_status_events (wa_message_id, status, timestamp) VALUES (?, ?, ?)",
         event.waMessageId,
         event.status,
         event.timestamp
       );
+      // WATS-200: monotonicity. Only advance the message status if the event
+      // timestamp is newer than the current updated_at, so a stale webhook
+      // retry (earlier timestamp) cannot regress a later status.
       this.#database.run(
-        "UPDATE wats_messages SET status = ?, updated_at = ? WHERE wa_message_id = ?",
+        "UPDATE wats_messages SET status = ?, updated_at = ? WHERE wa_message_id = ? AND ? > updated_at",
         event.status,
         event.timestamp,
-        event.waMessageId
+        event.waMessageId,
+        event.timestamp
       );
       this.#database.exec("COMMIT");
     } catch (cause) {

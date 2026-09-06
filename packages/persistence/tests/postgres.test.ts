@@ -66,6 +66,22 @@ function successLockMigrationResponses(): PostgresQueryResult[] {
     { rows: [], rowCount: 0 }, // migration 4 stmt
     { rows: [], rowCount: 1 }, // record migration 4
     { rows: [], rowCount: 0 }, // COMMIT
+    { rows: [], rowCount: 0 }, // migration 5 existing?
+    { rows: [], rowCount: 0 }, // BEGIN
+    { rows: [], rowCount: 0 }, // migration 5 stmt 1 (CREATE TABLE new)
+    { rows: [], rowCount: 0 }, // migration 5 stmt 2 (INSERT ... SELECT)
+    { rows: [], rowCount: 0 }, // migration 5 stmt 3 (DROP TABLE)
+    { rows: [], rowCount: 0 }, // migration 5 stmt 4 (RENAME)
+    { rows: [], rowCount: 1 }, // record migration 5
+    { rows: [], rowCount: 0 }, // COMMIT
+    { rows: [], rowCount: 0 }, // migration 6 existing?
+    { rows: [], rowCount: 0 }, // BEGIN
+    { rows: [], rowCount: 0 }, // migration 6 stmt 1 (DELETE status events dedup)
+    { rows: [], rowCount: 0 }, // migration 6 stmt 2 (DELETE messages dedup)
+    { rows: [], rowCount: 0 }, // migration 6 stmt 3 (CREATE UNIQUE INDEX messages)
+    { rows: [], rowCount: 0 }, // migration 6 stmt 4 (CREATE UNIQUE INDEX events)
+    { rows: [], rowCount: 1 }, // record migration 6
+    { rows: [], rowCount: 0 }, // COMMIT
     { rows: [], rowCount: 1 } // release lock
   ];
 }
@@ -108,8 +124,8 @@ describe("WATS-125 Postgres persistence adapter", () => {
     const report = await store.migrate();
 
     expect(report.currentVersion).toBe(CURRENT_SCHEMA_VERSION);
-    expect(report.currentVersion).toBe(4);
-    expect(report.appliedMigrations).toEqual(["001_initial", "002_outbox_lease_id", "003_message_projection", "004_inbound_window_index"]);
+    expect(report.currentVersion).toBe(6);
+    expect(report.appliedMigrations).toEqual(["001_initial", "002_outbox_lease_id", "003_message_projection", "004_inbound_window_index", "005_service_request_claims", "006_message_uniqueness"]);
     const joined = client.queries.map((q) => q.sql).join("\n");
     expect(joined).toContain("CREATE TABLE IF NOT EXISTS wats_messages");
     expect(joined).toContain("CREATE TABLE IF NOT EXISTS wats_message_status_events");

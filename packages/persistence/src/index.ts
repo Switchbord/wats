@@ -1,4 +1,4 @@
-export const CURRENT_SCHEMA_VERSION = 4 as const;
+export const CURRENT_SCHEMA_VERSION = 6 as const;
 export const REDACTED_SQLITE_LOCATION = "[REDACTED_SQLITE_DATABASE]" as const;
 
 export type PersistenceBackend = "sqlite" | "postgres";
@@ -11,6 +11,8 @@ export type PersistenceErrorCode =
   | "migration_checksum_mismatch"
   | "migration_lock_failed"
   | "outbox_failed"
+  | "claim_failed"
+  | "completion_failed"
   | "store_closed";
 
 export interface MigrationReport {
@@ -45,6 +47,26 @@ export interface ServiceRequestRecordInput extends ServiceRequestLookupInput {
 }
 
 export type ServiceRequestLookupResult = null | "conflict" | { readonly responseJson: string };
+
+// WATS-200: durable atomic service request claim/completion. A claim reserves
+// a namespaced request identity before the caller sends to Graph; a completion
+// stores the response. Claims persist across restart indefinitely — there is no
+// timeout-based blind resend. Completion must match the reserved request hash;
+// the old record API must not overwrite a reservation.
+export interface ServiceRequestClaimInput {
+  readonly idempotencyKey: string;
+  readonly requestHash: string;
+  readonly createdAt: string;
+}
+
+export type ServiceRequestClaimResult = "claimed" | "pending" | "conflict" | { readonly responseJson: string };
+
+export interface ServiceRequestCompletionInput {
+  readonly idempotencyKey: string;
+  readonly requestHash: string;
+  readonly responseJson: string;
+  readonly createdAt: string;
+}
 
 export type OutboxStatus = "pending" | "processing" | "succeeded";
 
@@ -161,6 +183,8 @@ export interface PersistenceStore {
   recordWebhookEvent(input: WebhookEventRecordInput): Promise<WebhookEventRecordResult>;
   getServiceRequest(input: ServiceRequestLookupInput): Promise<ServiceRequestLookupResult>;
   recordServiceRequest(input: ServiceRequestRecordInput): Promise<void>;
+  claimServiceRequest(input: ServiceRequestClaimInput): Promise<ServiceRequestClaimResult>;
+  completeServiceRequest(input: ServiceRequestCompletionInput): Promise<void>;
   enqueueOutboxItem(input: OutboxEnqueueInput): Promise<OutboxEnqueueResult>;
   claimOutboxItems(input: OutboxClaimInput): Promise<readonly OutboxItem[]>;
   markOutboxItemFailed(input: OutboxFailedInput): Promise<void>;
