@@ -35,9 +35,9 @@ describe("WATS 0.4.0-beta.0 public docs truth contract", () => {
     expect(readme).not.toContain("After the alpha packages are published");
   });
 
-  test("changelog has a top 0.4.0-beta.0 section and keeps release side-effect boundaries honest", () => {
+  test("changelog has a top 0.4.1-beta.0 section and keeps release side-effect boundaries honest", () => {
     const changelog = read("CHANGELOG.md");
-    expect(changelog.startsWith("# Changelog\n\n## [0.4.0-beta.0]")).toBe(true);
+    expect(changelog.startsWith("# Changelog\n\n## [0.4.1-beta.0]")).toBe(true);
     expect(changelog).toContain("### WATS-108 — community governance files");
     expect(changelog).toContain("canonical `@wats/*` package scope");
     expect(changelog).toContain("### WATS-98 — Marketing Messages API compatibility surfaces");

@@ -1,7 +1,7 @@
 {
   "name": "@wats/http",
   "description": "Webhook verification and Bun/Node/Fetch adapters.",
-  "version": "0.4.0-beta.0",
+  "version": "0.4.1-beta.0",
   "private": false,
   "license": "MIT",
   "type": "module",
@@ -62,8 +62,8 @@
     "wats"
   ],
   "dependencies": {
-    "@wats/crypto": "^0.4.0-beta.0",
-    "@wats/core": "^0.4.0-beta.0",
-    "@wats/types": "^0.4.0-beta.0"
+    "@wats/crypto": "^0.4.1-beta.0",
+    "@wats/core": "^0.4.1-beta.0",
+    "@wats/types": "^0.4.1-beta.0"
   }
 }

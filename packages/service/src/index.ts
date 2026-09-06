@@ -204,7 +204,7 @@ const METRICS_PATH = "/metrics";
 const DEBUG_DIAGNOSTICS_PATH = "/debug/diagnostics";
 const SERVER_START_MS = Date.now();
 const DEFAULT_OPENAPI_TITLE = "WATS Service API";
-const DEFAULT_OPENAPI_VERSION = "0.4.0-beta.0";
+const DEFAULT_OPENAPI_VERSION = "0.4.1-beta.0";
 
 // Local isRecord intentionally diverges from @wats/internal-utils: the service
 // uses it to structurally validate class-instance inputs (PersistenceStore,
