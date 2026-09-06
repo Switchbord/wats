@@ -14,6 +14,7 @@
 // secret-like payload never appears in any serialization of the error.
 import { describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
+import { inspect } from "node:util";
 import {
   PersistenceError,
   createSqlitePersistence,
@@ -49,6 +50,7 @@ function assertTypedNoLeak(
     String(err.code ?? ""),
     JSON.stringify(err),
     String(err),
+    inspect(err, { depth: 8 }),
     `${err.name}: ${err.message}`
   ];
   for (const secret of secrets) {
