@@ -666,6 +666,42 @@ describe("WATS-204 startup/bind failure closes the store", () => {
   });
 });
 
+describe("WATS-204 live secret validation order (no SQLite artifact from invalid creds)", () => {
+  test("live + --database with invalid/missing secrets creates no SQLite file", async () => {
+    const dir = trackedTempDir();
+    const config = validConfig();
+    const configPath = writeConfig(dir, config);
+    const dbPath = join(dir, "should-not-exist.sqlite");
+    const envPath = join(dir, ".env.local");
+    // Empty/missing secrets: the env file exists but resolves no secret values.
+    writeFileSync(envPath, ["# no secrets here", ""].join("\n"), "utf8");
+    const before = new Set(readdirSafe(dir));
+    const port = await getFreePort();
+    const result = runCli([
+      "serve", "--config", configPath,
+      "--live", "--yes-live", "--env-file", ".env.local",
+      "--database", dbPath,
+      "--host", "127.0.0.1", "--port", String(port)
+    ], dir, {
+      WATS_ACCESS_TOKEN: undefined,
+      WATS_APP_SECRET: undefined,
+      WATS_SERVICE_TOKEN: undefined,
+      WATS_VERIFY_TOKEN: undefined,
+      WATS_LIVE_ENABLE: "1",
+      WATS_YES_LIVE: "1"
+    });
+    // SecretResolutionError: exit 1, no listening, no SQLite artifact.
+    expect(result.exitCode, result.stderr).toBe(1);
+    expect(result.stdout).not.toContain("status: listening");
+    expect(result.stderr).toContain("SecretResolutionError");
+    const after = new Set(readdirSafe(dir));
+    expect([...after].filter((f) => !before.has(f))).toEqual([]);
+    expect(existsSync(dbPath)).toBe(false);
+    expect(await canBind(port)).toBe(true);
+    expectNoLeaks(result.stderr);
+  });
+});
+
 describe("WATS-204 --database-url-env safe env reference", () => {
   test("resolves a postgres connection string from the named env var (fail-closed without pg)", async () => {
     const dir = trackedTempDir();
