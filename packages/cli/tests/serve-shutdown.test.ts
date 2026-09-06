@@ -10,7 +10,7 @@
 // store so the outcome is deterministic and fast.
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { createServeShutdown, type ServeShutdownStore } from "../src/index";
+import { createServeShutdown, type ServeShutdownStore } from "../src/serve-shutdown";
 
 // Minimal fake server: stop() records admission-stop vs force-stop; the drain
 // loop reads pendingRequests and exits immediately when it reaches 0.
@@ -46,7 +46,7 @@ function delay(ms: number): Promise<void> {
 
 describe("WATS-204 createServeShutdown bounded store-close (F1)", () => {
   test("successful close clears its deadline timer without retaining the process", () => {
-    const code = `import {createServeShutdown} from ${JSON.stringify(new URL('../src/index.ts', import.meta.url).pathname)};
+    const code = `import {createServeShutdown} from ${JSON.stringify(new URL('../src/serve-shutdown.ts', import.meta.url).pathname)};
       const shutdown = createServeShutdown({port:0,pendingRequests:0,stop(){}}, {close:async()=>{}}, {storeCloseTimeoutMs:30000});
       await shutdown(); console.log('closed');`;
     const result = spawnSync(process.execPath, ["-e", code], {timeout:2000, encoding:"utf8"});
