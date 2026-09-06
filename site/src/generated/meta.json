@@ -1,10 +1,10 @@
 {
   "version": "0.4.1-beta.0",
-  "testCount": 2978,
+  "testCount": 2983,
   "testCountRounded": 2900,
-  "generatedAt": "2026-09-06T23:32:39.262Z",
+  "generatedAt": "2026-09-06T23:52:20.373Z",
   "source": {
     "cmd": "bun test",
-    "commit": "5554edc3364a8a4c5d94bcc7daf65683318e5ddc"
+    "commit": "8e6b7890aadc52178418a93cae66c7d6e7d0f3b1"
   }
 }
