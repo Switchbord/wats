@@ -9,6 +9,7 @@
 // no real DB) and inject a bounded store-close deadline + a never-resolving
 // store so the outcome is deterministic and fast.
 import { describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
 import { createServeShutdown, type ServeShutdownStore } from "../src/index";
 
 // Minimal fake server: stop() records admission-stop vs force-stop; the drain
@@ -44,6 +45,20 @@ function delay(ms: number): Promise<void> {
 }
 
 describe("WATS-204 createServeShutdown bounded store-close (F1)", () => {
+  test("successful close clears its deadline timer without retaining the process", () => {
+    const code = `import {createServeShutdown} from ${JSON.stringify(new URL('../src/index.ts', import.meta.url).pathname)};
+      const shutdown = createServeShutdown({port:0,pendingRequests:0,stop(){}}, {close:async()=>{}}, {storeCloseTimeoutMs:30000});
+      await shutdown(); console.log('closed');`;
+    const result = spawnSync(process.execPath, ["-e", code], {timeout:2000, encoding:"utf8"});
+    expect(result.stdout).toContain("closed");
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(0);
+  });
+
+  test("synchronous close failure still resolves shutdown", async () => {
+    const shutdown = createServeShutdown(fakeServer(), {close() {throw new Error('private backend fault');}}, {storeCloseTimeoutMs:30});
+    await expect(shutdown()).resolves.toBeUndefined();
+  });
   test("never-resolving store.close returns within the injected bounded deadline", async () => {
     const server = fakeServer(0);
     const store = hangingStore();
