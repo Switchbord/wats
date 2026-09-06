@@ -23,7 +23,11 @@ COPY examples/ ./examples/
 # without pulling the whole site tree. If you add another root workspace member,
 # its package.json must be copied here too (or the Railway build breaks silently).
 COPY site/package.json ./site/package.json
-RUN bun install --frozen-lockfile || bun install
+# Strict frozen install: the lockfile is the source of truth. A drift here is
+# a build failure, never silently re-resolved. Do NOT add a `|| bun install`
+# fallback — that would mask lockfile/registry drift and produce unreproducible
+# images.
+RUN bun install --frozen-lockfile
 
 # Build all publishable packages (produces packages/*/dist).
 RUN bun run build:packages

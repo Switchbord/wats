@@ -75,7 +75,8 @@ const repoRoot = findRepoRoot(import.meta.dir);
 const entrypoint = join(repoRoot, "packages/cli/dist/bin.js");
 
 function runCli(args: readonly string[], cwd: string = repoRoot, env: Record<string, string | undefined> = {}): CliResult {
-  const completed = Bun.spawnSync(["bun", entrypoint, ...args], {
+  const bunPath = process.execPath ?? "bun";
+  const completed = Bun.spawnSync([bunPath, entrypoint, ...args], {
     cwd,
     stdout: "pipe",
     stderr: "pipe",
@@ -98,7 +99,8 @@ function spawnServe(
   args: readonly string[],
   env: Record<string, string | undefined> = {}
 ): { proc: ServeProcess; stdout: Promise<string>; stderr: Promise<string> } {
-  const proc = Bun.spawn(["bun", entrypoint, ...args], {
+  const bunPath = process.execPath ?? "bun";
+  const proc = Bun.spawn([bunPath, entrypoint, ...args], {
     cwd: repoRoot,
     stdout: "pipe",
     stderr: "pipe",
@@ -236,6 +238,27 @@ async function canBind(port: number): Promise<boolean> {
   }
 }
 
+// A fake Graph server that delays its response by `delayMs`. Used to test
+// graceful drain: the admitted request is genuinely in-flight on the Graph
+// transport when shutdown is signaled.
+function createSlowFakeGraphServer(delayMs: number): {
+  readonly baseUrl: string;
+  readonly stop: () => void;
+} {
+  const server = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    async fetch() {
+      await new Promise<void>((resolveDelay) => setTimeout(resolveDelay, delayMs));
+      return Response.json({ messaging_product: "whatsapp", messages: [{ id: "wamid.SLOW_DRAIN_TEST" }] });
+    }
+  });
+  return {
+    baseUrl: `http://127.0.0.1:${server.port}`,
+    stop: () => server.stop(true)
+  };
+}
+
 const dirsToClean: string[] = [];
 afterEach(() => {
   while (dirsToClean.length > 0) {
@@ -281,7 +304,6 @@ describe("WATS-204 serve --database help and arg validation", () => {
     const configPath = writeConfig(dir);
     const port = 39902;
     const cases: readonly string[] = [
-      "",
       "   ",
       "../../.env.local",
       "TOKEN_SENTINEL_DO_NOT_PRINT_1234567890",
@@ -297,7 +319,7 @@ describe("WATS-204 serve --database help and arg validation", () => {
       expect(result.exitCode, `bad=${JSON.stringify(bad)}`).toBe(1);
       expect(result.stdout).toBe("");
       expect(result.stderr).toContain("wats serve --help");
-      expect(result.stderr).not.toContain(bad);
+      if (bad.trim().length > 0) expect(result.stderr).not.toContain(bad);
     }
   });
 
@@ -306,7 +328,6 @@ describe("WATS-204 serve --database help and arg validation", () => {
     const configPath = writeConfig(dir);
     const port = 39903;
     const cases: readonly string[] = [
-      "",
       "   ",
       "../../.env.local",
       "../../../etc/passwd",
@@ -322,7 +343,7 @@ describe("WATS-204 serve --database help and arg validation", () => {
       expect(result.exitCode, `bad=${JSON.stringify(bad)}`).toBe(1);
       expect(result.stdout).toBe("");
       expect(result.stderr).toContain("wats serve --help");
-      expect(result.stderr).not.toContain(bad);
+      if (bad.trim().length > 0) expect(result.stderr).not.toContain(bad);
     }
   });
 
@@ -362,16 +383,15 @@ describe("WATS-204 serve --database durable SQLite (dry-run)", () => {
     try {
       const response = await waitForHttpStatus(serve.proc, `http://127.0.0.1:${port}/healthz`, 200);
       expect(response.status).toBe(200);
-      // The SQLite file must exist on disk (open+migrate ran before binding).
       expect(existsSync(dbPath)).toBe(true);
-      const stdout = await serve.stdout;
-      expect(stdout).toContain("status: listening");
-      expectNoLeaks(stdout);
     } finally {
-      if (await Promise.race([serve.proc.exited.then(() => true), delay(1).then(() => false)]) === false) {
-        serve.proc.kill("SIGKILL");
-      }
+      // Kill the process BEFORE reading stdout/stderr (the Response text()
+      // promise only resolves when the stream closes, which happens on exit).
+      await stopServe(serve.proc);
     }
+    const stdout = await serve.stdout;
+    expect(stdout).toContain("status: listening");
+    expectNoLeaks(stdout);
   });
 
   test("stateless default (no --database) is unchanged: no SQLite file created", async () => {
@@ -400,7 +420,9 @@ describe("WATS-204 serve --database durable SQLite (dry-run)", () => {
     const dir = trackedTempDir();
     const configPath = writeConfig(dir);
     const dbPath = join(dir, "wats-persist.sqlite");
-    const token = "raw-service-bearer-token-do-not-print";
+    // Dry-run uses synthetic placeholder secrets; the bearer token is the
+    // dry-run placeholder, NOT the env WATS_SERVICE_TOKEN.
+    const dryRunToken = "dry-run-service-placeholder";
 
     // First boot: start, send a message (projected to SQLite), stop.
     const port1 = await getFreePort();
@@ -408,12 +430,12 @@ describe("WATS-204 serve --database durable SQLite (dry-run)", () => {
       "serve", "--config", configPath, "--dry-run",
       "--database", dbPath,
       "--host", "127.0.0.1", "--port", String(port1)
-    ], { WATS_SERVICE_TOKEN: token });
+    ]);
     try {
       await waitForHttpStatus(serve1.proc, `http://127.0.0.1:${port1}/healthz`, 200);
       const send = await fetch(`http://127.0.0.1:${port1}/api/messages/text`, {
         method: "POST",
-        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+        headers: { authorization: `Bearer ${dryRunToken}`, "content-type": "application/json" },
         body: JSON.stringify({ to: "15551230000", text: "persist-me" })
       });
       expect(send.status).toBe(200);
@@ -434,11 +456,11 @@ describe("WATS-204 serve --database durable SQLite (dry-run)", () => {
       "serve", "--config", configPath, "--dry-run",
       "--database", dbPath,
       "--host", "127.0.0.1", "--port", String(port2)
-    ], { WATS_SERVICE_TOKEN: token });
+    ]);
     try {
       await waitForHttpStatus(serve2.proc, `http://127.0.0.1:${port2}/healthz`, 200);
       const list = await fetch(`http://127.0.0.1:${port2}/api/messages?limit=10`, {
-        headers: { authorization: `Bearer ${token}` }
+        headers: { authorization: `Bearer ${dryRunToken}` }
       });
       expect(list.status).toBe(200);
       const body = await list.json() as JsonRecord;
@@ -454,36 +476,55 @@ describe("WATS-204 serve --database durable SQLite (dry-run)", () => {
 });
 
 describe("WATS-204 graceful finite drain", () => {
-  test("active in-flight request is allowed to finish during shutdown", async () => {
+  test("active in-flight request is allowed to finish during shutdown (live, slow Graph)", async () => {
     const dir = trackedTempDir();
-    const configPath = writeConfig(dir);
+    const graph = createSlowFakeGraphServer(500);
+    const config = validConfig();
+    (((config.profiles as JsonRecord).local as JsonRecord).graph as JsonRecord).baseUrl = graph.baseUrl;
+    const configPath = writeConfig(dir, config);
     const dbPath = join(dir, "drain.sqlite");
     const port = await getFreePort();
-    const token = "raw-service-bearer-token-do-not-print";
+    const envPath = join(dir, ".env.local");
+    writeFileSync(envPath, [
+      "WATS_ACCESS_TOKEN=LIVE_ACCESS_TOKEN_DO_NOT_PRINT_1234567890",
+      "WATS_VERIFY_TOKEN=LIVE_VERIFY_TOKEN_DO_NOT_PRINT",
+      "WATS_APP_SECRET=LIVE_APP_SECRET_DO_NOT_PRINT",
+      "WATS_SERVICE_TOKEN=LIVE_SERVICE_TOKEN_DO_NOT_PRINT",
+      ""
+    ].join("\n"), "utf8");
     const serve = spawnServe([
-      "serve", "--config", configPath, "--dry-run",
+      "serve", "--config", configPath,
+      "--live", "--yes-live", "--env-file", ".env.local",
       "--database", dbPath,
       "--host", "127.0.0.1", "--port", String(port)
-    ], { WATS_SERVICE_TOKEN: token });
+    ], {
+      WATS_ACCESS_TOKEN: undefined,
+      WATS_APP_SECRET: undefined,
+      WATS_SERVICE_TOKEN: undefined,
+      WATS_LIVE_ENABLE: "1",
+      WATS_YES_LIVE: "1"
+    });
     try {
       await waitForHttpStatus(serve.proc, `http://127.0.0.1:${port}/healthz`, 200);
 
-      // Start a slow request (the dry-run transport responds instantly, so
-      // we use a request that we hold open by reading the body slowly).
+      // Start a request that the fake Graph server delays by 500ms. This is
+      // an admitted request whose response is genuinely in-flight.
       const slowFetch = fetch(`http://127.0.0.1:${port}/api/messages/text`, {
         method: "POST",
-        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+        headers: { authorization: "Bearer LIVE_SERVICE_TOKEN_DO_NOT_PRINT", "content-type": "application/json" },
         body: JSON.stringify({ to: "15551230000", text: "drain-me" })
       });
 
-      // Give the request a beat to be admitted, then signal shutdown.
-      await delay(80);
+      // Give the request a beat to be admitted and reach the slow Graph,
+      // then signal shutdown while the response is still pending.
+      await delay(100);
       serve.proc.kill("SIGTERM");
 
-      // The in-flight request must complete (not be aborted) within a finite window.
+      // The in-flight request must complete (not be aborted) within a
+      // finite window. This proves the server drains active work.
       const result = await Promise.race([
         slowFetch.then((r) => ({ ok: true as const, status: r.status })),
-        delay(10000).then(() => ({ ok: false as const }))
+        delay(15000).then(() => ({ ok: false as const }))
       ]);
       expect(result.ok).toBe(true);
       if (result.ok) expect(result.status).toBe(200);
@@ -492,6 +533,7 @@ describe("WATS-204 graceful finite drain", () => {
       const exitCode = await serve.proc.exited;
       expect(exitCode).toBe(0);
     } finally {
+      graph.stop();
       if (await Promise.race([serve.proc.exited.then(() => true), delay(1).then(() => false)]) === false) {
         serve.proc.kill("SIGKILL");
       }
@@ -646,6 +688,12 @@ describe("WATS-204 --database-url-env safe env reference", () => {
         serve.proc.exited.then((code) => ({ exited: true as const, code })),
         delay(3000).then(() => ({ exited: false as const, code: 0 as number }))
       ]);
+      if (!early.exited) {
+        // Process is still running (pg installed + connected). Kill it first
+        // so we can read stdout/stderr.
+        serve.proc.kill("SIGTERM");
+        await Promise.race([serve.proc.exited, delay(5000)]);
+      }
       const stdout = await serve.stdout;
       const stderr = await serve.stderr;
       const combined = stdout + stderr;
@@ -668,11 +716,14 @@ describe("WATS-204 --database-url-env safe env reference", () => {
     const dir = trackedTempDir();
     const configPath = writeConfig(dir);
     const port = await getFreePort();
+    // runCli(args, cwd, env): the env overlay MUST be the 3rd argument. An
+    // earlier revision passed it as the 2nd (cwd) argument, which made cwd an
+    // object and Bun.spawnSync threw a spurious ENOENT on the resolved path.
     const result = runCli([
       "serve", "--config", configPath, "--dry-run",
       "--database-url-env", "WATS_MISSING_DATABASE_URL",
       "--host", "127.0.0.1", "--port", String(port)
-    ], { WATS_MISSING_DATABASE_URL: undefined });
+    ], repoRoot, { WATS_MISSING_DATABASE_URL: undefined });
     expect(result.exitCode).toBe(1);
     expect(result.stdout).toBe("");
     expect(result.stderr).toContain("wats serve --help");

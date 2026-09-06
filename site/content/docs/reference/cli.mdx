@@ -208,6 +208,24 @@ wats serve --config wats.config.yaml --live --yes-live --env-file .env.local --p
 
 This removes the need for a container entrypoint shim mapping `$PORT`/`0.0.0.0` onto static flags. `wats serve --help` prints usage and exits 0.
 
+### `wats serve ... --database <sqlite-path>` / `--database-url-env <env-name>`
+
+Opt-in durable persistence for `wats serve`. Both modes are mutually exclusive and off by default: without either flag the service is stateless (in-memory only), byte-identical to prior behavior.
+
+```bash
+# Local SQLite file (opened + migrated before binding, closed on shutdown)
+wats serve --config wats.config.yaml --dry-run --database ./wats.sqlite
+
+# PostgreSQL via a named env var (the raw DSN never appears on the command line)
+WATS_DATABASE_URL=postgres://user:pass@host:5432/wats \
+  wats serve --config wats.config.yaml --dry-run --database-url-env WATS_DATABASE_URL
+```
+
+- `--database <sqlite-path>` opens and migrates a local SQLite file **before** binding the port, so an open/migration failure fails closed without ever touching the network. The path is a safe local filename (no traversal, control chars, or token-like names); relative paths resolve under the config directory. `:memory:` is allowed for tests.
+- `--database-url-env <env-name>` resolves a PostgreSQL connection string from the named environment variable on startup. The env name must be a safe identifier (`[A-Z][A-Z0-9_]*`); the raw DSN is never accepted on the command line and never printed. Requires the optional `pg` package in the runtime.
+- The store is injected into the service config (metadata and message-history only; no raw-message outbox or distributed queue is implied) and closed **after** active work drains on shutdown.
+- Shutdown is graceful and finite: `server.stop(false)` stops admitting new requests and lets in-flight work finish within a finite 10s drain window (polling the server's pending-request counters), then force-stops, then closes the store. Repeated shutdown signals are idempotent. The bin awaits this async shutdown on `SIGINT`/`SIGTERM`.
+
 
 ### `wats messages list` / `wats messages show`
 

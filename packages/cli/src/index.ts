@@ -1,12 +1,13 @@
 import { ConfigValidationError, loadConfig, parseConfig, redactConfig, type WatsConfig, type WatsProfileConfig } from "@wats/config";
 import { createWatsServiceApp, createWatsServiceOpenApiDocument, WatsServiceError } from "@wats/service";
+import { createSqlitePersistence, createPostgresPersistence, type PersistenceStore } from "@wats/persistence";
 import { formatMessagesStatusSummaryLine } from "./status-renderer.js";
 
 export type CliCommandResult = Readonly<{
   exitCode: number;
   stdout: string;
   stderr: string;
-  shutdown?: () => void;
+  shutdown?: () => void | Promise<void>;
 }>;
 
 export type CliPromptRequest = Readonly<{
@@ -76,6 +77,8 @@ type ServeArgs = Readonly<{
   paas: boolean;
   printRoutes: boolean;
   envFile?: string;
+  database?: string;
+  databaseUrlEnv?: string;
 }> | Readonly<{
   ok: false;
   reason: "help" | "usage" | "live_missing";
@@ -97,7 +100,14 @@ type TransportLike = Readonly<{
 type BunServer = Readonly<{
   port: number;
   stop(closeActive?: boolean): void;
+  pendingRequests?: number;
+  pendingWebSockets?: number;
 }>;
+
+// WATS-204: graceful drain timeout. server.stop(false) stops admission and
+// lets active requests finish; after this many ms we force-stop.
+const SERVE_DRAIN_TIMEOUT_MS = 10_000;
+const SERVE_DRAIN_POLL_MS = 25;
 
 type BunLike = Readonly<{
   serve(options: { hostname: string; port: number; fetch(request: Request): Response | Promise<Response> }): BunServer;
@@ -325,8 +335,8 @@ The document is for the WATS service API only, not the Meta Graph API. The comma
 ${NO_LIVE_CREDENTIALS}
 `;
 
-const SERVE_HELP = `Usage: wats serve --config <path> --dry-run [--profile <name>] [--host <host>] [--port <port>] [--paas] [--print-routes]
-       wats serve --config <path> --live --yes-live --env-file <path> [--profile <name>] [--host <host>] [--port <port>] [--paas] [--print-routes]
+const SERVE_HELP = `Usage: wats serve --config <path> --dry-run [--profile <name>] [--host <host>] [--port <port>] [--paas] [--print-routes] [--database <sqlite-path> | --database-url-env <env-name>]
+       wats serve --config <path> --live --yes-live --env-file <path> [--profile <name>] [--host <host>] [--port <port>] [--paas] [--print-routes] [--database <sqlite-path> | --database-url-env <env-name>]
 
 Start the @wats/service Request -> Response app as a local Bun.serve process.
 
@@ -344,9 +354,17 @@ Options:
   --print-routes        Print the safe route inventory and exit without binding a port.
   --paas                PaaS deploy mode: bind 0.0.0.0 and read the platform-injected $PORT (Railway/Fly/Render/Cloud Run). Explicit --host/--port override these defaults; without --paas, $PORT is ignored.
 
+Durable persistence (opt-in, mutually exclusive):
+  --database <sqlite-path>        Open and migrate a local SQLite file before binding. The path is a safe local filename (no traversal, control chars, or token-like names); relative paths resolve under the config directory. The store is injected into the service config and closed on shutdown.
+  --database-url-env <env-name>   Resolve a PostgreSQL connection string from the named environment variable on startup. The env name must be a safe identifier; the raw DSN never appears on the command line or in output. Requires the optional 'pg' package in the runtime.
+
+Without persistence flags the service is stateless (in-memory only), matching the default. --database and --database-url-env are mutually exclusive. Persistence is metadata and message-history only; no raw-message outbox or distributed queue is implied.
+
 Live mode requires --live, --yes-live, and --env-file together. The CLI does not read .env.local implicitly. Keep live tokens in the env file or process environment, never in command arguments. For local webhook testing, put a secure HTTPS tunnel such as ngrok in front of the chosen host/port; Meta will not verify plain HTTP or a bare local IP callback.
 
 With --paas, the port comes from $PORT unless --port is given, and the host defaults to 0.0.0.0 unless --host is given; serve fails closed if --paas needs $PORT but it is missing or not 1..65535. This removes the external container entrypoint shim for PaaS deploys.
+
+Shutdown is graceful: in-flight requests are allowed to finish within a finite timeout (default 10s), then the store is closed. Repeated shutdown signals are idempotent.
 `;
 
 const WEBHOOK_TOKEN_HELP = `Usage: wats webhook token [--help]
@@ -456,8 +474,8 @@ const DOCTOR_VALUE_FLAGS = ["--config", "--profile", "--format"] as const;
 const DOCTOR_ALLOWED_FLAGS = ["--config", "--profile", "--format", "--check-env"] as const;
 const UPGRADE_ALLOWED_FLAGS = ["--dry-run"] as const;
 const PUBLIC_WATS_UPGRADE_PACKAGES = ["@wats/cli", "@wats/core", "@wats/graph", "@wats/http", "@wats/config", "@wats/service"] as const;
-const SERVE_VALUE_FLAGS = ["--config", "--profile", "--host", "--port", "--env-file"] as const;
-const SERVE_ALLOWED_FLAGS = ["--config", "--profile", "--host", "--port", "--dry-run", "--print-routes", "--live", "--yes-live", "--env-file", "--paas"] as const;
+const SERVE_VALUE_FLAGS = ["--config", "--profile", "--host", "--port", "--env-file", "--database", "--database-url-env"] as const;
+const SERVE_ALLOWED_FLAGS = ["--config", "--profile", "--host", "--port", "--dry-run", "--print-routes", "--live", "--yes-live", "--env-file", "--paas", "--database", "--database-url-env"] as const;
 const MESSAGES_LIST_VALUE_FLAGS = ["--config", "--profile", "--env-file", "--limit", "--cursor"] as const;
 const MESSAGES_LIST_ALLOWED_FLAGS = ["--config", "--profile", "--env-file", "--limit", "--cursor", "--json", "--help", "-h"] as const;
 const MESSAGES_SHOW_VALUE_FLAGS = ["--config", "--profile", "--env-file"] as const;
@@ -768,6 +786,37 @@ function isSafeServeEnvFile(value: string): boolean {
   if (segments.some((segment) => segment.length === 0 || segment === "." || segment === "..")) return false;
   const leaf = segments[segments.length - 1] ?? "";
   return leaf === ".env.local" || /^[A-Za-z0-9._-]+\.env$/u.test(leaf);
+}
+
+// WATS-204: validate a --database SQLite path. The path must be a safe local
+// filename: no traversal, no control chars, no token-like names, no absolute
+// paths pointing outside a reasonable local scope. Relative paths resolve
+// under the config directory (the caller resolves them). Reject empty,
+// whitespace, and oversized values. `:memory:` is allowed for in-memory tests.
+function isSafeDatabasePath(value: string): boolean {
+  if (value === ":memory:") return true;
+  if (!isNonEmptyArg(value) || value.length > 4096) return false;
+  if (value.startsWith("-")) return false;
+  if (/[\\?\u0000-\u001f\u007f]/u.test(value)) return false;
+  if (/token|secret|password/iu.test(value)) return false;
+  if (value.startsWith("/")) {
+    const segments = value.slice(1).split("/").filter((s) => s.length > 0);
+    if (segments.some((s) => s === "." || s === "..")) return false;
+    return true;
+  }
+  const segments = value.split("/");
+  if (segments.some((s) => s.length === 0 || s === "." || s === "..")) return false;
+  return true;
+}
+
+// WATS-204: validate a --database-url-env env name. Must be a safe
+// identifier (uppercase letters, digits, underscores), 1..64 chars, no
+// token/secret/password-like words, no traversal. The raw DSN is never
+// accepted on the command line — only the env NAME is.
+function isSafeDatabaseUrlEnvName(value: string): boolean {
+  if (!isNonEmptyArg(value) || value.length > 64) return false;
+  if (/token|secret|password|\.\.|[\\/?#]/iu.test(value)) return false;
+  return /^[A-Z][A-Z0-9_]*$/u.test(value);
 }
 
 function hasUnsafeTargetPath(value: string): boolean {
@@ -1380,7 +1429,12 @@ function parseServeArgs(args: readonly string[]): ServeArgs {
   const liveIntent = hasFlagName(args, "--live");
   const liveAcknowledgement = hasFlagName(args, "--yes-live");
   const envFileFlag = parseFlagValue(valueArgs, ["--env-file"], SERVE_VALUE_FLAGS);
+  const databaseFlag = parseFlagValue(valueArgs, ["--database"], SERVE_VALUE_FLAGS);
+  const databaseUrlEnvFlag = parseFlagValue(valueArgs, ["--database-url-env"], SERVE_VALUE_FLAGS);
   if (!envFileFlag.ok) return { ok: envFileFlag.reason === "missing" ? false : false, reason: envFileFlag.reason === "missing" ? "live_missing" : "usage" };
+  if (!databaseFlag.ok || !databaseUrlEnvFlag.ok) return { ok: false, reason: "usage" };
+  // WATS-204: --database and --database-url-env are mutually exclusive.
+  if (databaseFlag.present && databaseUrlEnvFlag.present) return { ok: false, reason: "usage" };
   const liveTouched = liveIntent || liveAcknowledgement || envFileFlag.present;
   if (dryRun && liveTouched) return { ok: false, reason: "live_missing" };
   if (!dryRun && !liveTouched) return { ok: false, reason: "usage" };
@@ -1405,6 +1459,9 @@ function parseServeArgs(args: readonly string[]): ServeArgs {
     port = parsedPort;
   }
   if (envFileFlag.value !== undefined && !isSafeServeEnvFile(envFileFlag.value)) return { ok: false, reason: "usage" };
+  // WATS-204: validate persistence flag values.
+  if (databaseFlag.value !== undefined && !isSafeDatabasePath(databaseFlag.value)) return { ok: false, reason: "usage" };
+  if (databaseUrlEnvFlag.value !== undefined && !isSafeDatabaseUrlEnvName(databaseUrlEnvFlag.value)) return { ok: false, reason: "usage" };
 
   return {
     ok: true,
@@ -1415,7 +1472,9 @@ function parseServeArgs(args: readonly string[]): ServeArgs {
     ...(envFileFlag.value !== undefined ? { envFile: envFileFlag.value } : {}),
     ...(profileFlag.value !== undefined ? { profileName: profileFlag.value } : {}),
     ...(hostFlag.value !== undefined ? { host: hostFlag.value } : {}),
-    ...(port !== undefined ? { port } : {})
+    ...(port !== undefined ? { port } : {}),
+    ...(databaseFlag.value !== undefined ? { database: databaseFlag.value } : {}),
+    ...(databaseUrlEnvFlag.value !== undefined ? { databaseUrlEnv: databaseUrlEnvFlag.value } : {})
   };
 }
 
@@ -1539,7 +1598,7 @@ type ResolvedServiceSecrets = Readonly<{
 
 type EnvFileRead = Readonly<{ ok: true; values: Record<string, string> }> | Readonly<{ ok: false }>;
 
-function syntheticServiceConfig(profile: WatsProfileConfig) {
+function syntheticServiceConfig(profile: WatsProfileConfig, persistence?: PersistenceStore) {
   return {
     profile,
     secrets: {
@@ -1553,7 +1612,8 @@ function syntheticServiceConfig(profile: WatsProfileConfig) {
       async dispatch(): Promise<void> {
         return undefined;
       }
-    })
+    }),
+    ...(persistence !== undefined ? { persistence } : {})
   };
 }
 
@@ -1618,8 +1678,8 @@ async function resolveLiveServiceSecrets(profile: WatsProfileConfig, parsed: Ser
   return { accessToken, webhookVerifyToken, webhookAppSecret, serviceBearerToken };
 }
 
-function liveServiceConfig(profile: WatsProfileConfig, secrets: ResolvedServiceSecrets) {
-  return { profile, secrets };
+function liveServiceConfig(profile: WatsProfileConfig, secrets: ResolvedServiceSecrets, persistence?: PersistenceStore) {
+  return { profile, secrets, ...(persistence !== undefined ? { persistence } : {}) };
 }
 
 function getBunRuntime(): BunLike | null {
@@ -1630,14 +1690,99 @@ function getBunRuntime(): BunLike | null {
   return maybeBun as BunLike;
 }
 
-function createServeShutdown(server: BunServer): () => void {
+function createServeShutdown(server: BunServer, store?: PersistenceStore): () => Promise<void> {
   let stopped = false;
-  return () => {
-    if (!stopped) {
-      stopped = true;
-      server.stop(true);
+  return async () => {
+    if (stopped) return;
+    stopped = true;
+    // Stop admitting new requests but let active work finish.
+    server.stop(false);
+
+    // Drain: poll the server's pendingRequests counter until it reaches
+    // zero (or a property is absent, in which case fall through to the
+    // finite timeout). The forced timeout guarantees we never wait forever.
+    const drainDeadline = Date.now() + SERVE_DRAIN_TIMEOUT_MS;
+    const hasPendingProp = typeof server.pendingRequests === "number" || typeof server.pendingWebSockets === "number";
+    if (hasPendingProp) {
+      while (Date.now() < drainDeadline) {
+        const pending =
+          (typeof server.pendingRequests === "number" ? server.pendingRequests : 0) +
+          (typeof server.pendingWebSockets === "number" ? server.pendingWebSockets : 0);
+        if (pending <= 0) break;
+        await new Promise<void>((resolvePoll) => setTimeout(resolvePoll, SERVE_DRAIN_POLL_MS));
+      }
+    } else {
+      // Fallback for runtimes that don't expose pendingRequests: wait the
+      // full finite timeout, then force-stop. This is still bounded.
+      await new Promise<void>((resolveTimeout) => setTimeout(resolveTimeout, SERVE_DRAIN_TIMEOUT_MS));
+    }
+
+    // Force-stop any remaining work after the drain window.
+    server.stop(true);
+
+    // Close the store AFTER active work has drained.
+    if (store !== undefined) {
+      try {
+        await store.close();
+      } catch {
+        // Best-effort close; the server is already stopping.
+      }
     }
   };
+}
+
+function resolveDatabasePath(configPath: string, database: string): string {
+  if (database === ":memory:") return database;
+  if (database.startsWith("/")) return database;
+  // Relative paths resolve under the config directory.
+  const slashIndex = configPath.lastIndexOf("/");
+  const baseDir = slashIndex === -1 ? "." : configPath.slice(0, slashIndex);
+  return `${baseDir.replace(/\/+$/u, "")}/${database}`;
+}
+
+async function resolveDatabaseUrlFromEnv(envName: string): Promise<string | null> {
+  const env = processEnv();
+  const value = env[envName];
+  if (typeof value !== "string" || value.trim().length === 0) return null;
+  return value;
+}
+
+async function openPersistenceStore(parsed: ServeArgs & { ok: true }): Promise<PersistenceStore | null | undefined> {
+  if (parsed.database !== undefined) {
+    const resolved = resolveDatabasePath(parsed.configPath, parsed.database);
+    let store: PersistenceStore;
+    try {
+      store = await createSqlitePersistence({ filename: resolved });
+    } catch {
+      return null;
+    }
+    try {
+      await store.migrate();
+      return store;
+    } catch {
+      // Migrate failed: close the opened handle so no file/lock leaks.
+      await store.close().catch(() => undefined);
+      return null;
+    }
+  }
+  if (parsed.databaseUrlEnv !== undefined) {
+    const connectionString = await resolveDatabaseUrlFromEnv(parsed.databaseUrlEnv);
+    if (connectionString === null) return null;
+    let store: PersistenceStore;
+    try {
+      store = await createPostgresPersistence({ connectionString });
+    } catch {
+      return null;
+    }
+    try {
+      await store.migrate();
+      return store;
+    } catch {
+      await store.close().catch(() => undefined);
+      return null;
+    }
+  }
+  return undefined;
 }
 
 async function serveCommand(args: readonly string[]): Promise<CliCommandResult> {
@@ -1648,6 +1793,7 @@ async function serveCommand(args: readonly string[]): Promise<CliCommandResult> 
     return fail("Invalid serve arguments. Run `wats serve --help` for usage.\n");
   }
 
+  let store: PersistenceStore | undefined;
   try {
     const config = await loadConfig(parsed.configPath);
     const selected = selectProfile(config, parsed.profileName);
@@ -1660,21 +1806,53 @@ async function serveCommand(args: readonly string[]): Promise<CliCommandResult> 
 
     // WATS-129: apply native PaaS bind resolution ($PORT / 0.0.0.0) only when --paas
     // is set, and only on the binding path (print-routes above never needs $PORT).
+    // Resolve this BEFORE opening the persistence store so a PaaS config failure
+    // does not leak an opened store handle.
     const boundProfile = resolvePaasServeProfile(profile, parsed, processEnv());
     if (boundProfile === null) return fail("Invalid serve arguments. Run `wats serve --help` for usage.\n");
 
+    // WATS-204: open+migrate the persistence store BEFORE binding, so a
+    // migration/open failure fails closed without ever touching the port.
+    // Returns undefined when no persistence flags were passed (stateless default).
+    const persistenceResult = await openPersistenceStore(parsed);
+    if (persistenceResult === null) {
+      return fail("PersistenceError\nDurable persistence could not be opened or migrated. Run `wats serve --help` for usage.\n");
+    }
+    store = persistenceResult;
+
     const bunRuntime = getBunRuntime();
-    if (bunRuntime === null) return fail("Bun runtime unavailable. Run `wats serve --help` for usage.\n");
+    if (bunRuntime === null) {
+      if (store !== undefined) await store.close().catch(() => undefined);
+      return fail("Bun runtime unavailable. Run `wats serve --help` for usage.\n");
+    }
 
     const serviceConfig = parsed.mode === "dry-run"
-      ? syntheticServiceConfig(boundProfile)
-      : await resolveLiveServiceSecrets(boundProfile, parsed as ServeArgs & { ok: true; mode: "live" }).then((secrets) => secrets === null ? null : liveServiceConfig(boundProfile, secrets));
-    if (serviceConfig === null) return fail("SecretResolutionError\nMissing or invalid live env values. Run `wats serve --help` for usage.\n");
+      ? syntheticServiceConfig(boundProfile, store)
+      : await resolveLiveServiceSecrets(boundProfile, parsed as ServeArgs & { ok: true; mode: "live" }).then((secrets) => secrets === null ? null : liveServiceConfig(boundProfile, secrets, store));
+    if (serviceConfig === null) {
+      if (store !== undefined) await store.close().catch(() => undefined);
+      return fail("SecretResolutionError\nMissing or invalid live env values. Run `wats serve --help` for usage.\n");
+    }
 
-    const app = createWatsServiceApp(serviceConfig);
-    const server = bunRuntime.serve({ hostname: boundProfile.service.host, port: boundProfile.service.port, fetch: app.fetch });
-    return Object.freeze({ ...ok(formatServeReady(boundProfile.service.host, server.port, parsed.mode)), shutdown: createServeShutdown(server) });
+    let server: BunServer;
+    try {
+      const app = createWatsServiceApp(serviceConfig);
+      server = bunRuntime.serve({ hostname: boundProfile.service.host, port: boundProfile.service.port, fetch: app.fetch });
+    } catch (error) {
+      // Bind failure: close the store before returning so no WAL lock leaks.
+      if (store !== undefined) await store.close().catch(() => undefined);
+      if (error instanceof WatsServiceError) {
+        const safe = error.code === "invalid_path"
+          ? new WatsServiceError(error.code, "Service route configuration is invalid.")
+          : error;
+        return fail(formatWatsServiceError(safe, "wats serve --help"));
+      }
+      return fail("Serve bind failed. Run `wats serve --help` for usage.\n");
+    }
+    return Object.freeze({ ...ok(formatServeReady(boundProfile.service.host, server.port, parsed.mode)), shutdown: createServeShutdown(server, store) });
   } catch (error) {
+    // Startup failure path: close the store if it was opened.
+    if (store !== undefined) await store.close().catch(() => undefined);
     if (error instanceof ConfigValidationError) {
       return fail(formatConfigValidationError(error, "wats serve --help"));
     }

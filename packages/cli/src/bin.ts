@@ -173,15 +173,19 @@ if (result.stderr.length > 0) {
 
 if (result.shutdown !== undefined && typeof process.once === "function") {
   let stopped = false;
-  const stopAndExit = (): void => {
+  const stopAndExit = async (): Promise<void> => {
     if (!stopped) {
       stopped = true;
-      result.shutdown?.();
+      try {
+        await result.shutdown?.();
+      } catch {
+        // Best-effort shutdown; the process is exiting.
+      }
     }
     process.exit?.(0);
   };
-  process.once("SIGINT", stopAndExit);
-  process.once("SIGTERM", stopAndExit);
+  process.once("SIGINT", () => { void stopAndExit(); });
+  process.once("SIGTERM", () => { void stopAndExit(); });
 }
 
 process.exitCode = result.exitCode;
