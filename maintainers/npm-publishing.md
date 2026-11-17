@@ -281,3 +281,9 @@ Human-blocked (cannot be completed or faked from the repo):
 
 Do not check the human-blocked boxes from a repo commit. Do not mark WATS-110
 Done in Linear from this slice alone.
+
+## Graph API v27 beta release preparation
+
+The prepared workspace release is `0.5.0-beta`. The manual release workflow selects the `beta` npm dist-tag for this version; stable versions select `latest`, and alpha/rc versions select their matching channel. Preparation does not publish packages or move registry tags. Run `bun run check-publish` before manually dispatching the protected release workflow after review and merge.
+
+The isolated `site/snippets` and `site/playground-build` packages intentionally remain pinned to the already published SDK. After all `0.5.0-beta` packages are published and provenance is verified, update those package pins and their isolated lockfiles, rebuild the playground assets and hero capture, and validate the site before deployment. Do not make a pre-publication site build depend on an unavailable registry version.

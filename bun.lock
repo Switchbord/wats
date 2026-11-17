@@ -39,60 +39,60 @@
     },
     "packages/cli": {
       "name": "@wats/cli",
-      "version": "0.4.0-beta.0",
+      "version": "0.5.0-beta",
       "bin": {
         "wats": "dist/bin.js",
       },
       "dependencies": {
-        "@wats/config": "^0.4.0-beta.0",
-        "@wats/persistence": "^0.4.0-beta.0",
-        "@wats/service": "^0.4.0-beta.0",
+        "@wats/config": "^0.5.0-beta",
+        "@wats/persistence": "^0.5.0-beta",
+        "@wats/service": "^0.5.0-beta",
       },
     },
     "packages/config": {
       "name": "@wats/config",
-      "version": "0.4.0-beta.0",
+      "version": "0.5.0-beta",
       "dependencies": {
-        "@wats/internal-utils": "^0.4.0-beta.0",
+        "@wats/internal-utils": "^0.5.0-beta",
       },
     },
     "packages/core": {
       "name": "@wats/core",
-      "version": "0.4.0-beta.0",
+      "version": "0.5.0-beta",
       "dependencies": {
-        "@wats/graph": "^0.4.0-beta.0",
+        "@wats/graph": "^0.5.0-beta",
       },
     },
     "packages/crypto": {
       "name": "@wats/crypto",
-      "version": "0.4.0-beta.0",
+      "version": "0.5.0-beta",
     },
     "packages/graph": {
       "name": "@wats/graph",
-      "version": "0.4.0-beta.0",
+      "version": "0.5.0-beta",
       "dependencies": {
-        "@wats/crypto": "^0.4.0-beta.0",
-        "@wats/internal-utils": "^0.4.0-beta.0",
+        "@wats/crypto": "^0.5.0-beta",
+        "@wats/internal-utils": "^0.5.0-beta",
       },
     },
     "packages/http": {
       "name": "@wats/http",
-      "version": "0.4.0-beta.0",
+      "version": "0.5.0-beta",
       "dependencies": {
-        "@wats/core": "^0.4.0-beta.0",
-        "@wats/crypto": "^0.4.0-beta.0",
-        "@wats/types": "^0.4.0-beta.0",
+        "@wats/core": "^0.5.0-beta",
+        "@wats/crypto": "^0.5.0-beta",
+        "@wats/types": "^0.5.0-beta",
       },
     },
     "packages/internal-utils": {
       "name": "@wats/internal-utils",
-      "version": "0.4.0-beta.0",
+      "version": "0.5.0-beta",
     },
     "packages/persistence": {
       "name": "@wats/persistence",
-      "version": "0.4.0-beta.0",
+      "version": "0.5.0-beta",
       "dependencies": {
-        "@wats/internal-utils": "^0.4.0-beta.0",
+        "@wats/internal-utils": "^0.5.0-beta",
       },
       "peerDependencies": {
         "pg": "^8.11.0",
@@ -103,20 +103,20 @@
     },
     "packages/service": {
       "name": "@wats/service",
-      "version": "0.4.0-beta.0",
+      "version": "0.5.0-beta",
       "dependencies": {
-        "@wats/config": "^0.4.0-beta.0",
-        "@wats/core": "^0.4.0-beta.0",
-        "@wats/crypto": "^0.4.0-beta.0",
-        "@wats/graph": "^0.4.0-beta.0",
-        "@wats/http": "^0.4.0-beta.0",
-        "@wats/internal-utils": "^0.4.0-beta.0",
-        "@wats/persistence": "^0.4.0-beta.0",
+        "@wats/config": "^0.5.0-beta",
+        "@wats/core": "^0.5.0-beta",
+        "@wats/crypto": "^0.5.0-beta",
+        "@wats/graph": "^0.5.0-beta",
+        "@wats/http": "^0.5.0-beta",
+        "@wats/internal-utils": "^0.5.0-beta",
+        "@wats/persistence": "^0.5.0-beta",
       },
     },
     "packages/testing": {
       "name": "@wats/testing",
-      "version": "0.4.0-beta.0",
+      "version": "0.5.0-beta",
       "dependencies": {
         "@wats/config": "workspace:*",
         "@wats/crypto": "workspace:*",
@@ -204,7 +204,7 @@
     },
     "packages/types": {
       "name": "@wats/types",
-      "version": "0.4.0-beta.0",
+      "version": "0.5.0-beta",
     },
     "site": {
       "name": "@wats/site",
