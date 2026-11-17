@@ -227,6 +227,18 @@ describe("wats setup", () => {
     expectNoSecrets(result.stdout + result.stderr);
   });
 
+  test("preserves an explicitly entered older Graph API version", async () => {
+    const dir = makeTempDir();
+    try {
+      const { result } = await runSetup(["setup", dir], validAnswers({ apiVersion: "v25.0" }));
+      expect(result.exitCode, result.stderr).toBe(0);
+      const parsed = parseConfig(read(join(dir, "wats.config.yaml")), { format: "yaml" });
+      expect(parsed.profiles.test?.graph.apiVersion).toBe("v25.0");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test("writes deterministic YAML and .env.local while redacting output", async () => {
     const dir = makeTempDir();
     try {
@@ -251,7 +263,7 @@ defaultProfile: test
 profiles:
   test:
     graph:
-      apiVersion: v25.0
+      apiVersion: v27.0
       baseUrl: https://graph.facebook.com
     whatsapp:
       wabaId: "123456789012345"

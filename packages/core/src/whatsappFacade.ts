@@ -298,7 +298,7 @@ function hasRequestMethod(
 
 // ---- WATS-172 createWhatsApp factory validation -------------------
 
-const DEFAULT_WHATSAPP_API_VERSION = "v25.0";
+const DEFAULT_WHATSAPP_API_VERSION = "v27.0";
 const FACTORY_ACCESS_TOKEN_MAX_LEN = 4096;
 const FACTORY_API_VERSION_REGEXP = /^v\d+(?:\.\d+)?$/;
 
@@ -397,7 +397,7 @@ function validateFactoryTransport(value: unknown): Transport {
 /**
  * WATS-172 factory. Constructs a `GraphClient` internally (transport
  * defaults to `createFetchTransport()`, apiVersion defaults to
- * `"v25.0"`) and returns a fully-wired `WhatsApp` instance. The only
+ * `"v27.0"`) and returns a fully-wired `WhatsApp` instance. The only
  * required option is `accessToken`; `phoneNumberId` / `wabaId` /
  * router / listener options pass through unchanged.
  *

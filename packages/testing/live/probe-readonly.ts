@@ -42,7 +42,7 @@ async function main(): Promise<void> {
   const accessToken = reqEnv("WATS_ACCESS_TOKEN");
   const wabaId = reqEnv("WATS_WABA_ID");
   const phoneNumberId = reqEnv("WATS_PHONE_NUMBER_ID");
-  const apiVersion = process.env.WATS_GRAPH_API_VERSION ?? "v25.0";
+  const apiVersion = process.env.WATS_GRAPH_API_VERSION ?? "v27.0";
   const baseUrl = process.env.WATS_GRAPH_BASE_URL ?? "https://graph.facebook.com";
 
   const client = new GraphClient({ accessToken, apiVersion, baseUrl: `${baseUrl}/` });

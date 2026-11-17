@@ -36,7 +36,7 @@ HOME=/root WATS_TEST_RUN_ID="ro-$(date -u +%Y%m%dT%H%M%SZ)" \
 
 Required env (names only): `WATS_ACCESS_TOKEN`, `WATS_WABA_ID`,
 `WATS_PHONE_NUMBER_ID`, `WATS_TEST_RECIPIENT`, plus the gate/domain flags.
-Optional: `WATS_GRAPH_API_VERSION` (default `v25.0`), `WATS_GRAPH_BASE_URL`,
+Optional: `WATS_GRAPH_API_VERSION` (default `v27.0`), `WATS_GRAPH_BASE_URL`,
 `WATS_TEMPLATE_NAME`/`WATS_TEMPLATE_LANG` (default `hello_world`/`en_US`).
 
 ## Evidence ledger + redaction

@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- New `createWhatsApp` clients, `wats init` profiles, `wats setup` prompts, and live probe defaults use Graph API `v27.0`. Explicit API versions in clients, existing profiles, setup answers, and `WATS_GRAPH_API_VERSION` remain honored. No live Meta compatibility validation is claimed.
+
 ## [0.4.1-beta.0] - 2026-09-06
 
 Standalone hardening patch. Beta status is unchanged.

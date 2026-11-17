@@ -22,14 +22,16 @@ Optional: `appSecret?`, `verifyToken?`, `apiVersion?`, `baseUrl?` (all strings).
 
 The normalized internal shape after defaults (`apiVersion`, `baseUrl`) are resolved during async startup.
 
+The `createWhatsApp` facade factory defaults `apiVersion` to `"v27.0"`. An explicitly supplied version is preserved. `GraphClient` itself requires an explicit `apiVersion`.
+
 ## `GraphClientConfig`
 
 Required fields:
 - `accessToken: string` — non-empty; max 4096 characters; not whitespace-only; no CR (U+000D), LF (U+000A), NUL (U+0000), or any other control character (U+0000..U+001F, U+007F). Invalid tokens throw `GraphRequestValidationError` at construction. Better there than in a request header.
-- `apiVersion: string` — must match `/^v\d+(\.\d+)?$/` (for example `v20` or `v25.0`). Values containing `/`, `?`, `#`, `..`, or control characters are rejected with `GraphRequestValidationError`.
+- `apiVersion: string` — must match `/^v\d+(\.\d+)?$/` (for example `v20` or `v27.0`). Values containing `/`, `?`, `#`, `..`, or control characters are rejected with `GraphRequestValidationError`.
 
 Optional fields:
-- `baseUrl?: string` — defaults to `DEFAULT_GRAPH_BASE_URL` (`"https://graph.facebook.com/"`). Must parse via `new URL(...)` and the protocol must be `http:` or `https:`; every other scheme (`javascript:`, `file:`, `ftp:`, `data:`, `about:`, `blob:`, …) is rejected with `GraphRequestValidationError`. The pathname of `baseUrl` is preserved in resolved request URLs: `baseUrl: "https://proxy.example.com/api"` + `path: "/me"` + `apiVersion: "v25.0"` resolves to `"https://proxy.example.com/api/v25.0/me"`.
+- `baseUrl?: string` — defaults to `DEFAULT_GRAPH_BASE_URL` (`"https://graph.facebook.com/"`). Must parse via `new URL(...)` and the protocol must be `http:` or `https:`; every other scheme (`javascript:`, `file:`, `ftp:`, `data:`, `about:`, `blob:`, …) is rejected with `GraphRequestValidationError`. The pathname of `baseUrl` is preserved in resolved request URLs: `baseUrl: "https://proxy.example.com/api"` + `path: "/me"` + `apiVersion: "v27.0"` resolves to `"https://proxy.example.com/api/v27.0/me"`.
 - `transport?: Transport` — defaults to `createFetchTransport()`. Inject a custom `Transport` for retry, auth-refresh, tracing, or mocking. See [Transport and Testing](/docs/guides/transport-and-testing).
 
 `DEFAULT_GRAPH_BASE_URL` is exported if you need the default explicitly.
@@ -259,7 +261,7 @@ import { WhatsApp } from "@wats/core";
 
 const graphClient = new GraphClient({
   accessToken: process.env.WHATSAPP_TOKEN!,
-  apiVersion: "v25.0"
+  apiVersion: "v27.0"
 });
 
 const wa = new WhatsApp({
