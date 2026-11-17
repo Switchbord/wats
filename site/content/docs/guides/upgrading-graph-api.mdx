@@ -1,0 +1,34 @@
+---
+title: Upgrade to Graph API v27
+description: Move explicit API version settings to v27.0 and verify your WhatsApp integration before rollout.
+---
+
+<DocMeta status="shape-only — credential-free examples; no live v27 validation" lastReviewed="2026-11-17" />
+
+The current examples target Graph API `v27.0`. Meta lists v27.0 as the latest version in its [Graph API versioning guide](https://developers.facebook.com/docs/graph-api/guides/versioning/). The v26/v27 changelog pages could not be retrieved during this documentation audit. This guide covers selecting that version in WATS; it is not an exhaustive account of Meta's v26 or v27 behavior changes.
+
+## Select the request version
+
+Set the version explicitly when upgrading an existing integration:
+
+```ts
+import { createWhatsApp } from "@wats/core";
+
+const wa = createWhatsApp({
+  accessToken: process.env.WHATSAPP_TOKEN!,
+  apiVersion: "v27.0",
+});
+```
+
+For `GraphClient`, pass `apiVersion: "v27.0"` in its constructor options. For configuration files, update every profile's `graph.apiVersion`; profiles can have separate settings. The checked-in JSON/YAML configuration examples and Railway template show the current target.
+
+WATS accepts explicit version strings rather than enforcing a supported-version allowlist. A previously pinned version remains an explicit choice, subject to Meta's availability and behavior for that version. Changing a WATS setting does not migrate your Meta app configuration or establish that every endpoint has been validated against v27.
+
+## Verify before rollout
+
+1. Review Meta's [Graph API changelog](https://developers.facebook.com/docs/graph-api/changelog/) and [WhatsApp Cloud API changelog](https://developers.facebook.com/documentation/business-messaging/whatsapp/changelog) for the versions you are crossing and the features you use.
+2. Check your Meta app's webhook subscription version separately. WATS's request version selects outbound Graph URLs; it does not configure the webhook version in the Meta app dashboard.
+3. Run your credential-free transport tests with the new version and check the captured request URLs. The [transport and testing guide](/docs/guides/transport-and-testing) shows this seam.
+4. In your own controlled environment, verify the reads, message types, templates, media, and webhook payloads your application uses before expanding rollout. Keep the previous explicit configuration available while evaluating results.
+
+Existing [live campaign evidence](/docs/parity/live-campaign) records the version actually used during those campaigns. The updated examples do not turn that historical evidence into v27 validation. Historical feature and version notes retain their original meaning.

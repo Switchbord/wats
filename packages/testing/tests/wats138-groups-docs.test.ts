@@ -242,8 +242,8 @@ describe("WATS-138 Groups runnable example", () => {
     expect(result.stdout).toContain("wats-groups-example:ready");
     expect(result.stdout).toContain("syntheticGroupUpdates=2");
     expect(result.stdout).toContain("graphRequests=5");
-    expect(result.stdout).toContain("POST /v25.0/15550000000/groups");
-    expect(result.stdout).toContain("POST /v25.0/15550000000/messages");
+    expect(result.stdout).toContain("POST /v27.0/15550000000/groups");
+    expect(result.stdout).toContain("POST /v27.0/15550000000/messages");
   });
 
   test("groups example docs and code avoid raw credentials and misleading localhost webhook curl", () => {

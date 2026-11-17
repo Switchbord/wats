@@ -31,7 +31,7 @@ const mock = createMockTransport({
 const wa = createWhatsApp({
   accessToken: "offline",
   phoneNumberId: "15550000000",
-  apiVersion: "v25.0",
+  apiVersion: "v27.0",
   transport: mock.transport
 });
 

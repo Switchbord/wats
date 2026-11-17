@@ -20,7 +20,7 @@ defaultProfile: local
 profiles:
   local:
     graph:
-      apiVersion: v25.0
+      apiVersion: v27.0
       baseUrl: https://graph.facebook.com
     whatsapp:
       wabaId: "123"

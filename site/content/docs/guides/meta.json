@@ -6,6 +6,7 @@
     "groups-quickstart",
     "transport-and-testing",
     "migrating-from-pywa",
+    "upgrading-graph-api",
     "send-template-message",
     "handle-button-and-list-replies",
     "handle-status-callbacks",

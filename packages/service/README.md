@@ -15,7 +15,7 @@ npm i @wats/service
 import { createWatsServiceOpenApiDocument } from "@wats/service";
 
 const doc = createWatsServiceOpenApiDocument({
-  graph: { apiVersion: "v25.0", baseUrl: "https://graph.facebook.com" },
+  graph: { apiVersion: "v27.0", baseUrl: "https://graph.facebook.com" },
   whatsapp: { wabaId: "123", phoneNumberId: "456" },
   auth: { accessToken: { env: "WATS_ACCESS_TOKEN" } },
   webhook: { path: "/webhooks/whatsapp", verifyToken: { env: "WATS_VERIFY_TOKEN" }, appSecret: { env: "WATS_APP_SECRET" }, maxBodyBytes: 1048576 },
