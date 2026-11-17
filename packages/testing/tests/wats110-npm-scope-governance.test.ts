@@ -8,6 +8,7 @@
 // "Acceptance and human blockers".
 
 import { describe, expect, test } from "bun:test";
+import { readReleaseVersion } from "../../../scripts/release-metadata";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
@@ -142,8 +143,12 @@ describe("WATS-110 npm scope governance and provenance hardening", () => {
     expect(doc).not.toMatch(/2FA has been enforced on the npm org|OIDC trust is configured|provenance attestation verified on/iu);
     // The changelog convention for post-tag work (cf. WATS-141/124/123) is to
     // add the entry in the next release PR, not under the already-tagged
-    // heading. Verify the top heading stays the current release.
+    // heading. Allow an Unreleased section before the current release.
     const changelog = read("CHANGELOG.md");
-    expect(changelog.startsWith("# Changelog\n\n## [0.4.1-beta.0]")).toBe(true);
+    expect(changelog.startsWith("# Changelog\n\n## [")).toBe(true);
+    const headings = [...changelog.matchAll(/^## \[([^\]]+)\]/gm)].map((match) => match[1]);
+    const releasedHeadings = headings[0] === "Unreleased" ? headings.slice(1) : headings;
+    expect(releasedHeadings[0]).toBe(readReleaseVersion(repoRoot));
+    expect(releasedHeadings).not.toContain("Unreleased");
   });
 });

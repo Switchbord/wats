@@ -1,6 +1,7 @@
 // WATS 0.3.0 public docs truth contract.
 
 import { describe, expect, test } from "bun:test";
+import { readReleaseVersion } from "../../../scripts/release-metadata";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -35,9 +36,13 @@ describe("WATS 0.4.0-beta.0 public docs truth contract", () => {
     expect(readme).not.toContain("After the alpha packages are published");
   });
 
-  test("changelog has a top 0.4.1-beta.0 section and keeps release side-effect boundaries honest", () => {
+  test("changelog has the current release after an optional Unreleased section and keeps release side-effect boundaries honest", () => {
     const changelog = read("CHANGELOG.md");
-    expect(changelog.startsWith("# Changelog\n\n## [0.4.1-beta.0]")).toBe(true);
+    expect(changelog.startsWith("# Changelog\n\n## [")).toBe(true);
+    const headings = [...changelog.matchAll(/^## \[([^\]]+)\]/gm)].map((match) => match[1]);
+    const releasedHeadings = headings[0] === "Unreleased" ? headings.slice(1) : headings;
+    expect(releasedHeadings[0]).toBe(readReleaseVersion(repoRoot));
+    expect(releasedHeadings).not.toContain("Unreleased");
     expect(changelog).toContain("### WATS-108 — community governance files");
     expect(changelog).toContain("canonical `@wats/*` package scope");
     expect(changelog).toContain("### WATS-98 — Marketing Messages API compatibility surfaces");
