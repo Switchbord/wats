@@ -456,7 +456,7 @@ const INIT_DEFAULT_FORMAT: InitFormat = "yaml";
 const INIT_VALUE_FLAGS = ["--format", "--profile"] as const;
 const SETUP_VALUE_FLAGS = ["--profile"] as const;
 const SETUP_DEFAULT_PROFILE = "local" as const;
-const SETUP_DEFAULT_API_VERSION = "v25.0" as const;
+const SETUP_DEFAULT_API_VERSION = "v27.0" as const;
 const SETUP_DEFAULT_BASE_URL = "https://graph.facebook.com" as const;
 const SETUP_DEFAULT_WEBHOOK_PATH = "/webhooks/whatsapp" as const;
 const SETUP_DEFAULT_SERVICE_HOST = "127.0.0.1" as const;
@@ -887,7 +887,7 @@ function parseInitArgs(args: readonly string[]): InitArgs {
 
 function initConfigObject(profileName: string): WatsConfig {
   const profile = Object.freeze({
-    graph: Object.freeze({ apiVersion: "v25.0", baseUrl: "https://graph.facebook.com" }),
+    graph: Object.freeze({ apiVersion: "v27.0", baseUrl: "https://graph.facebook.com" }),
     whatsapp: Object.freeze({ wabaId: "000000000000000", phoneNumberId: "00000000000" }),
     auth: Object.freeze({ accessToken: Object.freeze({ env: "WATS_ACCESS_TOKEN" }) }),
     webhook: Object.freeze({

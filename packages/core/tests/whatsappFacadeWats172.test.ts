@@ -144,7 +144,7 @@ describe("WATS-172 createWhatsApp factory — construction", () => {
     expect(wa.phoneNumberClient?.phoneNumberId).toBe("1234567890");
   });
 
-  test("defaults apiVersion to v25.0 when omitted", async () => {
+  test("defaults apiVersion to v27.0 when omitted", async () => {
     const handle = makeHandle();
     const wa = createWhatsApp({
       accessToken: "token-AAA",
@@ -153,7 +153,7 @@ describe("WATS-172 createWhatsApp factory — construction", () => {
     });
     await wa.sendText({ to: "15551230000", text: "hi" });
     expect(handle.requests[0]?.url).toBe(
-      "https://graph.facebook.com/v25.0/1234567890/messages"
+      "https://graph.facebook.com/v27.0/1234567890/messages"
     );
   });
 

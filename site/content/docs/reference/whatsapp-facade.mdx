@@ -17,7 +17,7 @@ import { GraphClient, createFetchTransport } from "@wats/graph";
 
 const graphClient = new GraphClient({
   accessToken: process.env.META_WA_TOKEN!,
-  apiVersion: "v25.0",
+  apiVersion: "v27.0",
   transport: createFetchTransport()
 });
 
@@ -47,7 +47,7 @@ Construction-time validation checks required shapes immediately. Facade config f
 
 ### Factory
 
-`createWhatsApp(options)` is the one-call path for the 80% case. It constructs the `GraphClient` internally so you do not wire one by hand. The only required option is `accessToken`; `apiVersion` defaults to `"v25.0"` and `transport` defaults to `createFetchTransport()`.
+`createWhatsApp(options)` is the one-call path for the 80% case. It constructs the `GraphClient` internally so you do not wire one by hand. The only required option is `accessToken`; `apiVersion` defaults to `"v27.0"` and `transport` defaults to `createFetchTransport()`.
 
 ```ts
 import { createWhatsApp } from "@wats/core";
@@ -60,7 +60,7 @@ const wa = createWhatsApp({
 
 `CreateWhatsAppOptions` accepts the same `phoneNumberId` / `wabaId` / `router` / `observer` / `routerOptions` / `listenerRegistry` / `listenerRegistryOptions` fields as `WhatsAppFacadeConfig`, plus:
 
-- `apiVersion?: string` — defaults to `"v25.0"`.
+- `apiVersion?: string` — defaults to `"v27.0"`.
 - `baseUrl?: string` — Graph base URL; defaults to `https://graph.facebook.com/`.
 - `transport?: Transport` — defaults to `createFetchTransport()`.
 

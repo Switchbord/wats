@@ -18,7 +18,7 @@ async function main(): Promise<void> {
   if (!liveGate().enabled) { console.log(JSON.stringify({ blocked: true })); return; }
   const client = new GraphClient({
     accessToken: reqEnv("WATS_ACCESS_TOKEN"),
-    apiVersion: process.env.WATS_GRAPH_API_VERSION ?? "v25.0",
+    apiVersion: process.env.WATS_GRAPH_API_VERSION ?? "v27.0",
     baseUrl: `${process.env.WATS_GRAPH_BASE_URL ?? "https://graph.facebook.com"}/`
   });
   const res = await listMessageTemplates(client, { wabaId: reqEnv("WATS_WABA_ID") }) as {

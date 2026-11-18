@@ -29,6 +29,8 @@ wats init ./my-bot --format yaml --profile local
 wats init ./my-bot --format=json --profile prod
 ```
 
+Generated profiles use Graph API `v27.0`.
+
 `--dry-run` previews a count-oriented summary without writing files:
 
 ```text
@@ -45,6 +47,8 @@ Failure behavior: unknown flags, duplicate flags, unsafe paths, unsupported form
 ### `wats setup [dir] [--profile <name>]`
 
 Credential setup wizard for one local profile. Writes `wats.config.yaml` with env-secret references and an ignored `.env.local` containing the operator-entered values. The generated config is validated through `@wats/config`; the command refuses to overwrite existing `wats.config.yaml` or `.env.local` and rolls back the config file if the secret-file write fails.
+
+The Graph API version prompt defaults to `v27.0`; an explicitly entered older version is preserved. Existing profiles retain their configured version.
 
 Raw tokens never land in YAML. The env names are `WATS_ACCESS_TOKEN`, `WATS_VERIFY_TOKEN`, `WATS_APP_SECRET`, and `WATS_SERVICE_TOKEN`; `.env.local` also records WABA/phone-number ids plus `WATS_LIVE_ENABLE=0` and `WATS_YES_LIVE=0`.
 

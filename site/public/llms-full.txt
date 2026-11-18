@@ -3371,6 +3371,8 @@ wats init ./my-bot --format yaml --profile local
 wats init ./my-bot --format=json --profile prod
 ```
 
+Generated profiles use Graph API `v27.0`.
+
 `--dry-run` previews a count-oriented summary without writing files:
 
 ```text
@@ -3387,6 +3389,8 @@ Failure behavior: unknown flags, duplicate flags, unsafe paths, unsupported form
 ### `wats setup [dir] [--profile <name>]`
 
 Credential setup wizard for one local profile. Writes `wats.config.yaml` with env-secret references and an ignored `.env.local` containing the operator-entered values. The generated config is validated through `@wats/config`; the command refuses to overwrite existing `wats.config.yaml` or `.env.local` and rolls back the config file if the secret-file write fails.
+
+The Graph API version prompt defaults to `v27.0`; an explicitly entered older version is preserved. Existing profiles retain their configured version.
 
 Raw tokens never land in YAML. The env names are `WATS_ACCESS_TOKEN`, `WATS_VERIFY_TOKEN`, `WATS_APP_SECRET`, and `WATS_SERVICE_TOKEN`; `.env.local` also records WABA/phone-number ids plus `WATS_LIVE_ENABLE=0` and `WATS_YES_LIVE=0`.
 
@@ -3629,14 +3633,16 @@ Optional: `appSecret?`, `verifyToken?`, `apiVersion?`, `baseUrl?` (all strings).
 
 The normalized internal shape after defaults (`apiVersion`, `baseUrl`) are resolved during async startup.
 
+The `createWhatsApp` facade factory defaults `apiVersion` to `"v27.0"`. An explicitly supplied version is preserved. `GraphClient` itself requires an explicit `apiVersion`.
+
 ## `GraphClientConfig`
 
 Required fields:
 - `accessToken: string` — non-empty; max 4096 characters; not whitespace-only; no CR (U+000D), LF (U+000A), NUL (U+0000), or any other control character (U+0000..U+001F, U+007F). Invalid tokens throw `GraphRequestValidationError` at construction. Better there than in a request header.
-- `apiVersion: string` — must match `/^v\d+(\.\d+)?$/` (for example `v20` or `v25.0`). Values containing `/`, `?`, `#`, `..`, or control characters are rejected with `GraphRequestValidationError`.
+- `apiVersion: string` — must match `/^v\d+(\.\d+)?$/` (for example `v20` or `v27.0`). Values containing `/`, `?`, `#`, `..`, or control characters are rejected with `GraphRequestValidationError`.
 
 Optional fields:
-- `baseUrl?: string` — defaults to `DEFAULT_GRAPH_BASE_URL` (`"https://graph.facebook.com/"`). Must parse via `new URL(...)` and the protocol must be `http:` or `https:`; every other scheme (`javascript:`, `file:`, `ftp:`, `data:`, `about:`, `blob:`, …) is rejected with `GraphRequestValidationError`. The pathname of `baseUrl` is preserved in resolved request URLs: `baseUrl: "https://proxy.example.com/api"` + `path: "/me"` + `apiVersion: "v25.0"` resolves to `"https://proxy.example.com/api/v25.0/me"`.
+- `baseUrl?: string` — defaults to `DEFAULT_GRAPH_BASE_URL` (`"https://graph.facebook.com/"`). Must parse via `new URL(...)` and the protocol must be `http:` or `https:`; every other scheme (`javascript:`, `file:`, `ftp:`, `data:`, `about:`, `blob:`, …) is rejected with `GraphRequestValidationError`. The pathname of `baseUrl` is preserved in resolved request URLs: `baseUrl: "https://proxy.example.com/api"` + `path: "/me"` + `apiVersion: "v27.0"` resolves to `"https://proxy.example.com/api/v27.0/me"`.
 - `transport?: Transport` — defaults to `createFetchTransport()`. Inject a custom `Transport` for retry, auth-refresh, tracing, or mocking. See [Transport and Testing](/docs/guides/transport-and-testing).
 
 `DEFAULT_GRAPH_BASE_URL` is exported if you need the default explicitly.
@@ -3866,7 +3872,7 @@ import { WhatsApp } from "@wats/core";
 
 const graphClient = new GraphClient({
   accessToken: process.env.WHATSAPP_TOKEN!,
-  apiVersion: "v25.0"
+  apiVersion: "v27.0"
 });
 
 const wa = new WhatsApp({
@@ -8518,7 +8524,7 @@ import { GraphClient, createFetchTransport } from "@wats/graph";
 
 const graphClient = new GraphClient({
   accessToken: process.env.META_WA_TOKEN!,
-  apiVersion: "v25.0",
+  apiVersion: "v27.0",
   transport: createFetchTransport()
 });
 
@@ -8548,7 +8554,7 @@ Construction-time validation checks required shapes immediately. Facade config f
 
 ### Factory
 
-`createWhatsApp(options)` is the one-call path for the 80% case. It constructs the `GraphClient` internally so you do not wire one by hand. The only required option is `accessToken`; `apiVersion` defaults to `"v25.0"` and `transport` defaults to `createFetchTransport()`.
+`createWhatsApp(options)` is the one-call path for the 80% case. It constructs the `GraphClient` internally so you do not wire one by hand. The only required option is `accessToken`; `apiVersion` defaults to `"v27.0"` and `transport` defaults to `createFetchTransport()`.
 
 ```ts
 import { createWhatsApp } from "@wats/core";
@@ -8561,7 +8567,7 @@ const wa = createWhatsApp({
 
 `CreateWhatsAppOptions` accepts the same `phoneNumberId` / `wabaId` / `router` / `observer` / `routerOptions` / `listenerRegistry` / `listenerRegistryOptions` fields as `WhatsAppFacadeConfig`, plus:
 
-- `apiVersion?: string` — defaults to `"v25.0"`.
+- `apiVersion?: string` — defaults to `"v27.0"`.
 - `baseUrl?: string` — Graph base URL; defaults to `https://graph.facebook.com/`.
 - `transport?: Transport` — defaults to `createFetchTransport()`.
 

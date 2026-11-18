@@ -37,7 +37,7 @@ async function main(): Promise<void> {
   const ledger = new LiveLedger(runId);
   const client = new GraphClient({
     accessToken: reqEnv("WATS_ACCESS_TOKEN"),
-    apiVersion: process.env.WATS_GRAPH_API_VERSION ?? "v25.0",
+    apiVersion: process.env.WATS_GRAPH_API_VERSION ?? "v27.0",
     baseUrl: `${process.env.WATS_GRAPH_BASE_URL ?? "https://graph.facebook.com"}/`
   });
   const phoneNumberId = reqEnv("WATS_PHONE_NUMBER_ID");
