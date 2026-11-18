@@ -67,7 +67,7 @@ function Hero() {
             href="/docs/parity"
             className={`mono text-sm text-text-muted hover:text-text ${linkFocus}`}
           >
-            alpha · endpoint status →
+            beta · endpoint status →
           </a>
         </p>
       </div>
@@ -149,7 +149,7 @@ function StatusSection() {
   return (
     <section className="space-y-4">
       <h2 className="text-2xl font-semibold text-text md:text-3xl">
-        Alpha, in the useful sense.
+        Beta, with endpoint status you can inspect.
       </h2>
       <p className="max-w-3xl leading-relaxed text-text-muted">
         The core paths — sending, webhooks, templates, errors — are tested and

@@ -10,6 +10,9 @@ config/env scaffolding, a setup wizard, offline diagnostics, OpenAPI export,
 and a local serve wrapper. It is credential-safe by default — no live Meta
 calls, no token validation, no implicit env-file reads, no file overwrites.
 
+Install the published beta CLI with `bun add --global @wats/cli@0.5.0-beta`,
+or run a command without installing globally: `bunx --bun @wats/cli@0.5.0-beta --help`.
+
 ## Current commands
 
 ```bash
@@ -61,8 +64,8 @@ CLI onboarding commands:
 ```bash
 mkdir ./my-bot && cd ./my-bot
 bun init -y
-bun add @wats/core @wats/graph @wats/http
-bun add @wats/config @wats/service
+bun add @wats/core@0.5.0-beta @wats/graph@0.5.0-beta @wats/http@0.5.0-beta
+bun add @wats/config@0.5.0-beta @wats/service@0.5.0-beta
 wats init --dry-run
 wats init --format yaml --profile local
 wats config validate --config wats.config.yaml
@@ -222,6 +225,10 @@ Bun's package updater for the public WATS runtime package set:
 ```bash
 bun update --latest @wats/cli @wats/core @wats/graph @wats/http @wats/config @wats/service
 ```
+
+This updater does not select the `beta` channel. To install `0.5.0-beta`, use
+the explicit `bun add ...@0.5.0-beta` commands above; npm’s `latest` tag remains
+on `0.4.0-beta.0`.
 
 Use `--dry-run` first to see the command without touching `package.json` or
 `bun.lock`. The command reads only the current project's `package.json` before

@@ -3,13 +3,13 @@ title: Roadmap
 description: What WATS plans to ship next, and what is explicitly out of scope for now.
 ---
 
-<DocMeta appliesTo="post-foundations roadmap" lastReviewed="2026-05-01" />
+<DocMeta appliesTo="post-foundations roadmap" lastReviewed="2026-11-18" />
 
 What is planned, what is shipped, and what is explicitly out of scope. Issue-level tracking lives in the project tracker.
 
 ## Shipped
 
-The `0.4.x-alpha-tooling` line ships the substrate:
+The published [0.5.0-beta release](https://github.com/Switchbord/wats/releases/tag/v0.5.0-beta) includes:
 
 - Graph client, transport seam, endpoint registry, pagination, scoped clients
 - Graph error registry seeded with the known Meta error codes
@@ -24,17 +24,17 @@ The `0.4.x-alpha-tooling` line ships the substrate:
 - template helpers: list/create/get/update/delete, compare, unpause, migrate, archive/unarchive, authentication-template upsert, library-template create fields, component builders, parameter validation, template webhook filters
 - `@wats/config`, `@wats/cli` (`init`, `setup`, `onboarding`, `config validate`, `doctor`, `serve`, `openapi`, `upgrade`, `messages list/show`), `@wats/service` with OpenAPI 3.1
 - SQLite persistence: migrations, idempotency records, outbox APIs
-- Postgres persistence adapter at `@wats/persistence/postgres` (shape-only, mock-client tested; no default CI live Postgres)
+- Postgres persistence adapter at `@wats/persistence/postgres`, with real PostgreSQL regression checks in CI
 - local message projection (`wats_messages` / `wats_message_status_events`) and read-only `wats messages list/show` CLI inspection
 - pywa migration guide and per-endpoint status page
 
-Everything above is credential-free and MockTransport-validated unless [endpoint status](/docs/parity) marks it live-validated. The Postgres adapter is mock-client tested; it is not live-validated against a running Postgres service.
+Everything above is credential-free and MockTransport-validated unless [endpoint status](/docs/parity) marks it live-validated. PostgreSQL regression checks exercise a real database in CI; this is separate from live Meta validation.
 
 ## Planned
 
 - Live credentialed validation of media, message, template, Flow, and calling paths: read-only discovery first, side-effecting tests second, destructive cleanup last. Halted until credentials and explicit operator authorization exist.
 - Mutating admin endpoints still remaining: WABA CRUD, catalog/product inventory CRUD, and `subscribeApp`; shipped request-shape helpers remain shape-only until live validation.
-- Live Postgres validation and service send enqueueing.
+- Service send enqueueing and an integrated payload outbox worker.
 - Production deployment hardening: Compose, container image publication, registry workflow, and a production hosting contract. The repo ships a Railway-targeted Dockerfile.
 - Analytics/quality/rate-limit surfaces beyond the current typed alert payloads.
 

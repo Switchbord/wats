@@ -23,10 +23,14 @@ function read(path: string): string {
 }
 
 describe("WATS 0.4.0-beta.0 public docs truth contract", () => {
-  test("README announces the alpha release and credential-safe install path without stale publication wording", () => {
+  test("README announces the beta release and credential-safe install path without stale publication wording", () => {
     const readme = read("README.md");
-    expect(readme).toContain("Alpha");
-    expect(readme).toContain("bunx --bun @wats/cli setup");
+    expect(readme).toContain("Beta");
+    expect(readme).toContain("https://github.com/Switchbord/wats/releases/tag/v0.5.0-beta");
+    expect(readme).toContain("`0.4.0-beta.0`");
+    expect(read("site/src/components/SiteNav.tsx")).toContain("https://github.com/Switchbord/wats/releases/tag/v${meta.version}");
+    expect(read("CHANGELOG.md")).not.toContain("Beta release preparation; npm publication");
+    expect(readme).toContain("bunx --bun @wats/cli@0.5.0-beta setup");
     expect(readme).not.toContain("bunx --bun wats setup");
     expect(readme).not.toContain("bunx --bun wats --help");
     expect(readme).toContain("writes wats.config.yaml");

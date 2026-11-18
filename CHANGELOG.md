@@ -1,12 +1,16 @@
 # Changelog
 
-## [0.5.0-beta] - 2026-11-17
+## [0.5.0-beta] - 2026-11-18
 
-Beta release preparation; npm publication and live Meta validation have not been performed. All workspace package versions are aligned to `0.5.0-beta`.
+Published beta: [v0.5.0-beta](https://github.com/Switchbord/wats/releases/tag/v0.5.0-beta). The publishable `@wats/*` packages are available on npm at `0.5.0-beta` through the `beta` tag; `latest` intentionally remains at `0.4.0-beta.0`. No new live Meta validation is claimed.
 
 ### Changed
 
 - New `createWhatsApp` clients, `wats init` profiles, `wats setup` prompts, and live probe defaults use Graph API `v27.0`. Explicit API versions in clients, existing profiles, setup answers, and `WATS_GRAPH_API_VERSION` remain honored. No live Meta compatibility validation is claimed.
+
+### Install
+
+`bun add @wats/core@0.5.0-beta @wats/graph@0.5.0-beta`; CLI: `bunx --bun @wats/cli@0.5.0-beta --help`.
 
 ## [0.4.1-beta.0] - 2026-09-06
 

@@ -5,8 +5,8 @@ Typed webhook normalization, filters, routers, listener registry, and the `Whats
 ## Install
 
 ```bash
-bun add @wats/core
-npm i @wats/core
+bun add @wats/core@0.5.0-beta
+npm i @wats/core@0.5.0-beta
 ```
 
 ## Usage

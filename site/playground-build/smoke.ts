@@ -34,7 +34,7 @@ const mock = createMockTransport({
 
 const graph = new GraphClient({
   accessToken: "SMOKE_TEST_TOKEN_NOT_A_REAL_CREDENTIAL",
-  apiVersion: "v21.0",
+  apiVersion: "v27.0",
   transport: mock.transport,
 });
 
@@ -68,5 +68,8 @@ console.log(
 if (mock.requests.length !== 1) {
   console.error(`\nSMOKE FAIL: expected exactly 1 captured request, got ${mock.requests.length}`);
   process.exit(1);
+}
+if (mock.requests[0]?.url !== "https://graph.facebook.com/v27.0/123456789012345/messages") {
+  throw new Error("Expected the playground bundle to send using Graph v27.0");
 }
 console.log("\nSMOKE OK: bundle ran createMockTransport + GraphClient + PhoneNumberClient.sendText and captured the Graph request.");

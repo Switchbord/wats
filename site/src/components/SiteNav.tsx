@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import meta from "../generated/meta.json"
 
-// Top nav: [menu] wats_ ... Docs Playground Parity GitHub↗ [version → npm].
+// Top nav: [menu] wats_ ... Docs Playground Parity GitHub↗ [version → release].
 // The menu button opens a slide-over with the docs sections so the docs tree
 // is reachable from the landing page without loading fumadocs-ui out here.
 
@@ -192,7 +192,7 @@ export function SiteNav() {
           </a>
           <ThemeToggle />
           <a
-            href="https://www.npmjs.com/org/wats"
+            href={`https://github.com/Switchbord/wats/releases/tag/v${meta.version}`}
             rel="noreferrer"
             target="_blank"
             className="mono rounded border border-border px-2 py-0.5 text-xs text-text-muted transition-colors duration-150 hover:border-accent-dim hover:text-text focus-visible:outline-2 focus-visible:outline-accent"

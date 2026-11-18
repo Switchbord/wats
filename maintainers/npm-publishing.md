@@ -282,8 +282,8 @@ Human-blocked (cannot be completed or faked from the repo):
 Do not check the human-blocked boxes from a repo commit. Do not mark WATS-110
 Done in Linear from this slice alone.
 
-## Graph API v27 beta release preparation
+## Published Graph API v27 beta
 
-The prepared workspace release is `0.5.0-beta`. The manual release workflow selects the `beta` npm dist-tag for this version; stable versions select `latest`, and alpha/rc versions select their matching channel. Preparation does not publish packages or move registry tags. Run `bun run check-publish` before manually dispatching the protected release workflow after review and merge.
+All ten public packages are available as `0.5.0-beta` on npm’s `beta` channel. The [GitHub prerelease](https://github.com/Switchbord/wats/releases/tag/v0.5.0-beta) points to the commit attested by npm, `2e84500acabf570dfde979eaa2a72151184b5c54`. The [publish run](https://github.com/Switchbord/wats/actions/runs/44292589657) uploaded all ten packages. Its verification step received a 404 during registry propagation. Subsequent public registry reads confirmed all ten versions, beta tags, and provenance records. A fresh registry install passed the SDK and CLI smoke checks.
 
-The isolated `site/snippets` and `site/playground-build` packages intentionally remain pinned to the already published SDK. After all `0.5.0-beta` packages are published and provenance is verified, update those package pins and their isolated lockfiles, rebuild the playground assets and hero capture, and validate the site before deployment. Do not make a pre-publication site build depend on an unavailable registry version.
+For subsequent releases, verify registry visibility before updating the isolated SDK pins in `site/snippets` and `site/playground-build`. Refresh both lockfiles, rebuild the playground bundle and type declarations, and run the site’s `gen:meta` and `check` scripts. Link to the specific GitHub release tag for a prerelease. After deployment, check the version badge, quickstart install command and playground assets on wats.sh.

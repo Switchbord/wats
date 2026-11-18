@@ -1,7 +1,7 @@
 # playground-build — wats.sh playground asset pipeline
 
 Isolated mini-package that bundles the PUBLISHED `@wats/*` packages (pinned
-`0.4.0-beta.0`) into the two static assets the `/playground` route will load at
+`0.5.0-beta`) into the two static assets the `/playground` route will load at
 runtime. It is **not** part of the `site` build graph and adds no deps to
 `site/package.json`.
 
@@ -30,8 +30,8 @@ clients, `createMockTransport` (from `@wats/graph/testing`), and from
 
 ## Pinned versions
 
-@wats/core 0.4.0-beta.0 · @wats/graph 0.4.0-beta.0 · @wats/http 0.4.0-beta.0 ·
-@wats/types 0.4.0-beta.0 · @wats/crypto 0.4.0-beta.0
+@wats/core 0.5.0-beta · @wats/graph 0.5.0-beta · @wats/http 0.5.0-beta ·
+@wats/types 0.5.0-beta · @wats/crypto 0.5.0-beta
 
 ## node-builtin FINDING (must carry forward)
 

@@ -5,8 +5,8 @@ Shared TypeScript contracts for WATS and WhatsApp Cloud API payloads: config, we
 ## Install
 
 ```bash
-bun add @wats/types
-npm i @wats/types
+bun add @wats/types@0.5.0-beta
+npm i @wats/types@0.5.0-beta
 ```
 
 ## Usage

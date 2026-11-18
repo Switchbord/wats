@@ -3,9 +3,13 @@ title: Release Policy
 description: How WATS versions packages and what each release class may contain.
 ---
 
-<DocMeta appliesTo="WATS toolkit" lastReviewed="2026-05-01" />
+<DocMeta appliesTo="WATS toolkit" lastReviewed="2026-11-18" />
 
 WATS uses semantic versioning across published workspace packages.
+
+## Current published beta
+
+[0.5.0-beta](https://github.com/Switchbord/wats/releases/tag/v0.5.0-beta) is published on npm under `beta`. Install it explicitly, for example `bun add @wats/core@0.5.0-beta @wats/graph@0.5.0-beta`, or use `@beta`. The npm `latest` tag intentionally remains at `0.4.0-beta.0`; unqualified installs select that older release.
 
 ## `0.x` development line
 
@@ -47,6 +51,7 @@ Publishable packages:
 - `@wats/internal-utils` (published internal support, not stable application API)
 - `@wats/config`
 - `@wats/service`
+- `@wats/persistence`
 - `@wats/cli`
 
 Private packages:

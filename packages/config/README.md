@@ -5,8 +5,8 @@ YAML/JSON WATS configuration parser, validator, redactor, and env-secret referen
 ## Install
 
 ```bash
-bun add @wats/config
-npm i @wats/config
+bun add @wats/config@0.5.0-beta
+npm i @wats/config@0.5.0-beta
 ```
 
 ## Usage
