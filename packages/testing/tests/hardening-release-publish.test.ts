@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { releaseDistTag } from "../../../scripts/release-dist-tag.js";
 
 const root = resolve(import.meta.dir, "../../..");
 const workflow = readFileSync(resolve(root, ".github/workflows/release.yml"), "utf8");
@@ -14,7 +15,15 @@ describe("manual release publishing prerequisites", () => {
 
   test("publishes prereleases with an explicit dist-tag", () => {
     expect(workflow).toContain('--tag "$RELEASE_DIST_TAG"');
-    expect(workflow).toContain("RELEASE_DIST_TAG: latest");
+    expect(workflow).toContain('bun run scripts/release-dist-tag.ts >> "$GITHUB_ENV"');
+    expect(workflow).not.toContain("RELEASE_DIST_TAG: latest");
+    expect(releaseDistTag("0.5.0-beta")).toBe("beta");
+    expect(releaseDistTag("0.5.0-beta.0")).toBe("beta");
+    expect(releaseDistTag("0.5.0-alpha.1")).toBe("alpha");
+    expect(releaseDistTag("0.5.0-rc.1")).toBe("rc");
+    expect(releaseDistTag("0.5.0")).toBe("latest");
+    expect(() => releaseDistTag("0.5.0-beta\nRELEASE_DIST_TAG=latest")).toThrow();
+    expect(() => releaseDistTag("0.5.0-unknown")).toThrow();
   });
 
   test("does not interpolate operator version input into executable shell text", () => {

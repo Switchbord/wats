@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased]
+## [0.5.0-beta] - 2026-11-17
+
+Beta release preparation; npm publication and live Meta validation have not been performed. All workspace package versions are aligned to `0.5.0-beta`.
 
 ### Changed
 

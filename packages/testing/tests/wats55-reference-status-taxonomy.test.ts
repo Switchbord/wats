@@ -1,5 +1,6 @@
 // WATS-55 RED — docs-lock reference status taxonomy after WATS-37..54 consistency hardening.
 
+import { readReleaseVersion } from "../../../scripts/release-metadata";
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -36,12 +37,7 @@ function expectAll(source: string, needles: readonly string[], label: string): v
   }
 }
 
-function currentAlphaLine(): string {
-  const version = JSON.parse(read("package.json")).version as string;
-  const match = /^(\d+)\.(\d+)\./.exec(version);
-  if (!match) throw new Error(`Unexpected root package version ${version}`);
-  return `${match[1]}.${match[2]}.x-alpha`;
-}
+
 
 const graphEndpointSubpaths = [
   "@wats/graph/endpoints/media",
@@ -55,10 +51,10 @@ describe("WATS-55 reference status taxonomy and metadata", () => {
   test("package map metadata covers the current WATS-37..56 consistency line and api check", () => {
     const packageMap = read("site/content/docs/concepts/package-map.mdx");
     // Voice-pass removed the WATS-nn ticket enumeration from appliesTo (ticket
-    // refs were deliberately dropped). The metadata still carries the alpha
+    // refs were deliberately dropped). The metadata still carries the current
     // tooling version tag — assert that survives.
     const appliesTo = metadataValue(packageMap, "appliesTo");
-    expect(appliesTo).toContain(currentAlphaLine());
+    expect(appliesTo).toContain(readReleaseVersion(repoRoot));
 
     // Substance preserved: the api:check guard and what it verifies. The
     // old "WATS-54 checks package exports" phrasing was reworded to drop the
@@ -69,10 +65,10 @@ describe("WATS-55 reference status taxonomy and metadata", () => {
 
   test("reference index metadata includes the current consistency/test-hygiene line", () => {
     const referenceIndex = read("site/content/docs/reference/index.mdx");
-    // Voice-pass dropped the WATS-nn enumeration from appliesTo; the alpha
+    // Voice-pass dropped the WATS-nn enumeration from appliesTo; the release
     // version tag survives.
     const appliesTo = metadataValue(referenceIndex, "appliesTo");
-    expect(appliesTo).toContain(currentAlphaLine());
+    expect(appliesTo).toContain(readReleaseVersion(repoRoot));
     // The old line "WATS-54 keeps these aligned with `bun run api:check`" was
     // removed from the index during the voice pass (the api:check alignment
     // note now lives in package-map.mdx and endpoints.mdx). The index's

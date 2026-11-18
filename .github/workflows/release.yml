@@ -48,7 +48,6 @@ jobs:
 
     env:
       RELEASE_VERSION: ${{ inputs.version }}
-      RELEASE_DIST_TAG: latest
 
     steps:
       - name: Checkout
@@ -96,6 +95,9 @@ jobs:
               exit 1
             fi
           done
+
+      - name: Select npm dist-tag
+        run: bun run scripts/release-dist-tag.ts >> "$GITHUB_ENV"
 
       - name: Run credential-free release gates before publishing
         run: bun run check-publish
