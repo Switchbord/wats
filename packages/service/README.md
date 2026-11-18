@@ -5,8 +5,8 @@ Runtime-neutral WATS service app and OpenAPI generator for webhook ingress, heal
 ## Install
 
 ```bash
-bun add @wats/service
-npm i @wats/service
+bun add @wats/service@0.5.0-beta
+npm i @wats/service@0.5.0-beta
 ```
 
 ## Usage

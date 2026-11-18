@@ -5,8 +5,8 @@ Runtime-neutral webhook verification and adapter helpers for WATS: signature val
 ## Install
 
 ```bash
-bun add @wats/http
-npm i @wats/http
+bun add @wats/http@0.5.0-beta
+npm i @wats/http@0.5.0-beta
 ```
 
 ## Usage

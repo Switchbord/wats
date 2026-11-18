@@ -7,8 +7,8 @@ Experimental WATS persistence contracts and adapters.
 Install:
 
 ```bash
-bun add @wats/persistence
-npm i @wats/persistence
+bun add @wats/persistence@0.5.0-beta
+npm i @wats/persistence@0.5.0-beta
 ```
 
 Current scope:

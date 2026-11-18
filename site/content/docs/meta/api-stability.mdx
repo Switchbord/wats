@@ -1,11 +1,11 @@
 ---
 title: API Stability Policy
-description: How to read stable-for-0.x, experimental, and internal WATS surfaces during the alpha line.
+description: How to read stable-for-0.x, experimental, and internal WATS surfaces during the beta line.
 ---
 
-<DocMeta appliesTo="WATS 0.x alpha package line" lastReviewed="2026-07-20" />
+<DocMeta appliesTo="WATS 0.x beta package line" lastReviewed="2026-07-20" />
 
-WATS public APIs carry one of three labels during the 0.x alpha line: stable-for-0.x, experimental, or internal. Pick your coupling accordingly.
+WATS public APIs carry one of three labels during the 0.x beta line: stable-for-0.x, experimental, or internal. Pick your coupling accordingly.
 
 ## Page honesty tags (DocMeta `status`)
 
@@ -42,7 +42,7 @@ Current experimental surfaces:
 - Endpoint catalog breadth beyond the stable Graph substrate, including new admin/business, template, media, marketing-message, and future parity families.
 - `@wats/config`, `@wats/cli`, `@wats/service`, and `@wats/persistence` operator/application-edge surfaces while live mode, deployment, and persistence are still evolving.
 - `@wats/persistence/sqlite` is experimental local/single-instance persistence; `@wats/persistence/postgres` is an experimental shape-only adapter (mock-client tested, no default CI live Postgres); service integration is a separate follow-up surface.
-- Generated OpenAPI details and docs-site navigation during public alpha.
+- Generated OpenAPI details and docs-site navigation during public beta.
 
 Experimental exports carry a JSDoc `@experimental` tag on their source barrels or declarations.
 

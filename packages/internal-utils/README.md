@@ -7,8 +7,8 @@ This package is not a stable application API. Anything useful is re-exported thr
 ## Install
 
 ```bash
-bun add @wats/internal-utils
-npm i @wats/internal-utils
+bun add @wats/internal-utils@0.5.0-beta
+npm i @wats/internal-utils@0.5.0-beta
 ```
 
 Application code should prefer public packages such as `@wats/config`, `@wats/graph`, `@wats/http`, and `@wats/service`. This package has no stable application API guarantee.

@@ -5,8 +5,8 @@ Graph client, transport seam, endpoint callables, typed Graph errors, pagination
 ## Install
 
 ```bash
-bun add @wats/graph
-npm i @wats/graph
+bun add @wats/graph@0.5.0-beta
+npm i @wats/graph@0.5.0-beta
 ```
 
 ## Usage

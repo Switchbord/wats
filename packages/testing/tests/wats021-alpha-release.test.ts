@@ -86,11 +86,11 @@ describe("WATS 0.2.1 alpha launch release contract", () => {
     expect(changelog).toContain("test account credentials are not required for this release");
   });
 
-  test("README announces current alpha install path and credential boundary", () => {
+  test("README announces current beta install path and credential boundary", () => {
     const readme = read("README.md");
-    expect(readme).toContain("Alpha");
+    expect(readme).toContain("Beta");
     expect(readme).toContain("@wats/cli");
-    expect(readme).toContain("bun add @wats/core @wats/graph");
+    expect(readme).toContain("bun add @wats/core@0.5.0-beta @wats/graph@0.5.0-beta");
     expect(readme).toContain("credentials are needed to install");
   });
 });

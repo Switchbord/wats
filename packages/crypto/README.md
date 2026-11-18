@@ -5,8 +5,8 @@ Portable crypto-provider seam for WATS signature verification and cryptographic 
 ## Install
 
 ```bash
-bun add @wats/crypto
-npm i @wats/crypto
+bun add @wats/crypto@0.5.0-beta
+npm i @wats/crypto@0.5.0-beta
 ```
 
 ## Usage

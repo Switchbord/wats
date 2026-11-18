@@ -1,7 +1,7 @@
 # WATS
 
 [![CI](https://github.com/Switchbord/wats/actions/workflows/ci.yml/badge.svg)](https://github.com/Switchbord/wats/actions/workflows/ci.yml)
-[![npm version](https://img.shields.io/npm/v/@wats/core)](https://www.npmjs.com/package/@wats/core)
+[![Release v0.5.0-beta](https://img.shields.io/badge/release-v0.5.0--beta-blue)](https://github.com/Switchbord/wats/releases/tag/v0.5.0-beta)
 
 WATS is a TypeScript toolkit for the WhatsApp Cloud API: typed Graph calls,
 webhook ingestion, routing, and a standalone service. Bun-first, runs on Node,
@@ -42,11 +42,15 @@ local workflow all work.
 
 ```bash
 # Client packages — most apps need only these two
-bun add @wats/core @wats/graph
+bun add @wats/core@0.5.0-beta @wats/graph@0.5.0-beta
 
 # Standalone webhook/API service (optional)
-bun add @wats/service
+bun add @wats/service@0.5.0-beta
 ```
+
+The published beta is [v0.5.0-beta](https://github.com/Switchbord/wats/releases/tag/v0.5.0-beta).
+Use the explicit versions above: npm’s `latest` tag intentionally remains on
+`0.4.0-beta.0`; `@beta` also selects the beta channel.
 
 The `@wats/*` packages are standard npm packages; `npm i` works too. No
 credentials are needed to install, test, or develop against the mock transport.
@@ -65,9 +69,9 @@ credential-free) from a Bun shell to scaffold config.
 ## CLI
 
 ```bash
-bunx --bun @wats/cli setup     # writes wats.config.yaml + gitignored .env.local
-bunx --bun @wats/cli doctor    # check local readiness
-bunx --bun @wats/cli --help
+bunx --bun @wats/cli@0.5.0-beta setup     # writes wats.config.yaml + gitignored .env.local
+bunx --bun @wats/cli@0.5.0-beta doctor    # check local readiness
+bunx --bun @wats/cli@0.5.0-beta --help
 ```
 
 Use the scoped specifier (`@wats/cli`) so Bun resolves the WATS package rather
@@ -78,7 +82,7 @@ implicitly. Full command reference: [wats.sh/docs/reference/cli](https://wats.sh
 
 ## Status
 
-Alpha. The core paths — text and template sends, media, webhook verification
+Beta. The core paths — text and template sends, media, webhook verification
 and normalization, routing, typed errors — are tested and have carried real
 traffic. The wider endpoint surface is typed and tested against the wire
 contract; per-endpoint status is tracked at
