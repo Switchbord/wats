@@ -24,8 +24,10 @@ only the transport is swapped.
 ## Install
 
 ```sh
-bun add @wats/core @wats/graph
+bun add @wats/core@0.5.0-beta @wats/graph@0.5.0-beta
 ```
+
+This selects the [published beta](https://github.com/Switchbord/wats/releases/tag/v0.5.0-beta). npm’s `latest` tag intentionally remains at `0.4.0-beta.0`; use the explicit version or `@beta` for this release.
 
 ## Runtime
 
@@ -136,6 +138,9 @@ config/env scaffolding, a setup wizard, offline diagnostics, OpenAPI export,
 and a local serve wrapper. It is credential-safe by default — no live Meta
 calls, no token validation, no implicit env-file reads, no file overwrites.
 
+Install the published beta CLI with `bun add --global @wats/cli@0.5.0-beta`,
+or run a command without installing globally: `bunx --bun @wats/cli@0.5.0-beta --help`.
+
 ## Current commands
 
 ```bash
@@ -187,8 +192,8 @@ CLI onboarding commands:
 ```bash
 mkdir ./my-bot && cd ./my-bot
 bun init -y
-bun add @wats/core @wats/graph @wats/http
-bun add @wats/config @wats/service
+bun add @wats/core@0.5.0-beta @wats/graph@0.5.0-beta @wats/http@0.5.0-beta
+bun add @wats/config@0.5.0-beta @wats/service@0.5.0-beta
 wats init --dry-run
 wats init --format yaml --profile local
 wats config validate --config wats.config.yaml
@@ -348,6 +353,10 @@ Bun's package updater for the public WATS runtime package set:
 ```bash
 bun update --latest @wats/cli @wats/core @wats/graph @wats/http @wats/config @wats/service
 ```
+
+This updater does not select the `beta` channel. To install `0.5.0-beta`, use
+the explicit `bun add ...@0.5.0-beta` commands above; npm’s `latest` tag remains
+on `0.4.0-beta.0`.
 
 Use `--dry-run` first to see the command without touching `package.json` or
 `bun.lock`. The command reads only the current project's `package.json` before
@@ -633,7 +642,7 @@ and other edge runtimes, see
 ## Install
 
 ```bash
-bun add @wats/http @wats/core @wats/graph @wats/crypto
+bun add @wats/http@0.5.0-beta @wats/core@0.5.0-beta @wats/graph@0.5.0-beta @wats/crypto@0.5.0-beta
 ```
 
 ## Minimal server
@@ -761,7 +770,7 @@ sneak in.
 ## Install
 
 ```bash
-npm install @wats/http @wats/core @wats/graph @wats/crypto
+npm install @wats/http@0.5.0-beta @wats/core@0.5.0-beta @wats/graph@0.5.0-beta @wats/crypto@0.5.0-beta
 ```
 
 Workers require `"nodejs_compat"` **only** for `node:buffer`-style
@@ -1183,7 +1192,7 @@ Cloudflare Workers and Deno, see
 ## Install
 
 ```bash
-npm install @wats/http @wats/core @wats/graph @wats/crypto
+npm install @wats/http@0.5.0-beta @wats/core@0.5.0-beta @wats/graph@0.5.0-beta @wats/crypto@0.5.0-beta
 ```
 
 ## Minimal server
@@ -3978,7 +3987,7 @@ JSON uses the same object shape.
 
 ## Checked-in templates
 
-Alpha templates with placeholder env names only:
+Config templates with placeholder env names only:
 
 - `examples/config/wats.config.example.yaml`
 - `examples/config/wats.config.example.json`
@@ -6149,7 +6158,7 @@ The migration runner creates:
 - `wats_messages`
 - `wats_message_status_events`
 
-Migrations are forward-only for alpha. Already-applied migration checksums must match the package migration definitions; checksum drift fails closed with `PersistenceError`. `001_initial` keeps its originally shipped checksum; `002_outbox_lease_id` upgrades existing v1 databases with the `leaseId` outbox column; `003_message_projection` adds the message projection tables and indexes; `004_inbound_window_index` adds the composite index backing `getLatestInboundMessageAt`; `005_service_request_claims` adds the durable claim/completion columns to `wats_service_requests`; `006_message_uniqueness` deduplicates preexisting duplicate `(direction, wa_message_id)` message rows (keeping the best known state) and adds the unique indexes backing message and status-event dedup. A held migration lock fails closed with `PersistenceError` code `migration_lock_failed`.
+Migrations are forward-only for beta. Already-applied migration checksums must match the package migration definitions; checksum drift fails closed with `PersistenceError`. `001_initial` keeps its originally shipped checksum; `002_outbox_lease_id` upgrades existing v1 databases with the `leaseId` outbox column; `003_message_projection` adds the message projection tables and indexes; `004_inbound_window_index` adds the composite index backing `getLatestInboundMessageAt`; `005_service_request_claims` adds the durable claim/completion columns to `wats_service_requests`; `006_message_uniqueness` deduplicates preexisting duplicate `(direction, wa_message_id)` message rows (keeping the best known state) and adds the unique indexes backing message and status-event dedup. A held migration lock fails closed with `PersistenceError` code `migration_lock_failed`.
 
 Backend faults are always typed as `PersistenceError` with a `code` from `PersistenceErrorCode` — a raw `bun:sqlite` or `pg` error never escapes the public API. `claim_failed` and `completion_failed` cover service-request claim/completion lease faults; `outbox_failed` covers outbox and message-projection transaction faults (including `recordMessage`/`appendMessageStatus` backend failures); `store_closed` covers operations on a closed store; `invalid_record`/`invalid_options`/`invalid_filename` cover input-validation failures (never backend faults); `migration_failed`/`migration_checksum_mismatch`/`migration_lock_failed` cover migration faults. The validation codes are distinct from the persistence-operation codes so a caller can tell a bad input from a backend fault.
 
@@ -8821,7 +8830,7 @@ export WATS_VERIFY_TOKEN=...            # any string you choose; Meta echoes it 
 ## Install
 
 ```sh
-bun add @wats/core @wats/graph @wats/http
+bun add @wats/core@0.5.0-beta @wats/graph@0.5.0-beta @wats/http@0.5.0-beta
 ```
 
 ## Send a message
@@ -9203,7 +9212,7 @@ evidence behind the live-validated tags in the [parity matrix](/docs/parity).
 # API Stability Policy
 URL: https://wats.sh/docs/meta/api-stability
 
-WATS public APIs carry one of three labels during the 0.x alpha line: stable-for-0.x, experimental, or internal. Pick your coupling accordingly.
+WATS public APIs carry one of three labels during the 0.x beta line: stable-for-0.x, experimental, or internal. Pick your coupling accordingly.
 
 ## Page honesty tags (DocMeta `status`)
 
@@ -9240,7 +9249,7 @@ Current experimental surfaces:
 - Endpoint catalog breadth beyond the stable Graph substrate, including new admin/business, template, media, marketing-message, and future parity families.
 - `@wats/config`, `@wats/cli`, `@wats/service`, and `@wats/persistence` operator/application-edge surfaces while live mode, deployment, and persistence are still evolving.
 - `@wats/persistence/sqlite` is experimental local/single-instance persistence; `@wats/persistence/postgres` is an experimental shape-only adapter (mock-client tested, no default CI live Postgres); service integration is a separate follow-up surface.
-- Generated OpenAPI details and docs-site navigation during public alpha.
+- Generated OpenAPI details and docs-site navigation during public beta.
 
 Experimental exports carry a JSDoc `@experimental` tag on their source barrels or declarations.
 
@@ -9331,6 +9340,10 @@ URL: https://wats.sh/docs/meta/release-policy
 
 WATS uses semantic versioning across published workspace packages.
 
+## Current published beta
+
+[0.5.0-beta](https://github.com/Switchbord/wats/releases/tag/v0.5.0-beta) is published on npm under `beta`. Install it explicitly, for example `bun add @wats/core@0.5.0-beta @wats/graph@0.5.0-beta`, or use `@beta`. The npm `latest` tag intentionally remains at `0.4.0-beta.0`; unqualified installs select that older release.
+
 ## `0.x` development line
 
 The `0.x` line covers the public toolkit while it expands toward full WhatsApp parity.
@@ -9371,6 +9384,7 @@ Publishable packages:
 - `@wats/internal-utils` (published internal support, not stable application API)
 - `@wats/config`
 - `@wats/service`
+- `@wats/persistence`
 - `@wats/cli`
 
 Private packages:
@@ -9450,7 +9464,7 @@ What is planned, what is shipped, and what is explicitly out of scope. Issue-lev
 
 ## Shipped
 
-The `0.4.x-alpha-tooling` line ships the substrate:
+The published [0.5.0-beta release](https://github.com/Switchbord/wats/releases/tag/v0.5.0-beta) includes:
 
 - Graph client, transport seam, endpoint registry, pagination, scoped clients
 - Graph error registry seeded with the known Meta error codes
@@ -9465,17 +9479,17 @@ The `0.4.x-alpha-tooling` line ships the substrate:
 - template helpers: list/create/get/update/delete, compare, unpause, migrate, archive/unarchive, authentication-template upsert, library-template create fields, component builders, parameter validation, template webhook filters
 - `@wats/config`, `@wats/cli` (`init`, `setup`, `onboarding`, `config validate`, `doctor`, `serve`, `openapi`, `upgrade`, `messages list/show`), `@wats/service` with OpenAPI 3.1
 - SQLite persistence: migrations, idempotency records, outbox APIs
-- Postgres persistence adapter at `@wats/persistence/postgres` (shape-only, mock-client tested; no default CI live Postgres)
+- Postgres persistence adapter at `@wats/persistence/postgres`, with real PostgreSQL regression checks in CI
 - local message projection (`wats_messages` / `wats_message_status_events`) and read-only `wats messages list/show` CLI inspection
 - pywa migration guide and per-endpoint status page
 
-Everything above is credential-free and MockTransport-validated unless [endpoint status](/docs/parity) marks it live-validated. The Postgres adapter is mock-client tested; it is not live-validated against a running Postgres service.
+Everything above is credential-free and MockTransport-validated unless [endpoint status](/docs/parity) marks it live-validated. PostgreSQL regression checks exercise a real database in CI; this is separate from live Meta validation.
 
 ## Planned
 
 - Live credentialed validation of media, message, template, Flow, and calling paths: read-only discovery first, side-effecting tests second, destructive cleanup last. Halted until credentials and explicit operator authorization exist.
 - Mutating admin endpoints still remaining: WABA CRUD, catalog/product inventory CRUD, and `subscribeApp`; shipped request-shape helpers remain shape-only until live validation.
-- Live Postgres validation and service send enqueueing.
+- Service send enqueueing and an integrated payload outbox worker.
 - Production deployment hardening: Compose, container image publication, registry workflow, and a production hosting contract. The repo ships a Railway-targeted Dockerfile.
 - Analytics/quality/rate-limit surfaces beyond the current typed alert payloads.
 
