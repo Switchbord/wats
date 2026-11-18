@@ -508,9 +508,16 @@ declare class GraphMessagesEndpoint {
 interface RateLimiter {
 	/**
 	 * Wait until `cost` tokens are available, then deduct them. Resolves once
-	 * the request is admitted; never rejects unless the injected sleep does.
+	 * the request is admitted; never rejects unless the injected sleep does,
+	 * or an `AbortSignal` is provided and aborts before admission.
+	 *
+	 * The optional `signal` is backwards compatible: callers using the legacy
+	 * `acquire(cost?)` signature are unaffected. A real `AbortSignal` racing
+	 * the wait rejects promptly with the signal's reason and consumes no
+	 * token. Non-AbortSignal inputs fail closed with a TypeError rather than
+	 * silently dropping cancellation.
 	 */
-	acquire(cost?: number): Promise<void>;
+	acquire(cost?: number, signal?: AbortSignal): Promise<void>;
 	/**
 	 * Non-blocking admission check. Refills the bucket to the current virtual
 	 * time, then if `cost` tokens are available deducts them and returns true;
@@ -547,16 +554,27 @@ interface ReliableTransportOptions extends Partial<TransportRetryPolicy> {
 	 * the historical behavior: POST is retried only on 429 (the rate-limit
 	 * exception), never on 5xx or network errors.
 	 *
+	 * A no-response POST failure (connection reset, socket closed mid-upload,
+	 * read timeout) is ambiguous: the server may have received and applied the
+	 * request before the response was lost. An Idempotency-Key header on its
+	 * own proves nothing — the client sets it, the server has no obligation to
+	 * honor it unless the endpoint documents verified remote idempotency. The
+	 * retry modes below opt into retry only when you have independently verified
+	 * the endpoint is idempotent or dedupes by Idempotency-Key server-side. The
+	 * key is a necessary, not sufficient, condition; it never overrides the
+	 * default "never".
+	 *
 	 * - "network-only": additionally retry a POST whose request threw a
 	 *   GraphNetworkError BEFORE any response arrived, but only when the request
-	 *   carries an Idempotency-Key header (case-insensitive). A pre-response
-	 *   network failure is the one POST failure shape that cannot have been
-	 *   processed by the server, so an idempotency key makes the retry safe.
-	 *   POST 5xx is still not retried — the server may have side-effected.
+	 *   carries an Idempotency-Key header (case-insensitive). This is the least
+	 *   ambiguous POST failure shape, but still not exactly-once: the server may
+	 *   have applied the first send and lost the response. The retry is safe only
+	 *   if the endpoint dedupes by the key you supplied. POST 5xx is not retried —
+	 *   the server began processing and may have side-effected.
 	 * - "always": additionally retry POST on 5xx. Requires server-side
 	 *   idempotency for the endpoint; a 5xx after the server began processing
-	 *   can otherwise duplicate a send. Use only for endpoints you have
-	 *   verified are idempotent or dedupe by Idempotency-Key.
+	 *   can otherwise duplicate a send. Use only for endpoints you have verified
+	 *   are idempotent or dedupe by Idempotency-Key.
 	 */
 	readonly retryPosts?: RetryPostMode;
 	readonly rateLimiter?: RateLimiter;

@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.5.0-beta] - 2026-11-17
+## [0.5.0-beta] - 2026-11-18
 
 Published beta: [v0.5.0-beta](https://github.com/Switchbord/wats/releases/tag/v0.5.0-beta). The publishable `@wats/*` packages are available on npm at `0.5.0-beta` through the `beta` tag; `latest` intentionally remains at `0.4.0-beta.0`. No new live Meta validation is claimed.
 

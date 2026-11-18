@@ -55,9 +55,9 @@ describe("WATS docs current surface accuracy", () => {
     const shipped = doc.slice(0, doc.indexOf("## Planned"));
     const planned = doc.slice(doc.indexOf("## Planned"));
     expect(shipped).toContain("@wats/persistence/postgres");
-    expect(shipped).toContain("shape-only, mock-client tested");
+    expect(shipped).toContain("real PostgreSQL regression checks in CI");
     expect(planned).not.toMatch(/Postgres persistence adapter/iu);
-    expect(planned).toContain("Live Postgres validation");
+    expect(planned).not.toContain("Live Postgres validation");
   });
 
   test("persistence reference documents wats messages list/show and does not claim no CLI navigation", () => {

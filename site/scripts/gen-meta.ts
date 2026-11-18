@@ -84,10 +84,8 @@ function runTestSuite(): number {
   const lastFail = failMatches[failMatches.length - 1];
   const failCount = lastFail ? Number(lastFail[1]) : 0;
   if (result.status !== 0 || failCount > 0) {
-    console.error(
-      `gen-meta: WARNING — bun test exited ${result.status} with ${failCount} fail; ` +
-        `recording the real pass count (${passCount}) anyway.`,
-    );
+    const failures = combined.split("\n").filter(line => line.includes("(fail)")).slice(-10);
+    fail(`bun test exited ${result.status} with ${failCount} failures.\n${failures.join("\n")}`);
   }
   console.error(`gen-meta: ${passCount} pass / ${failCount} fail`);
   return passCount;
@@ -105,20 +103,20 @@ function readCommittedTestCount(): number {
 
 // --- 3. zero-hard-deps self-check against the npm registry --------------------
 
-async function fetchPublishedDependencies(pkg: string): Promise<Record<string, string>> {
-  const url = `https://registry.npmjs.org/${pkg.replace("/", "%2f")}/latest`;
+async function fetchPublishedDependencies(pkg: string, version: string): Promise<Record<string, string>> {
+  const url = `https://registry.npmjs.org/${pkg.replace("/", "%2f")}/${version}`;
   const res = await fetch(url);
   if (!res.ok) fail(`registry fetch failed for ${pkg}: HTTP ${res.status} (${url})`);
   const json = (await res.json()) as { dependencies?: Record<string, string> };
   return json.dependencies ?? {};
 }
 
-async function verifyZeroHardDeps(): Promise<void> {
+async function verifyZeroHardDeps(version: string): Promise<void> {
   console.error("gen-meta: verifying 0-hard-dependencies claim against registry.npmjs.org…");
   const results = await Promise.all(
     ZERO_DEP_PACKAGES.map(async (pkg) => ({
       pkg,
-      deps: await fetchPublishedDependencies(pkg),
+      deps: await fetchPublishedDependencies(pkg, version),
     })),
   );
   // "0 hard dependencies" = zero THIRD-PARTY runtime deps. Intra-workspace
@@ -131,7 +129,7 @@ async function verifyZeroHardDeps(): Promise<void> {
       Object.entries(deps).filter(([name]) => !name.startsWith("@wats/")),
     );
     console.error(
-      `gen-meta:   ${pkg}@latest: ${names.length} runtime deps ` +
+      `gen-meta:   ${pkg}@${version}: ${names.length} runtime deps ` +
         `(${Object.keys(external).length} third-party${names.length ? `: ${names.join(", ")}` : ""})`,
     );
     if (Object.keys(external).length > 0) offenders.push({ pkg, external });
@@ -155,7 +153,7 @@ function gitHead(): string {
 }
 
 const version = readVersion();
-await verifyZeroHardDeps();
+await verifyZeroHardDeps(version);
 const testCount = offline ? readCommittedTestCount() : runTestSuite();
 const commit = gitHead();
 
