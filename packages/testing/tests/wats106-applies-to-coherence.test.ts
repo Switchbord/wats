@@ -2,6 +2,7 @@
 // the DocMeta appliesTo prop on release-line docs must track the current minor.
 // Repointed from the retired VitePress docs/ tree to site/content/docs.
 
+import { readReleaseVersion } from "../../../scripts/release-metadata";
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
@@ -31,13 +32,6 @@ function docFiles(dir: string): string[] {
   });
 }
 
-function rootMinorLine(): string {
-  const version = JSON.parse(read("package.json")).version as string;
-  const match = /^(\d+)\.(\d+)\./.exec(version);
-  if (!match) throw new Error(`Unexpected root package version ${version}`);
-  return `${match[1]}.${match[2]}.x-alpha-tooling`;
-}
-
 describe("WATS-106 applies-to coherence", () => {
   test("public docs do not advertise stale 0.2.0 foundations metadata", () => {
     const offenders = docFiles("site/content/docs")
@@ -47,10 +41,10 @@ describe("WATS-106 applies-to coherence", () => {
     expect(offenders).toEqual([]);
   });
 
-  test("DocMeta appliesTo on tooling-line docs tracks the current root minor", () => {
-    const expectedLine = rootMinorLine();
-    // Docs that declare the alpha-tooling line via the DocMeta component must
-    // use the current minor. Docs that omit appliesTo or scope to a narrower
+  test("DocMeta appliesTo on tooling-line docs tracks the current release", () => {
+    const expectedLine = readReleaseVersion(repoRoot);
+    // Docs that declare the current release via the DocMeta component must
+    // use the current version. Docs that omit appliesTo or scope to a narrower
     // line (e.g. 0.3.x-alpha) are out of scope for this coherence check.
     const toolingLineDocs = [
       "site/content/docs/concepts/overview.mdx",
