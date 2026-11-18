@@ -7,7 +7,7 @@ import type { WatsServiceConfig } from "@wats/service";
 const DEMO_SERVICE_TOKEN = ["example", "service", "token"].join("-");
 
 const profile: WatsProfileConfig = {
-  graph: { apiVersion: "v25.0", baseUrl: "https://graph.example.test" },
+  graph: { apiVersion: "v27.0", baseUrl: "https://graph.example.test" },
   whatsapp: { wabaId: "example-waba", phoneNumberId: "15550000000" },
   auth: { accessToken: { env: "WATS_ACCESS_TOKEN" } },
   webhook: {

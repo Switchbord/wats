@@ -67,7 +67,7 @@ function buildHandler(env: Env) {
   const wa = createWhatsApp({
     accessToken: env.WATS_ACCESS_TOKEN,
     phoneNumberId: env.WATS_PHONE_NUMBER_ID,
-    apiVersion: "v25.0",
+    apiVersion: "v27.0",
   });
 
   wa.onMessage(async (ctx) => {

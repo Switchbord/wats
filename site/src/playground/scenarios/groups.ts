@@ -13,7 +13,7 @@ const mock = createMockTransport({
 
 const graphClient = new GraphClient({
   accessToken: "demo-token",
-  apiVersion: "v25.0",
+  apiVersion: "v27.0",
   baseUrl: "https://graph.facebook.com",
   transport: mock.transport,
 })

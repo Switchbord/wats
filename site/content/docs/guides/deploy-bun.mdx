@@ -26,7 +26,7 @@ import { createWhatsApp } from "@wats/core";
 const wa = createWhatsApp({
   accessToken: process.env.WATS_ACCESS_TOKEN!,
   phoneNumberId: process.env.WATS_PHONE_NUMBER_ID!,
-  apiVersion: "v25.0",
+  apiVersion: "v27.0",
 });
 
 wa.onMessage(async (ctx) => {

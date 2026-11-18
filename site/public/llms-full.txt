@@ -59,7 +59,7 @@ const mock = createMockTransport({
 const wa = createWhatsApp({
   accessToken: "demo-token",
   phoneNumberId: "15550000000",
-  apiVersion: "v25.0",
+  apiVersion: "v27.0",
   transport: mock.transport,
 });
 
@@ -510,7 +510,7 @@ const mock = createMockTransport({
 
 const client = new GraphClient({
   accessToken: process.env.WATS_ACCESS_TOKEN ?? "offline",
-  apiVersion: "v25.0",
+  apiVersion: "v27.0",
   baseUrl: "https://graph.test/",
   transport: mock.transport
 });
@@ -551,7 +551,7 @@ import { createMockTransport } from "@wats/graph/testing";
 import { createWatsServiceApp, createWatsServiceOpenApiDocument } from "@wats/service";
 
 const profile: WatsProfileConfig = {
-  graph: { apiVersion: "v25.0", baseUrl: "https://graph.test/" },
+  graph: { apiVersion: "v27.0", baseUrl: "https://graph.test/" },
   whatsapp: { wabaId: "000000000000000", phoneNumberId: "00000000000" },
   auth: { accessToken: { env: "WATS_ACCESS_TOKEN" } },
   webhook: {
@@ -646,7 +646,7 @@ import { createWhatsApp } from "@wats/core";
 const wa = createWhatsApp({
   accessToken: process.env.WATS_ACCESS_TOKEN!,
   phoneNumberId: process.env.WATS_PHONE_NUMBER_ID!,
-  apiVersion: "v25.0",
+  apiVersion: "v27.0",
 });
 
 wa.onMessage(async (ctx) => {
@@ -806,7 +806,7 @@ function buildHandler(env: Env) {
   const wa = createWhatsApp({
     accessToken: env.WATS_ACCESS_TOKEN,
     phoneNumberId: env.WATS_PHONE_NUMBER_ID,
-    apiVersion: "v25.0",
+    apiVersion: "v27.0",
   });
 
   wa.onMessage(async (ctx) => {
@@ -1197,7 +1197,7 @@ import { createWhatsApp } from "@wats/core";
 const wa = createWhatsApp({
   accessToken: process.env.WATS_ACCESS_TOKEN!,
   phoneNumberId: process.env.WATS_PHONE_NUMBER_ID!,
-  apiVersion: "v25.0",
+  apiVersion: "v27.0",
 });
 
 wa.onMessage(async (ctx) => {
@@ -1311,7 +1311,7 @@ import { GraphClient, PhoneNumberClient, createFetchTransport } from "@wats/grap
 
 const graphClient = new GraphClient({
   accessToken: process.env.WATS_ACCESS_TOKEN!,
-  apiVersion: "v25.0",
+  apiVersion: "v27.0",
   transport: createFetchTransport()
 });
 
@@ -1718,7 +1718,7 @@ import { WhatsApp } from "@wats/core";
 
 const graphClient = new GraphClient({
   accessToken: process.env.WATS_ACCESS_TOKEN!,
-  apiVersion: "v25.0",
+  apiVersion: "v27.0",
   transport: createFetchTransport()
 });
 
@@ -2390,7 +2390,7 @@ const handle = createMockTransport({
 
 const client = new GraphClient({
   accessToken: "test-token",
-  apiVersion: "v25.0",
+  apiVersion: "v27.0",
   baseUrl: "https://graph.facebook.com",
   transport: handle.transport
 });
@@ -2404,7 +2404,7 @@ const res = await client.messages.sendMessage({
 // Assert on the recorded request — method/url/headers/body — verbatim.
 expect(handle.requests.length).toBe(1);
 expect(handle.requests[0]?.url).toBe(
-  "https://graph.facebook.com/v25.0/123/messages"
+  "https://graph.facebook.com/v27.0/123/messages"
 );
 expect(handle.requests[0]?.headers.get("authorization")).toBe("Bearer test-token");
 ```
@@ -2446,7 +2446,7 @@ const transport = createReliableTransport(createFetchTransport(), {
 
 const client = new GraphClient({
   accessToken: token,
-  apiVersion: "v25.0",
+  apiVersion: "v27.0",
   transport
 });
 ```
@@ -2517,6 +2517,39 @@ Interceptors can be async; the chain awaits each hook. For errors originating in
 
 - [Client reference](/docs/reference/client) — `GraphClient` options and the request pipeline.
 - [Errors reference](/docs/reference/errors) — `GraphNetworkError` and the typed error hierarchy.
+
+---
+
+# Upgrade to Graph API v27
+URL: https://wats.sh/docs/guides/upgrading-graph-api
+
+The current examples target Graph API `v27.0`. Meta lists v27.0 as the latest version in its [Graph API versioning guide](https://developers.facebook.com/docs/graph-api/guides/versioning/). The v26/v27 changelog pages could not be retrieved during this documentation audit. This guide covers selecting that version in WATS; it is not an exhaustive account of Meta's v26 or v27 behavior changes.
+
+## Select the request version
+
+Set the version explicitly when upgrading an existing integration:
+
+```ts
+import { createWhatsApp } from "@wats/core";
+
+const wa = createWhatsApp({
+  accessToken: process.env.WHATSAPP_TOKEN!,
+  apiVersion: "v27.0",
+});
+```
+
+For `GraphClient`, pass `apiVersion: "v27.0"` in its constructor options. For configuration files, update every profile's `graph.apiVersion`; profiles can have separate settings. The checked-in JSON/YAML configuration examples and Railway template show the current target.
+
+WATS accepts explicit version strings rather than enforcing a supported-version allowlist. A previously pinned version remains an explicit choice, subject to Meta's availability and behavior for that version. Changing a WATS setting does not migrate your Meta app configuration or establish that every endpoint has been validated against v27.
+
+## Verify before rollout
+
+1. Review Meta's [Graph API changelog](https://developers.facebook.com/docs/graph-api/changelog/) and [WhatsApp Cloud API changelog](https://developers.facebook.com/documentation/business-messaging/whatsapp/changelog) for the versions you are crossing and the features you use.
+2. Check your Meta app's webhook subscription version separately. WATS's request version selects outbound Graph URLs; it does not configure the webhook version in the Meta app dashboard.
+3. Run your credential-free transport tests with the new version and check the captured request URLs. The [transport and testing guide](/docs/guides/transport-and-testing) shows this seam.
+4. In your own controlled environment, verify the reads, message types, templates, media, and webhook payloads your application uses before expanding rollout. Keep the previous explicit configuration available while evaluating results.
+
+Existing [live campaign evidence](/docs/parity/live-campaign) records the version actually used during those campaigns. The updated examples do not turn that historical evidence into v27 validation. Historical feature and version notes retain their original meaning.
 
 ---
 
@@ -3918,7 +3951,7 @@ defaultProfile: local
 profiles:
   local:
     graph:
-      apiVersion: v25.0
+      apiVersion: v27.0
       baseUrl: https://graph.facebook.com
     whatsapp:
       wabaId: "1234567890"
@@ -4000,7 +4033,7 @@ Validates and returns a copy where every env name under a secret reference is re
 | `version` | Must be exactly `1`. |
 | `defaultProfile` | Non-empty string and must exist in `profiles`. |
 | `profiles` | Object map of profile names to profile configs. |
-| `graph.apiVersion` | Must match `vNN.N`, for example `v25.0`. |
+| `graph.apiVersion` | Must match `vNN.N`, for example `v27.0`. |
 | `graph.baseUrl` | Absolute `http:` or `https:` URL. |
 | `whatsapp.wabaId` | Non-empty string; no CR/LF/NUL. |
 | `whatsapp.phoneNumberId` | Non-empty string; no CR/LF/NUL. |
@@ -4027,7 +4060,7 @@ defaultProfile: live-test
 profiles:
   live-test:
     graph:
-      apiVersion: v25.0
+      apiVersion: v27.0
       baseUrl: https://graph.facebook.com
     whatsapp:
       wabaId: "${WATS_WABA_ID_FROM_ENV_OR_SECRET_STORE}"
@@ -4359,7 +4392,7 @@ import { GraphClient, sendMessage } from "@wats/graph";
 
 const client = new GraphClient({
   accessToken: process.env.WATS_TOKEN!,
-  apiVersion: "v25.0"
+  apiVersion: "v27.0"
 });
 
 const result = await sendMessage(
@@ -4429,7 +4462,7 @@ export const getAnalytics = defineEndpoint<
 // call it:
 const client = new GraphClient({
   accessToken: "…",
-  apiVersion: "v25.0"
+  apiVersion: "v27.0"
 });
 const report = await getAnalytics(client, {
   businessId: "987654321",
@@ -5402,7 +5435,7 @@ import { createFetchTransport } from "@wats/graph";
 
 const graphClient = new GraphClient({
   accessToken: process.env.WATS_ACCESS_TOKEN!,
-  apiVersion: "v25.0",
+  apiVersion: "v27.0",
   transport: createFetchTransport()
 });
 
@@ -5936,7 +5969,7 @@ const listPhoneNumbers = defineEndpoint<
 
 const client = new GraphClient({
   accessToken: "...",
-  apiVersion: "v25.0"
+  apiVersion: "v27.0"
 });
 
 // 2. Stream items one at a time (recommended for large result sets).
@@ -6566,7 +6599,7 @@ import {
 
 const graphClient = new GraphClient({
   accessToken: process.env.WHATSAPP_TOKEN!,
-  apiVersion: "v25.0"
+  apiVersion: "v27.0"
 });
 
 const phone = new PhoneNumberClient({

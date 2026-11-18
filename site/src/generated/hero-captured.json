@@ -1,6 +1,6 @@
 {
   "method": "POST",
-  "url": "https://graph.facebook.com/v25.0/1234567890/messages",
+  "url": "https://graph.facebook.com/v27.0/1234567890/messages",
   "headers": {
     "content-type": "application/json",
     "authorization": "Bearer demo-token"
