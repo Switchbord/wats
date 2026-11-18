@@ -105,18 +105,18 @@ jobs:
       - name: Build dist artifacts
         run: bun run build:packages
 
-      - name: Configure npm registry (OIDC, no static token)
-        run: |
-          # With npm org OIDC trust configured, npm publish --provenance uses
-          # GitHub's OIDC token exchange at publish time. No NPM_TOKEN secret is
-          # used on the preferred path. If a long-lived NPM_TOKEN fallback is
-          # configured in the protected environment, npm reads it from the env;
-          # do not echo it.
-          echo "registry=https://registry.npmjs.org/" >> "$HOME/.npmrc"
-
       - name: Publish packages in dependency order with provenance
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
+          export NPM_CONFIG_USERCONFIG="$RUNNER_TEMP/wats-publish.npmrc"
+          trap 'rm -f "$NPM_CONFIG_USERCONFIG"' EXIT
+          umask 077
+          echo 'registry=https://registry.npmjs.org/' > "$NPM_CONFIG_USERCONFIG"
+          if [[ -n "$NPM_TOKEN" ]]; then
+            echo '//registry.npmjs.org/:_authToken=${NPM_TOKEN}' >> "$NPM_CONFIG_USERCONFIG"
+          fi
           for pkg in types crypto graph core http internal-utils config persistence service cli; do
             echo "Publishing @wats/$pkg@$RELEASE_VERSION with provenance"
             (cd "packages/$pkg" && npm publish --provenance --access public --tag "$RELEASE_DIST_TAG")
